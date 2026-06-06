@@ -9,6 +9,10 @@ final class PingManager: ObservableObject {
 
     @Published var pendingPing: ReceivedPing?
     @Published var isSending   = false
+    /// "Mum felt your thought ✓" — set when a sent ping gets opened remotely.
+    @Published var feltNotice: String?
+    /// "Mum is pointing toward you 🧭" — their compass just locked onto us.
+    @Published var pointingNotice: String?
 
     private let networkService: NetworkServiceProtocol
 
@@ -16,6 +20,7 @@ final class PingManager: ObservableObject {
         let fromName:  String
         let emoji:     String
         let timestamp: Date
+        var remoteID:  UUID? = nil   // Supabase ping id, for read receipts
     }
 
     init(networkService: NetworkServiceProtocol) {
@@ -30,8 +35,27 @@ final class PingManager: ObservableObject {
         HapticEngine.pingSent()
     }
 
-    func receivePing(fromName: String, emoji: String) {
-        let ping = ReceivedPing(fromName: fromName, emoji: emoji, timestamp: .now)
+    func showFelt(name: String) {
+        feltNotice = "\(name) felt your thought ✓"
+        Task {
+            try? await Task.sleep(nanoseconds: 3_500_000_000)
+            feltNotice = nil
+        }
+    }
+
+    /// Gentle "they're pointing at you" moment — soft double haptic, 4s toast.
+    func showPointing(name: String) {
+        guard UserDefaults.standard.object(forKey: "notifyPointing") as? Bool ?? true else { return }
+        pointingNotice = "\(name) is pointing toward you"
+        HapticEngine.pingReceived()
+        Task {
+            try? await Task.sleep(nanoseconds: 4_000_000_000)
+            pointingNotice = nil
+        }
+    }
+
+    func receivePing(fromName: String, emoji: String, remoteID: UUID? = nil) {
+        let ping = ReceivedPing(fromName: fromName, emoji: emoji, timestamp: .now, remoteID: remoteID)
         pendingPing = ping
         AppGroupStore.pendingPingEmoji     = emoji
         AppGroupStore.pendingPingFromName  = fromName

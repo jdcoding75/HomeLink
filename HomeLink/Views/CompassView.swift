@@ -62,12 +62,12 @@ struct CompassView: View {
 
                     // ── Compass face — the hero of the screen ────────────────
                     // Skins render at a fixed 240pt design size; scale the whole
-                    // composition so every face grows together. 350pt face —
-                    // dominates the screen while name and distance stay visible.
+                    // composition so every face grows together. 370pt — near
+                    // edge-to-edge, matching the Send a Thought immersion.
                     compassFace
                         .frame(width: 240, height: 240)
-                        .scaleEffect(350.0 / 240.0)
-                        .frame(width: 350, height: 350)
+                        .scaleEffect(370.0 / 240.0)
+                        .frame(width: 370, height: 370)
 
                     // ── Lock badge ───────────────────────────────────────────
                     lockBadge
@@ -87,7 +87,31 @@ struct CompassView: View {
                 }
                 .transition(.scale(scale: 0.1).combined(with: .opacity))
             }
+
+            // ── Pointing toast — quieter than a ping: just a compass whisper ──
+            if let notice = pings.pointingNotice {
+                VStack {
+                    HStack(spacing: 7) {
+                        Text("🧭").font(.system(size: 14))
+                        Text(notice)
+                            .font(.system(size: 13, design: .serif).italic())
+                            .foregroundColor(DesignTokens.Color.textPrimary)
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
+                    .background(
+                        Capsule()
+                            .fill(DesignTokens.Color.backgroundLift.opacity(0.95))
+                            .overlay(Capsule().stroke(DesignTokens.Color.accentMid.opacity(0.5), lineWidth: 1))
+                    )
+                    .shadow(color: Color(hex: "#9b7fc0").opacity(0.3), radius: 10)
+                    .padding(.top, 14)
+                    Spacer()
+                }
+                .transition(.opacity.combined(with: .move(edge: .top)))
+            }
         }
+        .animation(.easeInOut(duration: 0.45), value: pings.pointingNotice)
         // ── Reactions to state changes ────────────────────────────────────────
         .onChange(of: compass.state.isLocked)        { _, locked in handleLock(locked) }
         .onChange(of: compass.state.personID)        { _, _      in handlePersonChange() }
@@ -140,7 +164,7 @@ struct CompassView: View {
             }
 
             Text("your compass is waiting")
-                .font(DesignTokens.Font.compassName)
+                .font(.system(size: 26, weight: .semibold, design: .serif))
                 .foregroundColor(DesignTokens.Color.textPrimary)
                 .padding(.bottom, 6)
 
@@ -150,7 +174,7 @@ struct CompassView: View {
                 .padding(.bottom, 10)
 
             Text("Love has a direction.")
-                .font(.system(size: 13).italic())
+                .font(.system(size: 14, design: .serif).italic())
                 .foregroundColor(DesignTokens.Color.accentMid)
                 .padding(.bottom, 28)
 
@@ -175,30 +199,34 @@ struct CompassView: View {
 
     private var personHeader: some View {
         VStack(spacing: 4) {
+            // Warm Editorial: refined overline with generous tracking
             Text("pointing toward")
-                .font(DesignTokens.Font.overline)
+                .font(.system(size: 11, weight: .medium))
+                .kerning(2.5)
                 .foregroundColor(DesignTokens.Color.textMuted)
 
-            // Name crossfades on person switch — never snaps
+            // The name — a dedication in a book. Serif, larger, crossfades.
             Text(compass.state.personName)
-                .font(DesignTokens.Font.compassName)
+                .font(.system(size: 30, weight: .semibold, design: .serif))
                 .foregroundColor(DesignTokens.Color.textPrimary)
                 .contentTransition(.opacity)
                 .animation(.easeInOut(duration: 0.35), value: compass.state.personName)
 
-            Text(compass.state.formattedDistance)
-                .font(DesignTokens.Font.compassDistance)
+            // Functional data: clean sans, light, dot-separated with direction
+            Text("\(compass.state.formattedDistance) · \(BearingCalculator.cardinalDirection(compass.state.bearingDegrees))")
+                .font(.system(size: 15, weight: .light))
                 .foregroundColor(DesignTokens.Color.textSecondary)
+                .monospacedDigit()
 
             // Below the numbers, exactly one idea at a time:
             //   custom tagline → ONLY the tagline (it always takes priority)
             //   no tagline     → emotional distance (+ "far from home" if > 500 km)
             Group {
                 if hasCustomTagline {
-                    // Custom tagline — fades out, then the new one fades in
+                    // Custom tagline — warm serif italic, fades out then in
                     // on person switch
                     Text(compass.state.resolvedTagline)
-                        .font(.system(size: 13).italic())
+                        .font(.system(size: 15, design: .serif).italic())
                         .foregroundColor(DesignTokens.Color.accentMid)
                         .multilineTextAlignment(.center)
                         .padding(.horizontal, DesignTokens.Spacing.xl)
@@ -211,12 +239,12 @@ struct CompassView: View {
                     VStack(spacing: 2) {
                         if compass.state.isFarFromHome {
                             Text("far from home")
-                                .font(DesignTokens.Font.caption)
+                                .font(.system(size: 12, design: .serif).italic())
                                 .foregroundColor(Color(hex: "#c4845a"))
                                 .transition(.opacity)
                         }
                         Text(BearingCalculator.emotionalDistance(compass.state.distanceKm))
-                            .font(.system(size: 12).italic())
+                            .font(.system(size: 13, design: .serif).italic())
                             .foregroundColor(DesignTokens.Color.textMuted)
                             .contentTransition(.opacity)
                     }
@@ -413,6 +441,10 @@ struct CompassView: View {
     }
 
     private func dismissPingOverlay() {
+        // Read receipt — tell the sender their thought was felt
+        if let remoteID = pings.pendingPing?.remoteID {
+            Task { await SupabaseService.shared.markPingOpened(remoteID) }
+        }
         withAnimation(AnimationSystem.softAppear) {
             pingOverlayVisible = false
             pingRingActive     = false

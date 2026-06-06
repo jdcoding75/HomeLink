@@ -21,6 +21,7 @@ struct AccountView: View {
     @State private var errorMessage: String?
     @State private var currentNonce       = ""
     @State private var showCelebration   = false
+    @State private var showCopied        = false
 
     var body: some View {
         ZStack {
@@ -134,29 +135,75 @@ struct AccountView: View {
 
     // MARK: - Pairing
 
+    /// "POINT-GP2S" displayed as "POINT · GP2S".
+    private var displayCode: String {
+        pairingCode.replacingOccurrences(of: "-", with: " · ")
+    }
+
     private var pairingSection: some View {
         VStack(spacing: 22) {
-            // Your code
-            VStack(spacing: 8) {
-                Text("YOUR CODE")
-                    .font(.system(size: 11, weight: .medium))
-                    .kerning(2)
-                    .foregroundColor(DesignTokens.Color.textMuted)
-                Text(pairingCode.isEmpty ? "· · · · · ·" : pairingCode)
-                    .font(.system(size: 30, weight: .semibold, design: .monospaced))
-                    .foregroundColor(DesignTokens.Color.accentSoft)
-                Text("share it with the person you point toward")
-                    .font(.system(size: 11))
-                    .foregroundColor(DesignTokens.Color.textDim)
+            // Your code — a large styled monospace block; tap anywhere to copy
+            Button {
+                guard !pairingCode.isEmpty else { return }
+                UIPasteboard.general.string = pairingCode
+                HapticEngine.personSelected()
+                withAnimation(.easeOut(duration: 0.25)) { showCopied = true }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                    withAnimation(.easeOut(duration: 0.4)) { showCopied = false }
+                }
+            } label: {
+                VStack(spacing: 10) {
+                    Text("YOUR CODE")
+                        .font(.system(size: 11, weight: .medium))
+                        .kerning(2.5)
+                        .foregroundColor(DesignTokens.Color.textMuted)
+                    Text(pairingCode.isEmpty ? "· · · · ·" : displayCode)
+                        .font(.system(size: 34, weight: .semibold, design: .monospaced))
+                        .kerning(1)
+                        .foregroundColor(DesignTokens.Color.accentSoft)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
+                    Text(showCopied ? "copied! ✓" : "tap to copy")
+                        .font(.system(size: 11))
+                        .foregroundColor(showCopied ? Color(hex: "#5dcaa5")
+                                                    : DesignTokens.Color.textDim)
+                        .contentTransition(.opacity)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 24)
+                .background(
+                    LinearGradient(
+                        colors: [Color(hex: "#241b33"), Color(hex: "#171120")],
+                        startPoint: .topLeading, endPoint: .bottomTrailing
+                    )
+                )
+                .cornerRadius(DesignTokens.Radius.card)
+                .overlay(
+                    RoundedRectangle(cornerRadius: DesignTokens.Radius.card)
+                        .stroke(DesignTokens.Color.accentMid.opacity(0.5), lineWidth: 1)
+                )
             }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 20)
-            .background(DesignTokens.Color.backgroundCard)
-            .cornerRadius(DesignTokens.Radius.card)
-            .overlay(
-                RoundedRectangle(cornerRadius: DesignTokens.Radius.card)
-                    .stroke(DesignTokens.Color.border, lineWidth: 1)
-            )
+            .buttonStyle(.plain)
+
+            // One tap to send them everything they need: link + your code
+            ShareLink(item: AppLinks.friendInvite(code: pairingCode)) {
+                HStack(spacing: 8) {
+                    Image(systemName: "square.and.arrow.up")
+                    Text("invite to pair")
+                }
+                .font(DesignTokens.Font.label)
+                .foregroundColor(DesignTokens.Color.textPrimary)
+                .frame(maxWidth: .infinity)
+                .padding(DesignTokens.Spacing.md)
+                .background(DesignTokens.Color.accentStrong)
+                .cornerRadius(DesignTokens.Radius.button)
+                .overlay(
+                    RoundedRectangle(cornerRadius: DesignTokens.Radius.button)
+                        .stroke(DesignTokens.Color.accentMid, lineWidth: 1)
+                )
+            }
+            .disabled(pairingCode.isEmpty)
+            .opacity(pairingCode.isEmpty ? 0.4 : 1)
 
             // Connection state / redeem
             if friendID != nil {

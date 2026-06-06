@@ -42,6 +42,8 @@ final class SupabaseService: ObservableObject {
     }()
 
     private var realtimeChannel: RealtimeChannelV2?
+    private var feltChannel: RealtimeChannelV2?
+    private var pointingChannel: RealtimeChannelV2?
 
     // MARK: - Auth (Apple Sign In)
 
@@ -232,9 +234,7 @@ final class SupabaseService: ObservableObject {
 
     // MARK: - Pings
 
-    /// Row shape for the `pings` table (create in the Supabase dashboard):
-    ///   id uuid default gen_random_uuid() · from_user uuid · to_user uuid
-    ///   emoji text · created_at timestamptz default now()
+    /// Insert shape for the `pings` table.
     struct PingPayload: Codable {
         let fromUser: UUID
         let toUser: UUID
@@ -244,6 +244,42 @@ final class SupabaseService: ObservableObject {
             case fromUser = "from_user"
             case toUser   = "to_user"
             case emoji
+        }
+    }
+
+    /// Realtime event shape (decoded with a plain JSONDecoder — dates as strings).
+    struct PingEvent: Codable {
+        let id: UUID?
+        let fromUser: UUID
+        let toUser: UUID
+        let emoji: String
+        let openedAt: String?
+
+        enum CodingKeys: String, CodingKey {
+            case id
+            case fromUser = "from_user"
+            case toUser   = "to_user"
+            case emoji
+            case openedAt = "opened_at"
+        }
+    }
+
+    /// Full row for ping history (decoded by PostgREST's date-aware decoder).
+    struct PingRecord: Codable, Identifiable {
+        let id: UUID
+        let fromUser: UUID
+        let toUser: UUID
+        let emoji: String
+        let createdAt: Date
+        let openedAt: Date?
+
+        enum CodingKeys: String, CodingKey {
+            case id
+            case fromUser  = "from_user"
+            case toUser    = "to_user"
+            case emoji
+            case createdAt = "created_at"
+            case openedAt  = "opened_at"
         }
     }
 
@@ -259,7 +295,7 @@ final class SupabaseService: ObservableObject {
 
     /// Subscribe to pings addressed to the signed-in user. The handler fires
     /// on every realtime insert until `stopListening()` is called.
-    func startListeningForPings(onReceive: @escaping (PingPayload) -> Void) async {
+    func startListeningForPings(onReceive: @escaping (PingEvent) -> Void) async {
         guard let client, let me = await currentUserID else { return }
 
         let channel = client.channel("incoming-pings")
@@ -275,14 +311,146 @@ final class SupabaseService: ObservableObject {
         await channel.subscribe()
 
         for await insert in inserts {
-            if let ping: PingPayload = try? insert.decodeRecord(decoder: JSONDecoder()) {
+            if let ping: PingEvent = try? insert.decodeRecord(decoder: JSONDecoder()) {
                 onReceive(ping)
+            }
+        }
+    }
+
+    /// Felt receipts: fires when a ping WE sent gets opened by the recipient.
+    func startListeningForFeltReceipts(onFelt: @escaping (PingEvent) -> Void) async {
+        guard let client, let me = await currentUserID else { return }
+
+        let channel = client.channel("felt-receipts")
+        feltChannel = channel
+
+        let updates = channel.postgresChange(
+            UpdateAction.self,
+            schema: "public",
+            table: "pings",
+            filter: "from_user=eq.\(me.uuidString)"
+        )
+
+        await channel.subscribe()
+
+        for await update in updates {
+            if let ping: PingEvent = try? update.decodeRecord(decoder: JSONDecoder()),
+               ping.openedAt != nil {
+                onFelt(ping)
             }
         }
     }
 
     func stopListening() async {
         await realtimeChannel?.unsubscribe()
+        await feltChannel?.unsubscribe()
         realtimeChannel = nil
+        feltChannel = nil
+    }
+
+    /// Read receipt: the recipient marks a ping as opened/felt.
+    func markPingOpened(_ id: UUID) async {
+        guard let client else { return }
+        _ = try? await client
+            .from("pings")
+            .update(["opened_at": ISO8601DateFormatter().string(from: .now)])
+            .eq("id", value: id.uuidString)
+            .execute()
+    }
+
+    /// All pings between me and one partner, newest first (ping history).
+    func fetchPings(with partner: UUID) async -> [PingRecord] {
+        guard let client, let me = await currentUserID else { return [] }
+        let a = me.uuidString, b = partner.uuidString
+        let rows: [PingRecord]? = try? await client
+            .from("pings")
+            .select()
+            .or("and(from_user.eq.\(a),to_user.eq.\(b)),and(from_user.eq.\(b),to_user.eq.\(a))")
+            .order("created_at", ascending: false)
+            .execute().value
+        return rows ?? []
+    }
+
+    // MARK: - Pointing (compass locked on them)
+
+    /// Report that our compass just locked onto the paired person.
+    /// Written only on lock edges (throttled by the caller) — never per heading.
+    func reportPointing(bearing: Double) async {
+        guard let client, let me = await currentUserID else { return }
+        struct Row: Codable {
+            let userID: UUID
+            let bearing: Double
+            let updatedAt: String
+            enum CodingKeys: String, CodingKey {
+                case userID    = "user_id"
+                case bearing
+                case updatedAt = "updated_at"
+            }
+        }
+        _ = try? await client
+            .from("compass_bearings")
+            .upsert(Row(userID: me, bearing: bearing,
+                        updatedAt: ISO8601DateFormatter().string(from: .now)))
+            .execute()
+    }
+
+    /// The "notify me when someone points toward me" preference, server-side
+    /// so the push Edge Function can respect it even when the app is closed.
+    func setNotifyPointing(_ enabled: Bool) async {
+        guard let client, let me = await currentUserID else { return }
+        _ = try? await client
+            .from("users")
+            .update(["notify_pointing": enabled])
+            .eq("id", value: me.uuidString)
+            .execute()
+    }
+
+    /// Fires whenever the paired partner's compass locks onto us (in-app path;
+    /// closed-app delivery comes via push).
+    func startListeningForPointing(partner: UUID, onPointed: @escaping () -> Void) async {
+        guard let client, await currentUserID != nil else { return }
+
+        let channel = client.channel("pointing")
+        pointingChannel = channel
+
+        let changes = channel.postgresChange(
+            AnyAction.self,
+            schema: "public",
+            table: "compass_bearings",
+            filter: "user_id=eq.\(partner.uuidString)"
+        )
+
+        await channel.subscribe()
+
+        for await _ in changes {
+            onPointed()
+        }
+    }
+
+    // MARK: - Presence (last seen)
+
+    /// Stamp our presence — called on every app open.
+    func touchLastSeen() async {
+        guard let client, let me = await currentUserID else { return }
+        _ = try? await client
+            .from("users")
+            .update(["last_seen": ISO8601DateFormatter().string(from: .now)])
+            .eq("id", value: me.uuidString)
+            .execute()
+    }
+
+    /// A partner's last_seen, for "active recently / last seen 2 hours ago".
+    func fetchLastSeen(of user: UUID) async -> Date? {
+        struct Row: Codable {
+            let lastSeen: Date?
+            enum CodingKeys: String, CodingKey { case lastSeen = "last_seen" }
+        }
+        guard let client else { return nil }
+        let rows: [Row]? = try? await client
+            .from("users")
+            .select("last_seen")
+            .eq("id", value: user.uuidString)
+            .execute().value
+        return rows?.first?.lastSeen
     }
 }

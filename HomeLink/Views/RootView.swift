@@ -60,17 +60,42 @@ struct RootView: View {
     }
 
     /// Phase 2: live pings over Supabase realtime → the existing in-app
-    /// ping animation. No-op until the user is signed in.
+    /// ping animation, plus felt receipts and presence. No-op when signed out.
     private func startRealtimePings() {
         guard SupabaseService.localUserID != nil else { return }
+        Task { await SupabaseService.shared.touchLastSeen() }   // "active recently"
         Task {
-            await SupabaseService.shared.startListeningForPings { payload in
+            await SupabaseService.shared.startListeningForPings { event in
                 Task { @MainActor in
                     // Name the sender if they match a saved person, else stay warm
                     let fromName = people.people.first {
-                        $0.pairedUserID == payload.fromUser.uuidString
+                        $0.pairedUserID == event.fromUser.uuidString
                     }?.name ?? "someone who loves you"
-                    pings.receivePing(fromName: fromName, emoji: payload.emoji)
+                    pings.receivePing(fromName: fromName, emoji: event.emoji,
+                                      remoteID: event.id)
+                }
+            }
+        }
+        Task {
+            await SupabaseService.shared.startListeningForFeltReceipts { event in
+                Task { @MainActor in
+                    let name = people.people.first {
+                        $0.pairedUserID == event.toUser.uuidString
+                    }?.name ?? people.selectedPerson?.name ?? "they"
+                    pings.showFelt(name: name)
+                }
+            }
+        }
+        // "[name] is pointing toward you 🧭" — their compass locked onto us
+        if let partner = SupabaseService.connectedFriendID {
+            Task {
+                await SupabaseService.shared.startListeningForPointing(partner: partner) {
+                    Task { @MainActor in
+                        let name = people.people.first {
+                            $0.pairedUserID == partner.uuidString
+                        }?.name ?? "someone"
+                        pings.showPointing(name: name)
+                    }
                 }
             }
         }

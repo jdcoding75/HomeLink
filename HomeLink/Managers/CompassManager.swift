@@ -18,6 +18,7 @@ final class CompassManager: NSObject, ObservableObject {
     private var currentHeading: Double = 0
     private var targetPerson: Person?
     private var wasLocked = false
+    private var lastPointingReport: Date = .distantPast   // throttle bearing writes
     private let lockThresholdDegrees: Double  = 5.0
     private let farFromHomeThresholdKm: Double = 500.0
 
@@ -81,6 +82,17 @@ final class CompassManager: NSObject, ObservableObject {
         return skinStore.activeSkin
     }
 
+    /// Lock-edge only, paired-person only, at most once a minute — tells the
+    /// backend "I'm actively pointing at them" so they can be gently notified.
+    private func reportPointingIfNeeded(target: Person, bearing: Double) {
+        guard let friend = SupabaseService.connectedFriendID,
+              target.pairedUserID == friend.uuidString,
+              Date.now.timeIntervalSince(lastPointingReport) > 60
+        else { return }
+        lastPointingReport = .now
+        Task { await SupabaseService.shared.reportPointing(bearing: bearing) }
+    }
+
     func stop() {
         locationManager.stopUpdatingLocation()
         locationManager.stopUpdatingHeading()
@@ -111,7 +123,10 @@ final class CompassManager: NSObject, ObservableObject {
             .truncatingRemainder(dividingBy: 360)
         let bearingDiff  = min(relativeBearing, 360 - relativeBearing)
         let isNowLocked  = bearingDiff <= lockThresholdDegrees
-        if isNowLocked && !wasLocked { HapticEngine.connectionFelt() }
+        if isNowLocked && !wasLocked {
+            HapticEngine.connectionFelt()
+            reportPointingIfNeeded(target: target, bearing: rawBearing)
+        }
         wasLocked = isNowLocked
         let activeSkin = resolvedSkin(for: target)
         state = CompassState(

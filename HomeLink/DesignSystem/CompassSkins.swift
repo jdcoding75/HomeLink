@@ -15,12 +15,12 @@ enum CompassSkin: String, CaseIterable, Identifiable {
 
     var displayName: String {
         switch self {
-        case .minimal:   return "minimal"
-        case .classic:   return "classic rose"
-        case .heart:     return "heart compass"
-        case .celestial: return "celestial"
-        case .vintage:   return "vintage brass"
-        case .aurora:    return "aurora"
+        case .minimal:   return "Minimal"
+        case .classic:   return "Classic Rose"
+        case .heart:     return "Heart Compass"
+        case .celestial: return "Celestial"
+        case .vintage:   return "Vintage Brass"
+        case .aurora:    return "Aurora"
         }
     }
 

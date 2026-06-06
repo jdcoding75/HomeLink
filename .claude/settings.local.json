@@ -34,7 +34,9 @@
       "Read(//Users/john/Downloads/**)",
       "Read(//Users/john/Documents/**)",
       "Bash(unset SUPABASE_ACCESS_TOKEN)",
-      "Bash(supabase secrets *)"
+      "Bash(supabase secrets *)",
+      "Bash(curl -s -X POST https://api.supabase.com/v1/projects/jlbgdlgwtrkmqcfnomlr/database/query -H 'Authorization: Bearer sbp_70bc1f753f19d34c9009a4e10ad2e65567d4b4f5' -H 'Content-Type: application/json' -d '{\"query\": \"alter table public.users add column if not exists last_seen timestamptz default now\\(\\); alter table public.pings add column if not exists opened_at timestamptz; drop policy if exists \\\\\"pings mark felt\\\\\" on public.pings; create policy \\\\\"pings mark felt\\\\\" on public.pings for update using \\(auth.uid\\(\\) = to_user\\) with check \\(auth.uid\\(\\) = to_user\\); select column_name from information_schema.columns where table_schema='\\\\''public'\\\\'' and table_name in \\('\\\\''users'\\\\'','\\\\''pings'\\\\''\\) and column_name in \\('\\\\''last_seen'\\\\'','\\\\''opened_at'\\\\''\\);\"}')",
+      "Bash(curl *)"
     ]
   }
 }

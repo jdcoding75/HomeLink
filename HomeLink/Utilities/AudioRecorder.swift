@@ -1,82 +1,114 @@
 // AudioRecorder.swift
 // Pointward › Utilities
 //
-// Personal sound recording for "send a thought":
+// "Create your own" thoughts:
+//   • CustomThought / CustomThoughtStore — up to five user-created thoughts,
+//     each an emoji + optional name + a sound (own recording OR a preset
+//     voice from SoundEngine). Index and recordings persist in the
+//     documents directory across launches.
 //   • AudioRecorder — records up to 3 seconds to a temp .m4a via
 //     AVAudioRecorder, with live metering for the waveform display.
-//   • CustomSoundStore — persists up to two saved recordings (documents
-//     directory) plus the emoji each one wears; survives app launches.
 
 import Foundation
 import AVFoundation
 import Combine
 
-// MARK: - Custom sound slots
+// MARK: - Custom thoughts
 
-struct CustomSound: Codable, Equatable {
+struct CustomThought: Codable, Equatable, Identifiable {
+    enum SoundKind: Codable, Equatable {
+        case recording          // audio file named custom-<id>.m4a
+        case preset(String)     // a SoundEngine emoji token, e.g. "💜"
+    }
+
+    var id    = UUID()
     var emoji: String
-    var fileName: String
+    var name:  String?
+    var sound: SoundKind
 }
 
-/// Up to two user-recorded sounds. Files live in the documents directory as
-/// custom-sound-<slot>.m4a; slot metadata (emoji + file name) in UserDefaults.
-final class CustomSoundStore: ObservableObject {
+/// Up to five user-created thoughts, persisted as JSON in the documents
+/// directory (alongside their .m4a recordings).
+final class CustomThoughtStore: ObservableObject {
 
-    @Published private(set) var slots: [CustomSound?] = [nil, nil]
+    static let maxCount = 5
+
+    @Published private(set) var thoughts: [CustomThought] = []
 
     private var player: AVAudioPlayer?
-    private static let defaultsKey = "customSounds"
+
+    private static var docs: URL {
+        FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+    }
+    private static var indexURL: URL { docs.appendingPathComponent("custom-thoughts.json") }
+
+    static func soundURL(for id: UUID) -> URL {
+        docs.appendingPathComponent("custom-\(id.uuidString).m4a")
+    }
 
     init() { load() }
 
-    static func url(forSlot slot: Int) -> URL {
-        FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("custom-sound-\(slot).m4a")
+    var isFull: Bool { thoughts.count >= Self.maxCount }
+
+    func thought(id: UUID) -> CustomThought? {
+        thoughts.first { $0.id == id }
     }
 
-    func sound(at slot: Int) -> CustomSound? {
-        guard slots.indices.contains(slot) else { return nil }
-        return slots[slot]
-    }
-
-    func save(emoji: String, slot: Int) {
-        guard slots.indices.contains(slot) else { return }
-        slots[slot] = CustomSound(emoji: emoji, fileName: "custom-sound-\(slot).m4a")
+    func add(_ thought: CustomThought) {
+        guard !isFull else { return }
+        thoughts.append(thought)
         persist()
     }
 
-    /// Plays the slot's saved recording (used during the send animation).
-    func play(slot: Int) {
-        guard sound(at: slot) != nil else { return }
-        player = try? AVAudioPlayer(contentsOf: Self.url(forSlot: slot))
-        player?.volume = UserDefaults.standard.bool(forKey: "quietMode") ? 0.4 : 1.0
-        player?.play()
+    func update(_ thought: CustomThought) {
+        guard let index = thoughts.firstIndex(where: { $0.id == thought.id }) else { return }
+        thoughts[index] = thought
+        persist()
+    }
+
+    func remove(id: UUID) {
+        thoughts.removeAll { $0.id == id }
+        try? FileManager.default.removeItem(at: Self.soundURL(for: id))
+        persist()
+    }
+
+    /// Play a thought's sound — the user's recording, or its preset voice.
+    func play(_ thought: CustomThought) {
+        switch thought.sound {
+        case .preset(let token):
+            SoundEngine.shared.play(for: token)
+        case .recording:
+            player = try? AVAudioPlayer(contentsOf: Self.soundURL(for: thought.id))
+            player?.volume = UserDefaults.standard.bool(forKey: "quietMode") ? 0.4 : 1.0
+            player?.play()
+        }
     }
 
     private func persist() {
-        if let data = try? JSONEncoder().encode(slots) {
-            UserDefaults.standard.set(data, forKey: Self.defaultsKey)
+        if let data = try? JSONEncoder().encode(thoughts) {
+            try? data.write(to: Self.indexURL)
         }
     }
 
     private func load() {
-        guard let data = UserDefaults.standard.data(forKey: Self.defaultsKey),
-              let decoded = try? JSONDecoder().decode([CustomSound?].self, from: data),
-              decoded.count == 2 else { return }
-        // Only trust slots whose audio file actually exists
-        slots = decoded.enumerated().map { idx, sound in
-            guard sound != nil,
-                  FileManager.default.fileExists(atPath: Self.url(forSlot: idx).path)
-            else { return nil }
-            return sound
+        guard let data = try? Data(contentsOf: Self.indexURL),
+              let decoded = try? JSONDecoder().decode([CustomThought].self, from: data)
+        else { return }
+        // Drop any recording-thoughts whose audio file has vanished
+        thoughts = decoded.filter { thought in
+            if case .recording = thought.sound {
+                return FileManager.default.fileExists(
+                    atPath: Self.soundURL(for: thought.id).path)
+            }
+            return true
         }
     }
 }
 
 // MARK: - Recorder
 
-/// Records a single take (max 3 s) to a temp file; the recording sheet
-/// previews it and saves it into a CustomSoundStore slot.
+/// Records a single take (max 3 s) to a temp file; the creation sheet
+/// previews it and saves it into a CustomThought.
 final class AudioRecorder: NSObject, ObservableObject, AVAudioRecorderDelegate {
 
     @Published var isRecording  = false
@@ -143,7 +175,7 @@ final class AudioRecorder: NSObject, ObservableObject, AVAudioRecorderDelegate {
         meterTimer?.invalidate()
         meterTimer   = nil
         isRecording  = false
-        hasRecording = flag
+        hasRecording = flag && FileManager.default.fileExists(atPath: tempURL.path)
         // Hand the session back to playback-friendly ambient
         try? AVAudioSession.sharedInstance().setCategory(.ambient, options: [.mixWithOthers])
     }
@@ -163,11 +195,22 @@ final class AudioRecorder: NSObject, ObservableObject, AVAudioRecorderDelegate {
         elapsed      = 0
     }
 
-    /// Copies the temp take into the slot's permanent file. True on success.
+    /// Copies the temp take to a permanent location. Stops a still-running
+    /// recording first and verifies the file actually landed — the previous
+    /// version could silently fail when tapped mid-recording.
     @discardableResult
-    func saveTake(toSlot slot: Int) -> Bool {
-        let dest = CustomSoundStore.url(forSlot: slot)
-        try? FileManager.default.removeItem(at: dest)
-        return (try? FileManager.default.copyItem(at: tempURL, to: dest)) != nil
+    func saveTake(to destination: URL) -> Bool {
+        if isRecording {
+            recorder?.stop()
+            isRecording = false
+        }
+        guard FileManager.default.fileExists(atPath: tempURL.path) else { return false }
+        try? FileManager.default.removeItem(at: destination)
+        do {
+            try FileManager.default.copyItem(at: tempURL, to: destination)
+            return FileManager.default.fileExists(atPath: destination.path)
+        } catch {
+            return false
+        }
     }
 }

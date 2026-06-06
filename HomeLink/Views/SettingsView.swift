@@ -14,6 +14,8 @@ struct SettingsView: View {
     @AppStorage("hapticsEnabled") private var hapticsEnabled = true
     // Distance units — defaults to the locale's measurement system, user can override
     @AppStorage("useMiles") private var useMiles = Locale.current.measurementSystem == .us
+    @AppStorage("lockScreenWidgetEnabled") private var lockScreenWidget = false
+    @AppStorage("notifyPointing") private var notifyPointing = true
 
     @State private var showSkinPicker = false
     @State private var showAbout      = false
@@ -29,6 +31,9 @@ struct SettingsView: View {
                         sectionHeader("unlock")
                         unlockSection
                     }
+
+                    sectionHeader("invite")
+                    inviteSection
 
                     sectionHeader("account")
                     accountSection
@@ -60,6 +65,34 @@ struct SettingsView: View {
         }
         .sheet(isPresented: $showAccount) {
             AccountView()
+        }
+    }
+
+    // MARK: - Invite
+
+    private var inviteSection: some View {
+        settingsGroup {
+            ShareLink(item: AppLinks.inviteMessage(pairingCode: SupabaseService.localPairingCode)) {
+                settingsRow {
+                    Image(systemName: "square.and.arrow.up.circle.fill")
+                        .font(.system(size: 24))
+                        .foregroundColor(DesignTokens.Color.accentSoft)
+                        .frame(width: 26, height: 26)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("invite a friend")
+                            .settingsLabel()
+                        Text(SupabaseService.localPairingCode != nil
+                             ? "sends the TestFlight link + your pairing code"
+                             : "sends the TestFlight link")
+                            .font(.system(size: 11))
+                            .foregroundColor(DesignTokens.Color.textDim)
+                    }
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 12))
+                        .foregroundColor(DesignTokens.Color.textDim)
+                }
+            }
         }
     }
 
@@ -177,6 +210,56 @@ struct SettingsView: View {
                     .tint(DesignTokens.Color.accentMid)
                     .labelsHidden()
             }
+
+            Divider().background(DesignTokens.Color.border).padding(.leading, 44)
+
+            settingsRow {
+                Image(systemName: "location.north.line")
+                    .settingsIcon()
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("notify me when someone points toward me")
+                        .settingsLabel()
+                    Text("a quiet compass toast when their needle finds you")
+                        .font(.system(size: 11))
+                        .foregroundColor(DesignTokens.Color.textDim)
+                }
+                Spacer()
+                Toggle("", isOn: $notifyPointing)
+                    .tint(DesignTokens.Color.accentMid)
+                    .labelsHidden()
+                    .onChange(of: notifyPointing) { _, enabled in
+                        // Mirror server-side so closed-app pushes respect it too
+                        Task { await SupabaseService.shared.setNotifyPointing(enabled) }
+                    }
+            }
+
+            Divider().background(DesignTokens.Color.border).padding(.leading, 44)
+
+            settingsRow {
+                Image(systemName: "lock.iphone")
+                    .settingsIcon()
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("lock screen widget")
+                        .settingsLabel()
+                    if lockScreenWidget {
+                        Text("long press your lock screen to add")
+                            .font(.system(size: 11))
+                            .foregroundColor(DesignTokens.Color.textDim)
+                        Link("how to add a widget →",
+                             destination: URL(string: "https://support.apple.com/en-us/HT207122")!)
+                            .font(.system(size: 11))
+                            .foregroundColor(DesignTokens.Color.accentSoft)
+                    } else {
+                        Text("the needle, right above the clock")
+                            .font(.system(size: 11))
+                            .foregroundColor(DesignTokens.Color.textDim)
+                    }
+                }
+                Spacer()
+                Toggle("", isOn: $lockScreenWidget)
+                    .tint(DesignTokens.Color.accentMid)
+                    .labelsHidden()
+            }
         }
     }
 
@@ -232,7 +315,7 @@ struct SettingsView: View {
             Divider().background(DesignTokens.Color.border).padding(.leading, 44)
 
             // Tell someone you love about it
-            ShareLink(item: "I've been using Pointward - a compass that always points toward the people you love. Check it out: https://pointward.app") {
+            ShareLink(item: AppLinks.shareMessage) {
                 settingsRow {
                     Image(systemName: "square.and.arrow.up")
                         .settingsIcon()

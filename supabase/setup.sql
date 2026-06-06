@@ -5,8 +5,10 @@
 create table if not exists public.users (
   id            uuid primary key references auth.users(id) on delete cascade,
   apple_user_id text,
+  last_seen     timestamptz default now(),   -- presence: "active recently"
   created_at    timestamptz default now()
 );
+alter table public.users add column if not exists last_seen timestamptz default now();
 alter table public.users enable row level security;
 create policy "users insert self"  on public.users for insert with check (auth.uid() = id);
 create policy "users update self"  on public.users for update using (auth.uid() = id);
@@ -32,12 +34,16 @@ create table if not exists public.pings (
   from_user  uuid not null references public.users(id) on delete cascade,
   to_user    uuid not null references public.users(id) on delete cascade,
   emoji      text not null,
+  opened_at  timestamptz,                    -- read receipt ("felt ✓")
   created_at timestamptz default now()
 );
+alter table public.pings add column if not exists opened_at timestamptz;
 alter table public.pings enable row level security;
 create policy "pings send as self" on public.pings for insert with check (auth.uid() = from_user);
 create policy "pings read own"     on public.pings for select
   using (auth.uid() = to_user or auth.uid() = from_user);
+create policy "pings mark felt"    on public.pings for update
+  using (auth.uid() = to_user) with check (auth.uid() = to_user);
 
 -- Realtime: the app subscribes to inserts on pings
 alter publication supabase_realtime add table public.pings;

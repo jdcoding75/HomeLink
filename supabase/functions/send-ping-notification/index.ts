@@ -65,58 +65,97 @@ async function apnsJWT(): Promise<string> {
   return token;
 }
 
+async function sendPush(toUser: string, aps: Record<string, unknown>): Promise<Response> {
+  const { data: tokens, error } = await supabase
+    .from("device_tokens")
+    .select("token")
+    .eq("user_id", toUser);
+  if (error) throw error;
+  if (!tokens || tokens.length === 0) {
+    return new Response("no devices", { status: 200 });
+  }
+
+  const host = Deno.env.get("APNS_SANDBOX") === "true"
+    ? "https://api.sandbox.push.apple.com"
+    : "https://api.push.apple.com";
+  const topic = Deno.env.get("APNS_TOPIC")!;
+  const jwt = await apnsJWT();
+
+  const results = await Promise.all(
+    tokens.map((t) =>
+      fetch(`${host}/3/device/${t.token}`, {
+        method: "POST",
+        headers: {
+          "authorization": `bearer ${jwt}`,
+          "apns-topic": topic,
+          "apns-push-type": "alert",
+          "apns-priority": "10",
+        },
+        body: JSON.stringify(aps),
+      }).then((r) => r.status)
+    ),
+  );
+  return new Response(JSON.stringify({ sent: results }), { status: 200 });
+}
+
 Deno.serve(async (req) => {
   try {
     const payload = await req.json();
-    const ping = payload.record; // { from_user, to_user, emoji, ... }
-    if (!ping?.to_user) {
-      return new Response("no record", { status: 400 });
+    const record = payload.record;
+    if (!record) return new Response("no record", { status: 400 });
+
+    // ── Pointing: compass_bearings insert/update → notify the partner ──────
+    if (payload.table === "compass_bearings") {
+      const userId = record.user_id;
+      if (!userId) return new Response("no user", { status: 400 });
+
+      // Who are they paired with?
+      const { data: conns } = await supabase
+        .from("connections")
+        .select("owner, friend")
+        .or(`owner.eq.${userId},friend.eq.${userId}`);
+      const conn = conns?.find((c) => c.friend);
+      const partner = conn
+        ? (conn.owner === userId ? conn.friend : conn.owner)
+        : null;
+      if (!partner) return new Response("no partner", { status: 200 });
+
+      // Respect the recipient's "notify me when someone points toward me"
+      const { data: prefs } = await supabase
+        .from("users")
+        .select("notify_pointing")
+        .eq("id", partner)
+        .maybeSingle();
+      if (prefs && prefs.notify_pointing === false) {
+        return new Response("muted", { status: 200 });
+      }
+
+      return await sendPush(partner, {
+        aps: {
+          alert: {
+            title: "someone is pointing toward you 🧭",
+            body: "they're thinking of you",
+          },
+          sound: "default",
+        },
+        type: "pointing",
+        fromName: "someone",
+      });
     }
 
-    // Recipient's devices
-    const { data: tokens, error } = await supabase
-      .from("device_tokens")
-      .select("token")
-      .eq("user_id", ping.to_user);
-    if (error) throw error;
-    if (!tokens || tokens.length === 0) {
-      return new Response("no devices", { status: 200 });
-    }
-
-    const host = Deno.env.get("APNS_SANDBOX") === "true"
-      ? "https://api.sandbox.push.apple.com"
-      : "https://api.push.apple.com";
-    const topic = Deno.env.get("APNS_TOPIC")!;
-    const jwt = await apnsJWT();
-
-    const aps = {
+    // ── Pings: insert → notify the recipient ───────────────────────────────
+    if (!record.to_user) return new Response("no recipient", { status: 400 });
+    return await sendPush(record.to_user, {
       aps: {
         alert: {
-          title: ping.emoji ?? "💜",
+          title: record.emoji ?? "💜",
           body: "someone sent you a thought",
         },
         sound: "default",
       },
-      pingEmoji: ping.emoji ?? "💜",
+      pingEmoji: record.emoji ?? "💜",
       fromName: "someone who loves you",
-    };
-
-    const results = await Promise.all(
-      tokens.map((t) =>
-        fetch(`${host}/3/device/${t.token}`, {
-          method: "POST",
-          headers: {
-            "authorization": `bearer ${jwt}`,
-            "apns-topic": topic,
-            "apns-push-type": "alert",
-            "apns-priority": "10",
-          },
-          body: JSON.stringify(aps),
-        }).then((r) => r.status)
-      ),
-    );
-
-    return new Response(JSON.stringify({ sent: results }), { status: 200 });
+    });
   } catch (e) {
     return new Response(`error: ${e}`, { status: 500 });
   }

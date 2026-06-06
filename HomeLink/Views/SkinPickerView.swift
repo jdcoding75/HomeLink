@@ -101,18 +101,21 @@ struct SkinCard: View {
             .cornerRadius(12)
 
             Text(skin.displayName)
-                .font(.system(size: 13, weight: .medium))
+                .font(.system(size: 16, weight: .semibold, design: .serif))
                 .foregroundColor(DesignTokens.Color.textPrimary)
                 .lineLimit(1)
+                .minimumScaleFactor(0.85)
 
             Text(skin.description)
                 .font(.system(size: 11))
                 .foregroundColor(DesignTokens.Color.textMuted)
                 .multilineTextAlignment(.center)
                 .lineLimit(2)
-                .fixedSize(horizontal: false, vertical: true)
+                .frame(height: 28, alignment: .top)   // equal card heights
         }
-        .padding(12)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 14)
+        .frame(maxWidth: .infinity)
         .background(isSelected ? DesignTokens.Color.backgroundLift : DesignTokens.Color.backgroundCard)
         .cornerRadius(DesignTokens.Radius.card)
         .overlay(

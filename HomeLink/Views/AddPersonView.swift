@@ -697,36 +697,80 @@ enum GeocodeState: Equatable {
 
 struct EmojiPickerRow: View {
     @Binding var selected: String
+    @State private var customInput = ""
+    @FocusState private var customFocused: Bool
+
     private let options = ["🏠","💜","🌿","🌙","✨","🫂","🌸","☀️","🐾","🎸","⛺️","🌊"]
 
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 8) {
-                ForEach(options, id: \.self) { e in
-                    Button {
-                        withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
-                            selected = e
-                        }
-                    } label: {
-                        Text(e)
-                            .font(.system(size: 22))
-                            .frame(width: 46, height: 46)
-                            .background(selected == e
-                                        ? DesignTokens.Color.accentStrong
-                                        : DesignTokens.Color.backgroundCard)
-                            .cornerRadius(13)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 13)
-                                    .stroke(selected == e
-                                            ? DesignTokens.Color.accentMid
-                                            : DesignTokens.Color.border,
-                                            lineWidth: 1)
-                            )
-                            .scaleEffect(selected == e ? 1.08 : 1.0)
-                    }
+                // A custom pick that isn't in the presets shows as its own chip
+                if !options.contains(selected) && !selected.isEmpty {
+                    chip(selected)
                 }
+
+                ForEach(options, id: \.self) { e in
+                    chip(e)
+                }
+
+                // "+" — any emoji via the native keyboard
+                ZStack {
+                    // Invisible field summons the system (emoji) keyboard
+                    TextField("", text: $customInput)
+                        .focused($customFocused)
+                        .opacity(0.02)
+                        .frame(width: 46, height: 46)
+                        .onChange(of: customInput) { _, new in
+                            guard let last = new.last else { return }
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
+                                selected = String(last)
+                            }
+                            customInput   = ""
+                            customFocused = false
+                        }
+                    Image(systemName: "plus")
+                        .font(.system(size: 18, weight: .medium))
+                        .foregroundColor(DesignTokens.Color.accentSoft)
+                        .frame(width: 46, height: 46)
+                        .background(DesignTokens.Color.backgroundCard)
+                        .cornerRadius(13)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 13)
+                                .stroke(customFocused
+                                        ? DesignTokens.Color.accentMid
+                                        : DesignTokens.Color.border,
+                                        style: StrokeStyle(lineWidth: 1, dash: [4, 3]))
+                        )
+                        .allowsHitTesting(false)
+                }
+                .onTapGesture { customFocused = true }
             }
             .padding(.bottom, 4)
+        }
+    }
+
+    private func chip(_ e: String) -> some View {
+        Button {
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
+                selected = e
+            }
+        } label: {
+            Text(e)
+                .font(.system(size: 22))
+                .frame(width: 46, height: 46)
+                .background(selected == e
+                            ? DesignTokens.Color.accentStrong
+                            : DesignTokens.Color.backgroundCard)
+                .cornerRadius(13)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 13)
+                        .stroke(selected == e
+                                ? DesignTokens.Color.accentMid
+                                : DesignTokens.Color.border,
+                                lineWidth: 1)
+                )
+                .scaleEffect(selected == e ? 1.08 : 1.0)
         }
     }
 }

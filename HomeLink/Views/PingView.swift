@@ -13,6 +13,7 @@ struct PingView: View {
 
     @EnvironmentObject var compass: CompassManager
     @EnvironmentObject var people:  PeopleManager
+    @EnvironmentObject var pings:   PingManager
 
     @AppStorage("quietMode") private var quietMode = false
 
@@ -29,11 +30,13 @@ struct PingView: View {
     @State private var popRing = false      // final pop as a fury thought exits
     @State private var wobble: CGFloat = 0  // 💨 screen wobble on launch
 
-    // Personal recorded sounds — two slots, tokens "custom0"/"custom1"
-    @StateObject private var customStore = CustomSoundStore()
+    // "Create your own" thoughts — up to five, tokens "yours:<uuid>"
+    @StateObject private var customStore = CustomThoughtStore()
     @StateObject private var recorder    = AudioRecorder()
-    @State private var recordSlot: RecordSlot? = nil
-    @State private var slotPulse = false    // soft pulsing border on empty slots
+    @State private var showCreateSheet = false
+    @State private var editingThought: CustomThought? = nil   // long-press → edit
+    @State private var deleteCandidate: CustomThought? = nil  // long-press → delete (confirmed)
+    @State private var slotPulse = false    // soft pulsing border on the create cell
 
     // Focused set — each emoji has its own synthesized voice in SoundEngine.
     // "gecko" renders the custom-drawn LeopardGeckoView — a personal touch
@@ -51,13 +54,13 @@ struct PingView: View {
     private static let geckoGold  = Color(hex: "#F5A623")
     private static let geckoSun   = Color(hex: "#FFD966")
 
-    /// Renders an emoji string, the hand-drawn gecko, or a custom slot's emoji.
+    /// Renders an emoji string, the hand-drawn gecko, or a custom thought's emoji.
     @ViewBuilder
     private func thoughtSymbol(_ token: String, size: CGFloat) -> some View {
         if token == "gecko" {
             LeopardGeckoView(size: size * 1.2)   // match emoji glyph footprint
-        } else if let slot = customSlot(for: token) {
-            Text(customStore.sound(at: slot)?.emoji ?? "🎤").font(.system(size: size))
+        } else if let thought = customThought(for: token) {
+            Text(thought.emoji).font(.system(size: size))
         } else {
             Text(token).font(.system(size: size))
         }
@@ -65,22 +68,21 @@ struct PingView: View {
 
     private var selectedIsFeeling: Bool {
         guard let e = selectedEmoji else { return false }
-        // Custom recordings ride the "with feeling" launch animation
-        return feelingEmojis.contains(e) || e.hasPrefix("custom")
+        // Custom thoughts ride the "with feeling" launch animation
+        return feelingEmojis.contains(e) || e.hasPrefix("yours:")
     }
 
-    /// Slot index for a "customN" token, if it is one.
-    private func customSlot(for token: String) -> Int? {
-        guard token.hasPrefix("custom"), let i = Int(token.dropFirst(6)) else { return nil }
-        return i
+    /// The CustomThought behind a "yours:<uuid>" token, if it is one.
+    private func customThought(for token: String) -> CustomThought? {
+        guard token.hasPrefix("yours:"),
+              let id = UUID(uuidString: String(token.dropFirst(6))) else { return nil }
+        return customStore.thought(id: id)
     }
 
     /// The plain emoji that represents a token when sent over the wire.
     private func remoteEmoji(for token: String) -> String {
         if token == "gecko" { return "🦎" }
-        if let slot = customSlot(for: token) {
-            return customStore.sound(at: slot)?.emoji ?? "💜"
-        }
+        if let thought = customThought(for: token) { return thought.emoji }
         return token
     }
 
@@ -108,10 +110,10 @@ struct PingView: View {
                     .allowsHitTesting(false)
 
                 // ── The compass IS the screen — flights cross the whole display
-                // (1.12 → 1.0: trimmed ~10% so the face breathes inside the edges)
+                // (1.0 → 0.9: another 10% trim per design pass)
                 miniCompass
                     .frame(width: 200, height: 200)
-                    .scaleEffect(min(geo.size.width, geo.size.height) * 1.0 / 200)
+                    .scaleEffect(min(geo.size.width, geo.size.height) * 0.9 / 200)
                     .position(x: geo.size.width / 2, y: geo.size.height * 0.42)
                     .allowsHitTesting(false)
 
@@ -119,6 +121,26 @@ struct PingView: View {
                 VStack(spacing: 0) {
                     header
                         .padding(.top, 8)
+
+                    // Felt receipt — "[name] felt your thought ✓"
+                    if let notice = pings.feltNotice {
+                        HStack(spacing: 6) {
+                            Image(systemName: "heart.fill")
+                                .font(.system(size: 10))
+                            Text(notice)
+                                .font(.system(size: 12, design: .serif).italic())
+                        }
+                        .foregroundColor(Color(hex: "#5dcaa5"))
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 8)
+                        .background(
+                            Capsule()
+                                .fill(DesignTokens.Color.background.opacity(0.8))
+                                .overlay(Capsule().stroke(Color(hex: "#5dcaa5").opacity(0.35), lineWidth: 1))
+                        )
+                        .padding(.top, 10)
+                        .transition(.opacity.combined(with: .move(edge: .top)))
+                    }
 
                     Spacer()
 
@@ -139,13 +161,34 @@ struct PingView: View {
                 // Tap anywhere to dismiss the confirmation
                 if phase == .sent { resetThought() }
             }
-            .sheet(item: $recordSlot) { slot in
-                RecordSoundSheet(slot: slot.id, recorder: recorder, store: customStore)
-                    .presentationDetents([.medium])
+            .sheet(isPresented: $showCreateSheet, onDismiss: { editingThought = nil }) {
+                CreateThoughtSheet(recorder: recorder, store: customStore,
+                                   editing: editingThought)
+                    .presentationDetents([.large])
+            }
+            .confirmationDialog(
+                "delete \(deleteCandidate?.emoji ?? "")?",
+                isPresented: Binding(
+                    get: { deleteCandidate != nil },
+                    set: { if !$0 { deleteCandidate = nil } }
+                ),
+                titleVisibility: .visible
+            ) {
+                Button("delete", role: .destructive) {
+                    if let thought = deleteCandidate {
+                        if selectedEmoji == "yours:\(thought.id.uuidString)" { selectedEmoji = nil }
+                        customStore.remove(id: thought.id)
+                    }
+                    deleteCandidate = nil
+                }
+                Button("cancel", role: .cancel) { deleteCandidate = nil }
+            } message: {
+                Text("its sound goes with it")
             }
         }
         .animation(.spring(response: 0.4, dampingFraction: 0.7), value: selectedEmoji)
         .animation(.easeOut(duration: 0.35), value: phase)
+        .animation(.easeInOut(duration: 0.4), value: pings.feltNotice)
     }
 
     // MARK: - Floating emoji panel
@@ -442,13 +485,16 @@ struct PingView: View {
                 .background(DesignTokens.Color.border)
                 .padding(.vertical, 8)
 
-            sectionLabel("your sounds · tap to record", color: Self.lavenderHi)
+            sectionLabel("yours", color: Self.lavenderHi)
             LazyVGrid(
                 columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 6),
                 spacing: 8
             ) {
-                ForEach(0..<2, id: \.self) { slot in
-                    customSlotCell(slot)
+                ForEach(customStore.thoughts) { thought in
+                    yoursCell(thought)
+                }
+                if !customStore.isFull {
+                    createCell
                 }
             }
             .onAppear {
@@ -460,26 +506,19 @@ struct PingView: View {
         }
     }
 
-    /// One of the two personal-recording slots: empty → 🎤 invite that opens
-    /// the recording sheet; filled → its emoji, selectable like any other.
-    /// Long-press a filled slot to re-record.
-    private func customSlotCell(_ slot: Int) -> some View {
-        let token      = "custom\(slot)"
-        let sound      = customStore.sound(at: slot)
+    /// A saved custom thought — selectable like any emoji; long-press to delete.
+    private func yoursCell(_ thought: CustomThought) -> some View {
+        let token      = "yours:\(thought.id.uuidString)"
         let isSelected = selectedEmoji == token
         return Button {
             guard phase != .flying else { return }
-            if sound == nil {
-                recordSlot = RecordSlot(id: slot)
-            } else {
-                if phase == .sent {
-                    phase  = .idle
-                    fly    = false
-                    scorch = false
-                }
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
-                    selectedEmoji = isSelected ? nil : token
-                }
+            if phase == .sent {
+                phase  = .idle
+                fly    = false
+                scorch = false
+            }
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
+                selectedEmoji = isSelected ? nil : token
             }
         } label: {
             ZStack {
@@ -489,18 +528,7 @@ struct PingView: View {
                         .blur(radius: 13)
                         .padding(6)
                 }
-                if let sound {
-                    Text(sound.emoji).font(.system(size: 25))
-                } else {
-                    VStack(spacing: 2) {
-                        Image(systemName: "mic.fill")
-                            .font(.system(size: 16))
-                            .foregroundColor(Self.lavenderHi)
-                        Text("record")
-                            .font(.system(size: 7))
-                            .foregroundColor(DesignTokens.Color.textMuted)
-                    }
-                }
+                Text(thought.emoji).font(.system(size: 25))
             }
             .frame(maxWidth: .infinity)
             .aspectRatio(1, contentMode: .fit)
@@ -510,21 +538,51 @@ struct PingView: View {
             .cornerRadius(15)
             .overlay(
                 RoundedRectangle(cornerRadius: 15)
-                    .stroke(
-                        sound == nil
-                            ? Self.lavenderHi.opacity(slotPulse ? 0.75 : 0.3)   // pulsing invite
-                            : (isSelected ? Self.lavenderHi.opacity(0.8) : DesignTokens.Color.borderMid),
-                        style: StrokeStyle(lineWidth: 1, dash: sound == nil ? [4, 3] : [])
-                    )
+                    .stroke(isSelected ? Self.lavenderHi.opacity(0.8)
+                                       : DesignTokens.Color.borderMid,
+                            lineWidth: 1)
             )
             .scaleEffect(isSelected ? 1.08 : 1.0)
         }
-        .simultaneousGesture(
-            LongPressGesture(minimumDuration: 0.5).onEnded { _ in
-                guard phase == .idle else { return }
-                recordSlot = RecordSlot(id: slot)   // re-record a filled slot
+        .contextMenu {
+            Button {
+                editingThought = thought
+                showCreateSheet = true
+            } label: {
+                Label("edit", systemImage: "pencil")
             }
-        )
+            Button(role: .destructive) {
+                deleteCandidate = thought   // confirm before removing
+            } label: {
+                Label("delete", systemImage: "trash")
+            }
+        }
+    }
+
+    /// "+ create your own" — opens the creation sheet (emoji + sound + name).
+    private var createCell: some View {
+        Button {
+            guard phase != .flying else { return }
+            showCreateSheet = true
+        } label: {
+            VStack(spacing: 2) {
+                Image(systemName: "plus")
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundColor(Self.lavenderHi)
+                Text("create")
+                    .font(.system(size: 7))
+                    .foregroundColor(DesignTokens.Color.textMuted)
+            }
+            .frame(maxWidth: .infinity)
+            .aspectRatio(1, contentMode: .fit)
+            .background(DesignTokens.Color.backgroundCard.opacity(0.8))
+            .cornerRadius(15)
+            .overlay(
+                RoundedRectangle(cornerRadius: 15)
+                    .stroke(Self.lavenderHi.opacity(slotPulse ? 0.75 : 0.3),
+                            style: StrokeStyle(lineWidth: 1, dash: [4, 3]))
+            )
+        }
     }
 
     private func sectionLabel(_ text: String, color: Color) -> some View {
@@ -641,8 +699,8 @@ struct PingView: View {
             flashGreen = (token == "💨")
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
                 HapticEngine.thoughtFired()
-                if let slot = customSlot(for: token) {
-                    customStore.play(slot: slot)      // their own recorded sound
+                if let thought = customThought(for: token) {
+                    customStore.play(thought)         // their own sound
                 } else {
                     SoundEngine.shared.play(for: token)   // synthesized
                 }
@@ -688,9 +746,12 @@ struct PingView: View {
         }
     }
 
-    /// The confirmation is brief — it dissolves on its own if not interacted with.
+    /// The confirmation is brief — it dissolves on its own if not interacted
+    /// with. When it carries the invite link (no one paired yet), it lingers
+    /// long enough to be tapped.
     private func scheduleConfirmationDismiss() {
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2.8) {
+        let delay: Double = SupabaseService.connectedFriendID == nil ? 6.5 : 2.8
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
             if phase == .sent { resetThought() }
         }
     }
@@ -708,200 +769,358 @@ struct PingView: View {
                 .font(.system(size: 13).italic())
                 .foregroundColor(DesignTokens.Color.textMuted)
                 .multilineTextAlignment(.center)
+
+            // No one paired to actually receive it? Offer the invite.
+            if SupabaseService.connectedFriendID == nil {
+                VStack(spacing: 7) {
+                    Text("want them to feel it too?")
+                        .font(.system(size: 12, design: .serif).italic())
+                        .foregroundColor(DesignTokens.Color.textMuted)
+
+                    ShareLink(item: AppLinks.thoughtInvite(code: SupabaseService.localPairingCode)) {
+                        HStack(spacing: 6) {
+                            Image(systemName: "square.and.arrow.up")
+                                .font(.system(size: 11))
+                            Text("invite \(people.selectedPerson?.name ?? "them") to Pointward")
+                                .font(.system(size: 12, weight: .medium))
+                        }
+                        .foregroundColor(Self.lavenderHi)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 8)
+                        .overlay(Capsule().stroke(Self.lavenderHi.opacity(0.4), lineWidth: 1))
+                    }
+                }
+                .padding(.top, 6)
+            }
         }
         .padding(.horizontal, 22)
         .padding(.vertical, 12)
         .background(
-            Capsule()
+            RoundedRectangle(cornerRadius: 22)
                 .fill(DesignTokens.Color.background.opacity(0.74))
-                .overlay(Capsule().stroke(DesignTokens.Color.border, lineWidth: 1))
+                .overlay(RoundedRectangle(cornerRadius: 22).stroke(DesignTokens.Color.border, lineWidth: 1))
         )
     }
 }
 
-// MARK: - Recording sheet
+// MARK: - Create your own
 
-struct RecordSlot: Identifiable {
-    let id: Int
-}
+/// The unified creation sheet: pick an emoji (native keyboard), choose its
+/// sound (record your own or a preset voice), optionally name it, save.
+struct CreateThoughtSheet: View {
 
-/// Record up to 3 seconds, preview it, pick an emoji to wear, save into a slot.
-struct RecordSoundSheet: View {
-
-    let slot: Int
     @ObservedObject var recorder: AudioRecorder
-    @ObservedObject var store: CustomSoundStore
+    @ObservedObject var store: CustomThoughtStore
+    var editing: CustomThought? = nil   // pre-fills when editing an existing one
     @Environment(\.dismiss) private var dismiss
 
-    @State private var chosenEmoji = ""
-    @State private var recordPulse = false
-    @FocusState private var emojiFieldFocused: Bool
+    private enum SoundChoice { case record, preset }
+
+    @State private var chosenEmoji   = ""
+    @State private var soundChoice: SoundChoice = .record
+    @State private var presetToken: String? = nil
+    @State private var keepExistingRecording = false   // editing a recorded thought
+    @State private var recordPulse   = false
+    @State private var errorMessage: String?
+    @FocusState private var emojiFocused: Bool
 
     private let lavender   = Color(hex: "#c4a8d4")
     private let lavenderHi = Color(hex: "#e0ccee")
+
+    // Every synthesized voice is available as a preset
+    private let presets = ["💜","💋","🫂","🌸","✨","😢","😤","🤬","⚡️","🔥","💨"]
+
+    private var canSave: Bool {
+        guard !chosenEmoji.isEmpty else { return false }
+        switch soundChoice {
+        case .record: return recorder.hasRecording || keepExistingRecording
+        case .preset: return presetToken != nil
+        }
+    }
 
     var body: some View {
         ZStack {
             DesignTokens.Color.background.ignoresSafeArea()
 
-            VStack(spacing: 0) {
-                Text("record your sound")
-                    .font(DesignTokens.Font.compassName)
-                    .foregroundColor(DesignTokens.Color.textPrimary)
-                    .padding(.top, 28)
-                    .padding(.bottom, 4)
+            ScrollView {
+                VStack(spacing: 0) {
+                    Text(editing == nil ? "create your own" : "edit your thought")
+                        .font(.system(size: 22, weight: .semibold, design: .serif))
+                        .foregroundColor(DesignTokens.Color.textPrimary)
+                        .padding(.top, 24)
+                        .padding(.bottom, 22)
 
-                Text("up to 3 seconds · tap to record")
-                    .font(DesignTokens.Font.caption)
-                    .foregroundColor(DesignTokens.Color.textMuted)
-                    .padding(.bottom, 24)
-
-                // The record button — pulses red while recording
-                Button {
-                    if recorder.isRecording {
-                        recorder.stopRecording()
-                    } else {
-                        recorder.beginRecording()
-                    }
-                } label: {
-                    ZStack {
-                        Circle()
-                            .fill(recorder.isRecording
-                                  ? Color.red.opacity(recordPulse ? 0.85 : 0.55)
-                                  : DesignTokens.Color.accentStrong)
-                            .frame(width: 84, height: 84)
-                        Circle()
-                            .stroke(recorder.isRecording ? Color.red : DesignTokens.Color.accentMid,
-                                    lineWidth: 1.5)
-                            .frame(width: 96, height: 96)
-                            .scaleEffect(recorder.isRecording && recordPulse ? 1.08 : 1.0)
-                        Image(systemName: recorder.isRecording ? "stop.fill" : "mic.fill")
-                            .font(.system(size: 28))
-                            .foregroundColor(DesignTokens.Color.textPrimary)
-                    }
-                }
-                .padding(.bottom, 16)
-                .onChange(of: recorder.isRecording) { _, recording in
-                    if recording {
-                        withAnimation(.easeInOut(duration: 0.5).repeatForever(autoreverses: true)) {
-                            recordPulse = true
+                    // a) The emoji — native keyboard; first tap auto-selects,
+                    // keyboard dismisses itself, no return key needed
+                    sectionLabel("its emoji")
+                    TextField("tap to pick an emoji", text: $chosenEmoji)
+                        .focused($emojiFocused)
+                        .multilineTextAlignment(.center)
+                        .font(.system(size: 40))
+                        .frame(height: 72)
+                        .frame(maxWidth: .infinity)
+                        .background(DesignTokens.Color.backgroundCard)
+                        .cornerRadius(16)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 16)
+                                .stroke(chosenEmoji.isEmpty
+                                        ? DesignTokens.Color.borderMid
+                                        : DesignTokens.Color.accentMid, lineWidth: 1)
+                        )
+                        .onChange(of: chosenEmoji) { _, new in
+                            guard let last = new.last else { return }
+                            chosenEmoji  = String(last)   // auto-select the tapped emoji
+                            emojiFocused = false          // dismiss keyboard immediately
                         }
-                    } else {
-                        withAnimation(.easeOut(duration: 0.2)) { recordPulse = false }
-                    }
-                }
+                        .padding(.bottom, 18)
 
-                // Live waveform while recording
-                HStack(spacing: 3) {
-                    ForEach(Array(recorder.levels.enumerated()), id: \.offset) { _, level in
-                        Capsule()
-                            .fill(lavender.opacity(0.85))
-                            .frame(width: 3, height: 4 + level * 40)
+                    // b) The sound
+                    sectionLabel("its sound")
+                    Picker("", selection: $soundChoice) {
+                        Text("record your own").tag(SoundChoice.record)
+                        Text("preset").tag(SoundChoice.preset)
                     }
-                }
-                .frame(height: 48)
-                .animation(.easeOut(duration: 0.06), value: recorder.levels)
-
-                Text(recorder.isRecording
-                     ? String(format: "0:0%.0f / 0:03", min(3, recorder.elapsed.rounded(.down)))
-                     : (recorder.hasRecording ? "recorded ✓" : " "))
-                    .font(.system(size: 11, design: .monospaced))
-                    .foregroundColor(DesignTokens.Color.textMuted)
+                    .pickerStyle(.segmented)
                     .padding(.bottom, 14)
 
-                // After the take: preview · emoji · save · retake
-                if recorder.hasRecording {
-                    VStack(spacing: 14) {
-                        HStack(spacing: 14) {
-                            Button {
-                                recorder.playPreview()
-                            } label: {
-                                HStack(spacing: 6) {
-                                    Image(systemName: "play.fill")
-                                    Text("preview")
-                                }
-                                .font(DesignTokens.Font.label)
-                                .foregroundColor(lavenderHi)
-                                .padding(.horizontal, 16)
-                                .padding(.vertical, 9)
-                                .overlay(Capsule().stroke(DesignTokens.Color.borderMid, lineWidth: 1))
-                            }
-
-                            // Emoji from the system keyboard wears the sound
-                            TextField("emoji", text: $chosenEmoji)
-                                .focused($emojiFieldFocused)
-                                .multilineTextAlignment(.center)
-                                .font(.system(size: 26))
-                                .frame(width: 64, height: 44)
-                                .background(DesignTokens.Color.backgroundCard)
-                                .cornerRadius(12)
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 12)
-                                        .stroke(chosenEmoji.isEmpty
-                                                ? DesignTokens.Color.borderMid
-                                                : DesignTokens.Color.accentMid,
-                                                lineWidth: 1)
-                                )
-                                .onChange(of: chosenEmoji) { _, new in
-                                    // Keep just the most recent character (emoji-safe)
-                                    if let last = new.last { chosenEmoji = String(last) }
-                                }
-                        }
-
-                        Text("pick an emoji to carry your sound")
-                            .font(.system(size: 11))
-                            .foregroundColor(DesignTokens.Color.textDim)
-
-                        HStack(spacing: 12) {
-                            Button {
-                                recorder.discardTake()
-                                chosenEmoji = ""
-                            } label: {
-                                Text("retake")
-                                    .font(DesignTokens.Font.label)
-                                    .foregroundColor(DesignTokens.Color.textMuted)
-                                    .frame(maxWidth: .infinity)
-                                    .padding(.vertical, 12)
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: DesignTokens.Radius.button)
-                                            .stroke(DesignTokens.Color.borderMid, lineWidth: 1)
-                                    )
-                            }
-
-                            Button {
-                                if recorder.saveTake(toSlot: slot) {
-                                    store.save(emoji: chosenEmoji, slot: slot)
-                                    HapticEngine.saved()
-                                    dismiss()
-                                }
-                            } label: {
-                                Text("save")
-                                    .font(DesignTokens.Font.label)
-                                    .foregroundColor(DesignTokens.Color.textPrimary)
-                                    .frame(maxWidth: .infinity)
-                                    .padding(.vertical, 12)
-                                    .background(DesignTokens.Color.accentStrong)
-                                    .cornerRadius(DesignTokens.Radius.button)
-                            }
-                            .disabled(chosenEmoji.isEmpty)
-                            .opacity(chosenEmoji.isEmpty ? 0.4 : 1)
+                    Group {
+                        if soundChoice == .record {
+                            recordSection
+                        } else {
+                            presetSection
                         }
                     }
-                    .padding(.horizontal, 28)
-                    .transition(.opacity.combined(with: .move(edge: .bottom)))
-                }
+                    .padding(.bottom, 22)
 
-                Spacer()
+                    if let errorMessage {
+                        Text(errorMessage)
+                            .font(DesignTokens.Font.caption)
+                            .foregroundColor(.red)
+                            .padding(.bottom, 10)
+                    }
+
+                    // Save / cancel
+                    HStack(spacing: 12) {
+                        Button {
+                            recorder.discardTake()
+                            dismiss()
+                        } label: {
+                            Text("cancel")
+                                .font(DesignTokens.Font.label)
+                                .foregroundColor(DesignTokens.Color.textMuted)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 13)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: DesignTokens.Radius.button)
+                                        .stroke(DesignTokens.Color.borderMid, lineWidth: 1)
+                                )
+                        }
+
+                        Button {
+                            save()
+                        } label: {
+                            Text("save")
+                                .font(.system(size: 15, weight: canSave ? .semibold : .regular))
+                                .foregroundColor(DesignTokens.Color.textPrimary)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 13)
+                                .background(DesignTokens.Color.accentStrong)
+                                .cornerRadius(DesignTokens.Radius.button)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: DesignTokens.Radius.button)
+                                        .stroke(canSave ? DesignTokens.Color.accentSoft
+                                                        : Color.clear, lineWidth: 1.2)
+                                )
+                                // The glow: save lights up the moment it's ready
+                                .shadow(color: DesignTokens.Color.accentMid.opacity(canSave ? 0.6 : 0),
+                                        radius: 10)
+                                .scaleEffect(canSave ? 1.03 : 1.0)
+                        }
+                        .disabled(!canSave)
+                        .opacity(canSave ? 1 : 0.4)
+                        .animation(.spring(response: 0.35, dampingFraction: 0.6), value: canSave)
+                    }
+                    .padding(.bottom, 30)
+                }
+                .padding(.horizontal, 26)
             }
         }
-        .animation(.easeOut(duration: 0.3), value: recorder.hasRecording)
+        .animation(.easeOut(duration: 0.25), value: soundChoice)
+        .animation(.easeOut(duration: 0.25), value: recorder.hasRecording)
         .onAppear {
-            // Pre-fill the emoji when re-recording an existing slot
-            chosenEmoji = store.sound(at: slot)?.emoji ?? ""
+            // Editing: pre-fill from the existing thought
+            if let editing {
+                chosenEmoji = editing.emoji
+                switch editing.sound {
+                case .preset(let token):
+                    soundChoice = .preset
+                    presetToken = token
+                case .recording:
+                    soundChoice = .record
+                    keepExistingRecording = true   // keep it unless they retake
+                }
+            }
         }
-        .onDisappear {
-            recorder.discardTake()
+        .onDisappear { recorder.discardTake() }
+    }
+
+    private func sectionLabel(_ text: String) -> some View {
+        Text(text)
+            .font(DesignTokens.Font.overline)
+            .foregroundColor(DesignTokens.Color.textMuted)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.bottom, 8)
+    }
+
+    // MARK: Record
+
+    private var recordSection: some View {
+        VStack(spacing: 12) {
+            Button {
+                if recorder.isRecording {
+                    recorder.stopRecording()
+                } else {
+                    recorder.beginRecording()
+                }
+            } label: {
+                ZStack {
+                    Circle()
+                        .fill(recorder.isRecording
+                              ? Color.red.opacity(recordPulse ? 0.85 : 0.55)
+                              : DesignTokens.Color.accentStrong)
+                        .frame(width: 72, height: 72)
+                    Circle()
+                        .stroke(recorder.isRecording ? Color.red : DesignTokens.Color.accentMid,
+                                lineWidth: 1.5)
+                        .frame(width: 82, height: 82)
+                        .scaleEffect(recorder.isRecording && recordPulse ? 1.08 : 1.0)
+                    Image(systemName: recorder.isRecording ? "stop.fill" : "mic.fill")
+                        .font(.system(size: 24))
+                        .foregroundColor(DesignTokens.Color.textPrimary)
+                }
+            }
+            .onChange(of: recorder.isRecording) { _, recording in
+                if recording {
+                    withAnimation(.easeInOut(duration: 0.5).repeatForever(autoreverses: true)) {
+                        recordPulse = true
+                    }
+                } else {
+                    withAnimation(.easeOut(duration: 0.2)) { recordPulse = false }
+                }
+            }
+
+            // Live waveform
+            HStack(spacing: 3) {
+                ForEach(Array(recorder.levels.enumerated()), id: \.offset) { _, level in
+                    Capsule()
+                        .fill(lavender.opacity(0.85))
+                        .frame(width: 3, height: 4 + level * 34)
+                }
+            }
+            .frame(height: 40)
+            .animation(.easeOut(duration: 0.06), value: recorder.levels)
+
+            Text(recorder.isRecording
+                 ? String(format: "0:0%.0f / 0:03", min(3, recorder.elapsed.rounded(.down)))
+                 : (recorder.hasRecording ? "recorded ✓"
+                    : keepExistingRecording ? "keeping your current recording — record to replace"
+                                            : "up to 3 seconds"))
+                .font(.system(size: 11, design: .monospaced))
+                .foregroundColor(DesignTokens.Color.textMuted)
+
+            if recorder.hasRecording {
+                HStack(spacing: 14) {
+                    Button {
+                        recorder.playPreview()
+                    } label: {
+                        HStack(spacing: 6) {
+                            Image(systemName: "play.fill")
+                            Text("preview")
+                        }
+                        .font(DesignTokens.Font.caption)
+                        .foregroundColor(lavenderHi)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 8)
+                        .overlay(Capsule().stroke(DesignTokens.Color.borderMid, lineWidth: 1))
+                    }
+                    Button("retake") {
+                        recorder.discardTake()
+                    }
+                    .font(DesignTokens.Font.caption)
+                    .foregroundColor(DesignTokens.Color.textMuted)
+                }
+            }
         }
+        .frame(maxWidth: .infinity)
+    }
+
+    // MARK: Presets
+
+    private var presetSection: some View {
+        LazyVGrid(
+            columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 6),
+            spacing: 8
+        ) {
+            ForEach(presets, id: \.self) { token in
+                Button {
+                    presetToken = token
+                    SoundEngine.shared.play(for: token)   // audition on tap
+                } label: {
+                    Text(token)
+                        .font(.system(size: 24))
+                        .frame(maxWidth: .infinity)
+                        .aspectRatio(1, contentMode: .fit)
+                        .background(presetToken == token
+                                    ? DesignTokens.Color.accentStrong
+                                    : DesignTokens.Color.backgroundCard)
+                        .cornerRadius(12)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(presetToken == token
+                                        ? DesignTokens.Color.accentMid
+                                        : DesignTokens.Color.border, lineWidth: 1)
+                        )
+                }
+            }
+        }
+    }
+
+    // MARK: Save
+
+    private func save() {
+        guard canSave else { return }
+        if editing == nil && store.isFull { return }
+        errorMessage = nil
+
+        // Keep the id stable when editing (recordings live at custom-<id>.m4a)
+        var thought = editing ?? CustomThought(emoji: chosenEmoji, name: nil, sound: .recording)
+        thought.emoji = chosenEmoji
+
+        switch soundChoice {
+        case .preset:
+            guard let token = presetToken else { return }
+            thought.sound = .preset(token)
+        case .record:
+            thought.sound = .recording
+            if recorder.hasRecording {
+                guard recorder.saveTake(to: CustomThoughtStore.soundURL(for: thought.id)) else {
+                    errorMessage = "Couldn't save the recording — try recording again."
+                    return
+                }
+            } else if !keepExistingRecording {
+                return   // nothing to save
+            }
+        }
+
+        if editing == nil {
+            store.add(thought)
+        } else {
+            store.update(thought)
+        }
+
+        HapticEngine.saved()
+        recorder.discardTake()
+        dismiss()
     }
 }
 

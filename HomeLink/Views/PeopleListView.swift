@@ -13,7 +13,9 @@ struct PeopleListView: View {
 
     @State private var showAdd    = false
     @State private var editPerson: Person? = nil
+    @State private var detailPerson: Person? = nil
     @State private var showUnlock = false
+    @State private var friendLastSeen: Date? = nil   // presence of the connected friend
 
     var body: some View {
         ZStack {
@@ -39,12 +41,15 @@ struct PeopleListView: View {
                             PersonCard(
                                 person: person,
                                 isSelected: people.selectedPerson?.id == person.id,
-                                distanceText: distanceText(for: person)
+                                distanceText: distanceText(for: person),
+                                isConnected: isConnected(person),
+                                lastSeenText: lastSeenText(for: person)
                             ) {
-                                // Tap card → select, with a gentle warm haptic
+                                // Tap card → select + open the detail view
                                 people.select(person)
                                 compass.start(tracking: person)
                                 HapticEngine.personSelected()
+                                detailPerson = person
                             } onEdit: {
                                 editPerson = person
                             }
@@ -71,6 +76,10 @@ struct PeopleListView: View {
         .sheet(isPresented: $showUnlock) {
             PaywallView()
         }
+        .sheet(item: $detailPerson) { person in
+            PersonDetailView(person: person)
+        }
+        .onAppear { fetchFriendPresence() }
     }
 
     // MARK: - Helpers
@@ -81,6 +90,24 @@ struct PeopleListView: View {
         let km = BearingCalculator.distanceKm(from: location.coordinate,
                                               to: person.coordinate)
         return BearingCalculator.formattedDistance(km)
+    }
+
+    /// Connected = this person carries the paired friend's Supabase id.
+    private func isConnected(_ person: Person) -> Bool {
+        guard let friend = SupabaseService.connectedFriendID else { return false }
+        return person.pairedUserID == friend.uuidString
+    }
+
+    private func lastSeenText(for person: Person) -> String? {
+        guard isConnected(person), let date = friendLastSeen else { return nil }
+        return PersonDetailView.presenceText(for: date)
+    }
+
+    private func fetchFriendPresence() {
+        guard let friend = SupabaseService.connectedFriendID else { return }
+        Task {
+            friendLastSeen = await SupabaseService.shared.fetchLastSeen(of: friend)
+        }
     }
 
     // MARK: - Subviews
@@ -115,6 +142,8 @@ struct PersonCard: View {
     let person: Person
     let isSelected: Bool
     let distanceText: String?
+    let isConnected: Bool
+    let lastSeenText: String?
     let onTap: () -> Void
     let onEdit: () -> Void
 
@@ -158,6 +187,22 @@ struct PersonCard: View {
                     .font(.system(size: 11))
                     .foregroundColor(DesignTokens.Color.textMuted)
                     .lineLimit(1)
+
+                // Connection status — green when their compasses are linked
+                HStack(spacing: 5) {
+                    Circle()
+                        .fill(isConnected ? Color(hex: "#5dcaa5")
+                                          : DesignTokens.Color.textDim.opacity(0.6))
+                        .frame(width: 6, height: 6)
+                    Text(isConnected
+                         ? (lastSeenText.map { "connected ✓ · \($0)" } ?? "connected ✓")
+                         : "not connected")
+                        .font(.system(size: 10))
+                        .foregroundColor(isConnected ? Color(hex: "#5dcaa5")
+                                                     : DesignTokens.Color.textDim)
+                        .lineLimit(1)
+                }
+                .padding(.top, 1)
             }
 
             Spacer()

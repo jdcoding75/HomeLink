@@ -64,12 +64,96 @@ struct CompassProvider: TimelineProvider {
 struct CompassWidgetEntryView: View {
     var entry: CompassEntry
 
+    @Environment(\.widgetFamily) private var family
+
     private let lavender   = Color(hex: "#c4a8d4")
     private let lavenderHi = Color(hex: "#e0ccee")
     private let purpleDeep = Color(hex: "#5a4870")
     private let dim        = Color(hex: "#7c6b8e")
 
+    /// Short single-unit distance for the tight lock-screen layouts.
+    private var compactDistance: String {
+        if Locale.current.measurementSystem == .us {
+            let miles = entry.distanceKm * 0.621371
+            return miles >= 1 ? "\(Int(miles.rounded())) mi"
+                              : "\(Int((miles * 5280).rounded())) ft"
+        }
+        return entry.distanceKm >= 1 ? "\(Int(entry.distanceKm.rounded())) km"
+                                     : "\(Int((entry.distanceKm * 1000).rounded())) m"
+    }
+
+    private var cardinal: String {
+        BearingCalculator.cardinalDirection(entry.bearing)
+    }
+
     var body: some View {
+        switch family {
+        case .accessoryCircular:    circularView
+        case .accessoryRectangular: rectangularView
+        case .accessoryInline:      inlineView
+        default:                    smallView
+        }
+    }
+
+    // MARK: Lock screen — circular: emoji inside a tiny needle ring
+
+    private var circularView: some View {
+        ZStack {
+            AccessoryWidgetBackground()
+            Circle()
+                .stroke(.secondary.opacity(0.5), lineWidth: 1)
+                .padding(2)
+            // Needle marker on the ring, pointing the live bearing
+            Circle()
+                .fill(.primary)
+                .frame(width: 6, height: 6)
+                .offset(y: -24)
+                .rotationEffect(.degrees(entry.bearing))
+            NeedleKite()
+                .fill(.primary)
+                .frame(width: 7, height: 12)
+                .offset(y: -16)
+                .rotationEffect(.degrees(entry.bearing))
+            Text(entry.personEmoji)
+                .font(.system(size: 22))
+        }
+        .containerBackground(for: .widget) { Color.clear }
+    }
+
+    // MARK: Lock screen — rectangular: emoji + name/distance + tagline
+
+    private var rectangularView: some View {
+        HStack(spacing: 8) {
+            Text(entry.personEmoji)
+                .font(.system(size: 26))
+            VStack(alignment: .leading, spacing: 1) {
+                Text(entry.personName.isEmpty ? "Pointward" : entry.personName)
+                    .font(.system(size: 14, weight: .semibold))
+                    .lineLimit(1)
+                Text("\(compactDistance) · \(cardinal)")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                Text(entry.tagline)
+                    .font(.system(size: 10).italic())
+                    .foregroundStyle(.tertiary)
+                    .lineLimit(1)
+            }
+            Spacer(minLength: 0)
+        }
+        .containerBackground(for: .widget) { Color.clear }
+    }
+
+    // MARK: Lock screen — inline: "🏠 Mum · 142 km · NNW"
+
+    private var inlineView: some View {
+        Text("\(entry.personEmoji) \(entry.personName.isEmpty ? "Pointward" : entry.personName) · \(compactDistance) · \(cardinal)")
+            .containerBackground(for: .widget) { Color.clear }
+    }
+
+    // MARK: Home screen — systemSmall (unchanged)
+
+    private var smallView: some View {
         VStack(spacing: 4) {
             Text(entry.personName.isEmpty ? "Pointward" : entry.personName)
                 .font(.system(size: 12, weight: .medium))
@@ -161,7 +245,12 @@ struct CompassWidget: Widget {
         }
         .configurationDisplayName("Pointward Compass")
         .description("The needle that points to them.")
-        .supportedFamilies([.systemSmall])
+        .supportedFamilies([
+            .systemSmall,
+            .accessoryCircular,     // lock screen: emoji in a needle ring
+            .accessoryRectangular,  // lock screen: name · distance · tagline
+            .accessoryInline,       // lock screen: above the clock
+        ])
     }
 }
 
