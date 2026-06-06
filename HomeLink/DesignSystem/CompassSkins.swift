@@ -1,5 +1,5 @@
 // CompassSkins.swift
-// HomeLink › DesignSystem
+// Pointward › DesignSystem
 
 import SwiftUI
 
@@ -46,34 +46,43 @@ enum CompassSkin: String, CaseIterable, Identifiable {
         }
     }
 
-    var requiresPro: Bool {
+    /// Free tier ships with Minimal and Vintage Brass (the default);
+    /// the $1.99 unlock opens the rest.
+    var requiresUnlock: Bool {
         switch self {
-        case .minimal, .classic, .heart:    return false
-        case .celestial, .vintage, .aurora: return true
+        case .minimal, .vintage:             return false
+        case .classic, .heart,
+             .celestial, .aurora:            return true
         }
     }
 
     var northAccentColor: Color {
         switch self {
-        case .aurora:    return Color(hex: "#5dcaa5")
-        case .celestial: return Color(hex: "#e8e0f0")
-        case .vintage:   return Color(hex: "#e8e0f0")
-        default:         return Color(hex: "#c4a8d4")
+        case .minimal:   return Color(hex: "#c4a8d4")   // lavender
+        case .classic:   return Color(hex: "#8B0000")   // deep red
+        case .heart:     return Color(hex: "#ff69b4")   // rose pink
+        case .celestial: return Color(hex: "#e8f4f8")   // starlight white
+        case .vintage:   return Color(hex: "#FFD700")   // polished gold
+        case .aurora:    return Color(hex: "#5dcaa5")   // bright teal
         }
     }
 
     var southAccentColor: Color {
         switch self {
-        case .aurora:  return Color(hex: "#085041")
-        case .vintage: return Color(hex: "#6b5f7a")
-        default:       return Color(hex: "#3a2e50")
+        case .minimal:   return Color(hex: "#3a2e50")   // deep violet
+        case .classic:   return Color(hex: "#f5f0e8")   // cream
+        case .heart:     return Color(hex: "#8b0038")   // deep rose
+        case .celestial: return Color(hex: "#1a1a3e")   // deep space
+        case .vintage:   return Color(hex: "#8b6914")   // aged brass
+        case .aurora:    return Color(hex: "#085041")   // deep ocean
         }
     }
 
     var pivotColor: Color {
         switch self {
-        case .aurora: return Color(hex: "#1D9E75")
-        default:      return Color(hex: "#7c6b8e")
+        case .aurora:    return Color(hex: "#1D9E75")
+        case .heart:     return Color(hex: "#e0a8c8")
+        default:         return Color(hex: "#7c6b8e")
         }
     }
 }

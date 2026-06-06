@@ -1,5 +1,5 @@
 // DesignTokens.swift
-// HomeLink › DesignSystem
+// Pointward › DesignSystem
 
 import SwiftUI
 

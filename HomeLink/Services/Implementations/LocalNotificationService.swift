@@ -1,5 +1,5 @@
 // LocalNotificationService.swift
-// HomeLink › Services › Implementations
+// Pointward › Services › Implementations
 
 import UserNotifications
 

@@ -1,5 +1,5 @@
 // AddPersonView.swift
-// HomeLink › Views
+// Pointward › Views
 //
 // Presented as a sheet from PeopleListView when the user taps "+".
 // Owns the full add-person flow:
@@ -12,6 +12,7 @@
 
 import SwiftUI
 import CoreLocation
+import Contacts
 
 struct AddPersonView: View {
 
@@ -35,13 +36,18 @@ struct AddPersonView: View {
 
     // Step 3
     @State private var addressText: String = ""
-    @State private var suggestions: [GeocodeSuggestion] = []
+    @StateObject private var autocomplete = AddressAutocompleteService()
+    @State private var selectedAddressText: String? = nil  // skip re-searching text we just filled in
     @State private var geocodeTask: Task<Void, Never>? = nil
     @State private var geocodeState: GeocodeState = .idle
     @State private var geocodedLocation: GeocodedLocation? = nil
 
-    // Error / paywall
-    @State private var showPaywall = false
+    // Contacts / invite
+    @State private var showContactPicker = false
+    @State private var showInviteShare = false
+
+    // Unlock / error
+    @State private var showUnlock = false
     @State private var saveError: String? = nil
 
     // MARK: - Body
@@ -75,8 +81,18 @@ struct AddPersonView: View {
                 ctaBar
             }
         }
-        .sheet(isPresented: $showPaywall) {
+        .sheet(isPresented: $showUnlock) {
             PaywallView()
+        }
+        .sheet(isPresented: $showContactPicker) {
+            ContactPickerView { contact in
+                applyContact(contact)
+            }
+            .ignoresSafeArea()
+        }
+        .sheet(isPresented: $showInviteShare, onDismiss: { dismiss() }) {
+            ActivityShareSheet(items: [inviteMessage])
+                .presentationDetents([.medium, .large])
         }
     }
 
@@ -139,7 +155,29 @@ struct AddPersonView: View {
             formLabel("their name")
             TextField("Mum, Dad, Home, Nan…", text: $name)
                 .formInput()
-                .padding(.bottom, DesignTokens.Spacing.md)
+                .padding(.bottom, DesignTokens.Spacing.sm)
+
+            // Or pick straight from the address book
+            Button {
+                showContactPicker = true
+            } label: {
+                HStack(spacing: 8) {
+                    Image(systemName: "person.crop.circle.badge.plus")
+                        .font(.system(size: 14))
+                    Text("choose from contacts")
+                        .font(DesignTokens.Font.label)
+                }
+                .foregroundColor(DesignTokens.Color.accentSoft)
+                .frame(maxWidth: .infinity)
+                .padding(DesignTokens.Spacing.md)
+                .background(DesignTokens.Color.backgroundCard)
+                .cornerRadius(DesignTokens.Radius.button)
+                .overlay(
+                    RoundedRectangle(cornerRadius: DesignTokens.Radius.button)
+                        .stroke(DesignTokens.Color.borderMid, lineWidth: 1)
+                )
+            }
+            .padding(.bottom, DesignTokens.Spacing.md)
 
             formLabel("their emoji")
             EmojiPickerRow(selected: $emoji)
@@ -261,9 +299,12 @@ struct AddPersonView: View {
             HStack {
                 TextField("e.g. 10 Downing Street, London", text: $addressText)
                     .foregroundColor(DesignTokens.Color.textPrimary)
+                    .autocorrectionDisabled()
+                    .textInputAutocapitalization(.words)
                     .onChange(of: addressText) { _, new in
                         handleAddressInput(new)
                     }
+                    .onSubmit { geocodeTypedAddress() }
                 if !addressText.isEmpty {
                     Button { clearAddress() } label: {
                         Image(systemName: "xmark.circle.fill")
@@ -280,11 +321,13 @@ struct AddPersonView: View {
             )
             .padding(.bottom, 8)
 
-            // Suggestions list
-            if !suggestions.isEmpty {
-                suggestionsList
-                    .padding(.bottom, 8)
-                    .transition(.opacity.combined(with: .move(edge: .top)))
+            // Live autocomplete suggestions (MKLocalSearchCompleter)
+            if !autocomplete.suggestions.isEmpty {
+                AddressSuggestionsList(suggestions: autocomplete.suggestions) { sug in
+                    selectSuggestion(sug)
+                }
+                .padding(.bottom, 8)
+                .transition(.opacity.combined(with: .move(edge: .top)))
             }
 
             // Geocode status
@@ -299,44 +342,6 @@ struct AddPersonView: View {
                     .padding(.top, 8)
             }
         }
-    }
-
-    private var suggestionsList: some View {
-        VStack(spacing: 0) {
-            ForEach(suggestions) { sug in
-                Button {
-                    selectSuggestion(sug)
-                } label: {
-                    HStack {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(sug.displayName)
-                                .font(DesignTokens.Font.label)
-                                .foregroundColor(DesignTokens.Color.textPrimary)
-                            Text(sug.fullAddress)
-                                .font(DesignTokens.Font.caption)
-                                .foregroundColor(DesignTokens.Color.textMuted)
-                        }
-                        Spacer()
-                        Image(systemName: "arrow.up.left")
-                            .font(.system(size: 11))
-                            .foregroundColor(DesignTokens.Color.textDim)
-                    }
-                    .padding(.horizontal, DesignTokens.Spacing.md)
-                    .padding(.vertical, 10)
-                }
-                if sug != suggestions.last {
-                    Divider()
-                        .background(DesignTokens.Color.border)
-                        .padding(.leading, DesignTokens.Spacing.md)
-                }
-            }
-        }
-        .background(DesignTokens.Color.backgroundCard)
-        .cornerRadius(DesignTokens.Radius.button)
-        .overlay(
-            RoundedRectangle(cornerRadius: DesignTokens.Radius.button)
-                .stroke(DesignTokens.Color.border, lineWidth: 1)
-        )
     }
 
     @ViewBuilder
@@ -359,7 +364,7 @@ struct AddPersonView: View {
             .background(DesignTokens.Color.backgroundCard)
             .cornerRadius(DesignTokens.Radius.button)
 
-        case .geocoding(let address):
+         case .geocoding(let address):
             HStack(spacing: 10) {
                 ProgressView()
                     .tint(DesignTokens.Color.accentSoft)
@@ -472,30 +477,29 @@ struct AddPersonView: View {
     }
 
     private func handleAddressInput(_ text: String) {
+        // Skip the onChange triggered by us filling the field from a suggestion
+        guard text != selectedAddressText else { return }
+        selectedAddressText = nil
+
         geocodeTask?.cancel()
         geocodedLocation = nil
-        suggestions      = []
+        geocodeState     = .idle
+        autocomplete.updateQuery(text)
+    }
 
-        guard text.count >= 3 else {
-            geocodeState = .idle
-            return
-        }
+    private func selectSuggestion(_ sug: AddressSuggestion) {
+        selectedAddressText = sug.fullText
+        addressText         = sug.fullText
+        autocomplete.clear()
+        geocodeState = .geocoding(sug.title)
 
-        geocodeState = .searching
-
+        geocodeTask?.cancel()
         geocodeTask = Task {
-            // Small debounce so we don't fire on every keystroke
-            try? await Task.sleep(nanoseconds: 350_000_000)
-            guard !Task.isCancelled else { return }
-
-            geocodeState = .geocoding(text)
-
             do {
-                let result = try await geocodingService.geocode(address: text)
+                let result = try await autocomplete.resolve(sug)
                 guard !Task.isCancelled else { return }
                 geocodedLocation = result
                 geocodeState     = .success(result)
-                suggestions      = []   // clear list once confirmed
             } catch let error as GeocodingError {
                 guard !Task.isCancelled else { return }
                 geocodeState = .failure(error.errorDescription ?? "Location not found.")
@@ -506,21 +510,25 @@ struct AddPersonView: View {
         }
     }
 
-    private func selectSuggestion(_ sug: GeocodeSuggestion) {
-        addressText  = sug.fullAddress
-        suggestions  = []
-        geocodeState = .geocoding(sug.displayName)
+    /// Fallback: user typed a full address and hit return without tapping a suggestion.
+    private func geocodeTypedAddress() {
+        let text = addressText.trimmingCharacters(in: .whitespaces)
+        guard text.count >= 3 else { return }
+        autocomplete.clear()
+        geocodeState = .geocoding(text)
 
         geocodeTask?.cancel()
         geocodeTask = Task {
             do {
-                let result = try await geocodingService.geocode(address: sug.fullAddress)
+                let result = try await geocodingService.geocode(address: text)
                 guard !Task.isCancelled else { return }
                 geocodedLocation = result
                 geocodeState     = .success(result)
             } catch let error as GeocodingError {
+                guard !Task.isCancelled else { return }
                 geocodeState = .failure(error.errorDescription ?? "Location not found.")
             } catch {
+                guard !Task.isCancelled else { return }
                 geocodeState = .failure(error.localizedDescription)
             }
         }
@@ -528,17 +536,19 @@ struct AddPersonView: View {
 
     private func clearAddress() {
         geocodeTask?.cancel()
-        addressText      = ""
-        suggestions      = []
-        geocodeState     = .idle
-        geocodedLocation = nil
+        autocomplete.clear()
+        selectedAddressText = nil
+        addressText         = ""
+        geocodeState        = .idle
+        geocodedLocation    = nil
     }
 
     private func savePerson() {
         guard let location = geocodedLocation else { return }
 
         guard people.canAddPerson() else {
-            showPaywall = true
+            // Free tier holds one person — the unlock opens the rest
+            showUnlock = true
             return
         }
 
@@ -553,10 +563,52 @@ struct AddPersonView: View {
         do {
             try people.addPerson(person)
             HapticEngine.connectionFelt()
-            dismiss()
+            // Offer to invite them — the sheet's onDismiss closes this view
+            showInviteShare = true
         } catch {
             saveError = error.localizedDescription
         }
+    }
+
+    // MARK: - Contacts
+
+    private func applyContact(_ contact: CNContact) {
+        let nickname = contact.nickname.trimmingCharacters(in: .whitespaces)
+        let given    = contact.givenName.trimmingCharacters(in: .whitespaces)
+        let family   = contact.familyName.trimmingCharacters(in: .whitespaces)
+        let resolved = !nickname.isEmpty ? nickname : (!given.isEmpty ? given : family)
+        if !resolved.isEmpty {
+            name  = resolved
+            emoji = Self.suggestedEmoji(for: resolved, fallback: emoji)
+        }
+
+        // Pre-fill the address step if the contact has a postal address —
+        // and geocode it right away so the address arrives at step 3 already
+        // confirmed (otherwise geocodeState stays .idle and save is disabled).
+        if let postal = contact.postalAddresses.first?.value {
+            let formatted = CNPostalAddressFormatter.string(from: postal, style: .mailingAddress)
+                .replacingOccurrences(of: "\n", with: ", ")
+                .trimmingCharacters(in: .whitespaces)
+            if !formatted.isEmpty {
+                selectedAddressText = formatted   // don't re-trigger the suggestion search
+                addressText         = formatted
+                geocodeTypedAddress()
+            }
+        }
+    }
+
+    /// Light-touch emoji guess from the contact's name; falls back to the current pick.
+    private static func suggestedEmoji(for name: String, fallback: String) -> String {
+        let n = name.lowercased()
+        if n.contains("mum") || n.contains("mom") || n.contains("mother")   { return "💜" }
+        if n.contains("dad") || n.contains("father")                        { return "🏠" }
+        if n.contains("nana") || n.contains("gran") || n.contains("nan ")   { return "🌸" }
+        if n.contains("home")                                               { return "🏠" }
+        return fallback
+    }
+
+    private var inviteMessage: String {
+        "I added you on Pointward \(emoji) — my compass now always points your way. Get Pointward and add me back: https://pointward.app"
     }
 
     // MARK: - Helpers
@@ -580,12 +632,57 @@ struct AddPersonView: View {
 
 // MARK: - Supporting types
 
-/// Lightweight suggestion model — separate from GeocodedLocation
-/// so we can display instant local suggestions before committing a full geocode.
-struct GeocodeSuggestion: Identifiable, Equatable {
-    let id = UUID()
-    let displayName: String
-    let fullAddress: String
+/// Tappable dropdown of live address suggestions — shared by
+/// AddPersonView and EditPersonView (Apple Maps-style autocomplete).
+struct AddressSuggestionsList: View {
+    let suggestions: [AddressSuggestion]
+    let onSelect: (AddressSuggestion) -> Void
+
+    var body: some View {
+        VStack(spacing: 0) {
+            ForEach(suggestions) { sug in
+                Button {
+                    onSelect(sug)
+                } label: {
+                    HStack {
+                        Image(systemName: "mappin.circle")
+                            .font(.system(size: 14))
+                            .foregroundColor(DesignTokens.Color.accentMid)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(sug.title)
+                                .font(DesignTokens.Font.label)
+                                .foregroundColor(DesignTokens.Color.textPrimary)
+                                .lineLimit(1)
+                            if !sug.subtitle.isEmpty {
+                                Text(sug.subtitle)
+                                    .font(DesignTokens.Font.caption)
+                                    .foregroundColor(DesignTokens.Color.textMuted)
+                                    .lineLimit(1)
+                            }
+                        }
+                        Spacer()
+                        Image(systemName: "arrow.up.left")
+                            .font(.system(size: 11))
+                            .foregroundColor(DesignTokens.Color.textDim)
+                    }
+                    .padding(.horizontal, DesignTokens.Spacing.md)
+                    .padding(.vertical, 10)
+                    .contentShape(Rectangle())
+                }
+                if sug != suggestions.last {
+                    Divider()
+                        .background(DesignTokens.Color.border)
+                        .padding(.leading, DesignTokens.Spacing.md)
+                }
+            }
+        }
+        .background(DesignTokens.Color.backgroundCard)
+        .cornerRadius(DesignTokens.Radius.button)
+        .overlay(
+            RoundedRectangle(cornerRadius: DesignTokens.Radius.button)
+                .stroke(DesignTokens.Color.border, lineWidth: 1)
+        )
+    }
 }
 
 enum GeocodeState: Equatable {

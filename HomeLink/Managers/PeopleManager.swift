@@ -1,5 +1,5 @@
 // PeopleManager.swift
-// HomeLink › Managers
+// Pointward › Managers
 
 import Foundation
 import Combine
@@ -59,6 +59,6 @@ final class PeopleManager: ObservableObject {
 
     enum PeopleError: Error, LocalizedError {
         case upgradeRequired
-        var errorDescription: String? { "Upgrade to HomeLink Pro to add more people." }
+        var errorDescription: String? { "Unlock Pointward to add more people — one-time purchase, no subscription." }
     }
 }

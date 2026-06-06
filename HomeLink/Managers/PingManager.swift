@@ -1,5 +1,5 @@
 // PingManager.swift
-// HomeLink › Managers
+// Pointward › Managers
 
 import Foundation
 import Combine

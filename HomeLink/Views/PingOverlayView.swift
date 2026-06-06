@@ -1,5 +1,5 @@
 // PingOverlayView.swift
-// HomeLink › Views
+// Pointward › Views
 
 import SwiftUI
 

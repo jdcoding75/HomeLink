@@ -1,5 +1,5 @@
 // AppDelegate.swift
-// HomeLink
+// Pointward
 
 import UIKit
 
@@ -9,8 +9,8 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
         _ application: UIApplication,
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
     ) -> Bool {
-        // Phase 2: uncomment to register for remote notifications
-        // application.registerForRemoteNotifications()
+        // Phase 2: pings arrive as pushes when the app is closed
+        application.registerForRemoteNotifications()
         return true
     }
 
@@ -19,7 +19,8 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
         didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data
     ) {
         let token = deviceToken.map { String(format: "%02.2hhx", $0) }.joined()
-        print("[APNs] device token: \(token)")
+        // Stored server-side so the Edge Function can target this device
+        Task { await SupabaseService.shared.registerDeviceToken(token) }
     }
 
     func application(

@@ -1,5 +1,5 @@
 // MockNetworkService.swift
-// HomeLink › Services › Implementations
+// Pointward › Services › Implementations
 
 import Foundation
 

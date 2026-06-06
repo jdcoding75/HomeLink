@@ -1,5 +1,5 @@
 // CompassState.swift
-// HomeLink › Models
+// Pointward › Models
 
 import Foundation
 

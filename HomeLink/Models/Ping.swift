@@ -1,5 +1,5 @@
 // Ping.swift
-// HomeLink › Models
+// Pointward › Models
 
 import Foundation
 import SwiftData

@@ -1,5 +1,5 @@
 // HapticEngine.swift
-// HomeLink › DesignSystem
+// Pointward › DesignSystem
 
 import UIKit
 
@@ -36,6 +36,31 @@ enum HapticEngine {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.14) {
             gen.impactOccurred(intensity: i2)
         }
+    }
+
+    /// Send-a-thought sequence: light tap as the emoji starts to move…
+    static func thoughtReleased() {
+        guard hapticsEnabled else { return }
+        UIImpactFeedbackGenerator(style: .light).impactOccurred(intensity: isQuiet ? 0.3 : 0.45)
+    }
+
+    /// …stronger pulse as it launches outward. (The fade-away uses pingReceived's
+    /// soft double tap.)
+    static func thoughtLaunched() {
+        guard hapticsEnabled else { return }
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred(intensity: isQuiet ? 0.5 : 0.85)
+    }
+
+    /// "With feeling" launch — strong and sharp, like something fired.
+    static func thoughtFired() {
+        guard hapticsEnabled else { return }
+        UIImpactFeedbackGenerator(style: .rigid).impactOccurred(intensity: isQuiet ? 0.6 : 1.0)
+    }
+
+    /// Gentle, warm tap when choosing who to point toward — softer than connectionFelt.
+    static func personSelected() {
+        guard hapticsEnabled else { return }
+        UIImpactFeedbackGenerator(style: .soft).impactOccurred(intensity: isQuiet ? 0.3 : 0.5)
     }
 
     static func paywallReached() {

@@ -1,5 +1,5 @@
 // AppEnvironment.swift
-// HomeLink › Utilities
+// Pointward › Utilities
 
 import Foundation
 import Combine

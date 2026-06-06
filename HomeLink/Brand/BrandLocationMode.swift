@@ -1,5 +1,5 @@
 // BrandLocationMode.swift
-// HomeLink › Brand
+// Pointward › Brand
 //
 // ─────────────────────────────────────────────────────────────────
 // BRAND LOCATION MODE — COMPLETE SCAFFOLD
@@ -57,8 +57,8 @@ struct BrandPack: Codable, Identifiable {
     let version:      Int            // bump to force a re-parse on update
     let locations:    [BrandLocation]
 
-    /// StoreKit product ID — "com.jdcoding75.homelink.brandpack.monmouth"
-    var productID: String { "com.jdcoding75.homelink.brandpack.\(id)" }
+    /// StoreKit product ID — "com.jdcoding75.pointward.brandpack.monmouth"
+    var productID: String { "com.jdcoding75.pointward.brandpack.\(id)" }
 }
 
 /// The state of a brand pack from the user's perspective.

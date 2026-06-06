@@ -1,5 +1,5 @@
 // TaglineSystem.swift
-// HomeLink › DesignSystem
+// Pointward › DesignSystem
 
 import Foundation
 

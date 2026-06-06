@@ -1,5 +1,7 @@
 // SettingsView.swift
-// HomeLink › Views
+// Pointward › Views
+//
+// Phase 1: intentionally minimal — skin picker, quiet mode, haptics, about.
 
 import SwiftUI
 
@@ -8,35 +10,34 @@ struct SettingsView: View {
     @EnvironmentObject var subscription: SubscriptionManager
     @EnvironmentObject var skinStore:    SkinStore
 
-    @AppStorage("quietMode")              private var quietMode         = false
-    @AppStorage("hapticsEnabled")         private var hapticsEnabled    = true
-    @AppStorage("emojiGlowEnabled")       private var emojiGlowEnabled  = true
-    @AppStorage("notificationsEnabled")   private var notificationsEnabled = true
-    @AppStorage("farThresholdKm")         private var farThresholdKm    = 500.0
-    @AppStorage("northReference")         private var northReference    = "magnetic"
+    @AppStorage("quietMode")      private var quietMode      = false
+    @AppStorage("hapticsEnabled") private var hapticsEnabled = true
+    // Distance units — defaults to the locale's measurement system, user can override
+    @AppStorage("useMiles") private var useMiles = Locale.current.measurementSystem == .us
 
-    @State private var showPaywall     = false
-    @State private var showSkinPicker  = false
+    @State private var showSkinPicker = false
+    @State private var showAbout      = false
+    @State private var showUnlock     = false
+    @State private var showAccount    = false
 
     var body: some View {
         ZStack {
             DesignTokens.Color.background.ignoresSafeArea()
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
-                    sectionHeader("subscription")
-                    subscriptionSection
+                    if subscription.tier == .free {
+                        sectionHeader("unlock")
+                        unlockSection
+                    }
 
-                    sectionHeader("experience")
-                    experienceSection
+                    sectionHeader("account")
+                    accountSection
 
                     sectionHeader("compass skin")
                     skinSection
 
-                    sectionHeader("location")
-                    locationSection
-
-                    sectionHeader("notifications")
-                    notificationsSection
+                    sectionHeader("experience")
+                    experienceSection
 
                     sectionHeader("about")
                     aboutSection
@@ -46,32 +47,83 @@ struct SettingsView: View {
                 .padding(.horizontal, DesignTokens.Spacing.lg)
             }
         }
-        .sheet(isPresented: $showPaywall) { PaywallView() }
         .sheet(isPresented: $showSkinPicker) {
             SkinPickerView()
                 .environmentObject(skinStore)
                 .environmentObject(subscription)
         }
+        .sheet(isPresented: $showAbout) {
+            AboutView()
+        }
+        .sheet(isPresented: $showUnlock) {
+            PaywallView()
+        }
+        .sheet(isPresented: $showAccount) {
+            AccountView()
+        }
     }
 
-    // MARK: - Subscription
+    // MARK: - Account
 
-    private var subscriptionSection: some View {
+    private var accountSection: some View {
+        settingsGroup {
+            settingsRow {
+                Image(systemName: "person.crop.circle")
+                    .settingsIcon()
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(SupabaseService.localUserID == nil ? "sign in" : "account")
+                        .settingsLabel()
+                    Text(SupabaseService.connectedFriendID != nil
+                         ? "connected — thoughts travel for real"
+                         : "pair with someone to send real thoughts")
+                        .font(.system(size: 11))
+                        .foregroundColor(DesignTokens.Color.textDim)
+                }
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 12))
+                    .foregroundColor(DesignTokens.Color.textDim)
+            }
+            .contentShape(Rectangle())
+            .onTapGesture { showAccount = true }
+        }
+    }
+
+    // MARK: - Unlock (one-time purchase — shown only while on the free tier)
+
+    private var unlockSection: some View {
         settingsGroup {
             settingsRow {
                 Image(systemName: "sparkles")
                     .settingsIcon()
-                Text("HomeLink Pro")
-                    .settingsLabel()
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Unlock Pointward — $1.99")
+                        .settingsLabel()
+                    Text("unlimited people · all skins · widget — one-time purchase")
+                        .font(.system(size: 11))
+                        .foregroundColor(DesignTokens.Color.textDim)
+                }
                 Spacer()
-                Text(subscription.tier == .pro ? "✦ pro" : "free plan")
-                    .font(DesignTokens.Font.caption)
-                    .foregroundColor(subscription.tier == .pro
-                                     ? DesignTokens.Color.accentSoft
-                                     : DesignTokens.Color.textMuted)
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 12))
+                    .foregroundColor(DesignTokens.Color.textDim)
             }
             .contentShape(Rectangle())
-            .onTapGesture { showPaywall = true }
+            .onTapGesture { showUnlock = true }
+
+            Divider().background(DesignTokens.Color.border).padding(.leading, 44)
+
+            settingsRow {
+                Image(systemName: "arrow.clockwise")
+                    .settingsIcon()
+                Text("restore purchase")
+                    .settingsLabel()
+                Spacer()
+            }
+            .contentShape(Rectangle())
+            .onTapGesture {
+                Task { await subscription.restorePurchases() }
+            }
         }
     }
 
@@ -111,12 +163,17 @@ struct SettingsView: View {
             Divider().background(DesignTokens.Color.border).padding(.leading, 44)
 
             settingsRow {
-                Image(systemName: "sparkle")
+                Image(systemName: "ruler")
                     .settingsIcon()
-                Text("emoji glow")
-                    .settingsLabel()
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(useMiles ? "use miles" : "use kilometers")
+                        .settingsLabel()
+                    Text(useMiles ? "88 mi · 142 km" : "142 km · 88 mi")
+                        .font(.system(size: 11))
+                        .foregroundColor(DesignTokens.Color.textDim)
+                }
                 Spacer()
-                Toggle("", isOn: $emojiGlowEnabled)
+                Toggle("", isOn: $useMiles)
                     .tint(DesignTokens.Color.accentMid)
                     .labelsHidden()
             }
@@ -151,90 +208,49 @@ struct SettingsView: View {
         }
     }
 
-    // MARK: - Location
-
-    private var locationSection: some View {
-        settingsGroup {
-            settingsRow {
-                Image(systemName: "location.fill")
-                    .settingsIcon()
-                Text("location access")
-                    .settingsLabel()
-                Spacer()
-                Text("while using app")
-                    .font(DesignTokens.Font.caption)
-                    .foregroundColor(Color(hex: "#5dcaa5"))
-            }
-
-            Divider().background(DesignTokens.Color.border).padding(.leading, 44)
-
-            settingsRow {
-                Image(systemName: "arrow.up.circle")
-                    .settingsIcon()
-                Text("north reference")
-                    .settingsLabel()
-                Spacer()
-                Text(northReference)
-                    .font(DesignTokens.Font.caption)
-                    .foregroundColor(DesignTokens.Color.textMuted)
-            }
-
-            Divider().background(DesignTokens.Color.border).padding(.leading, 44)
-
-            settingsRow {
-                Image(systemName: "house")
-                    .settingsIcon()
-                Text("far from home at")
-                    .settingsLabel()
-                Spacer()
-                Text("\(Int(farThresholdKm)) km")
-                    .font(DesignTokens.Font.caption)
-                    .foregroundColor(DesignTokens.Color.textMuted)
-            }
-        }
-    }
-
-    // MARK: - Notifications
-
-    private var notificationsSection: some View {
-        settingsGroup {
-            settingsRow {
-                Image(systemName: "bell")
-                    .settingsIcon()
-                Text("ping notifications")
-                    .settingsLabel()
-                Spacer()
-                Toggle("", isOn: $notificationsEnabled)
-                    .tint(DesignTokens.Color.accentMid)
-                    .labelsHidden()
-            }
-
-            Divider().background(DesignTokens.Color.border).padding(.leading, 44)
-
-            settingsRow {
-                Image(systemName: "moon.zzz")
-                    .settingsIcon()
-                Text("quiet hours")
-                    .settingsLabel()
-                Spacer()
-                Text("11 pm – 7 am")
-                    .font(DesignTokens.Font.caption)
-                    .foregroundColor(DesignTokens.Color.textMuted)
-            }
-        }
-    }
-
     // MARK: - About
+
+    private var appVersion: String {
+        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.0"
+    }
 
     private var aboutSection: some View {
         settingsGroup {
+            settingsRow {
+                Image(systemName: "heart.text.square")
+                    .settingsIcon()
+                Text("our story")
+                    .settingsLabel()
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 12))
+                    .foregroundColor(DesignTokens.Color.textDim)
+            }
+            .contentShape(Rectangle())
+            .onTapGesture { showAbout = true }
+
+            Divider().background(DesignTokens.Color.border).padding(.leading, 44)
+
+            // Tell someone you love about it
+            ShareLink(item: "I've been using Pointward - a compass that always points toward the people you love. Check it out: https://pointward.app") {
+                settingsRow {
+                    Image(systemName: "square.and.arrow.up")
+                        .settingsIcon()
+                    Text("share Pointward")
+                        .settingsLabel()
+                    Spacer()
+                }
+            }
+
+            Divider().background(DesignTokens.Color.border).padding(.leading, 44)
+
             settingsRow {
                 Image(systemName: "app.badge")
                     .settingsIcon()
                 Text("version")
                     .settingsLabel()
                 Spacer()
-                Text("1.0.0")
+                Text(appVersion)
                     .font(DesignTokens.Font.caption)
                     .foregroundColor(DesignTokens.Color.textMuted)
             }

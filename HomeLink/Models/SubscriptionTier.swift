@@ -1,17 +1,19 @@
 // SubscriptionTier.swift
-// HomeLink › Models
+// Pointward › Models
 
 import Foundation
 
+/// Phase 1 model: free to download, one-time $1.99 purchase unlocks everything.
+/// No subscription — `.unlocked` is permanent once purchased.
 enum SubscriptionTier: String, Codable {
     case free
-    case pro
+    case unlocked        // one-time $1.99 purchase
     case institutional   // reserved for School Edition
 
     var maxPeople: Int {
         switch self {
         case .free:          return 1
-        case .pro:           return Int.max
+        case .unlocked:      return Int.max
         case .institutional: return Int.max
         }
     }
@@ -21,8 +23,8 @@ enum SubscriptionTier: String, Codable {
 
     var unlockedSkinIDs: Set<String> {
         switch self {
-        case .free:          return ["minimal", "classic", "heart"]
-        case .pro:           return Set(CompassSkin.allCases.map(\.rawValue))
+        case .free:          return ["minimal", "vintage"]
+        case .unlocked:      return Set(CompassSkin.allCases.map(\.rawValue))
         case .institutional: return Set(CompassSkin.allCases.map(\.rawValue))
         }
     }

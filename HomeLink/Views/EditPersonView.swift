@@ -1,5 +1,5 @@
 // EditPersonView.swift
-// HomeLink › Views
+// Pointward › Views
 //
 // Presented as a sheet from PeopleListView when the user taps "edit" on a card.
 // Pre-populates all fields from the existing Person model.
@@ -27,6 +27,8 @@ struct EditPersonView: View {
 
     // Address state
     @State private var addressText: String
+    @StateObject private var autocomplete = AddressAutocompleteService()
+    @State private var selectedAddressText: String? = nil  // skip re-searching text we just filled in
     @State private var geocodeState: GeocodeState
     @State private var geocodedLocation: GeocodedLocation?
     @State private var geocodeTask: Task<Void, Never>? = nil
@@ -236,13 +238,9 @@ struct EditPersonView: View {
                             .foregroundColor(DesignTokens.Color.textDim)
                     }
                     Spacer()
-                    Button("change") {
-                        withAnimation { addressChanged = true }
-                        geocodeState = .idle
-                        addressText  = ""
-                    }
-                    .font(DesignTokens.Font.caption)
-                    .foregroundColor(DesignTokens.Color.accentSoft)
+                    Button("change") { startAddressEdit() }
+                        .font(DesignTokens.Font.caption)
+                        .foregroundColor(DesignTokens.Color.accentSoft)
                 }
                 .padding(DesignTokens.Spacing.md)
                 .background(DesignTokens.Color.backgroundCard)
@@ -254,13 +252,16 @@ struct EditPersonView: View {
                 .padding(.bottom, DesignTokens.Spacing.md)
 
             } else {
-                // Active address editor
+                // Active address editor with live autocomplete
                 HStack {
-                    TextField("new address…", text: $addressText)
+                    TextField("search for an address…", text: $addressText)
                         .foregroundColor(DesignTokens.Color.textPrimary)
+                        .autocorrectionDisabled()
+                        .textInputAutocapitalization(.words)
                         .onChange(of: addressText) { _, new in
                             handleAddressInput(new)
                         }
+                        .onSubmit { geocodeTypedAddress() }
                     if !addressText.isEmpty {
                         Button { clearAddress() } label: {
                             Image(systemName: "xmark.circle.fill")
@@ -277,9 +278,32 @@ struct EditPersonView: View {
                 )
                 .padding(.bottom, 8)
 
+                // Live autocomplete suggestions (MKLocalSearchCompleter)
+                if !autocomplete.suggestions.isEmpty {
+                    AddressSuggestionsList(suggestions: autocomplete.suggestions) { sug in
+                        selectSuggestion(sug)
+                    }
+                    .padding(.bottom, 8)
+                    .transition(.opacity.combined(with: .move(edge: .top)))
+                }
+
                 geocodeStatusView
                     .animation(.easeOut(duration: 0.3), value: geocodeState)
-                    .padding(.bottom, DesignTokens.Spacing.md)
+                    .padding(.bottom, 8)
+
+                // Way back if the user tapped "change" by mistake
+                Button {
+                    revertAddressEdit()
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "arrow.uturn.backward")
+                            .font(.system(size: 11))
+                        Text("keep current address")
+                            .font(DesignTokens.Font.caption)
+                    }
+                    .foregroundColor(DesignTokens.Color.textMuted)
+                }
+                .padding(.bottom, DesignTokens.Spacing.md)
             }
 
             Divider().background(DesignTokens.Color.border)
@@ -437,18 +461,73 @@ struct EditPersonView: View {
         }
     }
 
-    // MARK: - Geocoding
+    // MARK: - Address editing
+
+    /// "change" tapped — switch to the autocomplete editor with a blank field.
+    private func startAddressEdit() {
+        geocodeTask?.cancel()
+        autocomplete.clear()
+        selectedAddressText = nil
+        addressText         = ""
+        geocodedLocation    = nil
+        geocodeState        = .idle
+        withAnimation { addressChanged = true }
+    }
+
+    /// "keep current address" tapped — restore the stored location untouched.
+    private func revertAddressEdit() {
+        geocodeTask?.cancel()
+        autocomplete.clear()
+        selectedAddressText = storedLocation.fullAddress
+        addressText         = storedLocation.fullAddress
+        geocodedLocation    = storedLocation
+        geocodeState        = .success(storedLocation)
+        withAnimation { addressChanged = false }
+    }
 
     private func handleAddressInput(_ text: String) {
+        // Skip the onChange triggered by us filling the field from a suggestion
+        guard text != selectedAddressText else { return }
+        selectedAddressText = nil
+
         geocodeTask?.cancel()
         geocodedLocation = nil
-        guard text.count >= 3 else { geocodeState = .idle; return }
+        geocodeState     = .idle
+        autocomplete.updateQuery(text)
+    }
 
-        geocodeState = .searching
-        geocodeTask  = Task {
-            try? await Task.sleep(nanoseconds: 350_000_000)
-            guard !Task.isCancelled else { return }
-            geocodeState = .geocoding(text)
+    private func selectSuggestion(_ sug: AddressSuggestion) {
+        selectedAddressText = sug.fullText
+        addressText         = sug.fullText
+        autocomplete.clear()
+        geocodeState = .geocoding(sug.title)
+
+        geocodeTask?.cancel()
+        geocodeTask = Task {
+            do {
+                let result = try await autocomplete.resolve(sug)
+                guard !Task.isCancelled else { return }
+                geocodedLocation = result
+                geocodeState     = .success(result)
+            } catch let error as GeocodingError {
+                guard !Task.isCancelled else { return }
+                geocodeState = .failure(error.errorDescription ?? "Location not found.")
+            } catch {
+                guard !Task.isCancelled else { return }
+                geocodeState = .failure(error.localizedDescription)
+            }
+        }
+    }
+
+    /// Fallback: user typed a full address and hit return without tapping a suggestion.
+    private func geocodeTypedAddress() {
+        let text = addressText.trimmingCharacters(in: .whitespaces)
+        guard text.count >= 3 else { return }
+        autocomplete.clear()
+        geocodeState = .geocoding(text)
+
+        geocodeTask?.cancel()
+        geocodeTask = Task {
             do {
                 let result = try await geocodingService.geocode(address: text)
                 guard !Task.isCancelled else { return }
@@ -466,9 +545,11 @@ struct EditPersonView: View {
 
     private func clearAddress() {
         geocodeTask?.cancel()
-        addressText      = ""
-        geocodeState     = .idle
-        geocodedLocation = nil
+        autocomplete.clear()
+        selectedAddressText = nil
+        addressText         = ""
+        geocodeState        = .idle
+        geocodedLocation    = nil
     }
 
     // MARK: - Save / Delete
@@ -476,20 +557,8 @@ struct EditPersonView: View {
     private func savePerson() {
         saveError = nil
 
-        // Resolve final location
-        let finalLocation: GeocodedLocation?
-        if addressChanged {
-            finalLocation = geocodedLocation
-        } else {
-            // Address unchanged — use stored coordinate
-            finalLocation = GeocodedLocation(
-                displayName: person.locationDisplayName,
-                fullAddress: person.displayAddress,
-                coordinate:  person.coordinate,
-                country:     nil,
-                postalCode:  nil
-            )
-        }
+        // Resolve final location — stored coordinate unless the address was edited
+        let finalLocation = addressChanged ? geocodedLocation : storedLocation
 
         guard let location = finalLocation else {
             saveError = "Please confirm a location before saving."
@@ -526,6 +595,17 @@ struct EditPersonView: View {
     }
 
     // MARK: - Computed helpers
+
+    /// The person's currently-saved location, as a GeocodedLocation.
+    private var storedLocation: GeocodedLocation {
+        GeocodedLocation(
+            displayName: person.locationDisplayName,
+            fullAddress: person.displayAddress,
+            coordinate:  person.coordinate,
+            country:     nil,
+            postalCode:  nil
+        )
+    }
 
     private var saveEnabled: Bool {
         let nameOk = !name.trimmingCharacters(in: .whitespaces).isEmpty

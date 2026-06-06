@@ -1,5 +1,5 @@
 // NotificationHandler.swift
-// HomeLink › Managers
+// Pointward › Managers
 
 import UserNotifications
 import Combine

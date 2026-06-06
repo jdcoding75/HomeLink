@@ -1,5 +1,5 @@
 // NeedleView.swift
-// HomeLink › Views
+// Pointward › Views
 //
 // The animated needle. Drawn with two Triangle shapes — north tip points
 // toward the target, south tip points away. Skin tints the colours.
@@ -48,23 +48,10 @@ struct NeedleView: View {
     }
 
     // MARK: - Skin colours
+    // Single source of truth: each skin's accent palette in CompassSkins.swift.
 
-    private var northColor: Color {
-        switch skin {
-        case .aurora:    return locked ? Color(hex: "#5dcaa5") : DesignTokens.Color.accentSoft
-        case .vintage:   return Color(hex: "#e8e0f0")
-        case .celestial: return Color(hex: "#e8e0f0")
-        default:         return DesignTokens.Color.accentSoft
-        }
-    }
-
-    private var southColor: Color {
-        switch skin {
-        case .aurora:    return Color(hex: "#085041")
-        case .vintage:   return Color(hex: "#6b5f7a")
-        default:         return DesignTokens.Color.accentStrong
-        }
-    }
+    private var northColor: Color { skin.northAccentColor }
+    private var southColor: Color { skin.southAccentColor }
 
     // MARK: - Ambient sway
 

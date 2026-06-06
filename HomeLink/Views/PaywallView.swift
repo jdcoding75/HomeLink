@@ -1,5 +1,8 @@
 // PaywallView.swift
-// HomeLink › Views
+// Pointward › Views
+//
+// One-time $1.99 unlock — NOT a subscription. No recurring charges,
+// no subscription language anywhere. Buy once, yours forever.
 
 import SwiftUI
 
@@ -11,13 +14,9 @@ struct PaywallView: View {
     @State private var isPurchasing = false
 
     private let features: [(emoji: String, text: String)] = [
-        ("👥", "add unlimited people"),
-        ("💜", "send and receive pings"),
-        ("✦",  "premium emoji glow themes"),
+        ("👥", "unlimited people"),
         ("🎨", "all compass skins"),
-        ("📍", "dynamic live location (coming soon)"),
-        ("☕", "brand location packs"),
-        ("📱", "lock screen and live activity widgets"),
+        ("📱", "home screen widget"),
     ]
 
     var body: some View {
@@ -45,18 +44,18 @@ struct PaywallView: View {
                         }
                         .padding(.bottom, 16)
 
-                        Text("HomeLink Pro")
+                        Text("Unlock Pointward")
                             .font(DesignTokens.Font.compassName)
                             .foregroundColor(DesignTokens.Color.textPrimary)
                             .padding(.bottom, 6)
 
-                        Text("everyone you love. every compass. one upgrade.")
+                        Text("one small unlock. everything, forever.")
                             .font(DesignTokens.Font.compassDistance)
                             .foregroundColor(DesignTokens.Color.textMuted)
                             .multilineTextAlignment(.center)
                             .padding(.bottom, 28)
 
-                        // Feature list
+                        // Feature list — clean and simple
                         VStack(spacing: 0) {
                             ForEach(features, id: \.text) { feature in
                                 HStack(spacing: 14) {
@@ -84,7 +83,17 @@ struct PaywallView: View {
                             RoundedRectangle(cornerRadius: DesignTokens.Radius.card)
                                 .stroke(DesignTokens.Color.border, lineWidth: 1)
                         )
-                        .padding(.bottom, 24)
+                        .padding(.bottom, 14)
+
+                        // One-time purchase badge
+                        HStack(spacing: 6) {
+                            Image(systemName: "checkmark.seal")
+                                .font(.system(size: 11))
+                            Text("one-time purchase · no subscription")
+                                .font(DesignTokens.Font.caption)
+                        }
+                        .foregroundColor(Color(hex: "#5dcaa5"))
+                        .padding(.bottom, 20)
 
                         // CTA
                         Button {
@@ -101,7 +110,7 @@ struct PaywallView: View {
                                         .tint(DesignTokens.Color.textPrimary)
                                         .scaleEffect(0.8)
                                 }
-                                Text(isPurchasing ? "purchasing…" : "upgrade · $2.99 / month")
+                                Text(isPurchasing ? "unlocking…" : "Unlock Pointward — $1.99")
                             }
                             .font(DesignTokens.Font.label)
                             .foregroundColor(DesignTokens.Color.textPrimary)
@@ -117,14 +126,14 @@ struct PaywallView: View {
                         .disabled(isPurchasing)
                         .padding(.bottom, 10)
 
-                        Button("restore purchases") {
+                        Button("restore purchase") {
                             Task { await subscription.restorePurchases() }
                         }
                         .font(DesignTokens.Font.caption)
                         .foregroundColor(DesignTokens.Color.textMuted)
                         .padding(.bottom, 8)
 
-                        Text("payment charged to your Apple ID. cancel anytime in Settings.")
+                        Text("one-time payment charged to your Apple ID. yours forever — nothing recurring.")
                             .font(.system(size: 10))
                             .foregroundColor(DesignTokens.Color.textDim)
                             .multilineTextAlignment(.center)

@@ -1,13 +1,13 @@
 // AppGroupStore.swift
-// HomeLink › Utilities
-// App Group: group.com.jdcoding75.homelink
+// Pointward › Utilities
+// App Group: group.com.jdcoding75.pointward
 
 import Foundation
 import WidgetKit
 
 struct AppGroupStore {
 
-    static let suiteName = "group.com.jdcoding75.homelink"
+    static let suiteName = "group.com.jdcoding75.pointward"
     private static let defaults = UserDefaults(suiteName: suiteName)!
 
     static var activePersonName: String {
@@ -23,7 +23,7 @@ struct AppGroupStore {
         set { defaults.set(newValue, forKey: "activeTagline"); reloadWidgets() }
     }
     static var activeSkin: String {
-        get { defaults.string(forKey: "activeSkin") ?? CompassSkin.minimal.rawValue }
+        get { defaults.string(forKey: "activeSkin") ?? CompassSkin.vintage.rawValue }
         set { defaults.set(newValue, forKey: "activeSkin"); reloadWidgets() }
     }
     static var activeBearing: Double {

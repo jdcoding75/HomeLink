@@ -1,19 +1,19 @@
 // PeopleListView.swift
-// HomeLink › Views
+// Pointward › Views
 
 import SwiftUI
+import CoreLocation
 
 struct PeopleListView: View {
 
-    @EnvironmentObject var people:       PeopleManager
-    @EnvironmentObject var subscription: SubscriptionManager
-    @EnvironmentObject var compass:      CompassManager
+    @EnvironmentObject var people:  PeopleManager
+    @EnvironmentObject var compass: CompassManager
 
     let geocodingService: GeocodingServiceProtocol
 
     @State private var showAdd    = false
     @State private var editPerson: Person? = nil
-    @State private var showPaywall = false
+    @State private var showUnlock = false
 
     var body: some View {
         ZStack {
@@ -34,29 +34,23 @@ struct PeopleListView: View {
                     .padding(.bottom, DesignTokens.Spacing.md)
 
                     // Person cards
-                    VStack(spacing: 10) {
+                    VStack(spacing: 12) {
                         ForEach(people.people) { person in
                             PersonCard(
                                 person: person,
-                                isSelected: people.selectedPerson?.id == person.id
+                                isSelected: people.selectedPerson?.id == person.id,
+                                distanceText: distanceText(for: person)
                             ) {
-                                // Tap card → select
+                                // Tap card → select, with a gentle warm haptic
                                 people.select(person)
                                 compass.start(tracking: person)
-                                HapticEngine.connectionFelt()
+                                HapticEngine.personSelected()
                             } onEdit: {
                                 editPerson = person
                             }
                         }
                     }
                     .padding(.horizontal, DesignTokens.Spacing.lg)
-
-                    // Paywall strip when at free limit
-                    if !subscription.tier.canAddMore(current: people.people.count) {
-                        paywallStrip
-                            .padding(.horizontal, DesignTokens.Spacing.lg)
-                            .padding(.top, DesignTokens.Spacing.sm)
-                    }
 
                     Spacer(minLength: DesignTokens.Spacing.xl)
                 }
@@ -65,12 +59,28 @@ struct PeopleListView: View {
         .sheet(isPresented: $showAdd) {
             AddPersonView(geocodingService: geocodingService)
         }
-        .sheet(item: $editPerson) { person in
+        .sheet(item: $editPerson, onDismiss: {
+            // Edits to the selected person (name, emoji, address) should show
+            // on the compass immediately — re-seed the compass state
+            if let person = people.selectedPerson {
+                compass.start(tracking: person)
+            }
+        }) { person in
             EditPersonView(person: person, geocodingService: geocodingService)
         }
-        .sheet(isPresented: $showPaywall) {
+        .sheet(isPresented: $showUnlock) {
             PaywallView()
         }
+    }
+
+    // MARK: - Helpers
+
+    /// Live distance from the user's last known location, when we have one.
+    private func distanceText(for person: Person) -> String? {
+        guard let location = compass.userLocation else { return nil }
+        let km = BearingCalculator.distanceKm(from: location.coordinate,
+                                              to: person.coordinate)
+        return BearingCalculator.formattedDistance(km)
     }
 
     // MARK: - Subviews
@@ -80,8 +90,9 @@ struct PeopleListView: View {
             if people.canAddPerson() {
                 showAdd = true
             } else {
+                // Free tier holds one person — the unlock opens the rest
                 HapticEngine.paywallReached()
-                showPaywall = true
+                showUnlock = true
             }
         } label: {
             Image(systemName: "plus")
@@ -94,82 +105,58 @@ struct PeopleListView: View {
         }
     }
 
-    private var paywallStrip: some View {
-        Button { showPaywall = true } label: {
-            HStack(spacing: 12) {
-                Text("🔒")
-                    .font(.system(size: 20))
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("add unlimited people")
-                        .font(DesignTokens.Font.label)
-                        .foregroundColor(DesignTokens.Color.textPrimary)
-                    Text("upgrade to HomeLink Pro")
-                        .font(DesignTokens.Font.caption)
-                        .foregroundColor(DesignTokens.Color.textMuted)
-                }
-                Spacer()
-                Text("upgrade")
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundColor(DesignTokens.Color.accentSoft)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
-                    .background(DesignTokens.Color.accentStrong)
-                    .cornerRadius(DesignTokens.Radius.pill)
-                    .overlay(
-                        Capsule().stroke(DesignTokens.Color.accentMid, lineWidth: 1)
-                    )
-            }
-            .padding(DesignTokens.Spacing.md)
-            .background(DesignTokens.Color.backgroundLift)
-            .cornerRadius(DesignTokens.Radius.card)
-            .overlay(
-                RoundedRectangle(cornerRadius: DesignTokens.Radius.card)
-                    .stroke(DesignTokens.Color.borderMid, lineWidth: 1)
-            )
-        }
-    }
 }
 
 // MARK: - PersonCard
 
+// A relationship, not a contact-list row: large glowing avatar, bold name,
+// their tagline in lavender, distance whispered beneath.
 struct PersonCard: View {
     let person: Person
     let isSelected: Bool
+    let distanceText: String?
     let onTap: () -> Void
     let onEdit: () -> Void
 
     var body: some View {
-        HStack(spacing: 14) {
-            // Avatar
-            Text(person.emoji)
-                .font(.system(size: 24))
-                .frame(width: 48, height: 48)
-                .background(DesignTokens.Color.backgroundLift)
-                .cornerRadius(14)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 14)
-                        .stroke(isSelected
-                                ? DesignTokens.Color.accentMid
-                                : DesignTokens.Color.border,
-                                lineWidth: 1)
-                )
+        HStack(spacing: 16) {
+            // Avatar — large, with a soft glow behind it
+            ZStack {
+                Circle()
+                    .fill(Color(hex: "#9b7fc0").opacity(isSelected ? 0.32 : 0.15))
+                    .frame(width: 60, height: 60)
+                    .blur(radius: 12)
+                Text(person.emoji)
+                    .font(.system(size: 30))
+                    .frame(width: 60, height: 60)
+                    .background(DesignTokens.Color.backgroundLift)
+                    .cornerRadius(18)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 18)
+                            .stroke(isSelected
+                                    ? DesignTokens.Color.accentMid
+                                    : DesignTokens.Color.border,
+                                    lineWidth: 1)
+                    )
+            }
 
             // Info
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: 3) {
                 Text(person.name)
-                    .font(DesignTokens.Font.label)
+                    .font(.system(size: 17, weight: .semibold))
                     .foregroundColor(DesignTokens.Color.textPrimary)
 
-                Text(person.displayAddress.isEmpty
-                     ? person.locationDisplayName
-                     : person.displayAddress)
-                    .font(DesignTokens.Font.caption)
-                    .foregroundColor(DesignTokens.Color.textMuted)
+                Text(person.resolvedTagline)
+                    .font(.system(size: 12).italic())
+                    .foregroundColor(DesignTokens.Color.accentMid)
                     .lineLimit(1)
 
-                Text(person.resolvedTagline)
-                    .font(.system(size: 11).italic())
-                    .foregroundColor(DesignTokens.Color.accentMid)
+                Text(distanceText
+                     ?? (person.displayAddress.isEmpty
+                         ? person.locationDisplayName
+                         : person.displayAddress))
+                    .font(.system(size: 11))
+                    .foregroundColor(DesignTokens.Color.textMuted)
                     .lineLimit(1)
             }
 
@@ -192,27 +179,28 @@ struct PersonCard: View {
                     )
             }
         }
-        .padding(DesignTokens.Spacing.md)
-        .background(isSelected
-                    ? DesignTokens.Color.backgroundLift
-                    : DesignTokens.Color.backgroundCard)
+        .padding(18)
+        .background(
+            // Subtle depth gradient instead of a flat card
+            LinearGradient(
+                colors: isSelected
+                    ? [Color(hex: "#251c35"), Color(hex: "#181222")]
+                    : [Color(hex: "#1a1424"), Color(hex: "#130f1b")],
+                startPoint: .topLeading, endPoint: .bottomTrailing
+            )
+        )
         .cornerRadius(DesignTokens.Radius.card)
         .overlay(
             RoundedRectangle(cornerRadius: DesignTokens.Radius.card)
                 .stroke(isSelected
                         ? DesignTokens.Color.accentMid
                         : DesignTokens.Color.border,
-                        lineWidth: 1)
+                        lineWidth: isSelected ? 1.4 : 1)
         )
+        // Warm lavender glow around the chosen one
+        .shadow(color: DesignTokens.Color.accentMid.opacity(isSelected ? 0.35 : 0),
+                radius: 12)
         .onTapGesture { onTap() }
-        .animation(.easeOut(duration: 0.2), value: isSelected)
-    }
-}
-
-// MARK: - SubscriptionTier helper
-
-private extension SubscriptionTier {
-    func canAddMore(current: Int) -> Bool {
-        current < maxPeople
+        .animation(.easeOut(duration: 0.25), value: isSelected)
     }
 }

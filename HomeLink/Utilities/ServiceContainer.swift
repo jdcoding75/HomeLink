@@ -1,6 +1,6 @@
 // ServiceContainer.swift
-// HomeLink › Utilities
-// Bundle ID: com.jdcoding75.homelink
+// Pointward › Utilities
+// Bundle ID: com.jdcoding75.pointward
 
 import Foundation
 import Combine

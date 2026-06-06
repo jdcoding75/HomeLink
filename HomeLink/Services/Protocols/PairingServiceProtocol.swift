@@ -1,5 +1,5 @@
 // PairingServiceProtocol.swift
-// HomeLink › Services › Protocols
+// Pointward › Services › Protocols
 
 protocol PairingServiceProtocol {
     func generatePairingCode() async throws -> String

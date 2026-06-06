@@ -1,5 +1,5 @@
 // CompassManager.swift
-// HomeLink › Managers
+// Pointward › Managers
 
 import Foundation
 import CoreLocation
@@ -13,7 +13,8 @@ final class CompassManager: NSObject, ObservableObject {
 
     private let skinStore: SkinStore
     private let locationManager = CLLocationManager()
-    private var userLocation: CLLocation?
+    // Published so list views can show live distances per person
+    @Published private(set) var userLocation: CLLocation?
     private var currentHeading: Double = 0
     private var targetPerson: Person?
     private var wasLocked = false
@@ -25,12 +26,59 @@ final class CompassManager: NSObject, ObservableObject {
         super.init()
         locationManager.delegate        = self
         locationManager.desiredAccuracy = kCLLocationAccuracyHundredMeters
+        // Ask immediately — before any startUpdatingLocation() call — so the
+        // system popup appears as soon as the app needs location.
+        locationManager.requestWhenInUseAuthorization()
     }
 
     func start(tracking person: Person) {
         targetPerson = person
+        // Surface the person's identity immediately — name/emoji/tagline must
+        // never wait for a GPS fix (which may never arrive in the Simulator).
+        seedState(with: person)
+        locationManager.requestWhenInUseAuthorization()
         locationManager.startUpdatingLocation()
         locationManager.startUpdatingHeading()
+        // If we already have a location from earlier, refresh bearing/distance now
+        updateCompassState()
+    }
+
+    /// Publish person identity right away, using the best-known location if any.
+    private func seedState(with person: Person) {
+        let activeSkin = resolvedSkin(for: person)
+        var distance = 0.0
+        var bearing  = 0.0
+        if let userLocation {
+            distance = BearingCalculator.distanceKm(from: userLocation.coordinate,
+                                                    to: person.coordinate)
+            bearing  = (BearingCalculator.bearing(from: userLocation.coordinate,
+                                                  to: person.coordinate)
+                        - currentHeading + 360).truncatingRemainder(dividingBy: 360)
+        }
+        wasLocked = false
+        state = CompassState(
+            bearingDegrees:   bearing,
+            distanceKm:       distance,
+            personID:         person.id,
+            personName:       person.name,
+            personEmoji:      person.emoji,
+            tagline:          person.tagline,
+            pendingPingEmoji: state.pendingPingEmoji,
+            isLocked:         false,
+            isFarFromHome:    userLocation != nil && distance > farFromHomeThresholdKm,
+            activeSkin:       activeSkin
+        )
+        AppGroupStore.activePersonName  = person.name
+        AppGroupStore.activePersonEmoji = person.emoji
+        AppGroupStore.activeTagline     = person.resolvedTagline
+        AppGroupStore.activeSkin        = activeSkin.rawValue
+    }
+
+    private func resolvedSkin(for person: Person) -> CompassSkin {
+        if let override = person.skinOverride, let skin = CompassSkin(rawValue: override) {
+            return skin
+        }
+        return skinStore.activeSkin
     }
 
     func stop() {
@@ -65,12 +113,7 @@ final class CompassManager: NSObject, ObservableObject {
         let isNowLocked  = bearingDiff <= lockThresholdDegrees
         if isNowLocked && !wasLocked { HapticEngine.connectionFelt() }
         wasLocked = isNowLocked
-        let activeSkin: CompassSkin
-        if let override = target.skinOverride, let skin = CompassSkin(rawValue: override) {
-            activeSkin = skin
-        } else {
-            activeSkin = skinStore.activeSkin
-        }
+        let activeSkin = resolvedSkin(for: target)
         state = CompassState(
             bearingDegrees:   relativeBearing,
             distanceKm:       distance,
@@ -103,7 +146,18 @@ extension CompassManager: CLLocationManagerDelegate {
         updateCompassState()
     }
     func locationManagerShouldDisplayHeadingCalibration(_ manager: CLLocationManager) -> Bool { true }
-    func locationManager(_ manager: CLLocationManager, didChangeAuthorization status: CLAuthorizationStatus) {
-        if status == .notDetermined { manager.requestWhenInUseAuthorization() }
+    func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
+        switch manager.authorizationStatus {
+        case .notDetermined:
+            manager.requestWhenInUseAuthorization()
+        case .authorizedWhenInUse, .authorizedAlways:
+            // Permission may arrive after start(tracking:) — kick updates off now
+            if targetPerson != nil {
+                manager.startUpdatingLocation()
+                manager.startUpdatingHeading()
+            }
+        default:
+            break
+        }
     }
 }

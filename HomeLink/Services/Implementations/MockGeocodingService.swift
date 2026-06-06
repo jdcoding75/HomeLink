@@ -1,5 +1,5 @@
 // MockGeocodingService.swift
-// HomeLink › Services › Implementations
+// Pointward › Services › Implementations
 
 import CoreLocation
 

@@ -15,7 +15,26 @@
       "Bash(tee /tmp/homelink_build5.log)",
       "Bash(echo \"exit: $?\")",
       "Bash(tee /tmp/homelink_build6.log)",
-      "Bash(jq *)"
+      "Bash(jq *)",
+      "Bash(xcodebuild -project HomeLink.xcodeproj -scheme HomeLink -destination 'generic/platform=iOS Simulator' build)",
+      "Bash(xcodebuild -scheme HomeLink -destination 'platform=iOS Simulator,name=iPhone 16 Pro' build)",
+      "Bash(xcrun simctl *)",
+      "Bash(swift Scripts/GenerateAppIcon.swift)",
+      "Bash(xcrun -sdk iphonesimulator swiftc -parse -target arm64-apple-ios18.0-simulator HomeLinkWidgets/CompassWidget.swift HomeLink/Utilities/AppGroupStore.swift HomeLink/Utilities/BearingCalculator.swift HomeLink/DesignSystem/TaglineSystem.swift HomeLink/DesignSystem/CompassSkins.swift HomeLink/DesignSystem/DesignTokens.swift)",
+      "Bash(xcodebuild -list)",
+      "Bash(xcodebuild -scheme PointwardWidgetsExtension -destination 'platform=iOS Simulator,name=iPhone 17 Pro' build)",
+      "Bash(sed -i '' '/case steampunk  = \"steampunk\"/d; /case \\\\.steampunk: return/d; /case \\\\.steampunk: return Color/d' HomeLink/DesignSystem/CompassSkins.swift)",
+      "Bash(sed -i '' 's/        case .minimal, .vintage, .steampunk: return false/        case .minimal, .vintage:             return false/' HomeLink/DesignSystem/CompassSkins.swift)",
+      "Bash(sed -i '' 's|    /// Steampunk; the \\\\$1.99 unlock opens the rest.|    /// the $1.99 unlock opens the rest.|' HomeLink/DesignSystem/CompassSkins.swift)",
+      "Bash(sed -i '' 's/return \\\\[\"minimal\", \"vintage\", \"steampunk\"\\\\]/return [\"minimal\", \"vintage\"]/' HomeLink/Models/SubscriptionTier.swift)",
+      "Bash(supabase --version)",
+      "Bash(brew install *)",
+      "Bash(supabase functions *)",
+      "Bash(export SUPABASE_ACCESS_TOKEN=sbp_70bc1f753f19d34c9009a4e10ad2e65567d4b4f5)",
+      "Read(//Users/john/Downloads/**)",
+      "Read(//Users/john/Documents/**)",
+      "Bash(unset SUPABASE_ACCESS_TOKEN)",
+      "Bash(supabase secrets *)"
     ]
   }
 }

@@ -1,5 +1,5 @@
 // CompassView.swift
-// HomeLink › Views
+// Pointward › Views
 //
 // The emotional core of the app. Every system converges here:
 //   - Skin system (NeedleView dispatches to the active skin's ring/face renderer)
@@ -22,6 +22,7 @@ struct CompassView: View {
     @EnvironmentObject var people:   PeopleManager
     @EnvironmentObject var pings:    PingManager
     @EnvironmentObject var skinStore: SkinStore
+    @EnvironmentObject var appEnv:   AppEnvironment
 
     @AppStorage("quietMode") private var quietMode = false
 
@@ -34,8 +35,8 @@ struct CompassView: View {
     @State private var pingRingActive  = false
     @State private var pingOverlayVisible = false
 
-    // Far-from-home
-    @State private var farGlowActive = false
+    // Empty state
+    @State private var showAddPerson = false
 
     // Tagline animation trigger
     @State private var taglineKey: UUID = UUID()
@@ -43,28 +44,40 @@ struct CompassView: View {
     var body: some View {
         ZStack {
             // ── Background ──────────────────────────────────────────────────
-            backgroundLayer
+            // Phase 1: steady deep purple — the far-from-home colour shift is
+            // gone, only the text label remains.
+            DesignTokens.Color.background
+                .ignoresSafeArea()
 
-            VStack(spacing: 0) {
-                Spacer()
+            if people.people.isEmpty {
+                // ── Warm empty state — no one to point toward yet ────────────
+                emptyState
+            } else {
+                VStack(spacing: 0) {
+                    Spacer(minLength: 0)
 
-                // ── Person header ────────────────────────────────────────────
-                personHeader
-                    .padding(.bottom, 20)
+                    // ── Person header ────────────────────────────────────────
+                    personHeader
+                        .padding(.bottom, 4)
 
-                // ── Compass face ─────────────────────────────────────────────
-                compassFace
-                    .frame(width: 240, height: 240)
+                    // ── Compass face — the hero of the screen ────────────────
+                    // Skins render at a fixed 240pt design size; scale the whole
+                    // composition so every face grows together. 350pt face —
+                    // dominates the screen while name and distance stay visible.
+                    compassFace
+                        .frame(width: 240, height: 240)
+                        .scaleEffect(350.0 / 240.0)
+                        .frame(width: 350, height: 350)
 
-                // ── Lock badge ───────────────────────────────────────────────
-                lockBadge
-                    .padding(.top, 8)
+                    // ── Lock badge ───────────────────────────────────────────
+                    lockBadge
+                        .padding(.top, 2)
 
-                // ── Bearing readout ──────────────────────────────────────────
-                bearingReadout
-                    .padding(.top, 4)
+                    // ── Bearing readout ──────────────────────────────────────
+                    bearingReadout
 
-                Spacer()
+                    Spacer(minLength: 0)
+                }
             }
 
             // ── Ping overlay (floats above everything) ───────────────────────
@@ -77,7 +90,6 @@ struct CompassView: View {
         }
         // ── Reactions to state changes ────────────────────────────────────────
         .onChange(of: compass.state.isLocked)        { _, locked in handleLock(locked) }
-        .onChange(of: compass.state.isFarFromHome)   { _, far    in handleFar(far) }
         .onChange(of: compass.state.personID)        { _, _      in handlePersonChange() }
         .onChange(of: pings.pendingPing != nil)      { _, hasPing in handlePing(hasPing) }
         .onAppear {
@@ -90,20 +102,72 @@ struct CompassView: View {
                 compass.start(tracking: person)
             }
         }
+        .sheet(isPresented: $showAddPerson) {
+            AddPersonView(geocodingService: appEnv.geocodingService)
+        }
     }
 
-    // MARK: - Background
+    // MARK: - Empty state
 
-    @ViewBuilder
-    private var backgroundLayer: some View {
-        if compass.state.isFarFromHome && !quietMode {
-            // Warm amber-brown tint when far from home
-            Color(hex: "#1a0f0a")
-                .ignoresSafeArea()
-                .animation(.easeInOut(duration: 1.2), value: compass.state.isFarFromHome)
-        } else {
-            DesignTokens.Color.background
-                .ignoresSafeArea()
+    @State private var emptyGlowPulse = false
+
+    private var emptyState: some View {
+        VStack(spacing: 0) {
+            Spacer()
+
+            // Compass emoji with a soft pulsing glow
+            ZStack {
+                Circle()
+                    .fill(Color(hex: "#9b7fc0").opacity(emptyGlowPulse ? 0.30 : 0.14))
+                    .frame(width: 110, height: 110)
+                    .blur(radius: 22)
+                Circle()
+                    .stroke(DesignTokens.Color.accentMid.opacity(0.3), lineWidth: 1)
+                    .frame(width: 124, height: 124)
+                Circle()
+                    .stroke(DesignTokens.Color.accentMid.opacity(0.12), lineWidth: 1)
+                    .frame(width: 148, height: 148)
+                Text("🧭")
+                    .font(.system(size: 52))
+                    .scaleEffect(emptyGlowPulse ? 1.04 : 1.0)
+            }
+            .padding(.bottom, 32)
+            .onAppear {
+                guard !quietMode else { return }
+                withAnimation(.easeInOut(duration: 2.8).repeatForever(autoreverses: true)) {
+                    emptyGlowPulse = true
+                }
+            }
+
+            Text("your compass is waiting")
+                .font(DesignTokens.Font.compassName)
+                .foregroundColor(DesignTokens.Color.textPrimary)
+                .padding(.bottom, 6)
+
+            Text("add someone to point toward")
+                .font(DesignTokens.Font.compassDistance)
+                .foregroundColor(DesignTokens.Color.textMuted)
+                .padding(.bottom, 10)
+
+            Text("Love has a direction.")
+                .font(.system(size: 13).italic())
+                .foregroundColor(DesignTokens.Color.accentMid)
+                .padding(.bottom, 28)
+
+            Button {
+                showAddPerson = true
+            } label: {
+                Text("add your first person")
+                    .font(DesignTokens.Font.label)
+                    .foregroundColor(DesignTokens.Color.textPrimary)
+                    .padding(.horizontal, 28)
+                    .padding(.vertical, 13)
+                    .background(DesignTokens.Color.accentStrong)
+                    .clipShape(Capsule())
+                    .overlay(Capsule().stroke(DesignTokens.Color.accentMid, lineWidth: 1))
+            }
+
+            Spacer()
         }
     }
 
@@ -115,33 +179,61 @@ struct CompassView: View {
                 .font(DesignTokens.Font.overline)
                 .foregroundColor(DesignTokens.Color.textMuted)
 
+            // Name crossfades on person switch — never snaps
             Text(compass.state.personName)
                 .font(DesignTokens.Font.compassName)
                 .foregroundColor(DesignTokens.Color.textPrimary)
+                .contentTransition(.opacity)
+                .animation(.easeInOut(duration: 0.35), value: compass.state.personName)
 
             Text(compass.state.formattedDistance)
                 .font(DesignTokens.Font.compassDistance)
                 .foregroundColor(DesignTokens.Color.textSecondary)
 
-            // Far-from-home label
-            if compass.state.isFarFromHome {
-                Text("far from home")
-                    .font(DesignTokens.Font.caption)
-                    .foregroundColor(Color(hex: "#c4845a"))
+            // Below the numbers, exactly one idea at a time:
+            //   custom tagline → ONLY the tagline (it always takes priority)
+            //   no tagline     → emotional distance (+ "far from home" if > 500 km)
+            Group {
+                if hasCustomTagline {
+                    // Custom tagline — fades out, then the new one fades in
+                    // on person switch
+                    Text(compass.state.resolvedTagline)
+                        .font(.system(size: 13).italic())
+                        .foregroundColor(DesignTokens.Color.accentMid)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, DesignTokens.Spacing.xl)
+                        .id(taglineKey)
+                        .transition(.asymmetric(
+                            insertion: .opacity.animation(.easeIn(duration: 0.4).delay(0.3)),
+                            removal:   .opacity.animation(.easeOut(duration: 0.25))
+                        ))
+                } else {
+                    VStack(spacing: 2) {
+                        if compass.state.isFarFromHome {
+                            Text("far from home")
+                                .font(DesignTokens.Font.caption)
+                                .foregroundColor(Color(hex: "#c4845a"))
+                                .transition(.opacity)
+                        }
+                        Text(BearingCalculator.emotionalDistance(compass.state.distanceKm))
+                            .font(.system(size: 12).italic())
+                            .foregroundColor(DesignTokens.Color.textMuted)
+                            .contentTransition(.opacity)
+                    }
                     .transition(.opacity)
+                }
             }
-
-            // Tagline — re-animates on person switch via id key
-            Text(compass.state.resolvedTagline)
-                .font(.system(size: 13).italic())
-                .foregroundColor(DesignTokens.Color.accentMid)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, DesignTokens.Spacing.xl)
-                .id(taglineKey)
-                .transition(.opacity.combined(with: .move(edge: .bottom)))
-                .animation(.easeOut(duration: 0.4), value: taglineKey)
-                .padding(.top, 2)
+            .padding(.top, 2)
+            .animation(.easeInOut(duration: 0.45), value: hasCustomTagline)
+            .animation(.easeInOut(duration: 0.45), value: compass.state.isFarFromHome)
+            .animation(.easeInOut(duration: 0.5), value: compass.state.distanceKm < 5)
         }
+    }
+
+    /// True only when the person has their own tagline — skin defaults don't count.
+    private var hasCustomTagline: Bool {
+        guard let t = compass.state.tagline else { return false }
+        return !t.trimmingCharacters(in: .whitespaces).isEmpty
     }
 
     // MARK: - Compass face
@@ -157,6 +249,18 @@ struct CompassView: View {
                 pingRingActive: pingRingActive
             )
 
+            // Subtle fixed cardinal markers at the rim — orientation reference
+            // while the needle moves (just inside the breathing ring)
+            ForEach(0..<4, id: \.self) { i in
+                let rad = Double(i) * 90 * .pi / 180
+                Text(["N", "E", "S", "W"][i])
+                    .font(.system(size: 9, weight: i == 0 ? .semibold : .regular, design: .rounded))
+                    .foregroundColor(i == 0
+                                     ? DesignTokens.Color.accentSoft.opacity(0.9)
+                                     : DesignTokens.Color.textDim.opacity(0.7))
+                    .offset(x: CGFloat(sin(rad)) * 113, y: -CGFloat(cos(rad)) * 113)
+            }
+
             // Emoji presence system — always at center
             emojiPresence
 
@@ -168,10 +272,11 @@ struct CompassView: View {
                 quietMode: quietMode
             )
 
-            // Pivot dot
+            // Pivot dot — soft glow on the heart skin
             Circle()
                 .fill(pivotColor)
                 .frame(width: 10, height: 10)
+                .shadow(color: pivotGlow, radius: 4)
                 .zIndex(4)
         }
     }
@@ -192,9 +297,11 @@ struct CompassView: View {
                 )
                 .zIndex(2)
 
-            // Emoji — scales up on lock
+            // Emoji — scales up on lock, crossfades on person switch
             Text(compass.state.personEmoji)
                 .font(.system(size: 28))
+                .contentTransition(.opacity)
+                .animation(.easeInOut(duration: 0.35), value: compass.state.personEmoji)
                 .scaleEffect(emojiScaled ? 1.2 : 1.0)
                 .animation(
                     quietMode
@@ -252,9 +359,17 @@ struct CompassView: View {
     }
 
     private var pivotColor: Color {
-        compass.state.activeSkin == .aurora
-            ? Color(hex: "#1D9E75")
-            : DesignTokens.Color.accentMid
+        switch compass.state.activeSkin {
+        case .aurora: return Color(hex: "#1D9E75")
+        case .heart:  return Color(hex: "#e0a8c8")
+        default:      return DesignTokens.Color.accentMid
+        }
+    }
+
+    private var pivotGlow: Color {
+        compass.state.activeSkin == .heart
+            ? Color(hex: "#e0a8c8").opacity(0.8)
+            : .clear
     }
 
     // MARK: - Event handlers
@@ -277,14 +392,8 @@ struct CompassView: View {
         }
     }
 
-    private func handleFar(_ far: Bool) {
-        withAnimation(.easeInOut(duration: 1.2)) {
-            farGlowActive = far
-        }
-    }
-
     private func handlePersonChange() {
-        // Re-trigger tagline fade animation
+        // Re-trigger tagline fade-out → fade-in
         withAnimation {
             taglineKey = UUID()
         }

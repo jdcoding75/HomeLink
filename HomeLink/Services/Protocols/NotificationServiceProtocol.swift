@@ -1,5 +1,5 @@
 // NotificationServiceProtocol.swift
-// HomeLink › Services › Protocols
+// Pointward › Services › Protocols
 
 import UserNotifications
 

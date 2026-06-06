@@ -1,12 +1,12 @@
-// HomeLinkApp.swift
-// HomeLink
-// Bundle ID: com.jdcoding75.homelink
+// PointwardApp.swift
+// Pointward
+// Bundle ID: com.jdcoding75.pointward
 
 import SwiftUI
 import SwiftData
 
 @main
-struct HomeLinkApp: App {
+struct PointwardApp: App {
 
     @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     @StateObject private var container = ServiceContainer()

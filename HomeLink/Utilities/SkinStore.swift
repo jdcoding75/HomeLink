@@ -1,5 +1,5 @@
 // SkinStore.swift
-// HomeLink › Utilities
+// Pointward › Utilities
 
 import Foundation
 import Combine
@@ -15,12 +15,22 @@ final class SkinStore: ObservableObject {
     }
 
     init() {
-        let saved  = UserDefaults.standard.string(forKey: "activeSkin") ?? ""
-        activeSkin = CompassSkin(rawValue: saved) ?? .minimal
+        // Vintage Brass is the first impression for every new user.
+        let saved = UserDefaults.standard.string(forKey: "activeSkin") ?? ""
+        var skin  = CompassSkin(rawValue: saved) ?? .vintage
+
+        // If a locked skin is somehow active on the free tier (e.g. state from
+        // an earlier build), fall back to the default rather than show locked content.
+        let savedTier = UserDefaults.standard.string(forKey: "subscriptionTier") ?? ""
+        let tier = SubscriptionTier(rawValue: savedTier) ?? .free
+        if skin.requiresUnlock && tier == .free {
+            skin = .vintage
+        }
+        activeSkin = skin
     }
 
     func select(_ skin: CompassSkin, subscription: SubscriptionManager) {
-        guard !skin.requiresPro || subscription.tier == .pro else { return }
+        guard !skin.requiresUnlock || subscription.tier != .free else { return }
         activeSkin = skin
         HapticEngine.skinSelected()
     }

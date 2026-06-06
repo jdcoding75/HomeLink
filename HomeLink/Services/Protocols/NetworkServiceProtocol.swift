@@ -1,5 +1,5 @@
 // NetworkServiceProtocol.swift
-// HomeLink › Services › Protocols
+// Pointward › Services › Protocols
 
 protocol NetworkServiceProtocol {
     func sendPing(toPairedUserID: String, emoji: String) async throws

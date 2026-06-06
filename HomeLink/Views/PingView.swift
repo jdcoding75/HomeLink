@@ -1,212 +1,1004 @@
 // PingView.swift
-// HomeLink › Views
+// Pointward › Views
+//
+// Phase 1: "send a thought" — a symbolic, backend-free gesture.
+// Two lanes of feeling: "with love" floats out softly like a lantern;
+// "with feeling" launches like a missile with fire and scorch marks.
+// Either way it flies in the real compass direction of the person.
+// Free for everyone — no Pro gating.
 
 import SwiftUI
 
 struct PingView: View {
 
-    @EnvironmentObject var pings:        PingManager
-    @EnvironmentObject var people:       PeopleManager
-    @EnvironmentObject var subscription: SubscriptionManager
+    @EnvironmentObject var compass: CompassManager
+    @EnvironmentObject var people:  PeopleManager
 
+    @AppStorage("quietMode") private var quietMode = false
+
+    // MARK: - State
+
+    private enum ThoughtPhase { case idle, flying, sent }
+
+    @State private var phase: ThoughtPhase = .idle
     @State private var selectedEmoji: String? = nil
-    @State private var isSending = false
-    @State private var showSentConfirm = false
-    @State private var showPaywall = false
+    @State private var fly = false          // drives every flight animation
+    @State private var redFlash = false     // one subtle screen flash for "with feeling"
+    @State private var flashGreen = false   // 💨 flashes green instead of red
+    @State private var scorch = false       // scorch marks linger, then fade
+    @State private var popRing = false      // final pop as a fury thought exits
+    @State private var wobble: CGFloat = 0  // 💨 screen wobble on launch
 
-    private let emojiOptions = ["💜","🌙","🌿","✨","🕊️","🌸","☀️","🫂",
-                                "🔥","🌈","⭐️","🍀","🎵","🌺","🦋","🤍"]
+    // Personal recorded sounds — two slots, tokens "custom0"/"custom1"
+    @StateObject private var customStore = CustomSoundStore()
+    @StateObject private var recorder    = AudioRecorder()
+    @State private var recordSlot: RecordSlot? = nil
+    @State private var slotPulse = false    // soft pulsing border on empty slots
+
+    // Focused set — each emoji has its own synthesized voice in SoundEngine.
+    // "gecko" renders the custom-drawn LeopardGeckoView — a personal touch
+    // for the leopard-gecko lover in the family
+    private let loveEmojis    = ["💜","💋","🫂","🌸","gecko","✨"]
+    private let feelingEmojis = ["😢","😤","🤬","⚡️","🔥","💨"]
+
+    private static let lavender   = Color(hex: "#c4a8d4")
+    private static let lavenderHi = Color(hex: "#e0ccee")
+    private static let purpleGlow = Color(hex: "#9b7fc0")
+    private static let dim        = Color(hex: "#7c6b8e")
+    private static let ember      = Color(hex: "#ff6b4a")
+    private static let fire       = Color(hex: "#ff3b30")
+    private static let amber      = Color(hex: "#ffb347")
+    private static let geckoGold  = Color(hex: "#F5A623")
+    private static let geckoSun   = Color(hex: "#FFD966")
+
+    /// Renders an emoji string, the hand-drawn gecko, or a custom slot's emoji.
+    @ViewBuilder
+    private func thoughtSymbol(_ token: String, size: CGFloat) -> some View {
+        if token == "gecko" {
+            LeopardGeckoView(size: size * 1.2)   // match emoji glyph footprint
+        } else if let slot = customSlot(for: token) {
+            Text(customStore.sound(at: slot)?.emoji ?? "🎤").font(.system(size: size))
+        } else {
+            Text(token).font(.system(size: size))
+        }
+    }
+
+    private var selectedIsFeeling: Bool {
+        guard let e = selectedEmoji else { return false }
+        // Custom recordings ride the "with feeling" launch animation
+        return feelingEmojis.contains(e) || e.hasPrefix("custom")
+    }
+
+    /// Slot index for a "customN" token, if it is one.
+    private func customSlot(for token: String) -> Int? {
+        guard token.hasPrefix("custom"), let i = Int(token.dropFirst(6)) else { return nil }
+        return i
+    }
+
+    /// The plain emoji that represents a token when sent over the wire.
+    private func remoteEmoji(for token: String) -> String {
+        if token == "gecko" { return "🦎" }
+        if let slot = customSlot(for: token) {
+            return customStore.sound(at: slot)?.emoji ?? "💜"
+        }
+        return token
+    }
+
+    // MARK: - Body
+
+    var body: some View {
+        GeometryReader { geo in
+            ZStack {
+                // Quiet night atmosphere — deep purple, faint stars
+                DesignTokens.Color.background.ignoresSafeArea()
+                RadialGradient(
+                    colors: [Self.purpleGlow.opacity(0.10), .clear],
+                    center: UnitPoint(x: 0.5, y: 0.40),
+                    startRadius: 30, endRadius: 420
+                )
+                .ignoresSafeArea()
+                starField
+                    .ignoresSafeArea()
+
+                // One subtle screen flash when something is fired with feeling
+                // (red for fury, green for the 💨)
+                (flashGreen ? Color.green : Color.red)
+                    .opacity(redFlash ? 0.10 : 0)
+                    .ignoresSafeArea()
+                    .allowsHitTesting(false)
+
+                // ── The compass IS the screen — flights cross the whole display
+                // (1.12 → 1.0: trimmed ~10% so the face breathes inside the edges)
+                miniCompass
+                    .frame(width: 200, height: 200)
+                    .scaleEffect(min(geo.size.width, geo.size.height) * 1.0 / 200)
+                    .position(x: geo.size.width / 2, y: geo.size.height * 0.42)
+                    .allowsHitTesting(false)
+
+                // ── Floating chrome over the face ────────────────────────────
+                VStack(spacing: 0) {
+                    header
+                        .padding(.top, 8)
+
+                    Spacer()
+
+                    if phase == .sent {
+                        sentConfirmation
+                            .padding(.bottom, 14)
+                            .transition(.opacity.animation(.easeIn(duration: 0.5).delay(0.4)))
+                    }
+
+                    emojiPanel
+                        .padding(.horizontal, 14)
+                        .padding(.bottom, 8)
+                }
+            }
+            .offset(x: wobble)   // 💨 launch shake — bouncy spring back to center
+            .contentShape(Rectangle())
+            .onTapGesture {
+                // Tap anywhere to dismiss the confirmation
+                if phase == .sent { resetThought() }
+            }
+            .sheet(item: $recordSlot) { slot in
+                RecordSoundSheet(slot: slot.id, recorder: recorder, store: customStore)
+                    .presentationDetents([.medium])
+            }
+        }
+        .animation(.spring(response: 0.4, dampingFraction: 0.7), value: selectedEmoji)
+        .animation(.easeOut(duration: 0.35), value: phase)
+    }
+
+    // MARK: - Floating emoji panel
+
+    private var emojiPanel: some View {
+        VStack(spacing: 8) {
+            emojiSections
+
+            if let emoji = selectedEmoji, phase == .idle {
+                sendButton(emoji: emoji)
+                    .transition(.opacity.combined(with: .move(edge: .bottom)))
+            }
+        }
+        .padding(14)
+        .background(
+            RoundedRectangle(cornerRadius: 24)
+                .fill(DesignTokens.Color.background.opacity(0.74))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 24)
+                        .stroke(DesignTokens.Color.border, lineWidth: 1)
+                )
+        )
+        .opacity(phase == .flying ? 0.25 : 1)
+    }
+
+    private func resetThought() {
+        withAnimation(.easeOut(duration: 0.3)) {
+            phase         = .idle
+            selectedEmoji = nil
+            fly           = false
+            scorch        = false
+        }
+    }
+
+    // MARK: - Header
+
+    private var header: some View {
+        VStack(spacing: 6) {
+            Text("send a thought")
+                .font(DesignTokens.Font.compassName)
+                .foregroundColor(DesignTokens.Color.textPrimary)
+
+            if let person = people.selectedPerson {
+                Text("toward \(person.name) · \(compass.state.formattedDistance) away")
+                    .font(.system(size: 13).italic())
+                    .foregroundColor(DesignTokens.Color.accentMid)
+            }
+        }
+    }
+
+    // MARK: - Star field
+
+    private var starField: some View {
+        Canvas { ctx, size in
+            var seed: UInt32 = 77
+            for _ in 0..<42 {
+                seed = seed &* 1103515245 &+ 12345
+                let x = Double(seed & 0x7fff) / Double(0x7fff) * size.width
+                seed = seed &* 1103515245 &+ 12345
+                let y = Double(seed & 0x7fff) / Double(0x7fff) * size.height
+                let r: CGFloat = 0.4 + CGFloat((seed >> 16) & 3) * 0.25
+                let op = 0.12 + Double((seed >> 20) & 3) * 0.08
+                let star = Path(ellipseIn: CGRect(x: x - r, y: y - r, width: r * 2, height: r * 2))
+                ctx.fill(star, with: .color(Self.lavender.opacity(op)))
+            }
+        }
+    }
+
+    // MARK: - Mini compass
+
+    /// Direction the needle points, as a unit offset (bearing 0° = up).
+    private var flightDirection: CGSize {
+        let rad = compass.state.bearingDegrees * .pi / 180
+        return CGSize(width: CGFloat(sin(rad)), height: -CGFloat(cos(rad)))
+    }
+
+    private var miniCompass: some View {
+        ZStack {
+            // Soft glow under the face — warms purple for love, embers for feeling
+            Circle()
+                .fill((phase == .flying && selectedIsFeeling ? Self.ember : Self.purpleGlow)
+                    .opacity(phase == .flying ? 0.25 : 0.12))
+                .frame(width: 185, height: 185)
+                .blur(radius: 26)
+                .animation(.easeInOut(duration: 0.5), value: phase)
+
+            // Face rings + ticks
+            Circle()
+                .stroke(Self.dim.opacity(0.55), lineWidth: 1)
+                .frame(width: 195, height: 195)
+            Circle()
+                .stroke(Self.dim.opacity(0.22), lineWidth: 0.5)
+                .frame(width: 187, height: 187)
+            Canvas { ctx, size in
+                let cx = size.width / 2, cy = size.height / 2
+                for deg in stride(from: 0, to: 360, by: 15) {
+                    let rad   = Double(deg) * .pi / 180
+                    let major = deg % 90 == 0
+                    let len: CGFloat = major ? 8 : 4
+                    var path = Path()
+                    path.move(to: CGPoint(x: cx + CGFloat(sin(rad)) * 93,
+                                          y: cy - CGFloat(cos(rad)) * 93))
+                    path.addLine(to: CGPoint(x: cx + CGFloat(sin(rad)) * (93 - len),
+                                             y: cy - CGFloat(cos(rad)) * (93 - len)))
+                    ctx.stroke(path,
+                               with: .color(major ? Self.lavender.opacity(0.7)
+                                                  : Self.dim.opacity(0.5)),
+                               lineWidth: major ? 1.0 : 0.5)
+                }
+            }
+            .frame(width: 195, height: 195)
+
+            // Needle at the live bearing — the thought travels where this points
+            ZStack {
+                Triangle()
+                    .fill(Self.lavender)
+                    .frame(width: 9, height: 56)
+                    .offset(y: -30)
+                Triangle()
+                    .fill(Color(hex: "#5a4870"))
+                    .frame(width: 7, height: 36)
+                    .rotationEffect(.degrees(180))
+                    .offset(y: 20)
+            }
+            .rotationEffect(.degrees(compass.state.bearingDegrees))
+            .opacity(phase == .sent ? 0.35 : 1)
+
+            // Pivot
+            Circle()
+                .fill(Self.dim)
+                .frame(width: 8, height: 8)
+
+            // ── The flight ───────────────────────────────────────────────────
+            if phase == .flying, let emoji = selectedEmoji {
+                if selectedIsFeeling {
+                    furyFlight(emoji: emoji)
+                } else {
+                    loveFlight(emoji: emoji)
+                }
+            }
+
+            // ── Afterglow: their emoji rests at center ───────────────────────
+            if phase == .sent, let person = people.selectedPerson {
+                ZStack {
+                    Circle()
+                        .fill(Self.purpleGlow.opacity(0.30))
+                        .frame(width: 64, height: 64)
+                        .blur(radius: 14)
+                    Text(person.emoji)
+                        .font(.system(size: 30))
+                }
+                .transition(.opacity.animation(.easeIn(duration: 0.6).delay(0.5)))
+            }
+        }
+    }
+
+    // MARK: - Love flight — a lantern released into the night
+
+    @ViewBuilder
+    private func loveFlight(emoji: String) -> some View {
+        let isGecko = emoji == "gecko"
+        let dir     = flightDirection
+        let edge    = CGSize(width: dir.width * 150, height: dir.height * 150)
+        // The gecko trails its own warm orange/yellow; everything else stays pink/purple
+        let cloudA  = isGecko ? Self.geckoGold : Self.purpleGlow
+        let cloudB  = isGecko ? Self.geckoSun  : Color(hex: "#e0a8c8")
+
+        // Soft warm particle cloud drifting behind
+        ForEach(0..<8, id: \.self) { i in
+            let frac   = 0.2 + Double(i) / 10
+            let side   = (i % 2 == 0 ? 1.0 : -1.0)
+            let jitter = side * Double(5 + (i * 9) % 14)
+            let target = CGSize(
+                width:  dir.width  * 150 * frac - dir.height * jitter,
+                height: dir.height * 150 * frac + dir.width  * jitter
+            )
+            Circle()
+                .fill((i % 2 == 0 ? cloudA : cloudB).opacity(0.5))
+                .frame(width: CGFloat(5 + (i * 3) % 7), height: CGFloat(5 + (i * 3) % 7))
+                .blur(radius: 3)
+                .scaleEffect(fly ? 1.4 : 0.3)
+                .opacity(fly ? 0 : 0.8)
+                .offset(fly ? target : .zero)
+                .animation(.easeOut(duration: 2.0).delay(0.25 + frac * 0.8), value: fly)
+        }
+
+        // Trail — hearts and sparkles, or orange/yellow sparkles for the gecko
+        ForEach(0..<6, id: \.self) { i in
+            Group {
+                if isGecko {
+                    Text("✦")
+                        .font(.system(size: CGFloat(10 + (i * 2) % 6)))
+                        .foregroundColor(i % 2 == 0 ? Self.geckoGold : Self.geckoSun)
+                } else {
+                    Text(i % 2 == 0 ? "💗" : "✨")
+                        .font(.system(size: CGFloat(10 + (i * 2) % 6)))
+                }
+            }
+            .scaleEffect(fly ? 0.4 : 0.9)
+            .opacity(fly ? 0 : 0.85 - Double(i) * 0.1)
+            .offset(fly ? edge : .zero)
+            .animation(.easeOut(duration: 2.4).delay(0.3 + Double(i) * 0.18), value: fly)
+        }
+
+        // The thought — a slow intentional drift across the whole screen
+        thoughtSymbol(emoji, size: 30)
+            .scaleEffect(fly ? 1.6 : 0.6)
+            .opacity(fly ? 0 : 1)
+            .offset(fly ? edge : .zero)
+            .animation(.easeOut(duration: 2.6).delay(0.1), value: fly)
+            .shadow(color: (isGecko ? Self.geckoGold : Self.purpleGlow).opacity(0.7), radius: 10)
+    }
+
+    // MARK: - Fury flight — fired, not floated
+
+    @ViewBuilder
+    private func furyFlight(emoji: String) -> some View {
+        let isFart = emoji == "💨"
+        let dir  = flightDirection
+        let edge = CGSize(width: dir.width * 165, height: dir.height * 165)
+        // 💨 trails green instead of fire
+        let trailA: Color = isFart ? Color(hex: "#6fd44a") : Self.fire
+        let trailB: Color = isFart ? Color(hex: "#4a9c33") : Self.ember
+        let trailC: Color = isFart ? Color(hex: "#a8e063") : Self.amber
+
+        // Scorch marks along the path — appear fast, linger, fade slow
+        ForEach(0..<6, id: \.self) { i in
+            let frac = 0.15 + Double(i) / 8
+            let pos  = CGSize(width: dir.width * 150 * frac,
+                              height: dir.height * 150 * frac)
+            Circle()
+                .fill(Color(hex: "#3a201a").opacity(0.9))
+                .frame(width: CGFloat(4 + (i * 5) % 6), height: CGFloat(4 + (i * 5) % 6))
+                .offset(pos)
+                .opacity(scorch ? 0 : 0.85)
+                .animation(.easeOut(duration: 1.6).delay(0.15 + frac * 0.4), value: scorch)
+        }
+
+        // Red/orange explosion trail — fades over a second
+        ForEach(0..<12, id: \.self) { i in
+            let frac   = 0.1 + Double(i) / 13
+            let side   = (i % 2 == 0 ? 1.0 : -1.0)
+            let jitter = side * Double(4 + (i * 11) % 20)
+            let target = CGSize(
+                width:  dir.width  * 160 * frac - dir.height * jitter,
+                height: dir.height * 160 * frac + dir.width  * jitter
+            )
+            let col: Color = i % 3 == 0 ? trailA : (i % 3 == 1 ? trailB : trailC)
+            Text("✦")
+                .font(.system(size: CGFloat(6 + (i * 3) % 8)))
+                .foregroundColor(col)
+                .scaleEffect(fly ? 0.3 : 1.1)
+                .opacity(fly ? 0 : 0.95)
+                .offset(fly ? target : .zero)
+                .animation(.easeOut(duration: 1.0).delay(0.08 + frac * 0.35), value: fly)
+        }
+
+        // Final pop — a brief expanding ring where the thought exits
+        if popRing {
+            Circle()
+                .stroke((isFart ? trailC : Self.amber).opacity(0.9), lineWidth: 2)
+                .frame(width: 30, height: 30)
+                .offset(edge)
+                .transition(.asymmetric(
+                    insertion: .scale(scale: 0.25).combined(with: .opacity),
+                    removal:   .opacity
+                ))
+        }
+
+        // The thought — still fired, but with enough air time to feel it
+        thoughtSymbol(emoji, size: 30)
+            .scaleEffect(fly ? 1.9 : 0.6)
+            .opacity(fly ? 0 : 1)
+            .offset(fly ? edge : .zero)
+            .animation(.easeIn(duration: 1.0).delay(0.05), value: fly)
+            .shadow(color: (isFart ? trailA : Self.fire).opacity(0.8), radius: 12)
+    }
+
+    // MARK: - Emoji sections
+
+    private var emojiSections: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            sectionLabel("with love", color: Self.lavender)
+            emojiGrid(loveEmojis)
+
+            Divider()
+                .background(DesignTokens.Color.border)
+                .padding(.vertical, 8)
+
+            sectionLabel("with feeling", color: Self.ember)
+            emojiGrid(feelingEmojis)
+
+            Divider()
+                .background(DesignTokens.Color.border)
+                .padding(.vertical, 8)
+
+            sectionLabel("your sounds · tap to record", color: Self.lavenderHi)
+            LazyVGrid(
+                columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 6),
+                spacing: 8
+            ) {
+                ForEach(0..<2, id: \.self) { slot in
+                    customSlotCell(slot)
+                }
+            }
+            .onAppear {
+                guard !quietMode else { return }
+                withAnimation(.easeInOut(duration: 1.8).repeatForever(autoreverses: true)) {
+                    slotPulse = true
+                }
+            }
+        }
+    }
+
+    /// One of the two personal-recording slots: empty → 🎤 invite that opens
+    /// the recording sheet; filled → its emoji, selectable like any other.
+    /// Long-press a filled slot to re-record.
+    private func customSlotCell(_ slot: Int) -> some View {
+        let token      = "custom\(slot)"
+        let sound      = customStore.sound(at: slot)
+        let isSelected = selectedEmoji == token
+        return Button {
+            guard phase != .flying else { return }
+            if sound == nil {
+                recordSlot = RecordSlot(id: slot)
+            } else {
+                if phase == .sent {
+                    phase  = .idle
+                    fly    = false
+                    scorch = false
+                }
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
+                    selectedEmoji = isSelected ? nil : token
+                }
+            }
+        } label: {
+            ZStack {
+                if isSelected {
+                    Circle()
+                        .fill(Self.lavenderHi.opacity(0.35))
+                        .blur(radius: 13)
+                        .padding(6)
+                }
+                if let sound {
+                    Text(sound.emoji).font(.system(size: 25))
+                } else {
+                    VStack(spacing: 2) {
+                        Image(systemName: "mic.fill")
+                            .font(.system(size: 16))
+                            .foregroundColor(Self.lavenderHi)
+                        Text("record")
+                            .font(.system(size: 7))
+                            .foregroundColor(DesignTokens.Color.textMuted)
+                    }
+                }
+            }
+            .frame(maxWidth: .infinity)
+            .aspectRatio(1, contentMode: .fit)
+            .background(isSelected
+                        ? DesignTokens.Color.accentStrong
+                        : DesignTokens.Color.backgroundCard.opacity(0.8))
+            .cornerRadius(15)
+            .overlay(
+                RoundedRectangle(cornerRadius: 15)
+                    .stroke(
+                        sound == nil
+                            ? Self.lavenderHi.opacity(slotPulse ? 0.75 : 0.3)   // pulsing invite
+                            : (isSelected ? Self.lavenderHi.opacity(0.8) : DesignTokens.Color.borderMid),
+                        style: StrokeStyle(lineWidth: 1, dash: sound == nil ? [4, 3] : [])
+                    )
+            )
+            .scaleEffect(isSelected ? 1.08 : 1.0)
+        }
+        .simultaneousGesture(
+            LongPressGesture(minimumDuration: 0.5).onEnded { _ in
+                guard phase == .idle else { return }
+                recordSlot = RecordSlot(id: slot)   // re-record a filled slot
+            }
+        )
+    }
+
+    private func sectionLabel(_ text: String, color: Color) -> some View {
+        Text(text)
+            .font(DesignTokens.Font.overline)
+            .foregroundColor(color.opacity(0.85))
+    }
+
+    private func emojiGrid(_ emojis: [String]) -> some View {
+        // 6-up keeps the floating panel compact so the compass stays the hero
+        LazyVGrid(
+            columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 6),
+            spacing: 8
+        ) {
+            ForEach(emojis, id: \.self) { emoji in
+                emojiCell(emoji)
+            }
+        }
+    }
+
+    private func emojiCell(_ emoji: String) -> some View {
+        let isSelected = selectedEmoji == emoji
+        let isFeeling  = feelingEmojis.contains(emoji)
+        let isGecko    = emoji == "gecko"
+        let glow       = isGecko ? Self.geckoGold : (isFeeling ? Self.ember : Self.purpleGlow)
+        return Button {
+            guard phase != .flying else { return }
+            // Tapping an emoji right after a send dismisses the confirmation
+            // and starts the next thought — no extra step
+            if phase == .sent {
+                phase  = .idle
+                fly    = false
+                scorch = false
+            }
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
+                selectedEmoji = isSelected ? nil : emoji
+            }
+        } label: {
+            ZStack {
+                if isSelected {
+                    Circle()
+                        .fill(glow.opacity(isGecko ? 0.45 : 0.35))   // warm orange for the gecko
+                        .blur(radius: 13)
+                        .padding(6)
+                }
+                thoughtSymbol(emoji, size: 25)
+            }
+            .frame(maxWidth: .infinity)
+            .aspectRatio(1, contentMode: .fit)
+            .background(isSelected
+                        ? (isGecko ? Self.geckoGold.opacity(0.16)
+                           : isFeeling ? Self.fire.opacity(0.18)
+                           : DesignTokens.Color.accentStrong)
+                        : DesignTokens.Color.backgroundCard.opacity(0.8))
+            .cornerRadius(15)
+            .overlay(
+                RoundedRectangle(cornerRadius: 15)
+                    .stroke(isSelected
+                            ? (isGecko ? Self.geckoGold.opacity(0.7)
+                               : isFeeling ? Self.ember.opacity(0.7)
+                               : DesignTokens.Color.accentMid)
+                            : DesignTokens.Color.border,
+                            lineWidth: 1)
+            )
+            .scaleEffect(isSelected ? 1.08 : 1.0)
+        }
+    }
+
+    // MARK: - Send
+
+    private func sendButton(emoji: String) -> some View {
+        Button {
+            sendThought()
+        } label: {
+            HStack(spacing: 8) {
+                Text(selectedIsFeeling ? "launch" : "release")
+                thoughtSymbol(emoji, size: 17)
+            }
+                .font(DesignTokens.Font.label)
+                .foregroundColor(DesignTokens.Color.textPrimary)
+                .frame(maxWidth: .infinity)
+                .padding(DesignTokens.Spacing.md)
+                .background(selectedIsFeeling
+                            ? Self.fire.opacity(0.25)
+                            : DesignTokens.Color.accentStrong)
+                .cornerRadius(DesignTokens.Radius.button)
+                .overlay(
+                    RoundedRectangle(cornerRadius: DesignTokens.Radius.button)
+                        .stroke(selectedIsFeeling ? Self.ember.opacity(0.7)
+                                                  : DesignTokens.Color.accentMid,
+                                lineWidth: 1)
+                )
+        }
+    }
+
+    private func sendThought() {
+        guard phase == .idle, let token = selectedEmoji else { return }
+        let isFeeling = selectedIsFeeling
+
+        fly     = false
+        scorch  = false
+        popRing = false
+        withAnimation(.easeOut(duration: 0.2)) { phase = .flying }
+
+        // If a real friend is paired via Supabase, the thought travels for real —
+        // fire-and-forget so the local animation never waits on the network.
+        if let friend = SupabaseService.connectedFriendID {
+            let emoji = remoteEmoji(for: token)
+            Task { try? await SupabaseService.shared.sendPing(to: friend, emoji: emoji) }
+        }
+
+        if isFeeling {
+            // Fired: sharp launch, screen flash, ~1s flight, pop at the edge
+            flashGreen = (token == "💨")
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                HapticEngine.thoughtFired()
+                if let slot = customSlot(for: token) {
+                    customStore.play(slot: slot)      // their own recorded sound
+                } else {
+                    SoundEngine.shared.play(for: token)   // synthesized
+                }
+                fly = true
+                if !quietMode {
+                    withAnimation(.easeIn(duration: 0.08)) { redFlash = true }
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
+                        withAnimation(.easeOut(duration: 0.4)) { redFlash = false }
+                    }
+                    // 💨 also rattles the screen — set hard, spring back loose
+                    if token == "💨" {
+                        wobble = 9
+                        withAnimation(.spring(response: 0.12, dampingFraction: 0.14)) {
+                            wobble = 0
+                        }
+                    }
+                }
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.05) {
+                HapticEngine.thoughtLaunched()                // second hit as it exits
+                scorch = true                                 // scorch marks begin to fade
+                withAnimation(.easeOut(duration: 0.25)) { popRing = true }   // the final pop
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                withAnimation(.easeOut(duration: 0.3)) { popRing = false }
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.85) {
+                withAnimation { phase = .sent }
+                scheduleConfirmationDismiss()
+            }
+        } else {
+            // Released: gentle double pulse, slow ~2.6s drift, soft fade
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                HapticEngine.pingReceived()                   // gentle double pulse
+                SoundEngine.shared.play(for: token)   // synthesized — rises with the float
+                fly = true
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2.9) {
+                HapticEngine.thoughtReleased()                // whisper as it fades
+                withAnimation { phase = .sent }
+                scheduleConfirmationDismiss()
+            }
+        }
+    }
+
+    /// The confirmation is brief — it dissolves on its own if not interacted with.
+    private func scheduleConfirmationDismiss() {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.8) {
+            if phase == .sent { resetThought() }
+        }
+    }
+
+    // MARK: - Sent confirmation
+
+    // Brief and button-free — auto-dismisses, or tap anywhere / tap an emoji
+    private var sentConfirmation: some View {
+        VStack(spacing: 5) {
+            Text("thought sent toward \(people.selectedPerson?.name ?? "them")")
+                .font(DesignTokens.Font.label)
+                .foregroundColor(DesignTokens.Color.accentSoft)
+
+            Text(people.selectedPerson?.resolvedTagline ?? TaglineSystem.defaultTagline)
+                .font(.system(size: 13).italic())
+                .foregroundColor(DesignTokens.Color.textMuted)
+                .multilineTextAlignment(.center)
+        }
+        .padding(.horizontal, 22)
+        .padding(.vertical, 12)
+        .background(
+            Capsule()
+                .fill(DesignTokens.Color.background.opacity(0.74))
+                .overlay(Capsule().stroke(DesignTokens.Color.border, lineWidth: 1))
+        )
+    }
+}
+
+// MARK: - Recording sheet
+
+struct RecordSlot: Identifiable {
+    let id: Int
+}
+
+/// Record up to 3 seconds, preview it, pick an emoji to wear, save into a slot.
+struct RecordSoundSheet: View {
+
+    let slot: Int
+    @ObservedObject var recorder: AudioRecorder
+    @ObservedObject var store: CustomSoundStore
+    @Environment(\.dismiss) private var dismiss
+
+    @State private var chosenEmoji = ""
+    @State private var recordPulse = false
+    @FocusState private var emojiFieldFocused: Bool
+
+    private let lavender   = Color(hex: "#c4a8d4")
+    private let lavenderHi = Color(hex: "#e0ccee")
 
     var body: some View {
         ZStack {
             DesignTokens.Color.background.ignoresSafeArea()
 
-            if subscription.tier == .free {
-                paywallGate
-            } else {
-                pingContent
-            }
-        }
-        .sheet(isPresented: $showPaywall) { PaywallView() }
-    }
-
-    // MARK: - Paywall gate
-
-    private var paywallGate: some View {
-        VStack(spacing: 20) {
-            Spacer()
-
-            ZStack {
-                Circle()
-                    .stroke(DesignTokens.Color.accentMid.opacity(0.25), lineWidth: 1)
-                    .frame(width: 80, height: 80)
-                Text("💜")
-                    .font(.system(size: 34))
-            }
-
-            Text("send a thought")
-                .font(DesignTokens.Font.compassName)
-                .foregroundColor(DesignTokens.Color.textPrimary)
-
-            Text("pings let you send a wordless moment to the people you love. one tap, no words needed.")
-                .font(DesignTokens.Font.compassDistance)
-                .foregroundColor(DesignTokens.Color.textMuted)
-                .multilineTextAlignment(.center)
-                .lineSpacing(4)
-                .padding(.horizontal, 32)
-
-            Button {
-                showPaywall = true
-            } label: {
-                Text("upgrade to Pro to send pings")
-                    .font(DesignTokens.Font.label)
-                    .foregroundColor(DesignTokens.Color.textPrimary)
-                    .frame(maxWidth: .infinity)
-                    .padding(DesignTokens.Spacing.md)
-                    .background(DesignTokens.Color.accentStrong)
-                    .cornerRadius(DesignTokens.Radius.button)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: DesignTokens.Radius.button)
-                            .stroke(DesignTokens.Color.accentMid, lineWidth: 1)
-                    )
-            }
-            .padding(.horizontal, 28)
-
-            Spacer()
-        }
-    }
-
-    // MARK: - Ping content
-
-    private var pingContent: some View {
-        ScrollView {
             VStack(spacing: 0) {
-                // Header
-                VStack(spacing: 6) {
-                    Text("send a thought")
-                        .font(DesignTokens.Font.compassName)
-                        .foregroundColor(DesignTokens.Color.textPrimary)
+                Text("record your sound")
+                    .font(DesignTokens.Font.compassName)
+                    .foregroundColor(DesignTokens.Color.textPrimary)
+                    .padding(.top, 28)
+                    .padding(.bottom, 4)
 
-                    if let person = people.selectedPerson {
-                        Text("to \(person.name)")
-                            .font(.system(size: 13).italic())
-                            .foregroundColor(DesignTokens.Color.accentMid)
+                Text("up to 3 seconds · tap to record")
+                    .font(DesignTokens.Font.caption)
+                    .foregroundColor(DesignTokens.Color.textMuted)
+                    .padding(.bottom, 24)
+
+                // The record button — pulses red while recording
+                Button {
+                    if recorder.isRecording {
+                        recorder.stopRecording()
+                    } else {
+                        recorder.beginRecording()
                     }
-
-                    Text("one tap · no words needed")
-                        .font(DesignTokens.Font.caption)
-                        .foregroundColor(DesignTokens.Color.textMuted)
-                        .padding(.top, 2)
-                }
-                .padding(.top, 24)
-                .padding(.bottom, 28)
-
-                // Emoji grid
-                LazyVGrid(
-                    columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 4),
-                    spacing: 10
-                ) {
-                    ForEach(emojiOptions, id: \.self) { emoji in
-                        emojiCell(emoji)
-                    }
-                }
-                .padding(.horizontal, 24)
-                .padding(.bottom, 24)
-
-                // Send button
-                if let emoji = selectedEmoji {
-                    sendButton(emoji: emoji)
-                        .padding(.horizontal, 24)
-                        .transition(.opacity.combined(with: .move(edge: .bottom)))
-                }
-
-                // Sent confirmation
-                if showSentConfirm {
-                    sentConfirmation
-                        .padding(.top, 12)
-                        .transition(.opacity.combined(with: .scale(scale: 0.9)))
-                }
-
-                Spacer(minLength: 40)
-            }
-        }
-        .animation(.spring(response: 0.4, dampingFraction: 0.7), value: selectedEmoji)
-        .animation(.easeOut(duration: 0.3), value: showSentConfirm)
-    }
-
-    private func emojiCell(_ emoji: String) -> some View {
-        let isSelected = selectedEmoji == emoji
-        return Button {
-            withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
-                selectedEmoji  = isSelected ? nil : emoji
-                showSentConfirm = false
-            }
-        } label: {
-            Text(emoji)
-                .font(.system(size: 30))
-                .frame(maxWidth: .infinity)
-                .aspectRatio(1, contentMode: .fit)
-                .background(isSelected
-                            ? DesignTokens.Color.accentStrong
-                            : DesignTokens.Color.backgroundCard)
-                .cornerRadius(15)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 15)
-                        .stroke(isSelected
-                                ? DesignTokens.Color.accentMid
-                                : DesignTokens.Color.border,
-                                lineWidth: 1)
-                )
-                .scaleEffect(isSelected ? 1.06 : 1.0)
-        }
-    }
-
-    private func sendButton(emoji: String) -> some View {
-        Button {
-            guard let person = people.selectedPerson else { return }
-            isSending = true
-            Task {
-                await pings.sendPing(to: person, emoji: emoji)
-                isSending       = false
-                selectedEmoji   = nil
-                showSentConfirm = true
-                withAnimation {
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
-                        showSentConfirm = false
+                } label: {
+                    ZStack {
+                        Circle()
+                            .fill(recorder.isRecording
+                                  ? Color.red.opacity(recordPulse ? 0.85 : 0.55)
+                                  : DesignTokens.Color.accentStrong)
+                            .frame(width: 84, height: 84)
+                        Circle()
+                            .stroke(recorder.isRecording ? Color.red : DesignTokens.Color.accentMid,
+                                    lineWidth: 1.5)
+                            .frame(width: 96, height: 96)
+                            .scaleEffect(recorder.isRecording && recordPulse ? 1.08 : 1.0)
+                        Image(systemName: recorder.isRecording ? "stop.fill" : "mic.fill")
+                            .font(.system(size: 28))
+                            .foregroundColor(DesignTokens.Color.textPrimary)
                     }
                 }
-            }
-        } label: {
-            HStack(spacing: 8) {
-                if isSending {
-                    ProgressView()
-                        .tint(DesignTokens.Color.textPrimary)
-                        .scaleEffect(0.8)
-                } else {
-                    Text("send \(emoji)")
+                .padding(.bottom, 16)
+                .onChange(of: recorder.isRecording) { _, recording in
+                    if recording {
+                        withAnimation(.easeInOut(duration: 0.5).repeatForever(autoreverses: true)) {
+                            recordPulse = true
+                        }
+                    } else {
+                        withAnimation(.easeOut(duration: 0.2)) { recordPulse = false }
+                    }
                 }
-            }
-            .font(DesignTokens.Font.label)
-            .foregroundColor(DesignTokens.Color.textPrimary)
-            .frame(maxWidth: .infinity)
-            .padding(DesignTokens.Spacing.md)
-            .background(DesignTokens.Color.accentStrong)
-            .cornerRadius(DesignTokens.Radius.button)
-            .overlay(
-                RoundedRectangle(cornerRadius: DesignTokens.Radius.button)
-                    .stroke(DesignTokens.Color.accentMid, lineWidth: 1)
-            )
-        }
-        .disabled(isSending)
-    }
 
-    private var sentConfirmation: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "checkmark.circle.fill")
-                .foregroundColor(Color(hex: "#5dcaa5"))
-            Text("sent to \(people.selectedPerson?.name ?? "them") ✦")
-                .font(DesignTokens.Font.label)
-                .foregroundColor(DesignTokens.Color.accentSoft)
+                // Live waveform while recording
+                HStack(spacing: 3) {
+                    ForEach(Array(recorder.levels.enumerated()), id: \.offset) { _, level in
+                        Capsule()
+                            .fill(lavender.opacity(0.85))
+                            .frame(width: 3, height: 4 + level * 40)
+                    }
+                }
+                .frame(height: 48)
+                .animation(.easeOut(duration: 0.06), value: recorder.levels)
+
+                Text(recorder.isRecording
+                     ? String(format: "0:0%.0f / 0:03", min(3, recorder.elapsed.rounded(.down)))
+                     : (recorder.hasRecording ? "recorded ✓" : " "))
+                    .font(.system(size: 11, design: .monospaced))
+                    .foregroundColor(DesignTokens.Color.textMuted)
+                    .padding(.bottom, 14)
+
+                // After the take: preview · emoji · save · retake
+                if recorder.hasRecording {
+                    VStack(spacing: 14) {
+                        HStack(spacing: 14) {
+                            Button {
+                                recorder.playPreview()
+                            } label: {
+                                HStack(spacing: 6) {
+                                    Image(systemName: "play.fill")
+                                    Text("preview")
+                                }
+                                .font(DesignTokens.Font.label)
+                                .foregroundColor(lavenderHi)
+                                .padding(.horizontal, 16)
+                                .padding(.vertical, 9)
+                                .overlay(Capsule().stroke(DesignTokens.Color.borderMid, lineWidth: 1))
+                            }
+
+                            // Emoji from the system keyboard wears the sound
+                            TextField("emoji", text: $chosenEmoji)
+                                .focused($emojiFieldFocused)
+                                .multilineTextAlignment(.center)
+                                .font(.system(size: 26))
+                                .frame(width: 64, height: 44)
+                                .background(DesignTokens.Color.backgroundCard)
+                                .cornerRadius(12)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 12)
+                                        .stroke(chosenEmoji.isEmpty
+                                                ? DesignTokens.Color.borderMid
+                                                : DesignTokens.Color.accentMid,
+                                                lineWidth: 1)
+                                )
+                                .onChange(of: chosenEmoji) { _, new in
+                                    // Keep just the most recent character (emoji-safe)
+                                    if let last = new.last { chosenEmoji = String(last) }
+                                }
+                        }
+
+                        Text("pick an emoji to carry your sound")
+                            .font(.system(size: 11))
+                            .foregroundColor(DesignTokens.Color.textDim)
+
+                        HStack(spacing: 12) {
+                            Button {
+                                recorder.discardTake()
+                                chosenEmoji = ""
+                            } label: {
+                                Text("retake")
+                                    .font(DesignTokens.Font.label)
+                                    .foregroundColor(DesignTokens.Color.textMuted)
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, 12)
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: DesignTokens.Radius.button)
+                                            .stroke(DesignTokens.Color.borderMid, lineWidth: 1)
+                                    )
+                            }
+
+                            Button {
+                                if recorder.saveTake(toSlot: slot) {
+                                    store.save(emoji: chosenEmoji, slot: slot)
+                                    HapticEngine.saved()
+                                    dismiss()
+                                }
+                            } label: {
+                                Text("save")
+                                    .font(DesignTokens.Font.label)
+                                    .foregroundColor(DesignTokens.Color.textPrimary)
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, 12)
+                                    .background(DesignTokens.Color.accentStrong)
+                                    .cornerRadius(DesignTokens.Radius.button)
+                            }
+                            .disabled(chosenEmoji.isEmpty)
+                            .opacity(chosenEmoji.isEmpty ? 0.4 : 1)
+                        }
+                    }
+                    .padding(.horizontal, 28)
+                    .transition(.opacity.combined(with: .move(edge: .bottom)))
+                }
+
+                Spacer()
+            }
+        }
+        .animation(.easeOut(duration: 0.3), value: recorder.hasRecording)
+        .onAppear {
+            // Pre-fill the emoji when re-recording an existing slot
+            chosenEmoji = store.sound(at: slot)?.emoji ?? ""
+        }
+        .onDisappear {
+            recorder.discardTake()
         }
     }
+}
+
+// MARK: - LeopardGeckoView
+
+/// A hand-drawn leopard gecko "emoji" — golden #F5A623 base, dark leopard
+/// spots, big glossy eyes, fat tapering tail. Cute, recognisable, and a
+/// personal touch for the gecko lover in the family.
+struct LeopardGeckoView: View {
+    var size: CGFloat = 30
+
+    private static let base   = Color(hex: "#F5A623")
+    private static let belly  = Color(hex: "#FFC85C")
+    private static let spot   = Color(hex: "#3d2410")
+    private static let eyeInk = Color(hex: "#241509")
+
+    var body: some View {
+        Canvas { ctx, sz in
+            let w = sz.width, h = sz.height
+            func pt(_ x: Double, _ y: Double) -> CGPoint {
+                CGPoint(x: x * w, y: y * h)
+            }
+            func ellipse(_ cx: Double, _ cy: Double, _ rx: Double, _ ry: Double) -> Path {
+                Path(ellipseIn: CGRect(x: (cx - rx) * w, y: (cy - ry) * h,
+                                       width: rx * 2 * w, height: ry * 2 * h))
+            }
+
+            // Tail — fat at the base, tapering with a gentle curl to the right
+            var tail = Path()
+            tail.move(to: pt(0.42, 0.60))
+            tail.addCurve(to: pt(0.74, 0.90),
+                          control1: pt(0.66, 0.64), control2: pt(0.84, 0.72))
+            tail.addCurve(to: pt(0.46, 0.70),
+                          control1: pt(0.62, 0.99), control2: pt(0.40, 0.86))
+            tail.closeSubpath()
+            ctx.fill(tail, with: .color(Self.base))
+
+            // Stubby legs with round toes
+            let legs: [(Double, Double, Double, Double)] = [
+                (0.38, 0.36, 0.20, 0.28),   // front left
+                (0.62, 0.36, 0.80, 0.28),   // front right
+                (0.38, 0.56, 0.20, 0.64),   // back left
+                (0.62, 0.56, 0.80, 0.64),   // back right
+            ]
+            for (x1, y1, x2, y2) in legs {
+                var leg = Path()
+                leg.move(to: pt(x1, y1))
+                leg.addLine(to: pt(x2, y2))
+                ctx.stroke(leg, with: .color(Self.base),
+                           style: StrokeStyle(lineWidth: w * 0.075, lineCap: .round))
+                ctx.fill(ellipse(x2, y2, 0.045, 0.04), with: .color(Self.base))
+            }
+
+            // Body
+            ctx.fill(ellipse(0.50, 0.46, 0.150, 0.230), with: .color(Self.base))
+            // Lighter belly stripe
+            ctx.fill(ellipse(0.50, 0.50, 0.075, 0.150), with: .color(Self.belly.opacity(0.55)))
+
+            // Head — broad and rounded, the leopard-gecko wedge
+            ctx.fill(ellipse(0.50, 0.20, 0.180, 0.150), with: .color(Self.base))
+
+            // Big glossy eyes
+            ctx.fill(ellipse(0.405, 0.165, 0.052, 0.062), with: .color(Self.eyeInk))
+            ctx.fill(ellipse(0.595, 0.165, 0.052, 0.062), with: .color(Self.eyeInk))
+            ctx.fill(ellipse(0.422, 0.145, 0.016, 0.018), with: .color(.white.opacity(0.92)))
+            ctx.fill(ellipse(0.612, 0.145, 0.016, 0.018), with: .color(.white.opacity(0.92)))
+
+            // Little smile
+            var smile = Path()
+            smile.addArc(center: pt(0.50, 0.225), radius: w * 0.052,
+                         startAngle: .degrees(25), endAngle: .degrees(155),
+                         clockwise: false)
+            ctx.stroke(smile, with: .color(Self.spot),
+                       style: StrokeStyle(lineWidth: max(0.8, w * 0.022), lineCap: .round))
+            // Nostrils
+            ctx.fill(ellipse(0.46, 0.115, 0.008, 0.008), with: .color(Self.spot.opacity(0.7)))
+            ctx.fill(ellipse(0.54, 0.115, 0.008, 0.008), with: .color(Self.spot.opacity(0.7)))
+
+            // Leopard spots — scattered over head, body and tail
+            let spots: [(Double, Double, Double)] = [
+                (0.40, 0.27, 0.018), (0.59, 0.28, 0.020),
+                (0.44, 0.36, 0.024), (0.57, 0.41, 0.028),
+                (0.45, 0.50, 0.026), (0.58, 0.55, 0.020),
+                (0.43, 0.62, 0.018), (0.52, 0.31, 0.016),
+                (0.55, 0.66, 0.018), (0.62, 0.76, 0.018),
+                (0.68, 0.84, 0.014), (0.51, 0.58, 0.014),
+            ]
+            for (sx, sy, sr) in spots {
+                ctx.fill(ellipse(sx, sy, sr, sr * 0.88), with: .color(Self.spot.opacity(0.85)))
+            }
+        }
+        .frame(width: size, height: size)
+    }
+}
+
+#Preview("Leopard gecko") {
+    LeopardGeckoView(size: 120)
+        .padding()
+        .background(Color(hex: "#0d0d14"))
 }

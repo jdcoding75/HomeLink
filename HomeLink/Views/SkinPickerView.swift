@@ -1,5 +1,5 @@
 // SkinPickerView.swift
-// HomeLink › Views
+// Pointward › Views
 // Note: Triangle shape is defined in NeedleView.swift — not duplicated here.
 
 import SwiftUI
@@ -10,7 +10,7 @@ struct SkinPickerView: View {
     @EnvironmentObject var subscription: SubscriptionManager
     @Environment(\.dismiss) var dismiss
 
-    @State private var showPaywall = false
+    @State private var showUnlock = false
 
     var body: some View {
         ZStack {
@@ -33,15 +33,14 @@ struct SkinPickerView: View {
 
                 ScrollView {
                     VStack(alignment: .leading, spacing: 0) {
-                        skinSection(title: "free",  skins: CompassSkin.allCases.filter { !$0.requiresPro })
-                        skinSection(title: "pro",   skins: CompassSkin.allCases.filter {  $0.requiresPro })
+                        skinSection(title: "skins", skins: CompassSkin.allCases)
                         Spacer(minLength: 40)
                     }
                     .padding(.horizontal, DesignTokens.Spacing.lg)
                 }
             }
         }
-        .sheet(isPresented: $showPaywall) { PaywallView() }
+        .sheet(isPresented: $showUnlock) { PaywallView() }
     }
 
     private func skinSection(title: String, skins: [CompassSkin]) -> some View {
@@ -56,15 +55,17 @@ struct SkinPickerView: View {
                 spacing: 12
             ) {
                 ForEach(skins) { skin in
+                    let locked = skin.requiresUnlock && subscription.tier == .free
                     SkinCard(
                         skin:       skin,
                         isSelected: skinStore.activeSkin == skin,
-                        isLocked:   skin.requiresPro && subscription.tier != .pro
+                        isLocked:   locked
                     )
                     .onTapGesture {
-                        if skin.requiresPro && subscription.tier != .pro {
+                        if locked {
+                            // One-time $1.99 unlock opens all six skins
                             HapticEngine.paywallReached()
-                            showPaywall = true
+                            showUnlock = true
                         } else {
                             skinStore.select(skin, subscription: subscription)
                             dismiss()
@@ -126,16 +127,6 @@ struct SkinCard: View {
                     .foregroundColor(DesignTokens.Color.accentSoft)
                     .padding(8)
             }
-        }
-        .overlay(alignment: .topTrailing) {
-            Text(isLocked ? "pro" : "free")
-                .font(.system(size: 9))
-                .foregroundColor(isLocked ? DesignTokens.Color.accentSoft : Color(hex: "#5dcaa5"))
-                .padding(.horizontal, 6).padding(.vertical, 2)
-                .background(isLocked ? DesignTokens.Color.accentSoft.opacity(0.12) : Color(hex: "#5dcaa5").opacity(0.1))
-                .clipShape(Capsule())
-                .overlay(Capsule().stroke(isLocked ? DesignTokens.Color.accentSoft.opacity(0.3) : Color(hex: "#5dcaa5").opacity(0.3), lineWidth: 1))
-                .padding(8)
         }
     }
 

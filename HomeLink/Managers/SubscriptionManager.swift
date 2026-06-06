@@ -1,5 +1,5 @@
 // SubscriptionManager.swift
-// HomeLink › Managers
+// Pointward › Managers
 
 import Foundation
 import Combine
@@ -10,12 +10,15 @@ final class SubscriptionManager: ObservableObject {
     @Published private(set) var tier: SubscriptionTier
 
     init() {
+        // Free to download — the $1.99 one-time unlock persists across launches.
         let saved = UserDefaults.standard.string(forKey: "subscriptionTier") ?? ""
         tier = SubscriptionTier(rawValue: saved) ?? .free
     }
 
+    /// One-time $1.99 unlock. Phase 1 simulates the purchase locally;
+    /// StoreKit wiring lands with App Store setup.
     func upgrade() async {
-        tier = .pro
+        tier = .unlocked
         UserDefaults.standard.set(tier.rawValue, forKey: "subscriptionTier")
     }
 
