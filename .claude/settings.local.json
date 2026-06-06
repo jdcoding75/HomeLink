@@ -1,0 +1,21 @@
+{
+  "env": {
+    "DEVELOPER_DIR": "/Applications/Xcode.app/Contents/Developer"
+  },
+  "permissions": {
+    "allow": [
+      "Bash(xcode-select -p)",
+      "Bash(export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer)",
+      "Bash(xcodebuild -scheme HomeLink -destination 'platform=iOS Simulator,name=iPhone 17 Pro' build)",
+      "Bash(tee /tmp/homelink_build1.log)",
+      "Bash(xargs xcrun -sdk iphonesimulator swiftc -typecheck -target arm64-apple-ios18.0-simulator -module-name HomeLink)",
+      "Bash(tee /tmp/homelink_build2.log)",
+      "Bash(tee /tmp/homelink_build3.log)",
+      "Bash(tee /tmp/homelink_build4.log)",
+      "Bash(tee /tmp/homelink_build5.log)",
+      "Bash(echo \"exit: $?\")",
+      "Bash(tee /tmp/homelink_build6.log)",
+      "Bash(jq *)"
+    ]
+  }
+}
