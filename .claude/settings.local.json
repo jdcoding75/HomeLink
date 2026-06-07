@@ -51,7 +51,9 @@
       "Bash(sed -n '840,860p' HomeLink/Views/PingView.swift)",
       "Bash(sed -n '275,285p' HomeLink/Views/PingView.swift)",
       "Bash(python3 *)",
-      "Bash(git mv *)"
+      "Bash(git mv *)",
+      "Bash(git commit *)",
+      "Bash(git push *)"
     ]
   }
 }
