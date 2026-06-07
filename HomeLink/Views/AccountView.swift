@@ -22,6 +22,7 @@ struct AccountView: View {
     @State private var currentNonce       = ""
     @State private var showCelebration   = false
     @State private var showCopied        = false
+    @State private var showManualEntry   = false
 
     var body: some View {
         ZStack {
@@ -213,6 +214,13 @@ struct AccountView: View {
                 }
                 .font(DesignTokens.Font.label)
                 .foregroundColor(Color(hex: "#5dcaa5"))
+            } else if !showManualEntry {
+                // The link does everything — manual entry is the fallback
+                Button("enter a code manually") {
+                    withAnimation(.easeOut(duration: 0.25)) { showManualEntry = true }
+                }
+                .font(DesignTokens.Font.caption)
+                .foregroundColor(DesignTokens.Color.textMuted)
             } else {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("enter a friend's code")
@@ -256,7 +264,9 @@ struct AccountView: View {
         Task {
             defer { isBusy = false }
             do {
-                friendID = try await SupabaseService.shared.redeemCode(codeInput)
+                let friend = try await SupabaseService.shared.redeemCode(codeInput)
+                friendID = friend
+                people.bindConnection(friendID: friend)   // light up person status
                 codeInput = ""
                 showCelebration = true   // the moment two compasses link
             } catch {
@@ -273,6 +283,7 @@ struct AccountView: View {
                 // Owner's side discovering the new pairing also celebrates
                 let isNew = friendID == nil
                 friendID = partner
+                people.bindConnection(friendID: partner)
                 if isNew { showCelebration = true }
             }
         }

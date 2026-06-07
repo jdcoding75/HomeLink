@@ -57,6 +57,16 @@ final class PeopleManager: ObservableObject {
         selectedPerson = person
     }
 
+    /// Make sure some local person carries the connected friend's Supabase id —
+    /// per-person status, pointing reports, and ping naming all key off it.
+    /// Binds to the selected person (or the first) when no one has it yet.
+    func bindConnection(friendID: UUID) {
+        guard !people.contains(where: { $0.pairedUserID == friendID.uuidString }) else { return }
+        guard let target = selectedPerson ?? people.first else { return }
+        target.pairedUserID = friendID.uuidString
+        try? save()
+    }
+
     enum PeopleError: Error, LocalizedError {
         case upgradeRequired
         var errorDescription: String? { "Unlock Pointward to add more people — one-time purchase, no subscription." }

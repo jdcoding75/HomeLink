@@ -11,25 +11,29 @@ enum AppLinks {
     static let testFlight = "https://testflight.apple.com/join/pointward"
     static let website    = "https://pointward.app"
 
-    /// The TestFlight invite; includes the sender's pairing code when they have one.
-    static func inviteMessage(pairingCode: String?) -> String {
-        var message = """
-        Join me on Pointward — a compass that always points toward the people you love.
-        Download here: \(testFlight)
-        """
-        if let code = pairingCode, !code.isEmpty {
-            message += "\nThen enter my pairing code: \(code)"
-        }
-        return message
+    /// Deep link that pairs instantly when tapped on a phone with the app.
+    static func pairLink(code: String) -> String {
+        "\(website)/pair/\(code)"
     }
 
-    /// The lightweight website invite (pairing share).
-    static func friendInvite(code: String?) -> String {
-        var message = "Join me on Pointward — download here: \(website)"
-        if let code, !code.isEmpty {
-            message += "\nEnter my code: \(code)"
+    /// The pairing invite — one tappable universal link does everything.
+    static func inviteMessage(pairingCode: String?) -> String {
+        guard let code = pairingCode, !code.isEmpty else {
+            return """
+            Join me on Pointward 🧭
+            Download here: \(website)
+            """
         }
-        return message
+        return """
+        Join me on Pointward 🧭
+        Tap to connect instantly:
+        \(pairLink(code: code))
+        """
+    }
+
+    /// Same pairing invite — kept as an alias for existing call sites.
+    static func friendInvite(code: String?) -> String {
+        inviteMessage(pairingCode: code)
     }
 
     /// Post-thought invite: "I just sent you a thought…"

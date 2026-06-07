@@ -13,19 +13,26 @@
 import Foundation
 import Combine
 import Supabase
+import os
 
 enum SupabaseServiceError: LocalizedError {
     case notConfigured
     case notSignedIn
+    case invalidCodeFormat
     case codeNotFound
     case cannotPairWithSelf
+    case codeAlreadyClaimed
+    case networkProblem
 
     var errorDescription: String? {
         switch self {
         case .notConfigured:      return "The backend isn't configured yet."
         case .notSignedIn:        return "Sign in to send pings."
-        case .codeNotFound:       return "That code wasn't found — check it and try again."
+        case .invalidCodeFormat:  return "Codes look like POINT-XXXX — double-check and try again."
+        case .codeNotFound:       return "That code wasn't found — make sure it's typed exactly."
         case .cannotPairWithSelf: return "That's your own code."
+        case .codeAlreadyClaimed: return "That code is already paired with someone else."
+        case .networkProblem:     return "Network problem — check your connection and try again."
         }
     }
 }
@@ -33,6 +40,10 @@ enum SupabaseServiceError: LocalizedError {
 final class SupabaseService: ObservableObject {
 
     static let shared = SupabaseService()
+
+    /// Console logging for the pairing/ping flows — filter on
+    /// subsystem com.jdcoding75.pointward in Console.app.
+    private let log = Logger(subsystem: "com.jdcoding75.pointward", category: "supabase")
 
     /// nil until SupabaseConfig is filled in — every API below guards on it.
     private(set) lazy var client: SupabaseClient? = {
@@ -140,12 +151,29 @@ final class SupabaseService: ObservableObject {
         }
 
         let code = Self.generatePairingCode()
-        try await client
-            .from("connections")
-            .insert(ConnectionRow(code: code, owner: me, friend: nil))
-            .execute()
+        do {
+            try await client
+                .from("connections")
+                .insert(ConnectionRow(code: code, owner: me, friend: nil))
+                .execute()
+        } catch {
+            log.error("pairing: code insert failed: \(error.localizedDescription, privacy: .public)")
+            throw error
+        }
+        log.info("pairing: created code \(code, privacy: .public)")
         Self.localPairingCode = code
         return code
+    }
+
+    /// Normalize whatever the user typed into the stored form "POINT-XXXX".
+    /// The UI displays codes as "POINT · GP2S", so people enter dots, spaces,
+    /// lowercase, or just the suffix — all of these must resolve.
+    static func normalizePairingCode(_ raw: String) -> String {
+        let alphanumerics = raw.uppercased().filter { $0.isLetter || $0.isNumber }
+        let suffix = alphanumerics.hasPrefix("POINT")
+            ? String(alphanumerics.dropFirst(5))
+            : alphanumerics
+        return "POINT-\(suffix)"
     }
 
     /// Enter a friend's code: claims their connection row and returns their id.
@@ -154,22 +182,51 @@ final class SupabaseService: ObservableObject {
         guard let client else { throw SupabaseServiceError.notConfigured }
         guard let me = await currentUserID else { throw SupabaseServiceError.notSignedIn }
 
-        let code = rawCode.trimmingCharacters(in: .whitespaces).uppercased()
-        let rows: [ConnectionRow] = try await client
+        let code = Self.normalizePairingCode(rawCode)
+        log.info("redeem: input '\(rawCode, privacy: .public)' → lookup '\(code, privacy: .public)'")
+
+        // Wrong shape entirely? Say so before hitting the network.
+        guard code.count == 10 else { throw SupabaseServiceError.invalidCodeFormat }
+
+        let rows: [ConnectionRow]
+        do {
+            rows = try await client
+                .from("connections")
+                .select()
+                .eq("code", value: code)
+                .execute().value
+        } catch let error as URLError {
+            log.error("redeem: network error: \(error.localizedDescription, privacy: .public)")
+            throw SupabaseServiceError.networkProblem
+        }
+        log.info("redeem: lookup matched \(rows.count) row(s)")
+        guard let row = rows.first else { throw SupabaseServiceError.codeNotFound }
+        guard row.owner != me else { throw SupabaseServiceError.cannotPairWithSelf }
+
+        do {
+            try await client
+                .from("connections")
+                .update(["friend": me.uuidString])
+                .eq("code", value: code)
+                .execute()
+        } catch {
+            log.error("redeem: claim update failed: \(error.localizedDescription, privacy: .public)")
+            throw error
+        }
+
+        // Verify the claim landed — RLS can match zero rows and "succeed" silently
+        let check: [ConnectionRow] = try await client
             .from("connections")
             .select()
             .eq("code", value: code)
             .execute().value
-        guard let row = rows.first else { throw SupabaseServiceError.codeNotFound }
-        guard row.owner != me else { throw SupabaseServiceError.cannotPairWithSelf }
-
-        try await client
-            .from("connections")
-            .update(["friend": me.uuidString])
-            .eq("code", value: code)
-            .execute()
+        guard check.first?.friend == me else {
+            log.error("redeem: claim did not persist (already claimed by someone else?)")
+            throw SupabaseServiceError.codeAlreadyClaimed
+        }
 
         Self.connectedFriendID = row.owner
+        log.info("redeem: connected ✓ partner=\(row.owner.uuidString, privacy: .public)")
         return row.owner
     }
 

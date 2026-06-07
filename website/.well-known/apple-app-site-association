@@ -1,0 +1,19 @@
+{
+  "applinks": {
+    "details": [
+      {
+        "appIDs": ["78842PK6A3.com.jdcoding75.pointward"],
+        "components": [
+          {
+            "/": "/pair/*",
+            "comment": "Pairing deep links — pointward.app/pair/POINT-XXXX"
+          },
+          {
+            "/": "/join/*",
+            "comment": "Fallback join links"
+          }
+        ]
+      }
+    ]
+  }
+}
