@@ -48,7 +48,7 @@ struct CompassView: View {
     @AppStorage("thoughtTaglineLocked") private var thoughtTaglineLocked = -1
     @AppStorage("showLightSpeed")       private var showLightSpeed       = true
     @State private var funnyIndex   = Int.random(in: 0..<DistanceFun.funnyCount)
-    @AppStorage(ExpressionMode.storageKey) private var expressiveOn = false
+    @AppStorage(ProFeatures.storageKey) private var proOn = false
 
     // Tagline: shuffled walk through the library — never repeats until
     // the whole library has been seen, then reshuffles
@@ -122,9 +122,9 @@ struct CompassView: View {
                 }
             }
 
-            // ── Thought queue badge — expressive mode only (core mode
+            // ── Thought queue badge — pro mode only (core mode
             // reveals thoughts automatically through the compass itself) ──────
-            if expressiveOn && !pings.queue.isEmpty && pings.nowPlaying == nil {
+            if proOn && !pings.queue.isEmpty && pings.nowPlaying == nil {
                 VStack {
                     Button {
                         pings.playNext()
@@ -163,9 +163,9 @@ struct CompassView: View {
             // ── Arrival ───────────────────────────────────────────────────────
             // Core: direction reveals content — the edge glows from their
             // direction, and you must physically turn toward them to feel it.
-            // Expressive: the immediate dramatic shooting animation.
+            // Pro: the immediate dramatic shooting animation.
             if let playing = pings.nowPlaying {
-                if expressiveOn {
+                if proOn {
                     ThoughtArrivalView(
                         ping: playing,
                         incomingBearing: compass.state.bearingDegrees,
@@ -201,15 +201,15 @@ struct CompassView: View {
                     .transition(.opacity)
             }
 
-            // ── "✦ expressive" indicator — top right, tap → Settings ──────────
-            if expressiveOn {
+            // ── "✦ Pro" indicator — top right, tap → Settings ──────────
+            if proOn {
                 VStack {
                     HStack {
                         Spacer()
                         Button {
                             NotificationCenter.default.post(name: .pointwardOpenSettings, object: nil)
                         } label: {
-                            Text("✦ expressive")
+                            Text("✦ Pro")
                                 .font(.system(size: 10, design: .serif).italic())
                                 .foregroundColor(DesignTokens.Color.accentMid.opacity(0.75))
                         }
@@ -435,9 +435,9 @@ struct CompassView: View {
                 .foregroundColor(DesignTokens.Color.textSecondary)
                 .monospacedDigit()
 
-            // EXPRESSIVE: the distance playground — random unit per launch,
+            // PRO: the distance playground — random unit per launch,
             // tap cycles through all seven (hidden in core mode)
-            if expressiveOn {
+            if proOn {
                 HStack(spacing: 5) {
                     Text(DistanceFun.funnyText(km: compass.state.distanceKm, index: funnyIndex))
                         .font(.system(size: 12))
@@ -764,7 +764,7 @@ struct CompassView: View {
 // MARK: - Notifications
 
 extension Notification.Name {
-    /// Posted by the "✦ expressive" badge — MainTabView jumps to Settings.
+    /// Posted by the "✦ Pro" badge — MainTabView jumps to Settings.
     static let pointwardOpenSettings = Notification.Name("pointwardOpenSettings")
 }
 
@@ -1320,7 +1320,7 @@ struct CoreArrivalView: View {
     }
 }
 
-/// EXPRESSIVE arrival — the full dramatic shooting animation.
+/// PRO arrival — the full dramatic shooting animation.
 struct ThoughtArrivalView: View {
 
     let ping: PingManager.ReceivedPing

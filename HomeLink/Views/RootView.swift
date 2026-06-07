@@ -396,7 +396,7 @@ struct MainTabView: View {
         }
         .tint(DesignTokens.Color.accentSoft)
         .preferredColorScheme(.dark)
-        // The "✦ expressive" badge on the compass jumps here
+        // The "✦ Pro" badge on the compass jumps here
         .onReceive(NotificationCenter.default.publisher(for: .pointwardOpenSettings)) { _ in
             selectedTab = 3
         }

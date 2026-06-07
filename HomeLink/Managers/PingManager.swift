@@ -71,7 +71,7 @@ final class PingManager: ObservableObject {
     }
 
     /// New thought arrives → joins the queue. Core mode starts the
-    /// direction-reveal immediately (the compass IS the inbox); Expressive
+    /// direction-reveal immediately (the compass IS the inbox); Pro
     /// mode shows the badge and waits for the tap.
     func receivePing(fromName: String, emoji: String, remoteID: UUID? = nil) {
         let ping = ReceivedPing(fromName: fromName, emoji: emoji, timestamp: .now, remoteID: remoteID)
@@ -84,7 +84,7 @@ final class PingManager: ObservableObject {
         AppGroupStore.pendingPingTimestamp = .now
         HapticEngine.thoughtArrived()   // soft directional pull, not an alert
 
-        if !ExpressionMode.isOn && nowPlaying == nil {
+        if !ProFeatures.isOn && nowPlaying == nil {
             playNext()
         }
     }

@@ -19,7 +19,7 @@ struct SettingsView: View {
     @AppStorage("notifyPointing") private var notifyPointing = true
     @AppStorage("funnyUnitLocked")      private var funnyUnitLocked      = -1
     @AppStorage("thoughtTaglineLocked") private var thoughtTaglineLocked = -1
-    @AppStorage(ExpressionMode.storageKey) private var expressiveMode = false
+    @AppStorage(ProFeatures.storageKey) private var proFeatures = false
     @AppStorage("holdToSendEnabled") private var holdToSend = false
 
     @State private var showCopied     = false
@@ -267,7 +267,7 @@ struct SettingsView: View {
                     .settingsIcon()
                 VStack(alignment: .leading, spacing: 2) {
                     HStack(spacing: 6) {
-                        Text("Expressive Mode")
+                        Text("Pro Features")
                             .settingsLabel()
                         if subscription.tier == .free {
                             Text("unlock")
@@ -278,19 +278,19 @@ struct SettingsView: View {
                                 .background(Capsule().stroke(DesignTokens.Color.accentMid, lineWidth: 1))
                         }
                     }
-                    Text("add playful emojis, chaotic animations, and silly sounds to your thoughts")
+                    Text("custom emojis, funny distances, hold to send, and more")
                         .font(.system(size: 11))
                         .foregroundColor(DesignTokens.Color.textDim)
                 }
                 Spacer()
                 Toggle("", isOn: Binding(
-                    get: { expressiveMode && subscription.tier != .free },
+                    get: { proFeatures && subscription.tier != .free },
                     set: { wantsOn in
                         if subscription.tier == .free {
                             HapticEngine.paywallReached()
-                            showUnlock = true     // Expressive Mode is the paid tier
+                            showUnlock = true     // Pro Mode is the paid tier
                         } else {
-                            expressiveMode = wantsOn
+                            proFeatures = wantsOn
                         }
                     }
                 ))
@@ -335,7 +335,7 @@ struct SettingsView: View {
             }
 
             // Lock a favourite funny unit (or keep the per-launch surprise)
-            if expressiveMode && subscription.tier != .free {
+            if proFeatures && subscription.tier != .free {
                 Divider().background(DesignTokens.Color.border).padding(.leading, 44)
 
                 settingsRow {

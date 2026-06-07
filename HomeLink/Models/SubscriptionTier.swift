@@ -4,17 +4,27 @@
 import Foundation
 
 /// Phase 1 model: free to download, one-time $1.99 purchase unlocks everything.
-/// No subscription — `.unlocked` is permanent once purchased.
+/// No subscription — `.pro` is permanent once purchased.
 enum SubscriptionTier: String, Codable {
     case free
-    case unlocked        // one-time $1.99 purchase
+    // case unlocked     // renamed to .pro (rawValue kept for persistence)
+    case pro = "unlocked"   // one-time $1.99 purchase
     case institutional   // reserved for School Edition
 
     var maxPeople: Int {
         switch self {
         case .free:          return 1
-        case .unlocked:      return Int.max
+        case .pro:      return Int.max
         case .institutional: return Int.max
+        }
+    }
+
+    /// Display labels: "free" / "pro"
+    var displayName: String {
+        switch self {
+        case .free:          return "free"
+        case .pro:           return "pro"
+        case .institutional: return "school"
         }
     }
 
@@ -24,7 +34,7 @@ enum SubscriptionTier: String, Codable {
     var unlockedSkinIDs: Set<String> {
         switch self {
         case .free:          return ["minimal", "vintage"]
-        case .unlocked:      return Set(CompassSkin.allCases.map(\.rawValue))
+        case .pro:      return Set(CompassSkin.allCases.map(\.rawValue))
         case .institutional: return Set(CompassSkin.allCases.map(\.rawValue))
         }
     }

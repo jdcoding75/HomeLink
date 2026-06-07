@@ -18,7 +18,7 @@ final class SubscriptionManager: ObservableObject {
     /// One-time $1.99 unlock. Phase 1 simulates the purchase locally;
     /// StoreKit wiring lands with App Store setup.
     func upgrade() async {
-        tier = .unlocked
+        tier = .pro
         UserDefaults.standard.set(tier.rawValue, forKey: "subscriptionTier")
     }
 

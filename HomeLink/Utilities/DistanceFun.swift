@@ -23,15 +23,15 @@ enum DistanceFun {
     ]
     static var funnyCount: Int { funnyLabels.count }
 
-    /// Expressive Mode shows just these four — football fields, chocolate
+    /// Pro Mode shows just these four — football fields, chocolate
     /// bars, pizza boxes, hours by car.
-    static let expressiveUnits = [0, 1, 3, 5]
+    static let proUnits = [0, 1, 3, 5]
 
-    static func nextExpressiveIndex(after index: Int) -> Int {
-        guard let position = expressiveUnits.firstIndex(of: index) else {
-            return expressiveUnits[0]
+    static func nextProIndex(after index: Int) -> Int {
+        guard let position = proUnits.firstIndex(of: index) else {
+            return proUnits[0]
         }
-        return expressiveUnits[(position + 1) % expressiveUnits.count]
+        return proUnits[(position + 1) % proUnits.count]
     }
 
     /// "1,294 football fields away" · "about 2 hours by car"

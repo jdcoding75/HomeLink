@@ -11,6 +11,11 @@ struct PointwardApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     @StateObject private var container = ServiceContainer()
 
+    init() {
+        // Carry "Expressive Mode" users into the renamed Pro key
+        ProFeatures.migrateLegacyKey()
+    }
+
     var body: some Scene {
         WindowGroup {
             RootView()

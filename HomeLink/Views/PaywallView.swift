@@ -14,7 +14,7 @@ struct PaywallView: View {
     @State private var isPurchasing = false
 
     private let features: [(emoji: String, text: String)] = [
-        ("😤", "expressive emojis — playful, chaotic, honestly human"),
+        ("😤", "pro emojis — playful, chaotic, honestly human"),
         ("📏", "funny distances — football fields, chocolate bars, leopard geckos"),
         ("🎤", "custom emoji + sound — record your voice, pick any emoji"),
         ("⏱", "hold to send — point and hold to send a thought physically"),
@@ -51,7 +51,7 @@ struct PaywallView: View {
                         }
                         .padding(.bottom, 16)
 
-                        Text("Unlock Pointward")
+                        Text("Unlock Pointward Pro")
                             .font(DesignTokens.Font.compassName)
                             .foregroundColor(DesignTokens.Color.textPrimary)
                             .padding(.bottom, 6)
@@ -117,7 +117,7 @@ struct PaywallView: View {
                                         .tint(DesignTokens.Color.textPrimary)
                                         .scaleEffect(0.8)
                                 }
-                                Text(isPurchasing ? "unlocking…" : "Unlock Pointward — $1.99")
+                                Text(isPurchasing ? "unlocking…" : "Unlock Pointward Pro — $1.99")
                             }
                             .font(DesignTokens.Font.label)
                             .foregroundColor(DesignTokens.Color.textPrimary)

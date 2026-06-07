@@ -2,7 +2,7 @@
 // Pointward › Utilities
 //
 // The curated six — every user carries exactly 6 thoughts on the send
-// screen. Free users carry the core six; Expressive Mode users curate
+// screen. Free users carry the core six; Pro Mode users curate
 // theirs from the whole library (including custom recordings).
 
 import Foundation

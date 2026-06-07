@@ -50,7 +50,7 @@ struct PingView: View {
     // ❤️ love · 💋 tenderness · 🤗 embrace · ✨ a spark · 🌸 fleeting · 🌙 night
     private let coreEmojis = ["❤️","💋","🤗","✨","🌸","🌙"]
 
-    // ── EXPRESSIVE — the playground, visible only in Expressive Mode ─────
+    // ── PRO — the playground, visible only in Pro Mode ─────
     private let feelingEmojis = ["😤","🤬","👊","💢","⚡️","🌋","🔥","😡","💨"]
     private let foodEmojis    = ["🍕","🍫","🍺","🍷","🍰","☕","🧁","🍜","🍣","🥂"]
     private let sillyEmojis   = ["😂","🤪","🥳","💥","🎉","gecko"]
@@ -58,7 +58,7 @@ struct PingView: View {
     // private let loveEmojis    = ["💜","💋","🫂","🌸","gecko","✨"]
     // private let feelingEmojis = ["😢","😤","🤬","⚡️","🔥","💨"]
 
-    @AppStorage(ExpressionMode.storageKey) private var expressiveOn = false
+    @AppStorage(ProFeatures.storageKey) private var proOn = false
     @EnvironmentObject var subscription: SubscriptionManager
     @State private var showPaywall = false
 
@@ -317,8 +317,8 @@ struct PingView: View {
                         emojiCell(token)
                     }
                 }
-                if expressiveOn && subscription.tier != .free {
-                    Text("✦ expressive")
+                if proOn && subscription.tier != .free {
+                    Text("✦ Pro")
                         .font(.system(size: 9, design: .serif).italic())
                         .foregroundColor(Self.lavender.opacity(0.7))
                 }
@@ -440,8 +440,8 @@ struct PingView: View {
 
     private var emojiPanel: some View {
         VStack(spacing: 8) {
-            if expressiveOn {
-                // Expressive Mode adds four sections — more than fits on
+            if proOn {
+                // Pro Mode adds four sections — more than fits on
                 // screen, so the panel scrolls. (Without this the sections
                 // rendered off-screen and appeared to be "missing".)
                 ScrollView(showsIndicators: false) {
@@ -457,7 +457,7 @@ struct PingView: View {
                     .transition(.opacity.combined(with: .move(edge: .bottom)))
             }
         }
-        .animation(.easeInOut(duration: 0.3), value: expressiveOn)
+        .animation(.easeInOut(duration: 0.3), value: proOn)
         .padding(14)
         .background(
             RoundedRectangle(cornerRadius: 24)
@@ -792,8 +792,8 @@ struct PingView: View {
                 lockedPreview
             }
 
-            // ── EXPRESSIVE: the playground, only when the mode is on ──────
-            if expressiveOn && subscription.tier != .free {
+            // ── PRO: the playground, only when the mode is on ──────
+            if proOn && subscription.tier != .free {
                 Divider()
                     .background(DesignTokens.Color.border)
                     .padding(.vertical, 8)
@@ -841,7 +841,7 @@ struct PingView: View {
         }
     }
 
-    /// FREE tier: a dimmed, blurred taste of the expressive playground with
+    /// FREE tier: a dimmed, blurred taste of the pro playground with
     /// a lock — one tap anywhere opens the paywall.
     private var lockedPreview: some View {
         Button {
@@ -864,7 +864,7 @@ struct PingView: View {
                     Image(systemName: "lock.fill")
                         .font(.system(size: 15))
                         .foregroundColor(Self.lavender)
-                    Text("unlock expressive mode")
+                    Text("unlock Pointward Pro")
                         .font(.system(size: 12, design: .serif).italic())
                         .foregroundColor(Self.lavender)
                 }

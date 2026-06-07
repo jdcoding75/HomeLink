@@ -3,7 +3,7 @@
 //
 // "✦ edit" — choose your personal six from the full library.
 // Free: only the core six are selectable (the rest show a quiet lock).
-// Expressive (paid): the entire library, including your recordings.
+// Pro (paid): the entire library, including your recordings.
 
 import SwiftUI
 

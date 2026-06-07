@@ -49,7 +49,7 @@ final class SoundEngine {
             ("🫂",    0.50, makeWarmPulse),
             ("😢",    0.55, makeSad),
 
-            // ── EXPRESSIVE — with feeling ──────────────────────────────────
+            // ── PRO — with feeling ──────────────────────────────────
             ("😤",    0.80, makeFrustrated),
             ("🤬",    0.85, makeAngry),
             ("👊",    0.85, makePunch),
@@ -60,7 +60,7 @@ final class SoundEngine {
             ("😡",    0.80, makeStab),
             ("💨",    0.85, makeFart),
 
-            // ── EXPRESSIVE — with food & drink ─────────────────────────────
+            // ── PRO — with food & drink ─────────────────────────────
             ("🍕",    0.55, makePizzaDoorbell),
             ("🍫",    0.50, makeChocolateCrinkle),
             ("🍺",    0.55, makeBeerPour),
@@ -72,7 +72,7 @@ final class SoundEngine {
             ("🍣",    0.50, makeSushiPlop),
             ("🥂",    0.55, makeChampagne),
 
-            // ── EXPRESSIVE — silly ─────────────────────────────────────────
+            // ── PRO — silly ─────────────────────────────────────────
             ("😂",    0.55, makeLaugh),
             ("🤪",    0.55, makeNoodleSlurp),
             ("🥳",    0.55, makeCakeChime),
@@ -96,7 +96,7 @@ final class SoundEngine {
         play(entry.buffer, volume: entry.volume)
     }
 
-    // MARK: - Core signatures (Expressive Mode OFF)
+    // MARK: - Core signatures (Pro Mode OFF)
     //
     // NOTE: programmatic synthesis has real limits for warmth — these are
     // designed placeholders. For production intimacy, source soft recorded
@@ -164,7 +164,7 @@ final class SoundEngine {
         return buf
     }
 
-    // MARK: - With love (expressive-era voices, kept for reuse)
+    // MARK: - With love (pro-era voices, kept for reuse)
 
     /// 💜 Soft warm sine pulse, 440→520 Hz over 0.8 s, gentle fades.
     private func makeHeart() -> AVAudioPCMBuffer? {
