@@ -75,8 +75,14 @@ struct PersonDetailView: View {
                             .padding(.horizontal, 24)
                             .padding(.bottom, 16)
 
-                        // ── Thought history ───────────────────────────────
-                        if isConnected, let partnerID {
+                        // ── Thought history — expandable memory trail ─────
+                        if isConnected, partnerID != nil {
+                            thoughtsSection
+                                .padding(.horizontal, 24)
+                        }
+
+                        // (push-style history retired for inline expand; kept)
+                        if false, isConnected, let partnerID {
                             NavigationLink {
                                 PingHistoryView(personName: person.name, partnerID: partnerID,
                                                 bearing: compass.state.bearingDegrees)
@@ -267,6 +273,107 @@ struct PersonDetailView: View {
                 errorMessage = error.localizedDescription
             }
         }
+    }
+
+    // MARK: - Expandable memory trail
+
+    @State private var historyExpanded = false
+    @State private var historyRecords: [SupabaseService.PingRecord] = []
+    @State private var historyLoaded = false
+    @State private var replayingID: UUID?
+
+    private var thoughtsSection: some View {
+        VStack(spacing: 0) {
+            Button {
+                withAnimation(.easeOut(duration: 0.3)) { historyExpanded.toggle() }
+            } label: {
+                HStack {
+                    Image(systemName: "clock.arrow.circlepath")
+                        .font(.system(size: 15))
+                        .foregroundColor(DesignTokens.Color.accentSoft)
+                    Text(historyLoaded
+                         ? "\(historyRecords.count) thought\(historyRecords.count == 1 ? "" : "s")"
+                         : "thoughts")
+                        .font(DesignTokens.Font.label)
+                        .foregroundColor(DesignTokens.Color.textPrimary)
+                    Spacer()
+                    Image(systemName: historyExpanded ? "chevron.down" : "chevron.right")
+                        .font(.system(size: 12))
+                        .foregroundColor(DesignTokens.Color.textDim)
+                }
+                .padding(DesignTokens.Spacing.md)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+
+            if historyExpanded {
+                if historyRecords.isEmpty {
+                    Text("no thoughts yet")
+                        .font(.system(size: 13, design: .serif).italic())
+                        .foregroundColor(DesignTokens.Color.textMuted)
+                        .padding(.vertical, 16)
+                } else {
+                    VStack(spacing: 0) {
+                        ForEach(historyRecords) { record in
+                            trailRow(record)
+                            if record.id != historyRecords.last?.id {
+                                Rectangle()
+                                    .fill(Color.white.opacity(0.10))
+                                    .frame(height: 1)
+                                    .padding(.leading, 52)
+                            }
+                        }
+                    }
+                    .padding(.bottom, 8)
+                }
+            }
+        }
+        .background(DesignTokens.Color.backgroundCard)
+        .cornerRadius(DesignTokens.Radius.card)
+        .overlay(
+            RoundedRectangle(cornerRadius: DesignTokens.Radius.card)
+                .stroke(DesignTokens.Color.border, lineWidth: 1)
+        )
+        .task {
+            guard let partnerID else { return }
+            historyRecords = await SupabaseService.shared.fetchPings(with: partnerID)
+            historyLoaded = true
+        }
+    }
+
+    /// Memory trail row: emoji · felt dot · poetic time. Tap to feel again.
+    private func trailRow(_ record: SupabaseService.PingRecord) -> some View {
+        let sent = record.toUser == partnerID
+        return Button {
+            SoundEngine.shared.play(for: record.emoji)
+            HapticEngine.thoughtArrived()
+            withAnimation(.easeOut(duration: 0.35)) { replayingID = record.id }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) {
+                withAnimation(.easeIn(duration: 0.4)) { replayingID = nil }
+            }
+        } label: {
+            HStack(spacing: 14) {
+                Text(record.emoji)
+                    .font(.system(size: 28))
+                    .frame(width: 38)
+                    .scaleEffect(replayingID == record.id ? 1.25 : 1.0)
+                if sent {
+                    Circle()
+                        .fill(record.openedAt != nil
+                              ? Color(hex: "#c4a8d4")
+                              : DesignTokens.Color.textDim.opacity(0.5))
+                        .frame(width: 5, height: 5)
+                }
+                Spacer()
+                Text(PoeticTime.string(for: record.createdAt))
+                    .font(.system(size: 12, design: .serif).italic())
+                    .foregroundColor(DesignTokens.Color.textMuted)
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 11)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
     }
 
     private func fetchPresence() {

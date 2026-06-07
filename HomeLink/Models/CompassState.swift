@@ -6,6 +6,8 @@ import Foundation
 struct CompassState: Equatable {
 
     var bearingDegrees:  Double
+    /// Rotation of the whole rose: -heading, so N stays at true North.
+    var faceRotationDegrees: Double = 0
     var distanceKm:      Double
     var personID:        UUID?
     var personName:      String

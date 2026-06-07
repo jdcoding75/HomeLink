@@ -14,6 +14,7 @@ struct PeopleListView: View {
     @State private var showAdd    = false
     @State private var editPerson: Person? = nil
     @State private var detailPerson: Person? = nil
+    @State private var showConnect = false
     @State private var showUnlock = false
     @State private var friendLastSeen: Date? = nil   // presence of the connected friend
 
@@ -57,6 +58,27 @@ struct PeopleListView: View {
                     }
                     .padding(.horizontal, DesignTokens.Spacing.lg)
 
+                    // ── At the very bottom: all connection UI lives here ──
+                    Button {
+                        showConnect = true
+                    } label: {
+                        HStack {
+                            Text("connect with someone →")
+                                .font(.system(size: 14, design: .serif).italic())
+                                .foregroundColor(DesignTokens.Color.accentSoft)
+                            Spacer()
+                        }
+                        .padding(DesignTokens.Spacing.md)
+                        .background(DesignTokens.Color.backgroundCard.opacity(0.7))
+                        .cornerRadius(DesignTokens.Radius.card)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: DesignTokens.Radius.card)
+                                .stroke(DesignTokens.Color.border, lineWidth: 1)
+                        )
+                    }
+                    .padding(.horizontal, DesignTokens.Spacing.lg)
+                    .padding(.top, 16)
+
                     Spacer(minLength: DesignTokens.Spacing.xl)
                 }
             }
@@ -78,6 +100,9 @@ struct PeopleListView: View {
         }
         .sheet(item: $detailPerson) { person in
             PersonDetailView(person: person)
+        }
+        .sheet(isPresented: $showConnect) {
+            ConnectView()
         }
         .onAppear { fetchFriendPresence() }
     }

@@ -84,6 +84,7 @@ struct CompassView: View {
     @State private var bearingFlash = false
     @State private var showSkinOverlay = false
     @State private var showSkinPaywall = false
+    @State private var showConnectSheet = false
     // (subscription env object already declared at the top)
 
     // ── Send a thought — merged onto the compass (thoughts tab retired) ──
@@ -118,9 +119,12 @@ struct CompassView: View {
                 emptyState
             } else {
                 VStack(spacing: 0) {
-                    // ── TOP ZONE: the name — largest text on screen ───────────
+                    // ── TOP ZONE: name, then distance right under it ──────────
                     nameHeader
                         .padding(.top, 16)
+
+                    distanceLine
+                        .padding(.top, 6)
 
                     Spacer(minLength: 12)
 
@@ -170,7 +174,21 @@ struct CompassView: View {
 
                     sendControl
                         .padding(.top, 10)
-                        .padding(.bottom, 12)
+
+                    // Unpaired: a quiet doorway to the connection sheet
+                    if SupabaseService.connectedFriendID == nil {
+                        Button {
+                            showConnectSheet = true
+                        } label: {
+                            Text("connect with someone")
+                                .font(.system(size: 11, design: .serif).italic())
+                                .foregroundColor(DesignTokens.Color.textMuted)
+                        }
+                        .padding(.top, 6)
+                        .sheet(isPresented: $showConnectSheet) { ConnectView() }
+                    }
+
+                    Color.clear.frame(height: 12)
 
                     // (send pill retired — the row replaced it; view kept)
                     // sendPill
@@ -580,49 +598,35 @@ struct CompassView: View {
         }
     }
 
+    /// TOP ZONE line 2 — the distance, tap cycles: standard → funny (Pro)
+    /// → light speed. Number only, clean crossfade, free skips funny.
+    private var distanceLine: some View {
+        HStack(spacing: 5) {
+            Text(distanceLineText)
+                .font(.system(size: 15, weight: .light))
+                .foregroundColor(DesignTokens.Color.textSecondary)
+                .monospacedDigit()
+                .contentTransition(.opacity)
+            Text("✦")
+                .font(.system(size: 8))
+                .foregroundColor(DesignTokens.Color.textDim.opacity(0.7))
+        }
+        .onTapGesture {
+            HapticEngine.personSelected()
+            withAnimation(.easeInOut(duration: 0.3)) {
+                let next = (distanceMode + 1) % 3
+                distanceMode = (next == 1 && !proOn) ? 2 : next
+            }
+        }
+        .animation(.easeInOut(duration: 0.3), value: distanceMode)
+    }
+
     private var bottomZone: some View {
         VStack(spacing: 12) {
-            // Line 1 — distance, tap cycles units with a crossfade
-            HStack(spacing: 5) {
-                Text(distanceLineText)
-                    .font(.system(size: 15, weight: .light))
-                    .foregroundColor(DesignTokens.Color.textSecondary)
-                    .monospacedDigit()
-                    .contentTransition(.opacity)
-                Text("✦")
-                    .font(.system(size: 8))
-                    .foregroundColor(DesignTokens.Color.textDim.opacity(0.7))
-            }
-            .onTapGesture {
-                HapticEngine.personSelected()
-                withAnimation(.easeInOut(duration: 0.3)) {
-                    // Free users skip the funny mode
-                    let next = (distanceMode + 1) % 3
-                    distanceMode = (next == 1 && !proOn) ? 2 : next
-                }
-            }
+            // (distance moved to the top zone; the "unit:" cycler retired —
+            //  the funny unit comes from Pro setup's lock or per-launch random)
 
-            // Line 2 — funny unit cycler (Pro, while the funny mode is up)
-            if proOn && distanceMode == 1 {
-                HStack(spacing: 5) {
-                    Text("unit: \(DistanceFun.funnyLabels[funnyIndex])")
-                        .font(.system(size: 12))
-                        .foregroundColor(DesignTokens.Color.textMuted)
-                        .contentTransition(.opacity)
-                    Text("✦")
-                        .font(.system(size: 7))
-                        .foregroundColor(DesignTokens.Color.textDim.opacity(0.7))
-                }
-                .transition(.opacity)
-                .onTapGesture {
-                    HapticEngine.personSelected()
-                    withAnimation(.easeInOut(duration: 0.25)) {
-                        funnyIndex = (funnyIndex + 1) % DistanceFun.funnyCount
-                    }
-                }
-            }
-
-            // Line 3 — the poetic tagline, never repeats until all shown
+            // The poetic tagline, never repeats until all shown
             HStack(spacing: 5) {
                 Text(TaglineSystem.poeticLibrary[taglineIndex])
                     .font(.system(size: 13, design: .serif).italic())
@@ -853,26 +857,32 @@ struct CompassView: View {
 
     private var compassFace: some View {
         ZStack {
-            // Skin-specific rings and decorations
-            SkinFaceView(
-                skin: compass.state.activeSkin,
-                bearing: compass.state.bearingDegrees,
-                locked: compass.state.isLocked,
-                quietMode: quietMode,
-                pingRingActive: pingRingActive
-            )
+            // ── The rose: face + cardinal markers counter-rotate the device
+            // heading, so N always points at true North — like a real
+            // instrument. The needle rotates independently below.
+            Group {
+                // Skin-specific rings and decorations
+                SkinFaceView(
+                    skin: compass.state.activeSkin,
+                    bearing: compass.state.bearingDegrees,
+                    locked: compass.state.isLocked,
+                    quietMode: quietMode,
+                    pingRingActive: pingRingActive
+                )
 
-            // Subtle fixed cardinal markers at the rim — orientation reference
-            // while the needle moves (just inside the breathing ring)
-            ForEach(0..<4, id: \.self) { i in
-                let rad = Double(i) * 90 * .pi / 180
-                Text(["N", "E", "S", "W"][i])
-                    .font(.system(size: 9, weight: i == 0 ? .semibold : .regular, design: .rounded))
-                    .foregroundColor(i == 0
-                                     ? DesignTokens.Color.accentSoft.opacity(0.9)
-                                     : DesignTokens.Color.textDim.opacity(0.7))
-                    .offset(x: CGFloat(sin(rad)) * 113, y: -CGFloat(cos(rad)) * 113)
+                // Cardinal markers ride the rose (just inside the ring)
+                ForEach(0..<4, id: \.self) { i in
+                    let rad = Double(i) * 90 * .pi / 180
+                    Text(["N", "E", "S", "W"][i])
+                        .font(.system(size: 9, weight: i == 0 ? .semibold : .regular, design: .rounded))
+                        .foregroundColor(i == 0
+                                         ? DesignTokens.Color.accentSoft.opacity(0.9)
+                                         : DesignTokens.Color.textDim.opacity(0.7))
+                        .offset(x: CGFloat(sin(rad)) * 113, y: -CGFloat(cos(rad)) * 113)
+                }
             }
+            .rotationEffect(.degrees(compass.state.faceRotationDegrees))
+            .animation(.easeOut(duration: 0.5), value: compass.state.faceRotationDegrees)
 
             // Emoji presence system — always at center
             emojiPresence

@@ -23,6 +23,7 @@ struct SettingsView: View {
     @AppStorage("holdToSendEnabled") private var holdToSend = false
 
     @State private var showCopied     = false
+    @State private var showConnect    = false
     @State private var showSkinPicker = false
     @State private var showAbout      = false
     @State private var showUnlock     = false
@@ -199,8 +200,25 @@ struct SettingsView: View {
             .contentShape(Rectangle())
             .onTapGesture { showAccount = true }
 
-            // Your pairing code — tap to copy
-            if let code = SupabaseService.localPairingCode {
+            Divider().background(DesignTokens.Color.border).padding(.leading, 44)
+
+            // All connection UI lives in ConnectView now
+            settingsRow {
+                Image(systemName: "link")
+                    .settingsIcon()
+                Text("your connection")
+                    .settingsLabel()
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 12))
+                    .foregroundColor(DesignTokens.Color.textDim)
+            }
+            .contentShape(Rectangle())
+            .onTapGesture { showConnect = true }
+            .sheet(isPresented: $showConnect) { ConnectView() }
+
+            // (pairing-code copy row replaced by ConnectView; kept)
+            if false, let code = SupabaseService.localPairingCode {
                 Divider().background(DesignTokens.Color.border).padding(.leading, 44)
 
                 settingsRow {

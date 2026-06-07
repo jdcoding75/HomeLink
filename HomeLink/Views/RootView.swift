@@ -27,6 +27,8 @@ struct RootView: View {
 
     @State private var showSplash = true
     @State private var pairRequest: PairRequest? = nil   // from universal links
+    @AppStorage("postOnboardConnectPromptShown") private var connectPromptShown = false
+    @State private var showConnectPrompt = false
     @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
@@ -57,9 +59,20 @@ struct RootView: View {
                 withAnimation(.easeOut(duration: 0.6)) { showSplash = false }
             }
         }
-        .onChange(of: hasCompletedOnboarding) { _, _ in
+        .onChange(of: hasCompletedOnboarding) { _, done in
             people.configure(with: modelContext)
             startCompassIfNeeded()
+            // One-time gentle nudge after first setup
+            if done && !connectPromptShown {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
+                    showConnectPrompt = true
+                    connectPromptShown = true
+                }
+            }
+        }
+        .sheet(isPresented: $showConnectPrompt) {
+            PostOnboardConnectPrompt()
+                .presentationDetents([.medium, .large])
         }
         // Realtime lives only in the foreground — reopen on activate,
         // close gracefully when backgrounding.
@@ -153,6 +166,56 @@ struct RootView: View {
         if let person = people.selectedPerson {
             compass.start(tracking: person)
         }
+    }
+}
+
+// MARK: - Post-onboarding connect prompt (shown once, ever)
+
+struct PostOnboardConnectPrompt: View {
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var showFullConnect = false
+
+    var body: some View {
+        ZStack {
+            DesignTokens.Color.background.ignoresSafeArea()
+
+            if showFullConnect {
+                ConnectView()
+            } else {
+                VStack(spacing: 14) {
+                    Spacer()
+                    Text("🧭")
+                        .font(.system(size: 40))
+                    Text("want to connect with someone?")
+                        .font(.system(size: 20, weight: .semibold, design: .serif))
+                        .foregroundColor(DesignTokens.Color.textPrimary)
+                    Text("paired compasses feel each other's thoughts")
+                        .font(.system(size: 13, design: .serif).italic())
+                        .foregroundColor(DesignTokens.Color.textMuted)
+
+                    Button {
+                        withAnimation(.easeOut(duration: 0.3)) { showFullConnect = true }
+                    } label: {
+                        Text("connect now →")
+                            .font(DesignTokens.Font.label)
+                            .foregroundColor(DesignTokens.Color.textPrimary)
+                            .frame(maxWidth: .infinity)
+                            .padding(DesignTokens.Spacing.md)
+                            .background(DesignTokens.Color.accentStrong)
+                            .cornerRadius(DesignTokens.Radius.button)
+                    }
+                    .padding(.horizontal, 36)
+                    .padding(.top, 8)
+
+                    Button("maybe later") { dismiss() }
+                        .font(DesignTokens.Font.caption)
+                        .foregroundColor(DesignTokens.Color.textMuted)
+                    Spacer()
+                }
+            }
+        }
+        .preferredColorScheme(.dark)
     }
 }
 

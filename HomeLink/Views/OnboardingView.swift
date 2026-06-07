@@ -195,15 +195,20 @@ struct OnboardingView: View {
         VStack(spacing: 0) {
             Spacer()
 
-            HStack(spacing: 26) {
-                miniCompass(skin: .minimal, bearing: 40,
-                            locked: conceptLocked, size: 130)
-                miniCompass(skin: .minimal, bearing: conceptRight,
-                            locked: conceptLocked, size: 130)
+            // The real behavior: the rose rotates with the world while the
+            // needle stays pointed at the person.
+            ZStack {
+                SkinFaceView(skin: .minimal, bearing: 40, locked: conceptLocked,
+                             quietMode: false, pingRingActive: false)
+                    .rotationEffect(.degrees(conceptRight))   // the rose turning
+                NeedleView(bearing: 40, skin: .minimal, locked: conceptLocked)
             }
+            .frame(width: 240, height: 240)
+            .scaleEffect(190.0 / 240.0)
+            .frame(width: 190, height: 190)
             .shadow(color: Self.glow.opacity(conceptLocked ? 0.45 : 0), radius: 22)
 
-            Text("always know which way")
+            Text("your compass always knows which way")
                 .font(.system(size: 26, weight: .semibold, design: .serif))
                 .foregroundColor(DesignTokens.Color.textPrimary)
                 .padding(.top, 36)
@@ -223,10 +228,10 @@ struct OnboardingView: View {
 
     private func alignConcept() {
         conceptLocked = false
-        conceptRight = Double.random(in: 160...300)
+        conceptRight = Double.random(in: -120 ... -40)
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.7) {
-            withAnimation(.spring(response: 1.3, dampingFraction: 0.6)) {
-                conceptRight = 40   // the needles find each other
+            withAnimation(.spring(response: 1.6, dampingFraction: 0.6)) {
+                conceptRight = 0   // the rose settles, needle never moved
             }
         }
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.9) {
@@ -268,7 +273,23 @@ struct OnboardingView: View {
             }
             .frame(height: 230)
 
-            Text("send a wordless thought")
+            // The emoji row lives on the compass — show it that way
+            HStack(spacing: 8) {
+                ForEach(["❤️","💋","🤗","✨","🌸","🌙"], id: \.self) { e in
+                    Text(e)
+                        .font(.system(size: 17))
+                        .frame(width: 34, height: 34)
+                        .background(DesignTokens.Color.backgroundCard.opacity(0.7))
+                        .cornerRadius(10)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 10)
+                                .stroke(DesignTokens.Color.border.opacity(0.6), lineWidth: 1)
+                        )
+                }
+            }
+            .padding(.top, 14)
+
+            Text("send a thought from the compass")
                 .font(.system(size: 26, weight: .semibold, design: .serif))
                 .foregroundColor(DesignTokens.Color.textPrimary)
                 .padding(.top, 30)

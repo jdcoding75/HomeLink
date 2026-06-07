@@ -12,6 +12,14 @@ struct PointwardApp: App {
     @StateObject private var container = ServiceContainer()
 
     init() {
+        // ── TESTING DEFAULTS — revert before App Store submission ────────
+        // Default tier .pro, Pro features on. (Skin default is .vintage in
+        // SkinStore.) Remove this register block to restore .free defaults.
+        UserDefaults.standard.register(defaults: [
+            "subscriptionTier": "unlocked",      // SubscriptionTier.pro
+            ProFeatures.storageKey: true,        // proFeaturesEnabled
+        ])
+
         // Carry "Expressive Mode" users into the renamed Pro key
         ProFeatures.migrateLegacyKey()
     }
