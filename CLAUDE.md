@@ -83,7 +83,7 @@
 ## Build Command
 xcodebuild -scheme HomeLink \
   -destination 'platform=iOS Simulator,\
-  name=iPhone 16 Pro' build 2>&1
+  name=iPhone 17 Pro' build 2>&1
 
 ## Git
 - Remote: github.com/jdcoding75/HomeLink
