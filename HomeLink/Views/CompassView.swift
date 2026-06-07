@@ -94,6 +94,8 @@ struct CompassView: View {
     @State private var personalSixRow: [String] = PersonalSet.load()
     @State private var selectedToken: String? = nil
     @State private var flightToken: String? = nil
+    // Full-compass sender styles dim the skin to 20 % while they play
+    @State private var faceDimmedForInstrument = false
     @State private var flightFly = false
     @State private var holdProgress: Double = 0
     private let holdDuration = 2.0
@@ -136,6 +138,12 @@ struct CompassView: View {
                         .frame(width: 240, height: 240)
                         .scaleEffect(370.0 / 240.0)
                         .frame(width: 370, height: 370)
+                        // The instrument takes the circle; the skin recedes
+                        .opacity(faceDimmedForInstrument ? 0.2 : 1.0)
+                        .animation(faceDimmedForInstrument
+                                   ? .easeOut(duration: 0.3)
+                                   : .easeIn(duration: 0.4),
+                                   value: faceDimmedForInstrument)
                         // STEADY LOCK (5 s+): warm breathing halo behind the face
                         .background(
                             Circle()
@@ -857,6 +865,17 @@ struct CompassView: View {
         withAnimation(.easeOut(duration: 0.25)) { selectedToken = nil }
         flightToken = token
         flightFly = true   // legacy flag (the style view drives its own motion)
+
+        // Full-compass instruments: the skin recedes to 20 % while the hand
+        // or bow owns the circle, then breathes back as the send completes.
+        let style = SenderStyle.effective(for: subscription.tier)
+        if style == .fingerFlick || style == .bowArrow {
+            faceDimmedForInstrument = true
+            let restoreDelay = style == .bowArrow ? 1.5 : 1.2
+            DispatchQueue.main.asyncAfter(deadline: .now() + restoreDelay) {
+                faceDimmedForInstrument = false
+            }
+        }
         // HapticEngine.thoughtReleased()   // retired — style haptic fires at launch
 
         // Real delivery when paired

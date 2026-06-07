@@ -51,14 +51,15 @@ enum SenderStyle: String, CaseIterable, Identifiable {
         }
     }
 
-    /// Total send-flight duration, per spec.
+    /// Total send duration — charge + launch + flight + impact.
+    /// (Dramatic rebuild: sends are events now, not blinks.)
     var sendDuration: Double {
         switch self {
-        case .glow:         return 0.35
-        case .shootingStar: return 0.30
-        case .firefly:      return 1.20   // slow, drifting
-        case .fingerFlick:  return 0.40   // compress 80 · flick 50 · flight 270
-        case .bowArrow:     return 0.60   // draw 200 · hold 100 · release 300
+        case .glow:         return 1.20   // charge 200 · launch 100 · flight 700 · impact 200
+        case .shootingStar: return 0.90   // charge 150 · streak 500 · impact 250
+        case .firefly:      return 2.00   // gather 300 · drift 1400 · land 300
+        case .fingerFlick:  return 0.78   // compress 80 · flick 50 · flight 450 · impact 200
+        case .bowArrow:     return 0.95   // draw 200 · hold 100 · flight 450 · impact 200
         }
     }
 
