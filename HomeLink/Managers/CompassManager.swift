@@ -102,7 +102,6 @@ final class CompassManager: NSObject, ObservableObject {
     func setPendingPing(emoji: String?) {
         state = CompassState(
             bearingDegrees:   state.bearingDegrees,
-            faceRotationDegrees: state.faceRotationDegrees,
             distanceKm:       state.distanceKm,
             personID:         state.personID,
             personName:       state.personName,
@@ -138,9 +137,6 @@ final class CompassManager: NSObject, ObservableObject {
         let activeSkin = resolvedSkin(for: target)
         state = CompassState(
             bearingDegrees:   relativeBearing,
-            // Real-instrument behavior: the rose counter-rotates the device
-            // heading so N always points at geographic North.
-            faceRotationDegrees: isHeadingAvailable ? -currentHeading : 0,
             distanceKm:       distance,
             personID:         target.id,
             personName:       target.name,

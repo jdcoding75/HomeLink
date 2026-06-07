@@ -175,21 +175,10 @@ struct CompassView: View {
 
                     sendControl
                         .padding(.top, 10)
+                        .padding(.bottom, 12)
 
-                    // Unpaired: a quiet doorway to the connection sheet
-                    if SupabaseService.connectedFriendID == nil {
-                        Button {
-                            showConnectSheet = true
-                        } label: {
-                            Text("connect with someone")
-                                .font(.system(size: 11, design: .serif).italic())
-                                .foregroundColor(DesignTokens.Color.textMuted)
-                        }
-                        .padding(.top, 6)
-                        .sheet(isPresented: $showConnectSheet) { ConnectView() }
-                    }
-
-                    Color.clear.frame(height: 12)
+                    // (connect link removed — connection UI lives in the
+                    //  People tab only; the compass stays clean)
 
                     // (send pill retired — the row replaced it; view kept)
                     // sendPill
@@ -884,9 +873,9 @@ struct CompassView: View {
 
     private var compassFace: some View {
         ZStack {
-            // ── The rose: face + cardinal markers counter-rotate the device
-            // heading, so N always points at true North — like a real
-            // instrument. The needle rotates independently below.
+            // ── The rose is STATIC: N at top, always. Real-world
+            // orientation comes from the fixed face; emotional direction
+            // from the needle (bearing - heading) alone.
             Group {
                 // Skin-specific rings and decorations
                 SkinFaceView(
@@ -908,8 +897,8 @@ struct CompassView: View {
                         .offset(x: CGFloat(sin(rad)) * 113, y: -CGFloat(cos(rad)) * 113)
                 }
             }
-            .rotationEffect(.degrees(compass.state.faceRotationDegrees))
-            .animation(.easeOut(duration: 0.5), value: compass.state.faceRotationDegrees)
+            // .rotationEffect(.degrees(compass.state.faceRotationDegrees))
+            //   — face rotation removed: the rose never turns
 
             // Emoji presence system — always at center
             emojiPresence

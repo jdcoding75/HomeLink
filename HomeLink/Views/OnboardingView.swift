@@ -195,13 +195,12 @@ struct OnboardingView: View {
         VStack(spacing: 0) {
             Spacer()
 
-            // The real behavior: the rose rotates with the world while the
-            // needle stays pointed at the person.
+            // The real behavior: the face is fixed (N at top), only the
+            // needle moves — it finds the person and settles.
             ZStack {
-                SkinFaceView(skin: .minimal, bearing: 40, locked: conceptLocked,
+                SkinFaceView(skin: .minimal, bearing: conceptRight, locked: conceptLocked,
                              quietMode: false, pingRingActive: false)
-                    .rotationEffect(.degrees(conceptRight))   // the rose turning
-                NeedleView(bearing: 40, skin: .minimal, locked: conceptLocked)
+                NeedleView(bearing: conceptRight, skin: .minimal, locked: conceptLocked)
             }
             .frame(width: 240, height: 240)
             .scaleEffect(190.0 / 240.0)
@@ -231,7 +230,7 @@ struct OnboardingView: View {
         conceptRight = Double.random(in: -120 ... -40)
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.7) {
             withAnimation(.spring(response: 1.6, dampingFraction: 0.6)) {
-                conceptRight = 0   // the rose settles, needle never moved
+                conceptRight = 40   // the needle finds them and settles
             }
         }
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.9) {
