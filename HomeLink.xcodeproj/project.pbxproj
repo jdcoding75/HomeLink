@@ -21,6 +21,13 @@
 			remoteGlobalIDString = 52C0B69A2FD49C4C002A6B41;
 			remoteInfo = PointwardWidgetsExtension;
 		};
+		7A0000012FD400000000000A /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 52C0B2D72FD392DF002A6B41 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 52C0B2DE2FD392DF002A6B41;
+			remoteInfo = HomeLink;
+		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -43,6 +50,7 @@
 		52C0B69D2FD49C4C002A6B41 /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = System/Library/Frameworks/WidgetKit.framework; sourceTree = SDKROOT; };
 		52C0B69F2FD49C4C002A6B41 /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
 		52C0B6B32FD49C7F002A6B41 /* PointwardWidgetsExtension.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = PointwardWidgetsExtension.entitlements; sourceTree = "<group>"; };
+		7A0000012FD4000000000008 /* HomeLinkTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = HomeLinkTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -83,6 +91,13 @@
 			path = PointwardWidgets;
 			sourceTree = "<group>";
 		};
+		7A0000012FD4000000000009 /* HomeLinkTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+			);
+			path = HomeLinkTests;
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -103,6 +118,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		7A0000012FD4000000000006 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -111,6 +133,7 @@
 			children = (
 				52C0B6B32FD49C7F002A6B41 /* PointwardWidgetsExtension.entitlements */,
 				52C0B2E12FD392DF002A6B41 /* HomeLink */,
+				7A0000012FD4000000000009 /* HomeLinkTests */,
 				52C0B6A12FD49C4C002A6B41 /* PointwardWidgets */,
 				52C0B69C2FD49C4C002A6B41 /* Frameworks */,
 				52C0B2E02FD392DF002A6B41 /* Products */,
@@ -122,6 +145,7 @@
 			children = (
 				52C0B2DF2FD392DF002A6B41 /* HomeLink.app */,
 				52C0B69B2FD49C4C002A6B41 /* PointwardWidgetsExtension.appex */,
+				7A0000012FD4000000000008 /* HomeLinkTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -185,6 +209,29 @@
 			productReference = 52C0B69B2FD49C4C002A6B41 /* PointwardWidgetsExtension.appex */;
 			productType = "com.apple.product-type.app-extension";
 		};
+		7A0000012FD4000000000001 /* HomeLinkTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 7A0000012FD4000000000002 /* Build configuration list for PBXNativeTarget "HomeLinkTests" */;
+			buildPhases = (
+				7A0000012FD4000000000005 /* Sources */,
+				7A0000012FD4000000000006 /* Frameworks */,
+				7A0000012FD4000000000007 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				7A0000012FD400000000000B /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				7A0000012FD4000000000009 /* HomeLinkTests */,
+			);
+			name = HomeLinkTests;
+			packageProductDependencies = (
+			);
+			productName = HomeLinkTests;
+			productReference = 7A0000012FD4000000000008 /* HomeLinkTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -200,6 +247,10 @@
 					};
 					52C0B69A2FD49C4C002A6B41 = {
 						CreatedOnToolsVersion = 26.5;
+					};
+					7A0000012FD4000000000001 = {
+						CreatedOnToolsVersion = 26.5;
+						TestTargetID = 52C0B2DE2FD392DF002A6B41;
 					};
 				};
 			};
@@ -222,6 +273,7 @@
 			targets = (
 				52C0B2DE2FD392DF002A6B41 /* HomeLink */,
 				52C0B69A2FD49C4C002A6B41 /* PointwardWidgetsExtension */,
+				7A0000012FD4000000000001 /* HomeLinkTests */,
 			);
 		};
 /* End PBXProject section */
@@ -235,6 +287,13 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		52C0B6992FD49C4C002A6B41 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		7A0000012FD4000000000007 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -258,6 +317,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		7A0000012FD4000000000005 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -265,6 +331,11 @@
 			isa = PBXTargetDependency;
 			target = 52C0B69A2FD49C4C002A6B41 /* PointwardWidgetsExtension */;
 			targetProxy = 52C0B6AB2FD49C4D002A6B41 /* PBXContainerItemProxy */;
+		};
+		7A0000012FD400000000000B /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 52C0B2DE2FD392DF002A6B41 /* HomeLink */;
+			targetProxy = 7A0000012FD400000000000A /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -524,6 +595,48 @@
 			};
 			name = Release;
 		};
+		7A0000012FD4000000000003 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 78842PK6A3;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.5;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.jdcoding75.pointward.HomeLinkTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/HomeLink.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/HomeLink";
+			};
+			name = Debug;
+		};
+		7A0000012FD4000000000004 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 78842PK6A3;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.5;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.jdcoding75.pointward.HomeLinkTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/HomeLink.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/HomeLink";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -550,6 +663,15 @@
 			buildConfigurations = (
 				52C0B6B02FD49C4D002A6B41 /* Debug */,
 				52C0B6B12FD49C4D002A6B41 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		7A0000012FD4000000000002 /* Build configuration list for PBXNativeTarget "HomeLinkTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				7A0000012FD4000000000003 /* Debug */,
+				7A0000012FD4000000000004 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

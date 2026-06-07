@@ -374,11 +374,19 @@ struct PairRequestView: View {
         .onAppear {
             // Show who the invite came from before asking to accept
             Task {
-                if let info = try? await SupabaseService.shared.lookupInvite(code) {
+                do {
+                    let info = try await SupabaseService.shared.lookupInvite(code)
                     withAnimation(.easeOut(duration: 0.3)) {
                         inviteName  = info.name
                         inviteEmoji = info.emoji
                     }
+                } catch let error as SupabaseServiceError where error == .codeNotFound {
+                    // Dead link — tell them now, before they hit Accept.
+                    rootLog.warning("pair-link: code \(code, privacy: .public) not found")
+                    errorMessage = error.localizedDescription
+                } catch {
+                    // Network hiccup — Accept will retry the lookup anyway.
+                    rootLog.error("pair-link: invite lookup failed: \(error.localizedDescription, privacy: .public)")
                 }
             }
         }
@@ -386,11 +394,13 @@ struct PairRequestView: View {
 
     private func accept() {
         guard SupabaseService.localUserID != nil else {
+            rootLog.warning("pair-link: accept blocked — not signed in")
             errorMessage = "Sign in first — Settings → account — then tap the link again."
             return
         }
         isBusy = true
         errorMessage = nil
+        rootLog.info("pair-link: accepting \(code, privacy: .public)")
         Task {
             defer { isBusy = false }
             do {
@@ -402,9 +412,11 @@ struct PairRequestView: View {
                     friendID: result.ownerID,
                     near: compass.userLocation?.coordinate
                 )
+                rootLog.info("pair-link: paired ✓ partner=\(result.ownerID.uuidString, privacy: .public)")
                 HapticEngine.connectionFelt()
                 withAnimation(.easeOut(duration: 0.4)) { connected = true }
             } catch {
+                rootLog.error("pair-link: accept failed — \(error.localizedDescription, privacy: .public)")
                 errorMessage = error.localizedDescription
             }
         }

@@ -29,9 +29,9 @@ struct FlickInstrumentView: View {
     private static let orange   = Color(hex: "#e08a3c")
 
     private var rad: Double { bearingDegrees * .pi / 180 }
-    private var alignDiff: Double { min(bearingDegrees, 360 - bearingDegrees) }
-    private var aligned: Bool { alignDiff <= 15 }
-    private var perfect: Bool { alignDiff <= 5 }
+    private var alignDiff: Double { BearingCalculator.alignmentError(relativeBearing: bearingDegrees) }
+    private var aligned: Bool { BearingCalculator.isSendAligned(bearingDegrees) }
+    private var perfect: Bool { BearingCalculator.isLockAligned(bearingDegrees) }
 
     /// The pocket sits at the bottom of the circle.
     private let pocketOffset = CGSize(width: 0, height: 130)

@@ -116,6 +116,20 @@ async function sendPush(toUser: string, aps: Record<string, unknown>): Promise<R
   return new Response(JSON.stringify({ sent: results }), { status: 200 });
 }
 
+// The RECIPIENT's name for the sender — their own person card label,
+// stored on the connection row they own (owner = recipient, friend = sender).
+// Falls back to the sender-side person_name, then null.
+async function nameOfSender(senderId: string, recipientId: string): Promise<string | null> {
+  const { data: ownRows } = await supabase
+    .from("connections")
+    .select("person_name")
+    .eq("owner", recipientId)
+    .eq("friend", senderId)
+    .limit(1);
+  if (ownRows?.[0]?.person_name) return ownRows[0].person_name;
+  return null;
+}
+
 Deno.serve(async (req) => {
   try {
     const payload = await req.json();
@@ -148,16 +162,18 @@ Deno.serve(async (req) => {
         return new Response("muted", { status: 200 });
       }
 
+      const pointerName = await nameOfSender(userId, partner);
+      console.log(`pointing: ${userId} → ${partner} (${pointerName ?? "someone"})`);
       return await sendPush(partner, {
         aps: {
           alert: {
-            title: "someone is pointing toward you 🧭",
+            title: `${pointerName ?? "someone"} is pointing toward you 🧭`,
             body: "they're thinking of you",
           },
           sound: "default",
         },
         type: "pointing",
-        fromName: "someone",
+        fromName: pointerName ?? "someone",
       });
     }
 
@@ -177,12 +193,26 @@ Deno.serve(async (req) => {
       ? { title: "Pointward", body: `you have ${unread} thoughts waiting ✦` }
       : { title: record.emoji ?? "💜", body: "someone sent you a thought" };
 
+    // Resolve who it's from so the catch screen can say their name
+    const senderName = record.from_user
+      ? await nameOfSender(record.from_user, record.to_user)
+      : null;
+
+    console.log(`ping: ${record.from_user} → ${record.to_user} ` +
+      `emoji=${record.emoji} style=${record.sender_style} id=${record.id} unread=${unread}`);
+
     return await sendPush(record.to_user, {
       aps: { alert, sound: "default", badge: unread },
       pingEmoji: record.emoji ?? "💜",
-      fromName: "someone who loves you",
+      fromName: senderName ?? "someone who loves you",
+      // The app needs these to record the felt receipt (opened_at) and to
+      // play the SENDER's catch animation when the push is the only path.
+      pingId: record.id ?? null,
+      senderStyle: record.sender_style ?? null,
+      fromUserId: record.from_user ?? null,
     });
   } catch (e) {
+    console.error(`handler error: ${e}`);
     return new Response(`error: ${e}`, { status: 500 });
   }
 });

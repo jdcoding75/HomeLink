@@ -66,3 +66,29 @@ create table if not exists public.device_tokens (
 alter table public.device_tokens enable row level security;
 create policy "tokens own" on public.device_tokens for all
   using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+-- ── compass bearings (ambient "pointing at you" presence) ─────────────
+create table if not exists public.compass_bearings (
+  user_id    uuid primary key references public.users(id) on delete cascade,
+  bearing    double precision not null,
+  updated_at timestamptz default now()
+);
+alter table public.compass_bearings enable row level security;
+create policy "bearings write own" on public.compass_bearings for insert
+  with check (auth.uid() = user_id);
+create policy "bearings update own" on public.compass_bearings for update
+  using (auth.uid() = user_id) with check (auth.uid() = user_id);
+create policy "bearings read" on public.compass_bearings for select using (true);
+
+-- Realtime: the app subscribes to the partner's pointing events
+alter publication supabase_realtime add table public.compass_bearings;
+
+-- ── giving back (running donation total, read-only to clients) ────────
+create table if not exists public.giving (
+  id                  int primary key default 1,
+  total_donated_cents int not null default 0,
+  charity_name        text
+);
+alter table public.giving enable row level security;
+create policy "giving read" on public.giving for select using (true);
+insert into public.giving (id) values (1) on conflict do nothing;

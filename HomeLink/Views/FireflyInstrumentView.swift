@@ -29,8 +29,8 @@ struct FireflyInstrumentView: View {
     private static let green = Color(hex: "#90EE90")
 
     private var rad: Double { bearingDegrees * .pi / 180 }
-    private var alignDiff: Double { min(bearingDegrees, 360 - bearingDegrees) }
-    private var aligned: Bool { alignDiff <= 15 }
+    private var alignDiff: Double { BearingCalculator.alignmentError(relativeBearing: bearingDegrees) }
+    private var aligned: Bool { BearingCalculator.isSendAligned(bearingDegrees) }
 
     var body: some View {
         ZStack {
