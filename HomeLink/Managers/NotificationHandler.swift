@@ -16,9 +16,9 @@ final class NotificationHandler: NSObject, ObservableObject {
     }
 
     private func handlePayload(_ userInfo: [AnyHashable: Any]) {
-        // "Pointing" pushes get the quiet compass toast, not the emoji burst
+        // "Pointing" pushes become ambient presence — the compass edge glow
         if userInfo["type"] as? String == "pointing" {
-            pingManager.showPointing(name: userInfo["fromName"] as? String ?? "someone")
+            pingManager.presenceFelt(name: userInfo["fromName"] as? String ?? "someone")
             return
         }
         guard

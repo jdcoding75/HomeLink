@@ -14,10 +14,16 @@ struct PaywallView: View {
     @State private var isPurchasing = false
 
     private let features: [(emoji: String, text: String)] = [
-        ("👥", "unlimited people"),
+        ("😤", "expressive emojis — playful, chaotic, honestly human"),
+        ("📏", "funny distances — football fields, chocolate bars, leopard geckos"),
+        ("🎤", "custom emoji + sound — record your voice, pick any emoji"),
+        ("🦎", "the gecko · obviously"),
         ("🎨", "all compass skins"),
-        ("📱", "home screen widget"),
+        ("👥", "up to 5 people"),
     ]
+    // (previous list:)
+    // ("👥", "unlimited people"), ("🎨", "all compass skins"),
+    // ("📱", "home screen widget")
 
     var body: some View {
         ZStack {

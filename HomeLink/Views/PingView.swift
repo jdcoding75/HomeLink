@@ -8,6 +8,7 @@
 // Free for everyone — no Pro gating.
 
 import SwiftUI
+import Combine
 
 struct PingView: View {
 
@@ -15,7 +16,8 @@ struct PingView: View {
     @EnvironmentObject var people:  PeopleManager
     @EnvironmentObject var pings:   PingManager
 
-    @AppStorage("quietMode") private var quietMode = false
+    // @AppStorage("quietMode") private var quietMode = false   // retired
+    private let quietMode = false
 
     // MARK: - State
 
@@ -57,6 +59,20 @@ struct PingView: View {
     // private let feelingEmojis = ["😢","😤","🤬","⚡️","🔥","💨"]
 
     @AppStorage(ExpressionMode.storageKey) private var expressiveOn = false
+    @EnvironmentObject var subscription: SubscriptionManager
+    @State private var showPaywall = false
+
+    // ── Curated six + bottom drawer ──────────────────────────────────────
+    @State private var personalSix: [String] = PersonalSet.load()
+    @State private var drawerExpanded = false
+    @State private var showCuration = false
+    @AppStorage("curationHintShown") private var curationHintShown = false
+    @State private var showCurationHint = false
+
+    // ── Hold to send — no button, ever. The holding still IS the send. ───
+    @State private var holdProgress: Double = 0
+    private let holdDuration: Double = 3.0
+    private let holdTick = Timer.publish(every: 0.05, on: .main, in: .common).autoconnect()
 
     private static let lavender   = Color(hex: "#c4a8d4")
     private static let lavenderHi = Color(hex: "#e0ccee")
@@ -183,7 +199,15 @@ struct PingView: View {
                             .transition(.opacity.animation(.easeIn(duration: 0.5).delay(0.4)))
                     }
 
-                    emojiPanel
+                    // Hold to send — the ring fills while you physically
+                    // hold the phone toward them. No button. Ever.
+                    if let emoji = selectedEmoji, phase == .idle, !drawerExpanded {
+                        holdToSendIndicator(emoji: emoji)
+                            .padding(.bottom, 10)
+                            .transition(.opacity.combined(with: .move(edge: .bottom)))
+                    }
+
+                    drawer
                         .padding(.horizontal, 14)
                         .padding(.bottom, 8)
                 }
@@ -191,8 +215,38 @@ struct PingView: View {
             .offset(x: wobble)   // 💨 launch shake — bouncy spring back to center
             .contentShape(Rectangle())
             .onTapGesture {
-                // Tap anywhere to dismiss the confirmation
-                if phase == .sent { resetThought() }
+                // Tap the compass area: collapse the drawer / dismiss confirmation
+                if drawerExpanded {
+                    withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                        drawerExpanded = false
+                    }
+                } else if phase == .sent {
+                    resetThought()
+                }
+            }
+            // The hold-to-send clock: fills over 3 s while aligned within 15°,
+            // resets the moment the phone drifts off target.
+            .onReceive(holdTick) { _ in
+                guard selectedEmoji != nil, phase == .idle else {
+                    if holdProgress > 0 { holdProgress = 0 }
+                    return
+                }
+                if isAligned {
+                    holdProgress += 0.05 / holdDuration
+                    if holdProgress >= 1.0 {
+                        holdProgress = 0
+                        HapticEngine.thoughtLaunched()   // the completion pulse
+                        sendThought()
+                    }
+                } else if holdProgress > 0 {
+                    withAnimation(.easeOut(duration: 0.3)) { holdProgress = 0 }
+                }
+            }
+            .sheet(isPresented: $showCuration) {
+                EmojiCurationView(customStore: customStore, recorder: recorder) { tokens in
+                    personalSix = tokens
+                    if let sel = selectedEmoji, !tokens.contains(sel) { selectedEmoji = nil }
+                }
             }
             .sheet(isPresented: $showCreateSheet, onDismiss: { editingThought = nil }) {
                 CreateThoughtSheet(recorder: recorder, store: customStore,
@@ -224,17 +278,173 @@ struct PingView: View {
         .animation(.easeInOut(duration: 0.4), value: pings.feltNotice)
     }
 
-    // MARK: - Floating emoji panel
+    // MARK: - Bottom drawer (the curated six)
+
+    /// Collapsed: a pill handle + your six in one quiet row, compass fully
+    /// visible above. Expanded: a bottom sheet (≤40% of screen) with the
+    /// 3×2 grid, "✦ edit", and the locked preview for free users.
+    private var drawer: some View {
+        VStack(spacing: 10) {
+            // The handle
+            Capsule()
+                .fill(DesignTokens.Color.borderMid)
+                .frame(width: 38, height: 5)
+                .padding(.top, 8)
+                .contentShape(Rectangle().inset(by: -12))
+                .onTapGesture {
+                    withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                        drawerExpanded.toggle()
+                    }
+                }
+
+            if !drawerExpanded {
+                // Collapsed: the six in a single row
+                HStack(spacing: 8) {
+                    ForEach(personalSix, id: \.self) { token in
+                        emojiCell(token)
+                    }
+                }
+                if expressiveOn && subscription.tier != .free {
+                    Text("✦ expressive")
+                        .font(.system(size: 9, design: .serif).italic())
+                        .foregroundColor(Self.lavender.opacity(0.7))
+                }
+            } else {
+                // Expanded: 3×2 grid + edit + (free) locked preview
+                ScrollView(showsIndicators: false) {
+                    VStack(spacing: 12) {
+                        HStack {
+                            Text("your six")
+                                .font(DesignTokens.Font.overline)
+                                .foregroundColor(DesignTokens.Color.textMuted)
+                            Spacer()
+                            Button {
+                                showCuration = true
+                            } label: {
+                                Text("✦ edit")
+                                    .font(.system(size: 12))
+                                    .foregroundColor(Self.lavender)
+                            }
+                        }
+
+                        LazyVGrid(
+                            columns: Array(repeating: GridItem(.flexible(), spacing: 14), count: 3),
+                            spacing: 14
+                        ) {
+                            ForEach(personalSix, id: \.self) { token in
+                                emojiCell(token, large: true)
+                            }
+                        }
+
+                        if subscription.tier == .free {
+                            lockedPreview
+                        }
+
+                        if showCurationHint {
+                            Text("tap ✦ edit to personalize your set")
+                                .font(.system(size: 11, design: .serif).italic())
+                                .foregroundColor(Self.lavender.opacity(0.8))
+                                .transition(.opacity)
+                        }
+                    }
+                    .padding(.top, 2)
+                }
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.bottom, 12)
+        .frame(maxHeight: drawerExpanded ? UIScreen.main.bounds.height * 0.40 : nil)
+        .background(
+            RoundedRectangle(cornerRadius: 24)
+                .fill(DesignTokens.Color.background.opacity(0.85))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 24)
+                        .stroke(DesignTokens.Color.border, lineWidth: 1)
+                )
+        )
+        .opacity(phase == .flying ? 0.25 : 1)
+        .onAppear {
+            // One-time discovery hint for the curation button
+            if !curationHintShown {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                    withAnimation { showCurationHint = true }
+                }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 4.0) {
+                    withAnimation { showCurationHint = false }
+                    curationHintShown = true
+                }
+            }
+        }
+        .onChange(of: selectedEmoji) { _, new in
+            // Picking a thought collapses the sheet — back to the compass
+            if new != nil && drawerExpanded {
+                withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                    drawerExpanded = false
+                }
+            }
+        }
+    }
+
+    // MARK: - Hold to send
+
+    /// The selected thought with a circular progress ring that fills while
+    /// the phone physically points at them (15° window, 3 seconds).
+    private func holdToSendIndicator(emoji: String) -> some View {
+        VStack(spacing: 7) {
+            ZStack {
+                Circle()
+                    .stroke(DesignTokens.Color.borderMid, lineWidth: 3)
+                    .frame(width: 56, height: 56)
+                Circle()
+                    .trim(from: 0, to: holdProgress)
+                    .stroke(Self.lavenderHi,
+                            style: StrokeStyle(lineWidth: 3, lineCap: .round))
+                    .frame(width: 56, height: 56)
+                    .rotationEffect(.degrees(-90))
+                thoughtSymbol(emoji, size: 24)
+                    .shadow(color: Self.purpleGlow.opacity(isAligned ? 0.8 : 0.3),
+                            radius: isAligned ? 10 : 4)
+            }
+            Text(isAligned
+                 ? (holdProgress > 0 ? "keep holding…" : "hold steady")
+                 : "hold toward \(people.selectedPerson?.name ?? "them") to send")
+                .font(.system(size: 11, design: .serif).italic())
+                .foregroundColor(isAligned ? Self.lavenderHi : DesignTokens.Color.textMuted)
+
+            #if DEBUG
+            // Simulator has no compass — bypass the aim gate
+            Button(alignBypass ? "⚙︎ aim bypass: on" : "⚙︎ aim bypass: off (sim)") {
+                alignBypass.toggle()
+            }
+            .font(.system(size: 9))
+            .foregroundColor(DesignTokens.Color.textDim)
+            #endif
+        }
+        .animation(.easeOut(duration: 0.2), value: isAligned)
+    }
+
+    // MARK: - Floating emoji panel (superseded by the drawer; kept)
 
     private var emojiPanel: some View {
         VStack(spacing: 8) {
-            emojiSections
+            if expressiveOn {
+                // Expressive Mode adds four sections — more than fits on
+                // screen, so the panel scrolls. (Without this the sections
+                // rendered off-screen and appeared to be "missing".)
+                ScrollView(showsIndicators: false) {
+                    emojiSections
+                }
+                .frame(maxHeight: 340)
+            } else {
+                emojiSections   // core 6 fits without scrolling
+            }
 
             if let emoji = selectedEmoji, phase == .idle {
                 sendButton(emoji: emoji)
                     .transition(.opacity.combined(with: .move(edge: .bottom)))
             }
         }
+        .animation(.easeInOut(duration: 0.3), value: expressiveOn)
         .padding(14)
         .background(
             RoundedRectangle(cornerRadius: 24)
@@ -564,8 +774,13 @@ struct PingView: View {
                 }
             }
 
+            // ── FREE: a locked glimpse of the playground ──────────────────
+            if subscription.tier == .free {
+                lockedPreview
+            }
+
             // ── EXPRESSIVE: the playground, only when the mode is on ──────
-            if expressiveOn {
+            if expressiveOn && subscription.tier != .free {
                 Divider()
                     .background(DesignTokens.Color.border)
                     .padding(.vertical, 8)
@@ -611,6 +826,46 @@ struct PingView: View {
                 }
             }
         }
+    }
+
+    /// FREE tier: a dimmed, blurred taste of the expressive playground with
+    /// a lock — one tap anywhere opens the paywall.
+    private var lockedPreview: some View {
+        Button {
+            HapticEngine.paywallReached()
+            showPaywall = true
+        } label: {
+            ZStack {
+                // The forbidden fruit, dimmed and softened
+                HStack(spacing: 10) {
+                    ForEach(["😤","🤬","🍕","🍺","😂","🥳","⚡️","🎉"], id: \.self) { e in
+                        Text(e).font(.system(size: 24))
+                    }
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 14)
+                .opacity(0.4)
+                .blur(radius: 2.5)
+
+                VStack(spacing: 4) {
+                    Image(systemName: "lock.fill")
+                        .font(.system(size: 15))
+                        .foregroundColor(Self.lavender)
+                    Text("unlock expressive mode")
+                        .font(.system(size: 12, design: .serif).italic())
+                        .foregroundColor(Self.lavender)
+                }
+            }
+            .background(DesignTokens.Color.backgroundCard.opacity(0.5))
+            .cornerRadius(16)
+            .overlay(
+                RoundedRectangle(cornerRadius: 16)
+                    .stroke(DesignTokens.Color.border, lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
+        .padding(.top, 4)
+        .sheet(isPresented: $showPaywall) { PaywallView() }
     }
 
     /// A saved custom thought — selectable like any emoji; long-press to delete.
@@ -981,6 +1236,7 @@ struct CreateThoughtSheet: View {
     private enum SoundChoice { case record, preset }
 
     @State private var chosenEmoji   = ""
+    @State private var thoughtName   = ""               // optional, step 3
     @State private var soundChoice: SoundChoice = .record
     @State private var presetToken: String? = nil
     @State private var keepExistingRecording = false   // editing a recorded thought
@@ -1054,7 +1310,13 @@ struct CreateThoughtSheet: View {
                             presetSection
                         }
                     }
-                    .padding(.bottom, 22)
+                    .padding(.bottom, 18)
+
+                    // Step 3 — optional name (leave empty to skip)
+                    sectionLabel("name this one")
+                    TextField("dad's laugh · our song", text: $thoughtName)
+                        .formInput()
+                        .padding(.bottom, 22)
 
                     if let errorMessage {
                         Text(errorMessage)
@@ -1115,6 +1377,7 @@ struct CreateThoughtSheet: View {
             // Editing: pre-fill from the existing thought
             if let editing {
                 chosenEmoji = editing.emoji
+                thoughtName = editing.name ?? ""
                 switch editing.sound {
                 case .preset(let token):
                     soundChoice = .preset
@@ -1259,6 +1522,8 @@ struct CreateThoughtSheet: View {
         // Keep the id stable when editing (recordings live at custom-<id>.m4a)
         var thought = editing ?? CustomThought(emoji: chosenEmoji, name: nil, sound: .recording)
         thought.emoji = chosenEmoji
+        let trimmedName = thoughtName.trimmingCharacters(in: .whitespaces)
+        thought.name = trimmedName.isEmpty ? nil : trimmedName
 
         switch soundChoice {
         case .preset:

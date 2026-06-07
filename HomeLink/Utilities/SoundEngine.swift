@@ -29,7 +29,9 @@ final class SoundEngine {
         buildCache()
     }
 
-    private var isQuiet: Bool { UserDefaults.standard.bool(forKey: "quietMode") }
+    // Quiet Mode retired — full emotional intensity, always.
+    // private var isQuiet: Bool { UserDefaults.standard.bool(forKey: "quietMode") }
+    private let isQuiet = false
 
     // MARK: - Cache
 

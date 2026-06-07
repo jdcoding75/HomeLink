@@ -324,7 +324,8 @@ struct PairingCelebrationView: View {
     let person: Person?
     let onDone: () -> Void
 
-    @AppStorage("quietMode") private var quietMode = false
+    // @AppStorage("quietMode") private var quietMode = false   // retired
+    private let quietMode = false
 
     // Staging
     @State private var glowBloom    = false

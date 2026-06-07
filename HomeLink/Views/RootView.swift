@@ -138,7 +138,8 @@ struct RootView: View {
                         let name = partner.flatMap { p in
                             people.people.first { $0.pairedUserID == p.uuidString }?.name
                         } ?? "someone"
-                        pings.showPointing(name: name)
+                        // Ambient presence — the compass edge glows, nothing else
+                        pings.presenceFelt(name: name)
                     }
                 }
             )
@@ -359,35 +360,45 @@ struct MainTabView: View {
     @EnvironmentObject var subscription: SubscriptionManager
     @EnvironmentObject var skinStore:    SkinStore
 
+    @State private var selectedTab = 0
+
     var body: some View {
-        TabView {
+        TabView(selection: $selectedTab) {
             CompassView()
                 .tabItem {
                     Label("compass", systemImage: "compass.drawing")
                 }
+                .tag(0)
 
             PeopleListView(geocodingService: geocodingService)
                 .tabItem {
                     Label("people", systemImage: "person.2")
                 }
+                .tag(1)
 
-            // "send a thought" — symbolic, backend-free, free for everyone
             PingView()
                 .tabItem {
-                    Label("thought", systemImage: "paperplane")
+                    Label("thoughts", systemImage: "paperplane")
                 }
+                .tag(2)
 
-            SkinPickerView()
-                .tabItem {
-                    Label("skins", systemImage: "paintpalette")
-                }
+            // Skin selection lives in Settings → compass only
+            // SkinPickerView()
+            //     .tabItem {
+            //         Label("skins", systemImage: "paintpalette")
+            //     }
 
             SettingsView()
                 .tabItem {
                     Label("settings", systemImage: "gearshape")
                 }
+                .tag(3)
         }
         .tint(DesignTokens.Color.accentSoft)
         .preferredColorScheme(.dark)
+        // The "✦ expressive" badge on the compass jumps here
+        .onReceive(NotificationCenter.default.publisher(for: .pointwardOpenSettings)) { _ in
+            selectedTab = 3
+        }
     }
 }

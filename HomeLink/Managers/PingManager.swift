@@ -13,7 +13,13 @@ final class PingManager: ObservableObject {
     /// "Mum felt your thought ✓" — set when a sent ping gets opened remotely.
     @Published var feltNotice: String?
     /// "Mum is pointing toward you 🧭" — their compass just locked onto us.
+    /// (Toast retired — the ambient presence glow replaced it. Kept.)
     @Published var pointingNotice: String?
+
+    /// Ambient presence: the partner's needle is resting on us. The compass
+    /// edge glows faintly from their direction — no badge, no alert, no text.
+    @Published var partnerPointingAt: Date?
+    @Published var partnerPointingName: String = "someone"
 
     // ── Thought queue ────────────────────────────────────────────────────
     /// Received thoughts waiting to be watched. Max 10; oldest drops off.
@@ -64,7 +70,9 @@ final class PingManager: ObservableObject {
         }
     }
 
-    /// New thought arrives → joins the queue (badge shows on the compass).
+    /// New thought arrives → joins the queue. Core mode starts the
+    /// direction-reveal immediately (the compass IS the inbox); Expressive
+    /// mode shows the badge and waits for the tap.
     func receivePing(fromName: String, emoji: String, remoteID: UUID? = nil) {
         let ping = ReceivedPing(fromName: fromName, emoji: emoji, timestamp: .now, remoteID: remoteID)
         queue.append(ping)
@@ -74,21 +82,36 @@ final class PingManager: ObservableObject {
         AppGroupStore.pendingPingEmoji     = emoji
         AppGroupStore.pendingPingFromName  = fromName
         AppGroupStore.pendingPingTimestamp = .now
-        HapticEngine.pingReceived()
+        HapticEngine.thoughtArrived()   // soft directional pull, not an alert
+
+        if !ExpressionMode.isOn && nowPlaying == nil {
+            playNext()
+        }
     }
 
-    /// Start (or skip to) the next queued thought's arrival animation.
-    /// Marks it felt (opened_at) the moment it begins to play.
+    /// Start (or skip to) the next queued thought.
+    /// opened_at is set at the moment of REVEAL (markOpened), not here —
+    /// "felt" means felt, not delivered.
     func playNext() {
         guard !queue.isEmpty else {
             nowPlaying = nil
             return
         }
-        let ping = queue.removeFirst()
-        nowPlaying = ping
+        nowPlaying = queue.removeFirst()
+    }
+
+    /// The thought was actually experienced — bloom played, sound heard.
+    func markOpened(_ ping: ReceivedPing) {
         if let remoteID = ping.remoteID {
             Task { await SupabaseService.shared.markPingOpened(remoteID) }
         }
+    }
+
+    /// Ambient presence arrived — their needle is resting on us.
+    func presenceFelt(name: String) {
+        guard UserDefaults.standard.object(forKey: "notifyPointing") as? Bool ?? true else { return }
+        partnerPointingName = name
+        partnerPointingAt = .now
     }
 
     /// Called when an arrival animation completes — auto-advances to the

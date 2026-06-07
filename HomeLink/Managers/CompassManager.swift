@@ -18,6 +18,7 @@ final class CompassManager: NSObject, ObservableObject {
     private var currentHeading: Double = 0
     private var targetPerson: Person?
     private var wasLocked = false
+    private var lockedSince: Date = .distantFuture        // steady-gaze tracking
     private var lastPointingReport: Date = .distantPast   // throttle bearing writes
     private let lockThresholdDegrees: Double  = 5.0
     private let farFromHomeThresholdKm: Double = 500.0
@@ -82,12 +83,12 @@ final class CompassManager: NSObject, ObservableObject {
         return skinStore.activeSkin
     }
 
-    /// Lock-edge only, paired-person only, at most once a minute — tells the
-    /// backend "I'm actively pointing at them" so they can be gently notified.
+    /// Steady-lock only, paired-person only, at most once per FIVE minutes —
+    /// the silent presence signal behind the partner's edge glow.
     private func reportPointingIfNeeded(target: Person, bearing: Double) {
         guard let friend = SupabaseService.connectedFriendID,
               target.pairedUserID == friend.uuidString,
-              Date.now.timeIntervalSince(lastPointingReport) > 60
+              Date.now.timeIntervalSince(lastPointingReport) > 300
         else { return }
         lastPointingReport = .now
         Task { await SupabaseService.shared.reportPointing(bearing: bearing) }
@@ -125,6 +126,11 @@ final class CompassManager: NSObject, ObservableObject {
         let isNowLocked  = bearingDiff <= lockThresholdDegrees
         if isNowLocked && !wasLocked {
             HapticEngine.connectionFelt()
+            lockedSince = .now
+        }
+        // Ambient presence: only after the needle has RESTED on them for
+        // 10+ seconds — a held gaze, not a glance. Throttled to 5 minutes.
+        if isNowLocked, Date.now.timeIntervalSince(lockedSince) >= 10 {
             reportPointingIfNeeded(target: target, bearing: rawBearing)
         }
         wasLocked = isNowLocked

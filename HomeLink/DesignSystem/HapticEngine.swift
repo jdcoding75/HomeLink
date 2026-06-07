@@ -5,9 +5,11 @@ import UIKit
 
 enum HapticEngine {
 
-    private static var isQuiet: Bool {
-        UserDefaults.standard.bool(forKey: "quietMode")
-    }
+    // Quiet Mode retired — full emotional intensity, always.
+    // private static var isQuiet: Bool {
+    //     UserDefaults.standard.bool(forKey: "quietMode")
+    // }
+    private static let isQuiet = false
     private static var hapticsEnabled: Bool {
         UserDefaults.standard.bool(forKey: "hapticsEnabled")
     }

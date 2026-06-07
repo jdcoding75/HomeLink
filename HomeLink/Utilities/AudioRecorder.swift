@@ -79,7 +79,7 @@ final class CustomThoughtStore: ObservableObject {
             SoundEngine.shared.play(for: token)
         case .recording:
             player = try? AVAudioPlayer(contentsOf: Self.soundURL(for: thought.id))
-            player?.volume = UserDefaults.standard.bool(forKey: "quietMode") ? 0.4 : 1.0
+            player?.volume = 1.0   // quiet mode retired
             player?.play()
         }
     }

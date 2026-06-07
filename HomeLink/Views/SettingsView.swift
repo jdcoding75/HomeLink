@@ -32,8 +32,9 @@ struct SettingsView: View {
             DesignTokens.Color.background.ignoresSafeArea()
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
-                    sectionHeader("feel")
-                    feelSection
+                    // Quiet Mode retired — full emotional intensity, always.
+                    // sectionHeader("feel")
+                    // feelSection
 
                     sectionHeader("expression")
                     expressionSection
@@ -47,10 +48,9 @@ struct SettingsView: View {
                     sectionHeader("account")
                     accountSection
 
-                    sectionHeader("about")
-                    aboutSection
-
                     // ── Stripped in the emotional-core pass (kept, not lost) ──
+                    // sectionHeader("about")
+                    // aboutSection              // story · version · offline
                     // if subscription.tier == .free {
                     //     sectionHeader("unlock")
                     //     unlockSection          // paywall now reached via Expression
@@ -216,40 +216,46 @@ struct SettingsView: View {
         }
     }
 
-    // MARK: - Feel (the core experience)
+    // MARK: - Feel (retired — quiet mode gone, full intensity always)
 
     private var feelSection: some View {
         settingsGroup {
-            settingsRow {
-                Image(systemName: "moon.stars")
-                    .settingsIcon()
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("quiet mode")
-                        .settingsLabel()
-                    Text("slower animations · reduced haptics · dimmer glows")
-                        .font(.system(size: 11))
-                        .foregroundColor(DesignTokens.Color.textDim)
-                }
-                Spacer()
-                Toggle("", isOn: $quietMode)
-                    .tint(DesignTokens.Color.accentMid)
-                    .labelsHidden()
-            }
+            // settingsRow {
+            //     Image(systemName: "moon.stars")
+            //         .settingsIcon()
+            //     VStack(alignment: .leading, spacing: 2) {
+            //         Text("quiet mode")
+            //             .settingsLabel()
+            //         Text("slower animations · reduced haptics · dimmer glows")
+            //             .font(.system(size: 11))
+            //             .foregroundColor(DesignTokens.Color.textDim)
+            //     }
+            //     Spacer()
+            //     Toggle("", isOn: $quietMode)
+            //         .tint(Self.toggleOn)
+            //         .labelsHidden()
+            // }
+            EmptyView()
 
-            Divider().background(DesignTokens.Color.border).padding(.leading, 44)
-
-            settingsRow {
-                Image(systemName: "iphone.radiowaves.left.and.right")
-                    .settingsIcon()
-                Text("haptics")
-                    .settingsLabel()
-                Spacer()
-                Toggle("", isOn: $hapticsEnabled)
-                    .tint(DesignTokens.Color.accentMid)
-                    .labelsHidden()
-            }
+            // (haptics row commented out in the settings-final pass — the
+            // hapticsEnabled storage still gates HapticEngine everywhere)
+            // Divider().background(DesignTokens.Color.border).padding(.leading, 44)
+            // settingsRow {
+            //     Image(systemName: "iphone.radiowaves.left.and.right")
+            //         .settingsIcon()
+            //     Text("haptics")
+            //         .settingsLabel()
+            //     Spacer()
+            //     Toggle("", isOn: $hapticsEnabled)
+            //         .tint(Self.toggleOn)
+            //         .labelsHidden()
+            // }
         }
     }
+
+    /// Toggle ON = clear warm teal with a white knob; OFF stays the system's
+    /// dark grey track — the two states read instantly at a glance.
+    private static let toggleOn = Color(hex: "#5dcaa5")
 
     // MARK: - Expression (the paid playground)
 
@@ -287,8 +293,29 @@ struct SettingsView: View {
                         }
                     }
                 ))
-                .tint(DesignTokens.Color.accentMid)
+                .tint(Self.toggleOn)
                 .labelsHidden()
+            }
+
+            // Lock a favourite funny unit (or keep the per-launch surprise)
+            if expressiveMode && subscription.tier != .free {
+                Divider().background(DesignTokens.Color.border).padding(.leading, 44)
+
+                settingsRow {
+                    Image(systemName: "sportscourt")
+                        .settingsIcon()
+                    Text("funny distance unit")
+                        .settingsLabel()
+                    Spacer()
+                    Picker("", selection: $funnyUnitLocked) {
+                        Text("surprise me").tag(-1)
+                        ForEach(0..<DistanceFun.funnyCount, id: \.self) { i in
+                            Text(DistanceFun.funnyLabels[i]).tag(i)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                    .tint(DesignTokens.Color.accentSoft)
+                }
             }
         }
     }
@@ -309,7 +336,7 @@ struct SettingsView: View {
                 }
                 Spacer()
                 Toggle("", isOn: $notifyPointing)
-                    .tint(DesignTokens.Color.accentMid)
+                    .tint(Self.toggleOn)
                     .labelsHidden()
                     .onChange(of: notifyPointing) { _, enabled in
                         // Mirror server-side so closed-app pushes respect it too

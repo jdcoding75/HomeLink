@@ -19,6 +19,7 @@ enum DistanceFun {
         "Empire State Buildings",
         "hours by car",
         "hours by plane",
+        "leopard geckos",
     ]
     static var funnyCount: Int { funnyLabels.count }
 
@@ -43,7 +44,8 @@ enum DistanceFun {
         case 3:  return "\(compact(meters / 0.45)) pizza boxes away"
         case 4:  return "\(compact(meters / 443.2)) Empire State Buildings stacked"
         case 5:  return "about \(hoursText(km / 90)) by car"
-        default: return "about \(hoursText(km / 880)) by plane"
+        case 6:  return "about \(hoursText(km / 880)) by plane"
+        default: return "\(compact(meters / 0.22)) leopard geckos end to end"
         }
     }
 
