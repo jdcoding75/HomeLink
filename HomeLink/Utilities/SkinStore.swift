@@ -29,6 +29,14 @@ final class SkinStore: ObservableObject {
         activeSkin = skin
     }
 
+    /// HARD GUARD: free users can never display a Pro skin, regardless of
+    /// anything previously persisted. Called at launch.
+    func enforceTier(_ tier: SubscriptionTier) {
+        if tier == .free && activeSkin != .minimal {
+            activeSkin = .minimal
+        }
+    }
+
     func select(_ skin: CompassSkin, subscription: SubscriptionManager) {
         guard !skin.requiresUnlock || subscription.tier != .free else { return }
         activeSkin = skin

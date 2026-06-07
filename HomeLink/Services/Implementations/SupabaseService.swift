@@ -611,4 +611,24 @@ final class SupabaseService: ObservableObject {
             .execute().value
         return rows?.first?.lastSeen
     }
+
+    // MARK: - Giving back
+
+    /// Total donated so far, in cents. Nil when offline/unconfigured —
+    /// callers fall back to $0 gracefully.
+    func fetchGivingTotalCents() async -> Int? {
+        struct Row: Codable {
+            let totalDonatedCents: Int
+            enum CodingKeys: String, CodingKey {
+                case totalDonatedCents = "total_donated_cents"
+            }
+        }
+        guard let client else { return nil }
+        let rows: [Row]? = try? await client
+            .from("giving")
+            .select("total_donated_cents")
+            .limit(1)
+            .execute().value
+        return rows?.first?.totalDonatedCents
+    }
 }

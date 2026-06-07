@@ -151,8 +151,34 @@ struct SettingsView: View {
 
     // MARK: - Account
 
+    @State private var showGivingBack = false
+
     private var accountSection: some View {
         settingsGroup {
+            // Giving back — above sign in, where the heart belongs
+            settingsRow {
+                Text("❤️")
+                    .font(.system(size: 16))
+                    .frame(width: 26, height: 26)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("giving back")
+                        .settingsLabel()
+                    Text(CharityConfig.current.map { "50% of Pro supports \($0.name)" }
+                         ?? "supporting those who need it most")
+                        .font(.system(size: 11))
+                        .foregroundColor(DesignTokens.Color.textDim)
+                }
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 12))
+                    .foregroundColor(DesignTokens.Color.textDim)
+            }
+            .contentShape(Rectangle())
+            .onTapGesture { showGivingBack = true }
+            .sheet(isPresented: $showGivingBack) { GivingBackView() }
+
+            Divider().background(DesignTokens.Color.border).padding(.leading, 44)
+
             settingsRow {
                 Image(systemName: "person.crop.circle")
                     .settingsIcon()

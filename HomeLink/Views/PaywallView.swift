@@ -107,6 +107,31 @@ struct PaywallView: View {
                         .foregroundColor(Color(hex: "#5dcaa5"))
                         .padding(.bottom, 20)
 
+                        // Giving back — half of this purchase does good
+                        if let charity = CharityConfig.current {
+                            HStack(spacing: 10) {
+                                Text(charity.emoji)
+                                    .font(.system(size: 22))
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("50% supports \(charity.name)")
+                                        .font(.system(size: 13, weight: .medium))
+                                        .foregroundColor(DesignTokens.Color.textPrimary)
+                                    Text("always · not a promotion, just how we work")
+                                        .font(.system(size: 10, design: .serif).italic())
+                                        .foregroundColor(DesignTokens.Color.textMuted)
+                                }
+                                Spacer()
+                            }
+                            .padding(12)
+                            .background(DesignTokens.Color.backgroundCard.opacity(0.7))
+                            .cornerRadius(14)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 14)
+                                    .stroke(Color(hex: "#5dcaa5").opacity(0.3), lineWidth: 1)
+                            )
+                            .padding(.bottom, 14)
+                        }
+
                         // CTA
                         Button {
                             isPurchasing = true

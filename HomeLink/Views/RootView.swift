@@ -52,6 +52,7 @@ struct RootView: View {
             people.configure(with: modelContext)
             startCompassIfNeeded()
             startRealtimePings()
+            skinStore.enforceTier(subscription.tier)   // free = Minimal, always
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
                 withAnimation(.easeOut(duration: 0.6)) { showSplash = false }
             }
