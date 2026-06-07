@@ -154,6 +154,8 @@ struct ConnectView: View {
                             .disabled(!MFMessageComposeViewController.canSendText() || code == nil)
 
                             // ── Secondary: anywhere else ───────────────────
+                            // (disabled until the code exists — an invite
+                            //  without a code can't pair anyone)
                             ShareLink(item: inviteText) {
                                 Text("📤 share another way")
                                     .font(DesignTokens.Font.label)
@@ -167,6 +169,8 @@ struct ConnectView: View {
                                             .stroke(DesignTokens.Color.borderMid, lineWidth: 1)
                                     )
                             }
+                            .disabled(code == nil)
+                            .opacity(code == nil ? 0.4 : 1)
 
                             // ── or ─────────────────────────────────────────
                             HStack {

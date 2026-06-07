@@ -7,8 +7,11 @@
 import SwiftUI
 import AuthenticationServices
 import CryptoKit
+import os
 
 struct AccountView: View {
+
+    private static let log = Logger(subsystem: "com.jdcoding75.pointward", category: "account")
 
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject var people: PeopleManager
@@ -106,12 +109,14 @@ struct AccountView: View {
 
     private func handleAppleResult(_ result: Result<ASAuthorization, Error>) {
         switch result {
-        case .failure:
+        case .failure(let error):
+            Self.log.error("signin: Apple authorization failed: \(error.localizedDescription, privacy: .public)")
             errorMessage = "Sign in didn't complete — try again."
         case .success(let auth):
             guard let credential = auth.credential as? ASAuthorizationAppleIDCredential,
                   let tokenData = credential.identityToken,
                   let idToken = String(data: tokenData, encoding: .utf8) else {
+                Self.log.error("signin: missing identity token in Apple credential")
                 errorMessage = "Sign in didn't complete — try again."
                 return
             }
@@ -127,7 +132,9 @@ struct AccountView: View {
                     userID = me
                     pairingCode = try await SupabaseService.shared.myPairingCode()
                     friendID = try await SupabaseService.shared.refreshConnection()
+                    Self.log.info("signin: complete ✓ code=\(pairingCode, privacy: .public) paired=\(friendID != nil, privacy: .public)")
                 } catch {
+                    Self.log.error("signin: post-auth setup failed: \(error.localizedDescription, privacy: .public)")
                     errorMessage = error.localizedDescription
                 }
             }
@@ -261,15 +268,27 @@ struct AccountView: View {
     private func redeem() {
         isBusy = true
         errorMessage = nil
+        Self.log.info("redeem: attempting \(codeInput, privacy: .public)")
         Task {
             defer { isBusy = false }
             do {
-                let friend = try await SupabaseService.shared.redeemCode(codeInput)
-                friendID = friend
-                people.bindConnection(friendID: friend)   // light up person status
+                let result = try await SupabaseService.shared.redeem(codeInput)
+                friendID = result.ownerID
+                // Bind (or auto-add) the right card when the invite says who
+                // it's from — blind binding used to link the wrong person.
+                if let name = result.personName {
+                    people.addFromInvite(name: name,
+                                         emoji: result.personEmoji ?? "💜",
+                                         friendID: result.ownerID,
+                                         near: nil)
+                } else {
+                    people.bindConnection(friendID: result.ownerID)
+                }
                 codeInput = ""
+                Self.log.info("redeem: paired ✓")
                 showCelebration = true   // the moment two compasses link
             } catch {
+                Self.log.error("redeem: failed — \(error.localizedDescription, privacy: .public)")
                 errorMessage = error.localizedDescription
             }
         }
@@ -278,19 +297,30 @@ struct AccountView: View {
     private func refresh() {
         guard userID != nil else { return }
         Task {
-            pairingCode = (try? await SupabaseService.shared.myPairingCode()) ?? pairingCode
-            if let partner = try? await SupabaseService.shared.refreshConnection() {
-                // Owner's side discovering the new pairing also celebrates
-                let isNew = friendID == nil
-                friendID = partner
-                people.bindConnection(friendID: partner)
-                if isNew { showCelebration = true }
+            do {
+                pairingCode = try await SupabaseService.shared.myPairingCode()
+            } catch {
+                Self.log.error("refresh: code fetch failed — \(error.localizedDescription, privacy: .public)")
+                if pairingCode.isEmpty { errorMessage = error.localizedDescription }
+            }
+            do {
+                if let partner = try await SupabaseService.shared.refreshConnection() {
+                    // Owner's side discovering the new pairing also celebrates
+                    let isNew = friendID == nil
+                    friendID = partner
+                    people.bindConnection(friendID: partner)
+                    if isNew { showCelebration = true }
+                }
+            } catch {
+                Self.log.error("refresh: connection check failed — \(error.localizedDescription, privacy: .public)")
             }
         }
     }
 
     private func signOut() {
+        Self.log.info("signout: clearing session + closing realtime")
         Task {
+            await SupabaseService.shared.stopListening()   // realtime dies with the session
             try? await SupabaseService.shared.signOut()
             SupabaseService.localUserID       = nil
             SupabaseService.connectedFriendID = nil
