@@ -14,13 +14,13 @@ struct PaywallView: View {
     @State private var isPurchasing = false
 
     private let features: [(emoji: String, text: String)] = [
+        ("🧭", "3 compass skins — minimal, vintage brass, heart"),
         ("😤", "pro emojis — playful, chaotic, honestly human"),
         ("📏", "funny distances — football fields, chocolate bars, leopard geckos"),
         ("🎤", "custom emoji + sound — record your voice, pick any emoji"),
         ("⏱", "hold to send — point and hold to send a thought physically"),
-        ("🦎", "the gecko · obviously"),
-        ("🎨", "all compass skins"),
         ("👥", "up to 5 people"),
+        ("🦎", "the gecko · obviously"),
     ]
     // (previous list:)
     // ("👥", "unlimited people"), ("🎨", "all compass skins"),
@@ -56,11 +56,16 @@ struct PaywallView: View {
                             .foregroundColor(DesignTokens.Color.textPrimary)
                             .padding(.bottom, 6)
 
-                        Text("one small unlock. everything, forever.")
+                        Text("the full experience · $1.99")
                             .font(DesignTokens.Font.compassDistance)
                             .foregroundColor(DesignTokens.Color.textMuted)
-                            .multilineTextAlignment(.center)
+                            .padding(.bottom, 3)
+
+                        Text("one time · yours forever")
+                            .font(.system(size: 11, design: .serif).italic())
+                            .foregroundColor(DesignTokens.Color.textDim)
                             .padding(.bottom, 28)
+                        // (previous: "one small unlock. everything, forever.")
 
                         // Feature list — clean and simple
                         VStack(spacing: 0) {
@@ -117,7 +122,7 @@ struct PaywallView: View {
                                         .tint(DesignTokens.Color.textPrimary)
                                         .scaleEffect(0.8)
                                 }
-                                Text(isPurchasing ? "unlocking…" : "Unlock Pointward Pro — $1.99")
+                                Text(isPurchasing ? "unlocking…" : "unlock pro · $1.99")
                             }
                             .font(DesignTokens.Font.label)
                             .foregroundColor(DesignTokens.Color.textPrimary)
@@ -140,7 +145,7 @@ struct PaywallView: View {
                         .foregroundColor(DesignTokens.Color.textMuted)
                         .padding(.bottom, 8)
 
-                        Text("one-time payment charged to your Apple ID. yours forever — nothing recurring.")
+                        Text("one time purchase · no subscription")
                             .font(.system(size: 10))
                             .foregroundColor(DesignTokens.Color.textDim)
                             .multilineTextAlignment(.center)

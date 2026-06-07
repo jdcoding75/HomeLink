@@ -370,15 +370,16 @@ struct MainTabView: View {
                 }
                 .tag(0)
 
-            PeopleListView(geocodingService: geocodingService)
-                .tabItem {
-                    Label("people", systemImage: "person.2")
-                }
-                .tag(1)
-
+            // Thoughts before People — daily action before setup/management
             PingView()
                 .tabItem {
                     Label("thoughts", systemImage: "paperplane")
+                }
+                .tag(1)
+
+            PeopleListView(geocodingService: geocodingService)
+                .tabItem {
+                    Label("people", systemImage: "person.2")
                 }
                 .tag(2)
 

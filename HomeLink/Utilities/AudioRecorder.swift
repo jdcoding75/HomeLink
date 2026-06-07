@@ -31,6 +31,10 @@ struct CustomThought: Codable, Equatable, Identifiable {
 /// directory (alongside their .m4a recordings).
 final class CustomThoughtStore: ObservableObject {
 
+    /// One store everywhere — ProSetupView and the send screen share it.
+    static let shared = CustomThoughtStore()
+
+
     static let maxCount = 5
 
     @Published private(set) var thoughts: [CustomThought] = []

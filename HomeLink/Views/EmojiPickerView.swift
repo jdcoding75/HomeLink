@@ -1,4 +1,4 @@
-// EmojiCurationView.swift
+// EmojiPickerView.swift
 // Pointward › Views
 //
 // "✦ edit" — choose your personal six from the full library.
@@ -7,7 +7,7 @@
 
 import SwiftUI
 
-struct EmojiCurationView: View {
+struct EmojiPickerView: View {
 
     @ObservedObject var customStore: CustomThoughtStore
     @ObservedObject var recorder: AudioRecorder
@@ -35,39 +35,71 @@ struct EmojiCurationView: View {
             ZStack {
                 DesignTokens.Color.background.ignoresSafeArea()
 
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 18) {
-                        Text("choose the six thoughts you carry")
-                            .font(.system(size: 15, design: .serif).italic())
-                            .foregroundColor(DesignTokens.Color.textMuted)
-                            .padding(.top, 6)
+                VStack(spacing: 0) {
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: 18) {
+                            Text("these appear on your send screen")
+                                .font(.system(size: 14, design: .serif).italic())
+                                .foregroundColor(DesignTokens.Color.textMuted)
+                                .padding(.top, 6)
 
-                        section("core", tokens: core, locked: false)
-                        section("with feeling", tokens: feeling, locked: !isPaid)
-                        section("with food & drink", tokens: food, locked: !isPaid)
-                        section("silly", tokens: silly, locked: !isPaid)
-                        yoursSection
+                            section("core", tokens: core, locked: false)
+                            section("with feeling", tokens: feeling, locked: !isPaid)
+                            section("with food & drink", tokens: food, locked: !isPaid)
+                            section("silly", tokens: silly, locked: !isPaid)
+                            yoursSection
 
-                        Spacer(minLength: 30)
+                            Spacer(minLength: 24)
+                        }
+                        .padding(.horizontal, 22)
+                    }
+
+                    // ── Live preview of the chosen six + save ─────────────
+                    VStack(spacing: 10) {
+                        HStack(spacing: 10) {
+                            ForEach(0..<PersonalSet.slotCount, id: \.self) { i in
+                                ZStack {
+                                    RoundedRectangle(cornerRadius: 11)
+                                        .fill(DesignTokens.Color.backgroundLift)
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 11)
+                                                .stroke(i < selected.count
+                                                        ? Self.lavender.opacity(0.5)
+                                                        : DesignTokens.Color.border,
+                                                        lineWidth: 1)
+                                        )
+                                    if i < selected.count {
+                                        previewSymbol(selected[i])
+                                    }
+                                }
+                                .frame(width: 42, height: 42)
+                            }
+                        }
+                        .animation(.easeOut(duration: 0.2), value: selected)
+
+                        Button {
+                            PersonalSet.save(selected)
+                            onDone(selected)
+                            dismiss()
+                        } label: {
+                            Text("save my set")
+                                .font(DesignTokens.Font.label)
+                                .foregroundColor(DesignTokens.Color.textPrimary)
+                                .frame(maxWidth: .infinity)
+                                .padding(DesignTokens.Spacing.md)
+                                .background(DesignTokens.Color.accentStrong)
+                                .cornerRadius(DesignTokens.Radius.button)
+                        }
+                        .disabled(selected.count != PersonalSet.slotCount)
+                        .opacity(selected.count == PersonalSet.slotCount ? 1 : 0.4)
                     }
                     .padding(.horizontal, 22)
+                    .padding(.vertical, 12)
+                    .background(DesignTokens.Color.background.opacity(0.97))
                 }
             }
-            .navigationTitle("\(selected.count) of \(PersonalSet.slotCount) selected")
+            .navigationTitle("choose your 6 · \(selected.count) of \(PersonalSet.slotCount) chosen")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("done") {
-                        PersonalSet.save(selected)
-                        onDone(selected)
-                        dismiss()
-                    }
-                    .foregroundColor(selected.count == PersonalSet.slotCount
-                                     ? DesignTokens.Color.accentSoft
-                                     : DesignTokens.Color.textDim)
-                    .disabled(selected.count != PersonalSet.slotCount)
-                }
-            }
         }
         .preferredColorScheme(.dark)
         .sheet(isPresented: $showCreateSheet) {
@@ -138,6 +170,20 @@ struct EmojiCurationView: View {
         }
     }
 
+    /// Renders a token for the preview row (emoji, gecko, or custom).
+    @ViewBuilder
+    private func previewSymbol(_ token: String) -> some View {
+        if token == "gecko" {
+            LeopardGeckoView(size: 20)
+        } else if token.hasPrefix("yours:"),
+                  let id = UUID(uuidString: String(token.dropFirst(6))),
+                  let thought = customStore.thought(id: id) {
+            Text(thought.emoji).font(.system(size: 20))
+        } else {
+            Text(token).font(.system(size: 20))
+        }
+    }
+
     // MARK: - Cell
 
     private func cell(_ token: String, locked: Bool, displayEmoji: String? = nil) -> some View {
@@ -165,6 +211,16 @@ struct EmojiCurationView: View {
                     }
                 }
                 .opacity(dimmed && !isSelected ? 0.35 : 1)
+
+                // Custom recordings carry a small 🎤 marker
+                if token.hasPrefix("yours:") {
+                    VStack { Spacer()
+                        HStack { Spacer()
+                            Text("🎤").font(.system(size: 9))
+                        }
+                    }
+                    .padding(3)
+                }
 
                 // Selected → quiet ✓ in the corner
                 if isSelected {

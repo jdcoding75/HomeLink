@@ -37,11 +37,15 @@ struct SettingsView: View {
                     // sectionHeader("feel")
                     // feelSection
 
-                    sectionHeader("expression")
-                    expressionSection
+                    sectionHeader("pro")
+                    proSection
 
-                    sectionHeader("compass")
-                    skinSection
+                    // Final clean: expression toggles + skin row moved
+                    // into ProSetupView. (kept below for reference)
+                    // sectionHeader("expression")
+                    // expressionSection
+                    // sectionHeader("compass")
+                    // skinSection
 
                     sectionHeader("notifications")
                     notificationsSection
@@ -79,6 +83,41 @@ struct SettingsView: View {
         }
         .sheet(isPresented: $showAccount) {
             AccountView()
+        }
+    }
+
+    // MARK: - Pro
+
+    @State private var showProSetup = false
+
+    private var proSection: some View {
+        settingsGroup {
+            settingsRow {
+                Image(systemName: "sparkles")
+                    .settingsIcon()
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("✦ Pro Features")
+                        .settingsLabel()
+                    Text(subscription.tier == .free
+                         ? "free · custom emojis, skins, and more"
+                         : (proFeatures ? "✦ active" : "pro · switched off"))
+                        .font(.system(size: 11))
+                        .foregroundColor(subscription.tier != .free && proFeatures
+                                         ? Color(hex: "#5dcaa5")
+                                         : DesignTokens.Color.textDim)
+                }
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 12))
+                    .foregroundColor(DesignTokens.Color.textDim)
+            }
+            .contentShape(Rectangle())
+            .onTapGesture { showProSetup = true }
+        }
+        .sheet(isPresented: $showProSetup) {
+            ProSetupView()
+                .environmentObject(subscription)
+                .environmentObject(skinStore)
         }
     }
 

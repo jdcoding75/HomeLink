@@ -33,7 +33,7 @@ struct PingView: View {
     @State private var wobble: CGFloat = 0  // 💨 screen wobble on launch
 
     // "Create your own" thoughts — up to five, tokens "yours:<uuid>"
-    @StateObject private var customStore = CustomThoughtStore()
+    @ObservedObject private var customStore = CustomThoughtStore.shared
     @StateObject private var recorder    = AudioRecorder()
     @State private var showCreateSheet = false
     @State private var editingThought: CustomThought? = nil   // long-press → edit
@@ -256,7 +256,7 @@ struct PingView: View {
                 }
             }
             .sheet(isPresented: $showCuration) {
-                EmojiCurationView(customStore: customStore, recorder: recorder) { tokens in
+                EmojiPickerView(customStore: customStore, recorder: recorder) { tokens in
                     personalSix = tokens
                     if let sel = selectedEmoji, !tokens.contains(sel) { selectedEmoji = nil }
                 }
@@ -311,35 +311,17 @@ struct PingView: View {
                 }
 
             if !drawerExpanded {
-                // Collapsed: the six in a single row
+                // Collapsed: the six in a single row — nothing else
                 HStack(spacing: 8) {
                     ForEach(personalSix, id: \.self) { token in
                         emojiCell(token)
                     }
                 }
-                if proOn && subscription.tier != .free {
-                    Text("✦ Pro")
-                        .font(.system(size: 9, design: .serif).italic())
-                        .foregroundColor(Self.lavender.opacity(0.7))
-                }
             } else {
-                // Expanded: 3×2 grid + edit + (free) locked preview
+                // Expanded: exactly six, clean 3×2 — no edit buttons,
+                // no sections, no headers. Curation lives in Pro setup.
                 ScrollView(showsIndicators: false) {
                     VStack(spacing: 12) {
-                        HStack {
-                            Text("your six")
-                                .font(DesignTokens.Font.overline)
-                                .foregroundColor(DesignTokens.Color.textMuted)
-                            Spacer()
-                            Button {
-                                showCuration = true
-                            } label: {
-                                Text("✦ edit")
-                                    .font(.system(size: 12))
-                                    .foregroundColor(Self.lavender)
-                            }
-                        }
-
                         LazyVGrid(
                             columns: Array(repeating: GridItem(.flexible(), spacing: 14), count: 3),
                             spacing: 14
@@ -352,17 +334,12 @@ struct PingView: View {
                         if subscription.tier == .free {
                             lockedPreview
                         }
-
-                        if showCurationHint {
-                            Text("tap ✦ edit to personalize your set")
-                                .font(.system(size: 11, design: .serif).italic())
-                                .foregroundColor(Self.lavender.opacity(0.8))
-                                .transition(.opacity)
-                        }
                     }
                     .padding(.top, 2)
                 }
             }
+            // ("your six" header, "✦ edit" button, and the curation hint
+            //  moved to ProSetupView in the Pro-setup pass)
         }
         .padding(.horizontal, 14)
         .padding(.bottom, 12)
@@ -377,16 +354,9 @@ struct PingView: View {
         )
         .opacity(phase == .flying ? 0.25 : 1)
         .onAppear {
-            // One-time discovery hint for the curation button
-            if !curationHintShown {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-                    withAnimation { showCurationHint = true }
-                }
-                DispatchQueue.main.asyncAfter(deadline: .now() + 4.0) {
-                    withAnimation { showCurationHint = false }
-                    curationHintShown = true
-                }
-            }
+            // Pick up set changes made in Pro setup
+            personalSix = PersonalSet.load()
+            // (curation hint retired — editing moved to ProSetupView)
         }
         .onChange(of: selectedEmoji) { _, new in
             // Picking a thought collapses the sheet — back to the compass
@@ -864,7 +834,7 @@ struct PingView: View {
                     Image(systemName: "lock.fill")
                         .font(.system(size: 15))
                         .foregroundColor(Self.lavender)
-                    Text("unlock Pointward Pro")
+                    Text("unlock pro for more")
                         .font(.system(size: 12, design: .serif).italic())
                         .foregroundColor(Self.lavender)
                 }

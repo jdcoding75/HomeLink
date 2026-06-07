@@ -14,7 +14,7 @@ enum SubscriptionTier: String, Codable {
     var maxPeople: Int {
         switch self {
         case .free:          return 1
-        case .pro:      return Int.max
+        case .pro:      return 5   // was Int.max — "up to 5 people"
         case .institutional: return Int.max
         }
     }
@@ -33,7 +33,9 @@ enum SubscriptionTier: String, Codable {
 
     var unlockedSkinIDs: Set<String> {
         switch self {
-        case .free:          return ["minimal", "vintage"]
+        // free had minimal+vintage before the Pro split:
+        // case .free:       return ["minimal", "vintage"]
+        case .free:          return ["minimal"]
         case .pro:      return Set(CompassSkin.allCases.map(\.rawValue))
         case .institutional: return Set(CompassSkin.allCases.map(\.rawValue))
         }
