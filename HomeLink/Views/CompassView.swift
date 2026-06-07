@@ -23,6 +23,7 @@ struct CompassView: View {
     @EnvironmentObject var people:   PeopleManager
     @EnvironmentObject var pings:    PingManager
     @EnvironmentObject var skinStore: SkinStore
+    @EnvironmentObject var subscription: SubscriptionManager
     @EnvironmentObject var appEnv:   AppEnvironment
 
     // @AppStorage("quietMode") private var quietMode = false   // retired
@@ -296,6 +297,9 @@ struct CompassView: View {
             withAnimation(AnimationSystem.pingGlow) { pingRingActive = !empty }
         }
         .onAppear {
+            // Hard guard — free tier renders Minimal only. Silent and
+            // immediate, before the compass face appears.
+            skinStore.enforceTier(subscription.tier)
             if let person = people.selectedPerson {
                 compass.start(tracking: person)
             }
@@ -1420,5 +1424,6 @@ struct ThoughtArrivalView: View {
         .environmentObject(ServiceContainer().peopleManager)
         .environmentObject(ServiceContainer().pingManager)
         .environmentObject(ServiceContainer().skinStore)
+        .environmentObject(ServiceContainer().subscriptionManager)
         .preferredColorScheme(.dark)
 }

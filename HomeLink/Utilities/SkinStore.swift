@@ -15,16 +15,17 @@ final class SkinStore: ObservableObject {
     }
 
     init() {
-        // Vintage Brass is the first impression for every new user.
+        // Vintage Brass is the first impression for Pro users.
         let saved = UserDefaults.standard.string(forKey: "activeSkin") ?? ""
         var skin  = CompassSkin(rawValue: saved) ?? .vintage
 
-        // If a locked skin is somehow active on the free tier (e.g. state from
-        // an earlier build), fall back to the default rather than show locked content.
+        // Hard guard — free users always get Minimal, regardless of anything
+        // previously persisted (e.g. state from an earlier build). Runs at
+        // every app launch, before the first frame renders.
         let savedTier = UserDefaults.standard.string(forKey: "subscriptionTier") ?? ""
         let tier = SubscriptionTier(rawValue: savedTier) ?? .free
-        if skin.requiresUnlock && tier == .free {
-            skin = .vintage
+        if tier == .free && skin != .minimal {
+            skin = .minimal
         }
         activeSkin = skin
     }

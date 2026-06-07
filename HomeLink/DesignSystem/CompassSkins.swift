@@ -46,12 +46,12 @@ enum CompassSkin: String, CaseIterable, Identifiable {
         }
     }
 
-    /// Free tier ships with Minimal and Vintage Brass (the default);
-    /// the $1.99 unlock opens the rest.
+    /// Free tier ships with Minimal only; the $1.99 unlock opens the rest.
+    /// Keep in sync with SubscriptionTier.unlockedSkinIDs.
     var requiresUnlock: Bool {
         switch self {
-        case .minimal, .vintage:             return false
-        case .classic, .heart,
+        case .minimal:                       return false
+        case .classic, .heart, .vintage,
              .celestial, .aurora:            return true
         }
     }

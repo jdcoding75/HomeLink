@@ -9,7 +9,11 @@ final class SubscriptionManager: ObservableObject {
 
     @Published private(set) var tier: SubscriptionTier
 
-    init() {
+    /// Wired by ServiceContainer so downgrades reset the skin immediately.
+    private weak var skinStore: SkinStore?
+
+    init(skinStore: SkinStore? = nil) {
+        self.skinStore = skinStore
         // Free to download — the $1.99 one-time unlock persists across launches.
         let saved = UserDefaults.standard.string(forKey: "subscriptionTier") ?? ""
         tier = SubscriptionTier(rawValue: saved) ?? .free
@@ -29,5 +33,7 @@ final class SubscriptionManager: ObservableObject {
     func resetToFree() {
         tier = .free
         UserDefaults.standard.set(tier.rawValue, forKey: "subscriptionTier")
+        // Hard guard — downgrading takes effect immediately: free = Minimal.
+        skinStore?.enforceTier(.free)
     }
 }

@@ -30,7 +30,7 @@ final class ServiceContainer: ObservableObject {
         pairingService   = MockPairingService()
         notificationService = LocalNotificationService()
         geocodingService = CLGeocodingService()
-        subscriptionManager = SubscriptionManager()
+        subscriptionManager = SubscriptionManager(skinStore: skinStore)
         compassManager   = CompassManager(skinStore: skinStore)
         peopleManager    = PeopleManager(subscriptionManager: subscriptionManager)
         pingManager      = PingManager(networkService: networkService)
