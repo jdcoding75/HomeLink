@@ -332,7 +332,7 @@ struct ProSetupView: View {
             sectionLabel("hold to send")
             lockable {
                 HStack {
-                    Text("hold your phone toward them for 3 seconds to send instead of tapping")
+                    Text("hold your phone toward them for 2 seconds to send instead of tapping")
                         .font(.system(size: 12))
                         .foregroundColor(DesignTokens.Color.textPrimary)
                         .fixedSize(horizontal: false, vertical: true)

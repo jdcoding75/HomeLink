@@ -72,7 +72,7 @@ struct PingView: View {
     // ── Hold to send — optional premium: the holding still IS the send ───
     @AppStorage("holdToSendEnabled") private var holdToSendEnabled = false
     @State private var holdProgress: Double = 0
-    private let holdDuration: Double = 3.0
+    private let holdDuration: Double = 2.0   // was 3.0
     private let holdTick = Timer.publish(every: 0.05, on: .main, in: .common).autoconnect()
 
     private var holdToSendActive: Bool {
@@ -371,7 +371,7 @@ struct PingView: View {
     // MARK: - Hold to send
 
     /// The selected thought with a circular progress ring that fills while
-    /// the phone physically points at them (15° window, 3 seconds).
+    /// the phone physically points at them (15° window, 2 seconds).
     private func holdToSendIndicator(emoji: String) -> some View {
         VStack(spacing: 7) {
             ZStack {

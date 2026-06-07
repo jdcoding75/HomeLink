@@ -379,7 +379,7 @@ struct SettingsView: View {
                                 .foregroundColor(DesignTokens.Color.accentSoft)
                         }
                     }
-                    Text("hold your phone toward them for 3 seconds to send a thought instead of tapping")
+                    Text("hold your phone toward them for 2 seconds to send a thought instead of tapping")
                         .font(.system(size: 11))
                         .foregroundColor(DesignTokens.Color.textDim)
                 }

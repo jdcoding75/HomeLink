@@ -11,6 +11,7 @@
 
 import SwiftUI
 import CoreLocation
+import ContactsUI
 
 struct OnboardingView: View {
 
@@ -28,6 +29,7 @@ struct OnboardingView: View {
     // Step 2
     @State private var name:  String = ""
     @State private var emoji: String = "🏠"
+    @State private var showContactPicker = false
 
     // Step 3
     @State private var addressText:      String = ""
@@ -102,6 +104,49 @@ struct OnboardingView: View {
             }
         }
         .animation(.easeOut(duration: 0.28), value: step)
+        .sheet(isPresented: $showContactPicker) {
+            ContactPickerView { contact in
+                applyContact(contact)
+            }
+            .ignoresSafeArea()
+        }
+    }
+
+    // MARK: - Contacts (same behavior as AddPersonView)
+
+    private func applyContact(_ contact: CNContact) {
+        let nickname = contact.nickname.trimmingCharacters(in: .whitespaces)
+        let given    = contact.givenName.trimmingCharacters(in: .whitespaces)
+        let family   = contact.familyName.trimmingCharacters(in: .whitespaces)
+        let resolved = !nickname.isEmpty ? nickname : (!given.isEmpty ? given : family)
+        if !resolved.isEmpty {
+            name  = resolved
+            emoji = Self.suggestedEmoji(for: resolved, fallback: emoji)
+        }
+
+        // Pre-fill the address step if the contact has a postal address —
+        // and geocode it right away so the address arrives at step 3 already
+        // confirmed (otherwise geocodeState stays .idle and next is disabled).
+        if let postal = contact.postalAddresses.first?.value {
+            let formatted = CNPostalAddressFormatter.string(from: postal, style: .mailingAddress)
+                .replacingOccurrences(of: "\n", with: ", ")
+                .trimmingCharacters(in: .whitespaces)
+            if !formatted.isEmpty {
+                selectedAddressText = formatted   // don't re-trigger the suggestion search
+                addressText         = formatted
+                geocodeTypedAddress()
+            }
+        }
+    }
+
+    /// Light-touch emoji guess from the contact's name; falls back to the current pick.
+    private static func suggestedEmoji(for name: String, fallback: String) -> String {
+        let n = name.lowercased()
+        if n.contains("mum") || n.contains("mom") || n.contains("mother")   { return "💜" }
+        if n.contains("dad") || n.contains("father")                        { return "🏠" }
+        if n.contains("nana") || n.contains("gran") || n.contains("nan ")   { return "🌸" }
+        if n.contains("home")                                               { return "🏠" }
+        return fallback
     }
 
     // MARK: - Progress dots
@@ -235,6 +280,29 @@ struct OnboardingView: View {
                 .foregroundColor(DesignTokens.Color.textMuted)
                 .lineSpacing(3)
                 .padding(.bottom, 28)
+
+            // Or pick straight from the address book — fills the name and,
+            // when the contact has a postal address, pre-confirms step 3 too.
+            Button {
+                showContactPicker = true
+            } label: {
+                HStack(spacing: 8) {
+                    Image(systemName: "person.crop.circle")
+                        .font(.system(size: 14))
+                    Text("choose from contacts")
+                        .font(DesignTokens.Font.label)
+                }
+                .foregroundColor(DesignTokens.Color.accentSoft)
+                .frame(maxWidth: .infinity)
+                .padding(DesignTokens.Spacing.md)
+                .background(DesignTokens.Color.backgroundCard)
+                .cornerRadius(DesignTokens.Radius.button)
+                .overlay(
+                    RoundedRectangle(cornerRadius: DesignTokens.Radius.button)
+                        .stroke(DesignTokens.Color.borderMid, lineWidth: 1)
+                )
+            }
+            .padding(.bottom, DesignTokens.Spacing.md)
 
             formLabel("their name")
             TextField("Mum, Dad, Home, Nan…", text: $name)
