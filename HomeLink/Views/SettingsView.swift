@@ -1,9 +1,10 @@
 // SettingsView.swift
 // Pointward › Views
 //
-// Phase 1: intentionally minimal — skin picker, quiet mode, haptics, about.
+// Emotional core: feel · expression · compass · notifications · account · about.
 
 import SwiftUI
+import UIKit
 
 struct SettingsView: View {
 
@@ -18,7 +19,9 @@ struct SettingsView: View {
     @AppStorage("notifyPointing") private var notifyPointing = true
     @AppStorage("funnyUnitLocked")      private var funnyUnitLocked      = -1
     @AppStorage("thoughtTaglineLocked") private var thoughtTaglineLocked = -1
+    @AppStorage(ExpressionMode.storageKey) private var expressiveMode = false
 
+    @State private var showCopied     = false
     @State private var showSkinPicker = false
     @State private var showAbout      = false
     @State private var showUnlock     = false
@@ -29,25 +32,33 @@ struct SettingsView: View {
             DesignTokens.Color.background.ignoresSafeArea()
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
-                    if subscription.tier == .free {
-                        sectionHeader("unlock")
-                        unlockSection
-                    }
+                    sectionHeader("feel")
+                    feelSection
 
-                    sectionHeader("invite")
-                    inviteSection
+                    sectionHeader("expression")
+                    expressionSection
+
+                    sectionHeader("compass")
+                    skinSection
+
+                    sectionHeader("notifications")
+                    notificationsSection
 
                     sectionHeader("account")
                     accountSection
 
-                    sectionHeader("compass skin")
-                    skinSection
-
-                    sectionHeader("experience")
-                    experienceSection
-
                     sectionHeader("about")
                     aboutSection
+
+                    // ── Stripped in the emotional-core pass (kept, not lost) ──
+                    // if subscription.tier == .free {
+                    //     sectionHeader("unlock")
+                    //     unlockSection          // paywall now reached via Expression
+                    // }
+                    // sectionHeader("invite")
+                    // inviteSection             // inviting lives on person cards now
+                    // sectionHeader("experience")
+                    // experienceSection         // miles toggle, pickers, lock-screen row
 
                     Spacer(minLength: 40)
                 }
@@ -121,6 +132,49 @@ struct SettingsView: View {
             }
             .contentShape(Rectangle())
             .onTapGesture { showAccount = true }
+
+            // Your pairing code — tap to copy
+            if let code = SupabaseService.localPairingCode {
+                Divider().background(DesignTokens.Color.border).padding(.leading, 44)
+
+                settingsRow {
+                    Image(systemName: "number")
+                        .settingsIcon()
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("your pairing code")
+                            .settingsLabel()
+                        Text(showCopied ? "copied ✓" : code.replacingOccurrences(of: "-", with: " · "))
+                            .font(.system(size: 13, design: .monospaced))
+                            .foregroundColor(showCopied ? Color(hex: "#5dcaa5")
+                                                        : DesignTokens.Color.accentSoft)
+                    }
+                    Spacer()
+                    Image(systemName: "doc.on.doc")
+                        .font(.system(size: 13))
+                        .foregroundColor(DesignTokens.Color.textDim)
+                }
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    UIPasteboard.general.string = code
+                    HapticEngine.saved()
+                    withAnimation { showCopied = true }
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                        withAnimation { showCopied = false }
+                    }
+                }
+            }
+
+            Divider().background(DesignTokens.Color.border).padding(.leading, 44)
+
+            ShareLink(item: AppLinks.shareMessage) {
+                settingsRow {
+                    Image(systemName: "square.and.arrow.up")
+                        .settingsIcon()
+                    Text("share Pointward")
+                        .settingsLabel()
+                    Spacer()
+                }
+            }
         }
     }
 
@@ -162,7 +216,110 @@ struct SettingsView: View {
         }
     }
 
-    // MARK: - Experience
+    // MARK: - Feel (the core experience)
+
+    private var feelSection: some View {
+        settingsGroup {
+            settingsRow {
+                Image(systemName: "moon.stars")
+                    .settingsIcon()
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("quiet mode")
+                        .settingsLabel()
+                    Text("slower animations · reduced haptics · dimmer glows")
+                        .font(.system(size: 11))
+                        .foregroundColor(DesignTokens.Color.textDim)
+                }
+                Spacer()
+                Toggle("", isOn: $quietMode)
+                    .tint(DesignTokens.Color.accentMid)
+                    .labelsHidden()
+            }
+
+            Divider().background(DesignTokens.Color.border).padding(.leading, 44)
+
+            settingsRow {
+                Image(systemName: "iphone.radiowaves.left.and.right")
+                    .settingsIcon()
+                Text("haptics")
+                    .settingsLabel()
+                Spacer()
+                Toggle("", isOn: $hapticsEnabled)
+                    .tint(DesignTokens.Color.accentMid)
+                    .labelsHidden()
+            }
+        }
+    }
+
+    // MARK: - Expression (the paid playground)
+
+    private var expressionSection: some View {
+        settingsGroup {
+            settingsRow {
+                Image(systemName: "party.popper")
+                    .settingsIcon()
+                VStack(alignment: .leading, spacing: 2) {
+                    HStack(spacing: 6) {
+                        Text("Expressive Mode")
+                            .settingsLabel()
+                        if subscription.tier == .free {
+                            Text("unlock")
+                                .font(.system(size: 9, weight: .semibold))
+                                .foregroundColor(DesignTokens.Color.accentSoft)
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(Capsule().stroke(DesignTokens.Color.accentMid, lineWidth: 1))
+                        }
+                    }
+                    Text("add playful emojis, chaotic animations, and silly sounds to your thoughts")
+                        .font(.system(size: 11))
+                        .foregroundColor(DesignTokens.Color.textDim)
+                }
+                Spacer()
+                Toggle("", isOn: Binding(
+                    get: { expressiveMode && subscription.tier != .free },
+                    set: { wantsOn in
+                        if subscription.tier == .free {
+                            HapticEngine.paywallReached()
+                            showUnlock = true     // Expressive Mode is the paid tier
+                        } else {
+                            expressiveMode = wantsOn
+                        }
+                    }
+                ))
+                .tint(DesignTokens.Color.accentMid)
+                .labelsHidden()
+            }
+        }
+    }
+
+    // MARK: - Notifications
+
+    private var notificationsSection: some View {
+        settingsGroup {
+            settingsRow {
+                Image(systemName: "sparkle")
+                    .settingsIcon()
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("thoughts")
+                        .settingsLabel()
+                    Text("a gentle word when someone points toward you")
+                        .font(.system(size: 11))
+                        .foregroundColor(DesignTokens.Color.textDim)
+                }
+                Spacer()
+                Toggle("", isOn: $notifyPointing)
+                    .tint(DesignTokens.Color.accentMid)
+                    .labelsHidden()
+                    .onChange(of: notifyPointing) { _, enabled in
+                        // Mirror server-side so closed-app pushes respect it too
+                        Task { await SupabaseService.shared.setNotifyPointing(enabled) }
+                    }
+            }
+        }
+    }
+
+    // MARK: - Experience (stripped from the body; kept for reference)
 
     private var experienceSection: some View {
         settingsGroup {
@@ -350,18 +507,14 @@ struct SettingsView: View {
             .contentShape(Rectangle())
             .onTapGesture { showAbout = true }
 
-            Divider().background(DesignTokens.Color.border).padding(.leading, 44)
-
-            // Tell someone you love about it
-            ShareLink(item: AppLinks.shareMessage) {
-                settingsRow {
-                    Image(systemName: "square.and.arrow.up")
-                        .settingsIcon()
-                    Text("share Pointward")
-                        .settingsLabel()
-                    Spacer()
-                }
-            }
+            // (share moved to the account section in the emotional-core pass)
+            // ShareLink(item: AppLinks.shareMessage) {
+            //     settingsRow {
+            //         Image(systemName: "square.and.arrow.up").settingsIcon()
+            //         Text("share Pointward").settingsLabel()
+            //         Spacer()
+            //     }
+            // }
 
             Divider().background(DesignTokens.Color.border).padding(.leading, 44)
 

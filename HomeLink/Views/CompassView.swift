@@ -45,8 +45,9 @@ struct CompassView: View {
     @AppStorage("funnyUnitLocked")      private var funnyUnitLocked      = -1
     @AppStorage("thoughtTaglineLocked") private var thoughtTaglineLocked = -1
     @AppStorage("showLightSpeed")       private var showLightSpeed       = true
-    @State private var funnyIndex   = Int.random(in: 0..<DistanceFun.funnyCount)
-    @State private var taglineIndex = Int.random(in: 0..<DistanceFun.thoughtTaglines.count)
+    @State private var funnyIndex   = DistanceFun.expressiveUnits.randomElement() ?? 0
+    @State private var taglineIndex = Int.random(in: 0..<TaglineSystem.poeticLibrary.count)
+    @AppStorage(ExpressionMode.storageKey) private var expressiveOn = false
 
     var body: some View {
         ZStack {
@@ -87,14 +88,16 @@ struct CompassView: View {
                 }
             }
 
-            // ── Thought queue badge — "X thoughts waiting ✦" ─────────────────
+            // ── Thought queue badge — "thoughts for you ✦" ───────────────────
             if !pings.queue.isEmpty && pings.nowPlaying == nil {
                 VStack {
                     Button {
                         pings.playNext()
                     } label: {
                         HStack(spacing: 6) {
-                            Text("\(pings.queue.count) thought\(pings.queue.count == 1 ? "" : "s") waiting")
+                            Text(pings.queue.count == 1
+                                 ? "a thought for you"
+                                 : "thoughts for you")
                                 .font(.system(size: 13, design: .serif).italic())
                             Text("✦")
                                 .font(.system(size: 12))
@@ -122,15 +125,24 @@ struct CompassView: View {
                 }
             }
 
-            // ── Arrival — the full dramatic experience, from their direction ──
+            // ── Arrival — core: a quiet bloom; expressive: the full drama ─────
             if let playing = pings.nowPlaying {
-                ThoughtArrivalView(
-                    ping: playing,
-                    incomingBearing: compass.state.bearingDegrees,
-                    onFinished: { pings.finishedPlaying(playing) },
-                    onSkip: { pings.skip(playing) }
-                )
-                .transition(.opacity)
+                if expressiveOn {
+                    ThoughtArrivalView(
+                        ping: playing,
+                        incomingBearing: compass.state.bearingDegrees,
+                        onFinished: { pings.finishedPlaying(playing) },
+                        onSkip: { pings.skip(playing) }
+                    )
+                    .transition(.opacity)
+                } else {
+                    CoreArrivalView(
+                        ping: playing,
+                        incomingBearing: compass.state.bearingDegrees,
+                        onContinue: { pings.skip(playing) }
+                    )
+                    .transition(.opacity)
+                }
             }
 
             // ── Pointing toast — quieter than a ping: just a compass whisper ──
@@ -171,7 +183,7 @@ struct CompassView: View {
             if funnyUnitLocked >= 0 && funnyUnitLocked < DistanceFun.funnyCount {
                 funnyIndex = funnyUnitLocked
             }
-            if thoughtTaglineLocked >= 0 && thoughtTaglineLocked < DistanceFun.thoughtTaglines.count {
+            if thoughtTaglineLocked >= 0 && thoughtTaglineLocked < TaglineSystem.poeticLibrary.count {
                 taglineIndex = thoughtTaglineLocked
             }
         }
@@ -217,7 +229,7 @@ struct CompassView: View {
                 }
             }
 
-            Text("your compass is waiting")
+            Text("the needle is ready")
                 .font(.system(size: 26, weight: .semibold, design: .serif))
                 .foregroundColor(DesignTokens.Color.textPrimary)
                 .padding(.bottom, 6)
@@ -235,7 +247,7 @@ struct CompassView: View {
             Button {
                 showAddPerson = true
             } label: {
-                Text("add your first person")
+                Text("who do you point toward?")
                     .font(DesignTokens.Font.label)
                     .foregroundColor(DesignTokens.Color.textPrimary)
                     .padding(.horizontal, 28)
@@ -266,44 +278,37 @@ struct CompassView: View {
                 .contentTransition(.opacity)
                 .animation(.easeInOut(duration: 0.35), value: compass.state.personName)
 
-            // Functional data: clean sans, light, dot-separated with direction
-            Text("\(compass.state.formattedDistance) · \(BearingCalculator.cardinalDirection(compass.state.bearingDegrees))")
+            // CORE distance: one clean muted line — "88 mi · 142 km"
+            Text(compass.state.formattedDistance)
                 .font(.system(size: 15, weight: .light))
                 .foregroundColor(DesignTokens.Color.textSecondary)
                 .monospacedDigit()
 
-            // Line 1 — funny unit: tap to cycle through the absurd conversions
-            Text(DistanceFun.funnyText(km: compass.state.distanceKm, index: funnyIndex))
-                .font(.system(size: 12))
-                .foregroundColor(DesignTokens.Color.textMuted)
-                .contentTransition(.opacity)
-                .onTapGesture {
-                    HapticEngine.personSelected()
-                    withAnimation(.easeInOut(duration: 0.25)) {
-                        funnyIndex = (funnyIndex + 1) % DistanceFun.funnyCount
-                    }
-                }
-
-            // Line 2 — light speed: tap to hide, tap the bolt to bring it back
-            if showLightSpeed {
-                Text(DistanceFun.lightSpeedText(km: compass.state.distanceKm))
-                    .font(.system(size: 11))
-                    .foregroundColor(DesignTokens.Color.textDim)
-                    .monospacedDigit()
+            // EXPRESSIVE: funny units, tap to cycle (hidden in core mode)
+            if expressiveOn {
+                Text(DistanceFun.funnyText(km: compass.state.distanceKm, index: funnyIndex))
+                    .font(.system(size: 12))
+                    .foregroundColor(DesignTokens.Color.textMuted)
+                    .contentTransition(.opacity)
                     .onTapGesture {
-                        withAnimation(.easeOut(duration: 0.25)) { showLightSpeed = false }
-                    }
-            } else {
-                Text("⚡︎")
-                    .font(.system(size: 10))
-                    .foregroundColor(DesignTokens.Color.textDim.opacity(0.6))
-                    .onTapGesture {
-                        withAnimation(.easeOut(duration: 0.25)) { showLightSpeed = true }
+                        HapticEngine.personSelected()
+                        withAnimation(.easeInOut(duration: 0.25)) {
+                            funnyIndex = DistanceFun.nextExpressiveIndex(after: funnyIndex)
+                        }
                     }
             }
 
-            // Line 3 — thought speed: one tagline per session, always present
-            Text(DistanceFun.thoughtTaglines[taglineIndex])
+            // (Light-speed line retired from core — kept for possible return:)
+            // if showLightSpeed {
+            //     Text(DistanceFun.lightSpeedText(km: compass.state.distanceKm))
+            //         .font(.system(size: 11))
+            //         .foregroundColor(DesignTokens.Color.textDim)
+            //         .monospacedDigit()
+            //         .onTapGesture { withAnimation { showLightSpeed = false } }
+            // }
+
+            // Thought-speed tagline — the emotional anchor, one per session
+            Text(TaglineSystem.poeticLibrary[taglineIndex])
                 .font(.system(size: 13, design: .serif).italic())
                 .foregroundColor(DesignTokens.Color.accentMid)
                 .padding(.top, 1)
@@ -327,7 +332,7 @@ struct CompassView: View {
                         ))
                 } else if compass.state.isFarFromHome {
                     // (Emotional distance superseded by the thought-speed line)
-                    Text("far from home")
+                    Text("across the distance")
                         .font(.system(size: 12, design: .serif).italic())
                         .foregroundColor(Color(hex: "#c4845a"))
                         .transition(.opacity)
@@ -522,6 +527,101 @@ struct CompassView: View {
 /// The full dramatic arrival: the emoji flies in FROM the sender's compass
 /// direction with a trail, its sound playing, then settles into a prominent
 /// "[emoji] from [name]" reveal. Tap anywhere to skip to the next thought.
+/// CORE arrival — intimate, not loud. A single soft pulse, light blooming
+/// from the edge of the screen in the sender's direction (like light through
+/// a curtain), the emoji blooming gently at center, then the sender's name.
+/// No particles. No bounce. Tap the emoji to feel it again; tap anywhere
+/// else to continue.
+struct CoreArrivalView: View {
+
+    let ping: PingManager.ReceivedPing
+    let incomingBearing: Double      // where they are, relative to us
+    let onContinue: () -> Void
+
+    @State private var bloomed   = false   // emoji bloom
+    @State private var glow      = false   // directional edge light
+    @State private var named     = false   // sender line
+    @State private var breathing = false   // gentle rest state
+
+    private static let lavender = Color(red: 196/255, green: 168/255, blue: 212/255)
+
+    var body: some View {
+        ZStack {
+            // Quiet veil — the room dims, nothing shouts
+            Color.black.opacity(0.45).ignoresSafeArea()
+
+            // Directional glow from the sender's edge of the screen,
+            // fading inward — warm lavender, light through a curtain
+            let rad = incomingBearing * .pi / 180
+            RadialGradient(
+                colors: [Self.lavender.opacity(0.30), .clear],
+                center: UnitPoint(x: 0.5 + 0.62 * sin(rad),
+                                  y: 0.5 - 0.62 * cos(rad)),
+                startRadius: 10,
+                endRadius: 420
+            )
+            .ignoresSafeArea()
+            .opacity(glow ? 1 : 0)
+
+            VStack(spacing: 14) {
+                // Sender — appears after the emoji settles
+                if named {
+                    VStack(spacing: 3) {
+                        Text("\(ping.fromName) sent you something")
+                            .font(.system(size: 15, design: .serif).italic())
+                            .foregroundColor(Self.lavender)
+                        Text(PoeticTime.string(for: ping.timestamp))
+                            .font(.system(size: 11))
+                            .foregroundColor(DesignTokens.Color.textMuted)
+                    }
+                    .transition(.opacity)
+                }
+
+                // The bloom — pure easeOut, no spring, no bounce
+                Text(ping.emoji)
+                    .font(.system(size: 76))
+                    .opacity(bloomed ? 1 : 0)
+                    .scaleEffect((bloomed ? 1.0 : 0.3) * (breathing ? 1.03 : 1.0))
+                    .shadow(color: Self.lavender.opacity(0.5), radius: 18)
+                    .onTapGesture { replay() }   // tap to feel again
+
+                if named {
+                    Text("tap to feel again")
+                        .font(.system(size: 10))
+                        .foregroundColor(DesignTokens.Color.textDim)
+                        .transition(.opacity)
+                }
+            }
+        }
+        .contentShape(Rectangle())
+        .onTapGesture { onContinue() }
+        .onAppear { play() }
+    }
+
+    private func play() {
+        HapticEngine.thoughtArrived()
+        SoundEngine.shared.play(for: ping.emoji)
+
+        withAnimation(.easeOut(duration: 1.2)) { bloomed = true }
+        withAnimation(.easeOut(duration: 0.5)) { glow = true }
+        withAnimation(.easeIn(duration: 1.0).delay(0.5)) { glow = false }
+        withAnimation(.easeOut(duration: 0.6).delay(1.0)) { named = true }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.3) {
+            withAnimation(.easeInOut(duration: 2.4).repeatForever(autoreverses: true)) {
+                breathing = true
+            }
+        }
+    }
+
+    private func replay() {
+        breathing = false
+        bloomed   = false
+        named     = false
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { play() }
+    }
+}
+
+/// EXPRESSIVE arrival — the full dramatic shooting animation.
 struct ThoughtArrivalView: View {
 
     let ping: PingManager.ReceivedPing

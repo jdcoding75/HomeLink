@@ -196,7 +196,7 @@ struct PersonCard: View {
                         .frame(width: 6, height: 6)
                     Text(isConnected
                          ? (lastSeenText.map { "connected ✓ · \($0)" } ?? "connected ✓")
-                         : "not connected")
+                         : "not yet linked")
                         .font(.system(size: 10))
                         .foregroundColor(isConnected ? Color(hex: "#5dcaa5")
                                                      : DesignTokens.Color.textDim)

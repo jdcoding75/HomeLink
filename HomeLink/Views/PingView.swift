@@ -44,9 +44,19 @@ struct PingView: View {
     // Focused set — each emoji has its own synthesized voice in SoundEngine.
     // "gecko" renders the custom-drawn LeopardGeckoView — a personal touch
     // for the leopard-gecko lover in the family
-    private let loveEmojis    = ["💜","💋","🫂","🌸","gecko","✨"]
-    private let feelingEmojis = ["😢","😤","🤬","⚡️","🔥","💨"]
+    // ── CORE — six emotions, always visible, no labels ───────────────────
+    // ❤️ love · 💋 tenderness · 🤗 embrace · ✨ a spark · 🌸 fleeting · 🌙 night
+    private let coreEmojis = ["❤️","💋","🤗","✨","🌸","🌙"]
+
+    // ── EXPRESSIVE — the playground, visible only in Expressive Mode ─────
+    private let feelingEmojis = ["😤","🤬","👊","💢","⚡️","🌋","🔥","😡","💨"]
     private let foodEmojis    = ["🍕","🍫","🍺","🍷","🍰","☕","🧁","🍜","🍣","🥂"]
+    private let sillyEmojis   = ["😂","🤪","🥳","💥","🎉","gecko"]
+    // (previous sets, superseded:)
+    // private let loveEmojis    = ["💜","💋","🫂","🌸","gecko","✨"]
+    // private let feelingEmojis = ["😢","😤","🤬","⚡️","🔥","💨"]
+
+    @AppStorage(ExpressionMode.storageKey) private var expressiveOn = false
 
     private static let lavender   = Color(hex: "#c4a8d4")
     private static let lavenderHi = Color(hex: "#e0ccee")
@@ -79,6 +89,11 @@ struct PingView: View {
     private var selectedIsFood: Bool {
         guard let e = selectedEmoji else { return false }
         return foodEmojis.contains(e)
+    }
+
+    private var selectedIsSilly: Bool {
+        guard let e = selectedEmoji else { return false }
+        return sillyEmojis.contains(e)
     }
 
     // ── 15° alignment gate ───────────────────────────────────────────────
@@ -245,7 +260,7 @@ struct PingView: View {
 
     private var header: some View {
         VStack(spacing: 6) {
-            Text("send a thought")
+            Text("point toward them")
                 .font(DesignTokens.Font.compassName)
                 .foregroundColor(DesignTokens.Color.textPrimary)
 
@@ -361,12 +376,12 @@ struct PingView: View {
 
             // ── The flight ───────────────────────────────────────────────────
             if phase == .flying, let emoji = selectedEmoji {
-                if selectedIsFood {
-                    foodFlight(emoji: emoji)
+                if selectedIsFood || selectedIsSilly {
+                    foodFlight(emoji: emoji)   // playful wobble for silly too
                 } else if selectedIsFeeling {
                     furyFlight(emoji: emoji)
                 } else {
-                    loveFlight(emoji: emoji)
+                    loveFlight(emoji: emoji)   // core six: the gentle release
                 }
             }
 
@@ -539,43 +554,60 @@ struct PingView: View {
 
     private var emojiSections: some View {
         VStack(alignment: .leading, spacing: 10) {
-            sectionLabel("with love", color: Self.lavender)
-            emojiGrid(loveEmojis)
-
-            Divider()
-                .background(DesignTokens.Color.border)
-                .padding(.vertical, 8)
-
-            sectionLabel("with feeling", color: Self.ember)
-            emojiGrid(feelingEmojis)
-
-            Divider()
-                .background(DesignTokens.Color.border)
-                .padding(.vertical, 8)
-
-            sectionLabel("with food & drink", color: Self.amber)
-            emojiGrid(foodEmojis)
-
-            Divider()
-                .background(DesignTokens.Color.border)
-                .padding(.vertical, 8)
-
-            sectionLabel("yours", color: Self.lavenderHi)
+            // ── CORE: six clean emotions, 3×2, no labels, no headers ──────
             LazyVGrid(
-                columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 6),
-                spacing: 8
+                columns: Array(repeating: GridItem(.flexible(), spacing: 14), count: 3),
+                spacing: 14
             ) {
-                ForEach(customStore.thoughts) { thought in
-                    yoursCell(thought)
-                }
-                if !customStore.isFull {
-                    createCell
+                ForEach(coreEmojis, id: \.self) { emoji in
+                    emojiCell(emoji, large: true)
                 }
             }
-            .onAppear {
-                guard !quietMode else { return }
-                withAnimation(.easeInOut(duration: 1.8).repeatForever(autoreverses: true)) {
-                    slotPulse = true
+
+            // ── EXPRESSIVE: the playground, only when the mode is on ──────
+            if expressiveOn {
+                Divider()
+                    .background(DesignTokens.Color.border)
+                    .padding(.vertical, 8)
+
+                sectionLabel("with feeling", color: Self.ember)
+                emojiGrid(feelingEmojis)
+
+                Divider()
+                    .background(DesignTokens.Color.border)
+                    .padding(.vertical, 8)
+
+                sectionLabel("with food & drink", color: Self.amber)
+                emojiGrid(foodEmojis)
+
+                Divider()
+                    .background(DesignTokens.Color.border)
+                    .padding(.vertical, 8)
+
+                sectionLabel("silly", color: Self.geckoGold)
+                emojiGrid(sillyEmojis)
+
+                Divider()
+                    .background(DesignTokens.Color.border)
+                    .padding(.vertical, 8)
+
+                sectionLabel("yours", color: Self.lavenderHi)
+                LazyVGrid(
+                    columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 6),
+                    spacing: 8
+                ) {
+                    ForEach(customStore.thoughts) { thought in
+                        yoursCell(thought)
+                    }
+                    if !customStore.isFull {
+                        createCell
+                    }
+                }
+                .onAppear {
+                    guard !quietMode else { return }
+                    withAnimation(.easeInOut(duration: 1.8).repeatForever(autoreverses: true)) {
+                        slotPulse = true
+                    }
                 }
             }
         }
@@ -678,7 +710,7 @@ struct PingView: View {
         }
     }
 
-    private func emojiCell(_ emoji: String) -> some View {
+    private func emojiCell(_ emoji: String, large: Bool = false) -> some View {
         let isSelected = selectedEmoji == emoji
         let isFeeling  = feelingEmojis.contains(emoji)
         let isGecko    = emoji == "gecko"
@@ -699,11 +731,11 @@ struct PingView: View {
             ZStack {
                 if isSelected {
                     Circle()
-                        .fill(glow.opacity(isGecko ? 0.45 : 0.35))   // warm orange for the gecko
-                        .blur(radius: 13)
+                        .fill(glow.opacity(isGecko ? 0.45 : large ? 0.30 : 0.35))
+                        .blur(radius: large ? 16 : 13)
                         .padding(6)
                 }
-                thoughtSymbol(emoji, size: 25)
+                thoughtSymbol(emoji, size: large ? 34 : 25)
             }
             .frame(maxWidth: .infinity)
             .aspectRatio(1, contentMode: .fit)
@@ -711,18 +743,21 @@ struct PingView: View {
                         ? (isGecko ? Self.geckoGold.opacity(0.16)
                            : isFeeling ? Self.fire.opacity(0.18)
                            : DesignTokens.Color.accentStrong)
+                        : large ? Color.clear
                         : DesignTokens.Color.backgroundCard.opacity(0.8))
-            .cornerRadius(15)
+            .cornerRadius(large ? 19 : 15)
             .overlay(
-                RoundedRectangle(cornerRadius: 15)
+                RoundedRectangle(cornerRadius: large ? 19 : 15)
                     .stroke(isSelected
                             ? (isGecko ? Self.geckoGold.opacity(0.7)
                                : isFeeling ? Self.ember.opacity(0.7)
                                : DesignTokens.Color.accentMid)
+                            : large ? DesignTokens.Color.border.opacity(0.5)
                             : DesignTokens.Color.border,
                             lineWidth: 1)
             )
-            .scaleEffect(isSelected ? 1.08 : 1.0)
+            // Selected: soft lavender glow + subtle scale (core stays gentle)
+            .scaleEffect(isSelected ? (large ? 1.05 : 1.08) : 1.0)
         }
     }
 
@@ -807,7 +842,7 @@ struct PingView: View {
             Task { try? await SupabaseService.shared.sendPing(to: friend, emoji: emoji) }
         }
 
-        if selectedIsFood {
+        if selectedIsFood || selectedIsSilly {
             // Served: slow playful float with a wobble, ~3s of deliciousness
             foodWobble = false
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {

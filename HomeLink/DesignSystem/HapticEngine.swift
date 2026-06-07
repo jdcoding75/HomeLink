@@ -38,6 +38,14 @@ enum HapticEngine {
         }
     }
 
+    /// Core-mode arrival — a single soft pulse, like a directional pull.
+    /// Intimate, not an alert: no double tap, no notification feel.
+    static func thoughtArrived() {
+        guard hapticsEnabled else { return }
+        UIImpactFeedbackGenerator(style: .soft)
+            .impactOccurred(intensity: isQuiet ? 0.35 : 0.6)
+    }
+
     /// Send-a-thought sequence: light tap as the emoji starts to move…
     static func thoughtReleased() {
         guard hapticsEnabled else { return }

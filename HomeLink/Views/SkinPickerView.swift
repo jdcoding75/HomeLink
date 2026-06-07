@@ -33,7 +33,10 @@ struct SkinPickerView: View {
 
                 ScrollView {
                     VStack(alignment: .leading, spacing: 0) {
-                        skinSection(title: "skins", skins: CompassSkin.allCases)
+                        // Emotional core: three skins only — Minimal,
+                        // Vintage Brass, Heart. (The rest stay in the code:
+                        // CompassSkin.allCases — .classic, .celestial, .aurora)
+                        skinSection(title: "skins", skins: [.minimal, .vintage, .heart])
                         Spacer(minLength: 40)
                     }
                     .padding(.horizontal, DesignTokens.Spacing.lg)

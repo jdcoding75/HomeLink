@@ -35,21 +35,30 @@ final class SoundEngine {
 
     private func buildCache() {
         let builders: [(token: String, volume: Float, make: () -> AVAudioPCMBuffer?)] = [
-            // with love
-            ("💜",    0.50, makeHeart),
-            ("💋",    0.55, makeKiss),
-            ("🫂",    0.55, makeLaugh),
-            ("🌸",    0.50, makeBlossom),
-            ("gecko", 0.50, makeGecko),
-            ("✨",    0.50, makeSparkle),
-            // with feeling
+            // ── CORE — four signatures, warm and barely-there ──────────────
+            ("❤️",    0.50, makeWarmPulse),
+            ("🤗",    0.50, makeWarmPulse),
+            ("🌸",    0.50, makeWarmPulse),
+            ("🌙",    0.50, makeWarmPulse),
+            ("✨",    0.45, makeLightShimmer),
+            ("💋",    0.50, makeSoftBreath),
+            // legacy tokens (old history entries replay through these)
+            ("💜",    0.50, makeWarmPulse),
+            ("🫂",    0.50, makeWarmPulse),
             ("😢",    0.55, makeSad),
+
+            // ── EXPRESSIVE — with feeling ──────────────────────────────────
             ("😤",    0.80, makeFrustrated),
             ("🤬",    0.85, makeAngry),
+            ("👊",    0.85, makePunch),
+            ("💢",    0.80, makeZap),
             ("⚡️",    0.90, makeLightning),
+            ("🌋",    0.85, makeVolcano),
             ("🔥",    0.85, makeFire),
+            ("😡",    0.80, makeStab),
             ("💨",    0.85, makeFart),
-            // with food & drink
+
+            // ── EXPRESSIVE — with food & drink ─────────────────────────────
             ("🍕",    0.55, makePizzaDoorbell),
             ("🍫",    0.50, makeChocolateCrinkle),
             ("🍺",    0.55, makeBeerPour),
@@ -60,7 +69,18 @@ final class SoundEngine {
             ("🍜",    0.55, makeNoodleSlurp),
             ("🍣",    0.50, makeSushiPlop),
             ("🥂",    0.55, makeChampagne),
+
+            // ── EXPRESSIVE — silly ─────────────────────────────────────────
+            ("😂",    0.55, makeLaugh),
+            ("🤪",    0.55, makeNoodleSlurp),
+            ("🥳",    0.55, makeCakeChime),
+            ("💥",    0.80, makePunch),
+            ("🎉",    0.55, makeChampagne),
+            ("gecko", 0.50, makeGecko),
         ]
+        // (Commented out of the core flow, voices kept below for reuse:)
+        // ("💜", 0.50, makeHeart), ("💋", 0.55, makeKiss),
+        // ("🌸", 0.50, makeBlossom), ("✨", 0.50, makeSparkle)
         for entry in builders {
             if let buffer = entry.make() {
                 cache[entry.token] = (buffer, entry.volume)
@@ -74,7 +94,75 @@ final class SoundEngine {
         play(entry.buffer, volume: entry.volume)
     }
 
-    // MARK: - With love
+    // MARK: - Core signatures (Expressive Mode OFF)
+    //
+    // NOTE: programmatic synthesis has real limits for warmth — these are
+    // designed placeholders. For production intimacy, source soft recorded
+    // .wav/.caf samples (freesound.org, zapsplat.com) and play them here.
+
+    /// WARM PULSE — ❤️ 🤗 🌸 🌙
+    /// 60–90 Hz sine, 0.3 s fade-in, 0.8 s total. A heartbeat in a quiet
+    /// room — felt more than heard.
+    private func makeWarmPulse() -> AVAudioPCMBuffer? {
+        let d = 0.8
+        guard let (buf, data, n) = makeBuffer(duration: d) else { return nil }
+        for i in 0..<n {
+            let t = Double(i) / sampleRate
+            let p = t / d
+            // One deep slow swell, 62 → 84 Hz
+            let phase = sweepPhase(t, f0: 62, f1: 84, d: d)
+            let tone  = sin(phase) + 0.15 * sin(phase * 2)
+            // 0.3 s of the 0.8 s is pure fade-in; long gentle release
+            data[i] = Float(tone * 0.30 * envelope(p, attack: 0.375, release: 0.45))
+        }
+        return buf
+    }
+
+    /// LIGHT SHIMMER — ✨
+    /// Slightly detuned high tones, 900–1400 Hz, 0.4 s.
+    /// Fades like light catching glass — a shimmer, never a beep.
+    private func makeLightShimmer() -> AVAudioPCMBuffer? {
+        let d = 0.4
+        guard let (buf, data, n) = makeBuffer(duration: d) else { return nil }
+        // Detuned pairs create the slow beating that reads as shimmer
+        let tones: [Double] = [905, 911, 1085, 1093, 1240, 1247, 1390]
+        for i in 0..<n {
+            let t = Double(i) / sampleRate
+            var s = 0.0
+            for (k, f) in tones.enumerated() {
+                s += sin(2 * .pi * f * t) * exp(-t * (6.5 + Double(k) * 0.7))
+            }
+            let attack = min(1, t / 0.03)
+            data[i] = Float(s * 0.075 * attack)
+        }
+        return buf
+    }
+
+    /// SOFT BREATH — 💋
+    /// Band-filtered noise warmth (150–300 Hz), a slight rise then fall —
+    /// an exhale. 0.5 s, intimate and barely-there.
+    private func makeSoftBreath() -> AVAudioPCMBuffer? {
+        let d = 0.5
+        guard let (buf, data, n) = makeBuffer(duration: d) else { return nil }
+        var rng = SystemRandomNumberGenerator()
+        let r = 0.965
+        var y1 = 0.0, y2 = 0.0
+        for i in 0..<n {
+            let t = Double(i) / sampleRate
+            let p = t / d
+            // Bandpass center drifts 180 → 260 → 180 Hz across the breath
+            let fc = 180 + 80 * sin(.pi * p)
+            let omega = 2 * Double.pi * fc / sampleRate
+            let x = Double.random(in: -1...1, using: &rng)
+            let y = x + 2 * r * cos(omega) * y1 - r * r * y2
+            y2 = y1; y1 = y
+            // The exhale shape: rise to the middle, fall away
+            data[i] = Float(max(-1, min(1, y * 0.022)) * sin(.pi * p))
+        }
+        return buf
+    }
+
+    // MARK: - With love (expressive-era voices, kept for reuse)
 
     /// 💜 Soft warm sine pulse, 440→520 Hz over 0.8 s, gentle fades.
     private func makeHeart() -> AVAudioPCMBuffer? {
@@ -330,6 +418,74 @@ final class SoundEngine {
             var s = (sin(phase) + 0.5 * sin(2 * phase)) * sputter + lp * 1.6 * sputter
             s = tanh(s * 1.8)
             data[i] = Float(s * 0.5 * envelope(p, attack: 0.04, release: 0.30))
+        }
+        return buf
+    }
+
+    /// 👊 Punch — a deep fast thump with a knuckle click.
+    private func makePunch() -> AVAudioPCMBuffer? {
+        let d = 0.3
+        guard let (buf, data, n) = makeBuffer(duration: d) else { return nil }
+        var rng = SystemRandomNumberGenerator()
+        for i in 0..<n {
+            let t = Double(i) / sampleRate
+            var s = sin(sweepPhase(t, f0: 95, f1: 42, d: 0.12)) * exp(-t * 16) * 1.3
+            if t < 0.015 { s += Double.random(in: -1...1, using: &rng) * 0.7 }
+            data[i] = Float(max(-1, min(1, tanh(s) * 0.7)))
+        }
+        return buf
+    }
+
+    /// 💢 Zap — a short bright buzz of irritation.
+    private func makeZap() -> AVAudioPCMBuffer? {
+        let d = 0.25
+        guard let (buf, data, n) = makeBuffer(duration: d) else { return nil }
+        var rng = SystemRandomNumberGenerator()
+        var phase = 0.0
+        for i in 0..<n {
+            let t = Double(i) / sampleRate
+            let f = 620 + Double.random(in: -40...40, using: &rng)
+            phase += 2 * .pi * f / sampleRate
+            // Square-ish edge = electric buzz
+            let s = tanh(sin(phase) * 4) * exp(-t * 11)
+            data[i] = Float(s * 0.5)
+        }
+        return buf
+    }
+
+    /// 🌋 Volcano — a deep building rumble that erupts and settles.
+    private func makeVolcano() -> AVAudioPCMBuffer? {
+        let d = 1.2
+        guard let (buf, data, n) = makeBuffer(duration: d) else { return nil }
+        var rng = SystemRandomNumberGenerator()
+        var lp = 0.0
+        var phase = 0.0
+        for i in 0..<n {
+            let t = Double(i) / sampleRate
+            let p = t / d
+            let x = Double.random(in: -1...1, using: &rng)
+            lp += 0.012 * (x - lp)
+            let f = 38 + 26 * p
+            phase += 2 * .pi * f / sampleRate
+            // Crescendo into an eruption at ~55%, then a rolling decay
+            let swell = p < 0.55 ? p / 0.55 : exp(-(p - 0.55) * 5)
+            let s = (lp * 7 + sin(phase) * 0.6) * swell
+            data[i] = Float(max(-1, min(1, tanh(s) * 0.8)))
+        }
+        return buf
+    }
+
+    /// 😡 Stab — one sharp furious jab.
+    private func makeStab() -> AVAudioPCMBuffer? {
+        let d = 0.22
+        guard let (buf, data, n) = makeBuffer(duration: d) else { return nil }
+        var rng = SystemRandomNumberGenerator()
+        for i in 0..<n {
+            let t = Double(i) / sampleRate
+            var s = sin(sweepPhase(t, f0: 1250, f1: 320, d: 0.1)) * exp(-t * 26)
+            s += 0.3 * sin(2 * .pi * 180 * t) * exp(-t * 20)
+            if t < 0.008 { s += Double.random(in: -1...1, using: &rng) * 0.5 }
+            data[i] = Float(max(-1, min(1, s * 0.65)))
         }
         return buf
     }

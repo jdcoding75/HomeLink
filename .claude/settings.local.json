@@ -46,7 +46,10 @@
       "Bash(gh api *)",
       "Bash(python3 -m json.tool)",
       "Bash(git add *)",
-      "Bash(git -c core.hooksPath=/dev/null commit -m ' *)"
+      "Bash(git -c core.hooksPath=/dev/null commit -m ' *)",
+      "Bash(export SUPABASE_ACCESS_TOKEN=sbp_c6ac81245be0b0ef0092cf78a0f63d2f27f04473)",
+      "Bash(sed -n '840,860p' HomeLink/Views/PingView.swift)",
+      "Bash(sed -n '275,285p' HomeLink/Views/PingView.swift)"
     ]
   }
 }

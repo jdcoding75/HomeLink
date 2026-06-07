@@ -11,6 +11,7 @@ struct PersonDetailView: View {
 
     let person: Person
     @EnvironmentObject var people: PeopleManager
+    @EnvironmentObject var compass: CompassManager
     @Environment(\.dismiss) private var dismiss
 
     @State private var codeInput = ""
@@ -77,7 +78,8 @@ struct PersonDetailView: View {
                         // ── Thought history ───────────────────────────────
                         if isConnected, let partnerID {
                             NavigationLink {
-                                PingHistoryView(personName: person.name, partnerID: partnerID)
+                                PingHistoryView(personName: person.name, partnerID: partnerID,
+                                                bearing: compass.state.bearingDegrees)
                             } label: {
                                 HStack {
                                     Image(systemName: "clock.arrow.circlepath")
@@ -148,7 +150,7 @@ struct PersonDetailView: View {
             VStack(spacing: 14) {
                 HStack(spacing: 8) {
                     Circle().fill(DesignTokens.Color.textDim).frame(width: 8, height: 8)
-                    Text("not connected")
+                    Text("not yet linked")
                         .font(.system(size: 13))
                         .foregroundColor(DesignTokens.Color.textMuted)
                 }
@@ -283,22 +285,23 @@ struct PersonDetailView: View {
     }
 }
 
-// MARK: - Ping history
+// MARK: - Memory trail
 
-/// Every thought between you and this person, newest first.
+/// The history of thoughts between you — an emotional archive, not a chat.
+/// No bubbles, no cards. Quiet rows, hairline separators, poetic time.
+/// Tap a row to feel that thought again.
 struct PingHistoryView: View {
 
     let personName: String
     let partnerID: UUID
+    /// The current bearing toward this person, for the tiny needle marks.
+    var bearing: Double = 0
 
     @State private var records: [SupabaseService.PingRecord] = []
     @State private var loaded = false
+    @State private var replayingID: UUID?   // brief swell on tapped row
 
-    private let relative: RelativeDateTimeFormatter = {
-        let f = RelativeDateTimeFormatter()
-        f.unitsStyle = .short
-        return f
-    }()
+    private static let lavender = Color(red: 196/255, green: 168/255, blue: 212/255)
 
     var body: some View {
         ZStack {
@@ -307,34 +310,26 @@ struct PingHistoryView: View {
             if !loaded {
                 ProgressView().tint(DesignTokens.Color.accentSoft)
             } else if records.isEmpty {
-                VStack(spacing: 8) {
-                    Text("🌙").font(.system(size: 40))
-                    Text("no thoughts yet")
-                        .font(.system(size: 18, weight: .semibold, design: .serif))
-                        .foregroundColor(DesignTokens.Color.textPrimary)
-                    Text("send the first one")
-                        .font(.system(size: 13, design: .serif).italic())
-                        .foregroundColor(DesignTokens.Color.textMuted)
-                }
+                Text("the needle is ready · send your first thought")
+                    .font(.system(size: 14, design: .serif).italic())
+                    .foregroundColor(DesignTokens.Color.textMuted)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 40)
             } else {
                 ScrollView {
                     VStack(spacing: 0) {
                         ForEach(records) { record in
                             row(record)
                             if record.id != records.last?.id {
-                                Divider()
-                                    .background(DesignTokens.Color.border)
-                                    .padding(.leading, 56)
+                                Rectangle()
+                                    .fill(Color.white.opacity(0.10))
+                                    .frame(height: 1)
+                                    .padding(.leading, 52)
                             }
                         }
                     }
-                    .background(DesignTokens.Color.backgroundCard)
-                    .cornerRadius(DesignTokens.Radius.card)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: DesignTokens.Radius.card)
-                            .stroke(DesignTokens.Color.border, lineWidth: 1)
-                    )
-                    .padding(20)
+                    .padding(.horizontal, 24)
+                    .padding(.vertical, 16)
                 }
             }
         }
@@ -348,37 +343,53 @@ struct PingHistoryView: View {
 
     private func row(_ record: SupabaseService.PingRecord) -> some View {
         let sent = record.toUser == partnerID
-        return HStack(spacing: 14) {
-            Text(record.emoji)
-                .font(.system(size: 26))
-                .frame(width: 36)
+        return Button {
+            replay(record)
+        } label: {
+            HStack(spacing: 14) {
+                // The thought, floating quietly on the left
+                Text(record.emoji)
+                    .font(.system(size: 28))
+                    .frame(width: 38)
+                    .scaleEffect(replayingID == record.id ? 1.25 : 1.0)
 
-            VStack(alignment: .leading, spacing: 2) {
-                Text(sent ? "sent" : "received")
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundColor(DesignTokens.Color.textPrimary)
-                Text(relative.localizedString(for: record.createdAt, relativeTo: .now))
-                    .font(.system(size: 11))
+                // Tiny compass needle — the direction it traveled
+                Image(systemName: "location.north.fill")
+                    .font(.system(size: 8))
+                    .foregroundColor(DesignTokens.Color.textDim.opacity(0.7))
+                    .rotationEffect(.degrees(sent ? bearing : bearing + 180))
+
+                // Felt indicator — a soft dot, never a tick
+                //   grey   · sent, waiting
+                //   lavender · received (felt)
+                if sent {
+                    Circle()
+                        .fill(record.openedAt != nil
+                              ? Self.lavender
+                              : DesignTokens.Color.textDim.opacity(0.5))
+                        .frame(width: 5, height: 5)
+                }
+
+                Spacer()
+
+                // Poetic time, right-aligned — a journal, not a log
+                Text(PoeticTime.string(for: record.createdAt))
+                    .font(.system(size: 12, design: .serif).italic())
                     .foregroundColor(DesignTokens.Color.textMuted)
             }
-
-            Spacer()
-
-            // Read receipts on the thoughts we sent — WhatsApp-style ticks:
-            // single grey → sent, double green ✓✓ felt
-            if sent {
-                if record.openedAt != nil {
-                    Text("✓✓ felt")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundColor(Color(hex: "#5dcaa5"))
-                } else {
-                    Text("→ sent")
-                        .font(.system(size: 12))
-                        .foregroundColor(DesignTokens.Color.textDim)
-                }
-            }
+            .padding(.vertical, 13)
+            .contentShape(Rectangle())
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
+        .buttonStyle(.plain)
+    }
+
+    /// Tap to feel again — the sound plays, the emoji swells briefly.
+    private func replay(_ record: SupabaseService.PingRecord) {
+        SoundEngine.shared.play(for: record.emoji)
+        HapticEngine.thoughtArrived()
+        withAnimation(.easeOut(duration: 0.35)) { replayingID = record.id }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) {
+            withAnimation(.easeIn(duration: 0.4)) { replayingID = nil }
+        }
     }
 }

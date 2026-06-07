@@ -16,6 +16,32 @@ enum TaglineSystem {
         "Never far.",
     ]
 
+    /// The full poetic library — the emotional anchor of the compass screen.
+    /// One is chosen at random per session (no timers, no cycling).
+    static let poeticLibrary: [String] = [
+        "Where you are, I feel.",
+        "Distance has a direction.",
+        "Near is a feeling.",
+        "You're the pull.",
+        "I turn toward you.",
+        "Love has a direction.",
+        "You're my true north.",
+        "No distance exists between two minds.",
+        "Felt before it was sent.",
+        "There before you finished missing them.",
+        "Already there · love travels instantly.",
+        "Distance is only physical.",
+        "Speed of love · immeasurable.",
+        "Closer than the miles suggest.",
+        "You're closer than the miles.",
+        "My heart points to you.",
+        "Where you are, I point.",
+        "The needle always knows.",
+        "I feel you move.",
+        "Near is where the heart points.",
+        "You're the direction I always return to.",
+    ]
+
     static func validate(_ text: String) -> TaglineValidation {
         let trimmed = text.trimmingCharacters(in: .whitespaces)
         if trimmed.isEmpty           { return .empty }
