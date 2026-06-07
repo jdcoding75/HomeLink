@@ -25,6 +25,7 @@ struct CompassView: View {
     @EnvironmentObject var pings:    PingManager
     @EnvironmentObject var skinStore: SkinStore
     @EnvironmentObject var subscription: SubscriptionManager
+    @EnvironmentObject var instrumentStore: InstrumentStore
     @EnvironmentObject var appEnv:   AppEnvironment
     @EnvironmentObject var appState: AppStateManager
 
@@ -134,16 +135,49 @@ struct CompassView: View {
                     // ── MIDDLE ZONE: the compass, dominant, nothing on it ─────
                     // Skins render at a fixed 240pt design size; scale the whole
                     // composition so every face grows together.
-                    compassFace
-                        .frame(width: 240, height: 240)
-                        .scaleEffect(370.0 / 240.0)
-                        .frame(width: 370, height: 370)
-                        // The instrument takes the circle; the skin recedes
-                        .opacity(faceDimmedForInstrument ? 0.2 : 1.0)
-                        .animation(faceDimmedForInstrument
-                                   ? .easeOut(duration: 0.3)
-                                   : .easeIn(duration: 0.4),
-                                   value: faceDimmedForInstrument)
+                    // ── FOUR INSTRUMENTS: only the middle changes ─────────
+                    Group {
+                        switch instrumentStore.selected {
+                        case .compass:
+                            compassFace
+                                .frame(width: 240, height: 240)
+                                .scaleEffect(370.0 / 240.0)
+                                .frame(width: 370, height: 370)
+                                // Full-compass send styles dim the skin
+                                .opacity(faceDimmedForInstrument ? 0.2 : 1.0)
+                                .animation(faceDimmedForInstrument
+                                           ? .easeOut(duration: 0.3)
+                                           : .easeIn(duration: 0.4),
+                                           value: faceDimmedForInstrument)
+                        case .bow:
+                            BowInstrumentView(
+                                loadedToken: selectedToken,
+                                loadedSymbol: selectedToken.map { AnyView(sendSymbol($0, size: 26)) },
+                                bearingDegrees: compass.state.bearingDegrees,
+                                personName: compass.state.personName,
+                                onSend: { if let token = selectedToken { sendThought(token) } }
+                            )
+                        case .firefly:
+                            FireflyInstrumentView(
+                                loadedToken: selectedToken,
+                                loadedSymbol: selectedToken.map { AnyView(sendSymbol($0, size: 26)) },
+                                bearingDegrees: compass.state.bearingDegrees,
+                                personName: compass.state.personName,
+                                onSend: { if let token = selectedToken { sendThought(token) } }
+                            )
+                        case .flick:
+                            FlickInstrumentView(
+                                loadedToken: selectedToken,
+                                loadedSymbol: selectedToken.map { AnyView(sendSymbol($0, size: 26)) },
+                                bearingDegrees: compass.state.bearingDegrees,
+                                personName: compass.state.personName,
+                                onSend: { _ in if let token = selectedToken { sendThought(token) } }
+                            )
+                        }
+                    }
+                    .id(instrumentStore.selected)              // crossfade on switch
+                    .transition(.opacity)
+                    .animation(.easeInOut(duration: 0.3), value: instrumentStore.selected)
                         // STEADY LOCK (5 s+): warm breathing halo behind the face
                         .background(
                             Circle()
@@ -204,7 +238,7 @@ struct CompassView: View {
             // out in the real compass direction (glow · star · firefly) ──────
             if let token = flightToken {
                 SenderAnimationView(
-                    style: SenderStyle.effective(for: subscription.tier),
+                    style: instrumentStore.selected.senderStyle,
                     emoji: sendRemoteEmoji(for: token),
                     bearingDegrees: compass.state.bearingDegrees,
                     symbol: sendSymbol(token, size: 30)
@@ -778,7 +812,11 @@ struct CompassView: View {
     /// Below the row: tap-send button, or the hold ring (Pro opt-in).
     @ViewBuilder
     private var sendControl: some View {
-        if let token = selectedToken, flightToken == nil {
+        // The other instruments carry their own send mechanic (draw / hold /
+        // flick) — the button belongs to the compass alone.
+        if instrumentStore.selected != .compass {
+            Color.clear.frame(height: 1)
+        } else if let token = selectedToken, flightToken == nil {
             if holdToSendActive {
                 VStack(spacing: 5) {
                     ZStack {
@@ -866,9 +904,10 @@ struct CompassView: View {
         flightToken = token
         flightFly = true   // legacy flag (the style view drives its own motion)
 
-        // Full-compass instruments: the skin recedes to 20 % while the hand
-        // or bow owns the circle, then breathes back as the send completes.
-        let style = SenderStyle.effective(for: subscription.tier)
+        // ONE SELECTION DEFINES EVERYTHING: the flight personality follows
+        // the chosen instrument (compass→glow, bow→bowArrow, firefly→firefly,
+        // flick→fingerFlick). Free users hold the compass, so glow.
+        let style = instrumentStore.selected.senderStyle
         if style == .fingerFlick || style == .bowArrow {
             faceDimmedForInstrument = true
             let restoreDelay = style == .bowArrow ? 1.5 : 1.2

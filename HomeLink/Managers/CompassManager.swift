@@ -20,6 +20,11 @@ final class CompassManager: NSObject, ObservableObject {
     private var wasLocked = false
     private var lockedSince: Date = .distantFuture        // steady-gaze tracking
     private var lastPointingReport: Date = .distantPast   // throttle bearing writes
+    // AUTO-PUSH FIX: the 1° heading throttle stops updateCompassState from
+    // firing while the phone is held perfectly still — exactly the steady
+    // gaze the presence signal needs. This timer re-checks every 2 s while
+    // locked, independent of heading events.
+    private var presenceTimer: Timer?
     private let lockThresholdDegrees: Double  = 5.0
     private let farFromHomeThresholdKm: Double = 500.0
 
@@ -83,6 +88,30 @@ final class CompassManager: NSObject, ObservableObject {
         return skinStore.activeSkin
     }
 
+    /// Re-evaluates the steady-lock condition every 2 s while locked —
+    /// heading events alone stop arriving when the phone is held still.
+    private func startPresenceTimer() {
+        stopPresenceTimer()
+        presenceTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                guard self.wasLocked,
+                      let target = self.targetPerson,
+                      let userLocation = self.userLocation else { return }
+                if Date.now.timeIntervalSince(self.lockedSince) >= 10 {
+                    let bearing = BearingCalculator.bearing(from: userLocation.coordinate,
+                                                            to: target.coordinate)
+                    self.reportPointingIfNeeded(target: target, bearing: bearing)
+                }
+            }
+        }
+    }
+
+    private func stopPresenceTimer() {
+        presenceTimer?.invalidate()
+        presenceTimer = nil
+    }
+
     /// Steady-lock only, paired-person only, at most once per FIVE minutes —
     /// the silent presence signal behind the partner's edge glow.
     private func reportPointingIfNeeded(target: Person, bearing: Double) {
@@ -127,6 +156,10 @@ final class CompassManager: NSObject, ObservableObject {
         if isNowLocked && !wasLocked {
             HapticEngine.connectionFelt()
             lockedSince = .now
+            startPresenceTimer()      // steady-gaze checks survive a still phone
+        }
+        if !isNowLocked && wasLocked {
+            stopPresenceTimer()
         }
         // Ambient presence: only after the needle has RESTED on them for
         // 10+ seconds — a held gaze, not a glance. Throttled to 5 minutes.

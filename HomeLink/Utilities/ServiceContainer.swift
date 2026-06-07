@@ -11,6 +11,7 @@ final class ServiceContainer: ObservableObject {
 
     let modelContainer:      ModelContainer
     let skinStore:           SkinStore
+    let instrumentStore:     InstrumentStore
     let networkService:      NetworkServiceProtocol
     let pairingService:      PairingServiceProtocol
     let notificationService: NotificationServiceProtocol
@@ -27,6 +28,7 @@ final class ServiceContainer: ObservableObject {
         let schema       = Schema([Person.self, Ping.self])
         modelContainer   = try! ModelContainer(for: schema)
         skinStore        = SkinStore()
+        instrumentStore  = InstrumentStore()
         networkService   = MockNetworkService()
         pairingService   = MockPairingService()
         notificationService = LocalNotificationService()

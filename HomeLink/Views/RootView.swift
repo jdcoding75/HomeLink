@@ -15,6 +15,7 @@ struct RootView: View {
     @EnvironmentObject var pings:        PingManager
     @EnvironmentObject var subscription: SubscriptionManager
     @EnvironmentObject var skinStore:    SkinStore
+    @EnvironmentObject var instrumentStore: InstrumentStore
 
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
 
@@ -55,6 +56,7 @@ struct RootView: View {
             startCompassIfNeeded()
             startRealtimePings()
             skinStore.enforceTier(subscription.tier)   // free = Minimal, always
+            instrumentStore.enforceTier(subscription.tier)   // free = compass, always
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
                 withAnimation(.easeOut(duration: 0.6)) { showSplash = false }
             }

@@ -41,7 +41,8 @@ struct ProSetupView: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 22) {
                         statusSection
-                        senderStyleSection
+                        instrumentSection
+                        // senderStyleSection   // superseded by the instrument selection
                         emojiSetSection
                         customSoundsSection
                         skinSection
@@ -147,7 +148,79 @@ struct ProSetupView: View {
         }
     }
 
-    // MARK: - How you send (sender styles)
+    // MARK: - Your instrument (the four-instrument architecture)
+
+    @EnvironmentObject var instrumentStore: InstrumentStore
+
+    private var instrumentSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            sectionLabel("your instrument")
+            card {
+                VStack(spacing: 12) {
+                    ForEach(Instrument.allCases) { instrument in
+                        instrumentCard(instrument)
+                    }
+                }
+                .padding(14)
+            }
+        }
+    }
+
+    private func instrumentCard(_ instrument: Instrument) -> some View {
+        let locked   = instrument.requiresPro && !isPro
+        let isActive = instrumentStore.selected == instrument && !locked
+
+        return Button {
+            if locked {
+                HapticEngine.paywallReached()
+                showPaywall = true
+            } else {
+                withAnimation(.easeInOut(duration: 0.3)) {
+                    instrumentStore.selected = instrument
+                }
+                HapticEngine.skinSelected()
+            }
+        } label: {
+            HStack(spacing: 12) {
+                Text(instrument.icon)
+                    .font(.system(size: 26))
+                    .frame(width: 40, height: 40)
+                    .background(DesignTokens.Color.backgroundLift)
+                    .cornerRadius(12)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(isActive ? Self.lavender : DesignTokens.Color.borderMid,
+                                    lineWidth: isActive ? 1.5 : 1)
+                    )
+                    .shadow(color: isActive ? Self.lavender.opacity(0.5) : .clear, radius: 8)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(instrument.displayName)
+                        .font(.system(size: 14, weight: isActive ? .semibold : .regular))
+                        .foregroundColor(DesignTokens.Color.textPrimary)
+                    Text(instrument.tagline)
+                        .font(.system(size: 11, design: .serif).italic())
+                        .foregroundColor(DesignTokens.Color.textMuted)
+                }
+
+                Spacer()
+
+                if locked {
+                    Image(systemName: "lock.fill")
+                        .font(.system(size: 12))
+                        .foregroundColor(Self.lavender.opacity(0.8))
+                } else if isActive {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: 16))
+                        .foregroundColor(Self.lavender)
+                }
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+
+    // MARK: - How you send (sender styles — superseded by instruments, kept)
 
     private var senderStyleSection: some View {
         VStack(alignment: .leading, spacing: 8) {

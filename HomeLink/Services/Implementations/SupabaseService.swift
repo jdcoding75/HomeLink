@@ -474,7 +474,14 @@ final class SupabaseService: ObservableObject {
     func sendPing(to userID: UUID, emoji: String) async throws {
         guard let client else { throw SupabaseServiceError.notConfigured }
         guard let me = await currentUserID else { throw SupabaseServiceError.notSignedIn }
-        let style = SenderStyle.effectiveForCurrentUser.rawValue
+        // One selection defines everything: the wire style follows the
+        // chosen instrument (falls back to the compass → glow for free).
+        let savedInstrument = UserDefaults.standard.string(forKey: InstrumentStore.storageKey) ?? ""
+        let savedTier = UserDefaults.standard.string(forKey: "subscriptionTier") ?? ""
+        let tier = SubscriptionTier(rawValue: savedTier) ?? .free
+        var instrument = Instrument(rawValue: savedInstrument) ?? .compass
+        if instrument.requiresPro && tier == .free { instrument = .compass }
+        let style = instrument.senderStyle.rawValue
         do {
             try await client
                 .from("pings")

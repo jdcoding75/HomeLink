@@ -22,6 +22,8 @@ struct PointwardApp: App {
 
         // Carry "Expressive Mode" users into the renamed Pro key
         ProFeatures.migrateLegacyKey()
+        // Carry sender-style users into the instrument architecture
+        Instrument.migrateLegacySelection()
     }
 
     var body: some Scene {
@@ -33,6 +35,7 @@ struct PointwardApp: App {
                 .environmentObject(container.subscriptionManager)
                 .environmentObject(container.notificationHandler)
                 .environmentObject(container.skinStore)
+                .environmentObject(container.instrumentStore)
                 .environmentObject(container.brandManager)
                 .environmentObject(container.appStateManager)
                 .environmentObject(AppEnvironment(geocodingService: container.geocodingService))
