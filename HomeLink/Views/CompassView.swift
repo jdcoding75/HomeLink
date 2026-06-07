@@ -17,8 +17,11 @@
 import SwiftUI
 import CoreLocation
 import Combine
+import os
 
 struct CompassView: View {
+
+    static let log = Logger(subsystem: "com.jdcoding75.pointward", category: "compass")
 
     @EnvironmentObject var compass:  CompassManager
     @EnvironmentObject var people:   PeopleManager
@@ -106,8 +109,7 @@ struct CompassView: View {
         holdToSendEnabled && subscription.tier != .free
     }
     private var sendAlignDiff: Double {
-        let bearing = compass.state.bearingDegrees
-        return min(bearing, 360 - bearing)
+        BearingCalculator.alignmentError(relativeBearing: compass.state.bearingDegrees)
     }
 
     var body: some View {
@@ -278,6 +280,32 @@ struct CompassView: View {
                 CaughtConfirmationView(emoji: caught.emoji)
                     .id(caught.at)
                     .zIndex(6)
+            }
+
+            // ── Send failed — the flight played but the thought did NOT
+            // travel. Quiet, honest, 4 s. ─────────────────────────────────────
+            if let failure = pings.sendFailedNotice {
+                VStack {
+                    HStack(spacing: 6) {
+                        Image(systemName: "wifi.slash")
+                            .font(.system(size: 10))
+                        Text(failure)
+                            .font(.system(size: 12, design: .serif).italic())
+                    }
+                    .foregroundColor(Color(hex: "#e08a3c"))
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 8)
+                    .background(
+                        Capsule()
+                            .fill(DesignTokens.Color.background.opacity(0.9))
+                            .overlay(Capsule().stroke(Color(hex: "#e08a3c").opacity(0.35), lineWidth: 1))
+                    )
+                    .padding(.top, 64)
+                    Spacer()
+                }
+                .zIndex(8)
+                .transition(.opacity.combined(with: .move(edge: .top)))
+                .animation(.easeInOut(duration: 0.4), value: pings.sendFailedNotice)
             }
 
             // (felt-receipt text capsule retired — replaced by the symbolic
@@ -902,7 +930,12 @@ struct CompassView: View {
     /// thought's own sound still plays here.
     private func sendThought(_ token: String) {
         // One state at a time — a catch in progress owns the screen
-        guard appState.transition(to: .sending) else { return }
+        guard appState.transition(to: .sending) else {
+            // The gesture succeeded but the screen is owned (catch mode) —
+            // never lose the moment silently; the selection stays loaded.
+            CompassView.log.warning("send: blocked by app state \(appState.currentState.rawValue, privacy: .public) — try again when free")
+            return
+        }
         withAnimation(.easeOut(duration: 0.25)) { selectedToken = nil }
         flightToken = token
         flightFly = true   // legacy flag (the style view drives its own motion)
@@ -920,10 +953,18 @@ struct CompassView: View {
         }
         // HapticEngine.thoughtReleased()   // retired — style haptic fires at launch
 
-        // Real delivery when paired
-        if let friend = SupabaseService.connectedFriendID {
-            let emoji = sendRemoteEmoji(for: token)
-            Task { try? await SupabaseService.shared.sendPing(to: friend, emoji: emoji) }
+        // Real delivery when paired. The SELECTED person's partner id wins —
+        // the global connectedFriendID is only a fallback (with several
+        // paired people it can point at someone else entirely).
+        let recipient = people.selectedPerson?.pairedUserID.flatMap(UUID.init)
+                        ?? SupabaseService.connectedFriendID
+        if let recipient {
+            CompassView.log.info("send: \(token, privacy: .public) → \(recipient.uuidString, privacy: .public) as \(style.rawValue, privacy: .public)")
+            pings.sendRemote(to: recipient,
+                             emoji: sendRemoteEmoji(for: token),
+                             style: style)
+        } else {
+            CompassView.log.info("send: local only — no paired recipient")
         }
 
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) {

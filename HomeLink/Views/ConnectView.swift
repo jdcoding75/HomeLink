@@ -6,13 +6,17 @@
 
 import SwiftUI
 import MessageUI
+import os
 
 struct ConnectView: View {
+
+    private static let log = Logger(subsystem: "com.jdcoding75.pointward", category: "pairing")
 
     @EnvironmentObject var people: PeopleManager
     @Environment(\.dismiss) private var dismiss
 
     @State private var code: String? = SupabaseService.localPairingCode
+    @State private var codeError: String?
     @State private var showCopied = false
     @State private var copyGlow = false
     @State private var showMessageComposer = false
@@ -78,6 +82,20 @@ struct ConnectView: View {
                                     .kerning(2)
                                     .foregroundColor(DesignTokens.Color.textMuted)
 
+                                if let codeError {
+                                    // The link below would be USELESS without a
+                                    // code — say so instead of sharing it broken.
+                                    HStack(spacing: 8) {
+                                        Text(codeError)
+                                            .font(DesignTokens.Font.caption)
+                                            .foregroundColor(Color(hex: "#e08a3c"))
+                                        Button("retry") { fetchMyCode() }
+                                            .font(DesignTokens.Font.caption)
+                                            .foregroundColor(DesignTokens.Color.accentSoft)
+                                    }
+                                    .padding(.bottom, 2)
+                                }
+
                                 Button {
                                     UIPasteboard.general.string = pairURL
                                     HapticEngine.saved()
@@ -132,8 +150,8 @@ struct ConnectView: View {
                                     .background(DesignTokens.Color.accentStrong)
                                     .cornerRadius(DesignTokens.Radius.button)
                             }
-                            .opacity(MFMessageComposeViewController.canSendText() ? 1 : 0.4)
-                            .disabled(!MFMessageComposeViewController.canSendText())
+                            .opacity((MFMessageComposeViewController.canSendText() && code != nil) ? 1 : 0.4)
+                            .disabled(!MFMessageComposeViewController.canSendText() || code == nil)
 
                             // ── Secondary: anywhere else ───────────────────
                             ShareLink(item: inviteText) {
@@ -235,8 +253,27 @@ struct ConnectView: View {
         }
         .onAppear {
             // Make sure a code exists (signed-in users only)
-            if code == nil, SupabaseService.localUserID != nil {
-                Task { code = try? await SupabaseService.shared.myPairingCode() }
+            if code == nil { fetchMyCode() }
+        }
+    }
+
+    /// Fetch (or mint) the shareable code. A silent failure here used to
+    /// hand the user a link with NO code in it — now it shows and retries.
+    private func fetchMyCode() {
+        guard SupabaseService.localUserID != nil else {
+            Self.log.info("connect: no code fetch — not signed in")
+            codeError = "sign in first (Settings → account)"
+            return
+        }
+        guard code == nil else { return }
+        codeError = nil
+        Task {
+            do {
+                code = try await SupabaseService.shared.myPairingCode()
+                Self.log.info("connect: my code ready \(code ?? "?", privacy: .public)")
+            } catch {
+                Self.log.error("connect: code fetch failed: \(error.localizedDescription, privacy: .public)")
+                codeError = error.localizedDescription
             }
         }
     }
@@ -248,16 +285,29 @@ struct ConnectView: View {
         }
         isBusy = true
         errorMessage = nil
+        Self.log.info("connect: redeeming entered code POINT-\(codeInput, privacy: .public)")
         Task {
             defer { isBusy = false }
             do {
                 let result = try await SupabaseService.shared.redeem("POINT-\(codeInput)")
-                people.bindConnection(friendID: result.ownerID)
+                // The invite may carry who it's from — bind (or auto-add)
+                // the RIGHT person card instead of blindly grabbing the
+                // selected/first one.
+                if let name = result.personName {
+                    people.addFromInvite(name: name,
+                                         emoji: result.personEmoji ?? "💜",
+                                         friendID: result.ownerID,
+                                         near: nil)
+                } else {
+                    people.bindConnection(friendID: result.ownerID)
+                }
+                Self.log.info("connect: paired ✓ with \(result.ownerID.uuidString, privacy: .public)")
                 HapticEngine.connectionFelt()
                 withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
                     connected = true
                 }
             } catch {
+                Self.log.error("connect: redeem failed — \(error.localizedDescription, privacy: .public)")
                 errorMessage = error.localizedDescription
             }
         }

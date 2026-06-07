@@ -23,8 +23,11 @@
 
 import SwiftUI
 import Combine
+import os
 
 struct CatchModeView: View {
+
+    private static let log = Logger(subsystem: "com.jdcoding75.pointward", category: "catch")
 
     let ping: PingManager.ReceivedPing
     let style: SenderStyle
@@ -67,8 +70,7 @@ struct CatchModeView: View {
         // treat as aligned rather than trapping the thought.
         guard compass.isHeadingAvailable else { return 0 }
         if debugBypass { return 0 }
-        let bearing = compass.state.bearingDegrees
-        return min(bearing, 360 - bearing)
+        return BearingCalculator.alignmentError(relativeBearing: compass.state.bearingDegrees)
     }
 
     /// Step 2 — visual feedback as the angle decreases.
@@ -297,7 +299,11 @@ struct CatchModeView: View {
 
     // ── Sequencing ────────────────────────────────────────────────────────
 
+    /// 1 Hz alignment trace (the 10 Hz heartbeat is too chatty for Console).
+    @State private var lastAlignmentLog = Date.distantPast
+
     private func begin() {
+        Self.log.info("catch: ACTIVATED — from=\(ping.fromName, privacy: .public) emoji=\(ping.emoji, privacy: .public) style=\(style.rawValue, privacy: .public) senderBearing=\(Int(compass.state.bearingDegrees), privacy: .public)° headingAvailable=\(compass.isHeadingAvailable, privacy: .public)")
         // Step 1 — the orb breathes (900 ms easeInOutSine cycle)
         withAnimation(AnimationSystem.easeInOutSine(AnimationSystem.Timing.glowPulseSlow)
                         .repeatForever(autoreverses: true)) {
@@ -308,6 +314,12 @@ struct CatchModeView: View {
     /// 10 Hz: haptic bands, drift, lock-hold confirmation.
     private func heartbeat() {
         guard phase == .seeking || phase == .locked else { return }
+
+        // Real-time alignment trace, throttled to 1 Hz
+        if Date.now.timeIntervalSince(lastAlignmentLog) >= 1.0 {
+            lastAlignmentLog = .now
+            Self.log.debug("catch: aligning — bearing=\(Int(compass.state.bearingDegrees), privacy: .public)° error=\(Int(angleError), privacy: .public)° phase=\(String(describing: phase), privacy: .public)")
+        }
 
         // Step 2 — haptic pulses quicken as the angle error shrinks
         HapticEngine.catchAlignment(angleError: angleError)
@@ -329,6 +341,7 @@ struct CatchModeView: View {
                 phase = .locked
                 lockHeldSince = .now
                 lockSnap = true                       // easeOutBack +10 %
+                Self.log.info("catch: LOCKED ON (error=\(Int(angleError), privacy: .public)°) — holding 0.5 s")
                 HapticEngine.lockOn()                 // clean medium tap
                 DispatchQueue.main.asyncAfter(deadline: .now()
                                               + AnimationSystem.Timing.lockOn) {
@@ -348,6 +361,7 @@ struct CatchModeView: View {
     /// Bow & arrow first gets PULLED OUT — a 5 px outward slide — before
     /// it releases and flies home.
     private func beginCatch() {
+        Self.log.info("catch: CAUGHT — flying home (style=\(style.rawValue, privacy: .public))")
         phase = .flying
         jitter = .zero
         if style == .bowArrow {
@@ -373,6 +387,7 @@ struct CatchModeView: View {
 
     /// Step 5 — the bloom. opened_at is set here: felt means felt.
     private func reveal() {
+        Self.log.info("catch: REVEALED — marking felt (opened_at)")
         phase = .revealed
         onRevealed()
         HapticEngine.reveal()                          // success, as it blooms

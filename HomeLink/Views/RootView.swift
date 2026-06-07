@@ -113,24 +113,36 @@ struct RootView: View {
 
     /// pointward.app/pair/POINT-GP2S → confirmation sheet with the code filled in.
     private func handleIncomingURL(_ url: URL) {
+        rootLog.info("deeplink: incoming URL \(url.absoluteString, privacy: .public)")
         let parts = url.pathComponents.filter { $0 != "/" }
         guard parts.count >= 2,
-              ["pair", "join"].contains(parts[0].lowercased()) else { return }
+              ["pair", "join"].contains(parts[0].lowercased()) else {
+            rootLog.warning("deeplink: not a pair/join link — ignored")
+            return
+        }
         let code = SupabaseService.normalizePairingCode(parts[1])
-        guard code.count == 10 else { return }
+        guard SupabaseService.isValidPairingCode(code) else {
+            rootLog.warning("deeplink: malformed code '\(parts[1], privacy: .public)' — ignored")
+            return
+        }
+        rootLog.info("deeplink: pair request for \(code, privacy: .public)")
         pairRequest = PairRequest(code: code)
     }
 
     /// Phase 2: discover pairings, stamp presence, and open the single
     /// consolidated realtime channel. No-op when signed out.
     private func startRealtimePings() {
-        guard SupabaseService.localUserID != nil else { return }
+        guard SupabaseService.localUserID != nil else {
+            rootLog.info("realtime: skipped — not signed in")
+            return
+        }
         Task { await SupabaseService.shared.touchLastSeen() }   // "active recently"
         Task {
             // Discover connections made from either side and bind them to
             // the correct person cards (owner_person_id when known).
             var partner = SupabaseService.connectedFriendID
-            if let connections = try? await SupabaseService.shared.refreshConnections() {
+            do {
+                let connections = try await SupabaseService.shared.refreshConnections()
                 await MainActor.run {
                     for connection in connections {
                         people.bindConnection(friendID: connection.partnerID,
@@ -138,6 +150,10 @@ struct RootView: View {
                     }
                 }
                 partner = connections.first?.partnerID ?? partner
+            } catch {
+                // Offline at launch — realtime still opens (it reconnects);
+                // bindings refresh on the next foreground.
+                rootLog.error("realtime: connection discovery failed: \(error.localizedDescription, privacy: .public)")
             }
 
             await SupabaseService.shared.startRealtime(
