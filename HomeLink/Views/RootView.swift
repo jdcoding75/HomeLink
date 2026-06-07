@@ -371,18 +371,17 @@ struct MainTabView: View {
                 }
                 .tag(0)
 
-            // Thoughts before People — daily action before setup/management
-            PingView()
-                .tabItem {
-                    Label("thoughts", systemImage: "paperplane")
-                }
-                .tag(1)
+            // Thoughts tab retired — sending lives ON the compass now
+            // PingView()
+            //     .tabItem {
+            //         Label("thoughts", systemImage: "paperplane")
+            //     }
 
             PeopleListView(geocodingService: geocodingService)
                 .tabItem {
                     Label("people", systemImage: "person.2")
                 }
-                .tag(2)
+                .tag(1)
 
             // Skin selection lives in Settings → compass only
             // SkinPickerView()
@@ -394,17 +393,17 @@ struct MainTabView: View {
                 .tabItem {
                     Label("settings", systemImage: "gearshape")
                 }
-                .tag(3)
+                .tag(2)
         }
         .tint(DesignTokens.Color.accentSoft)
         .preferredColorScheme(.dark)
         // The "✦ Pro" badge on the compass jumps here
         .onReceive(NotificationCenter.default.publisher(for: .pointwardOpenSettings)) { _ in
-            selectedTab = 3
+            selectedTab = 2
         }
-        // The compass send-pill opens the thoughts drawer
-        .onReceive(NotificationCenter.default.publisher(for: .pointwardOpenThoughts)) { _ in
-            selectedTab = 1
-        }
+        // (thoughts tab retired — the pill/notification path is gone)
+        // .onReceive(NotificationCenter.default.publisher(for: .pointwardOpenThoughts)) { _ in
+        //     selectedTab = 1
+        // }
     }
 }

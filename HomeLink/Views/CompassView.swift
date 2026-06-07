@@ -16,6 +16,7 @@
 
 import SwiftUI
 import CoreLocation
+import Combine
 
 struct CompassView: View {
 
@@ -85,6 +86,25 @@ struct CompassView: View {
     @State private var showSkinPaywall = false
     // (subscription env object already declared at the top)
 
+    // ── Send a thought — merged onto the compass (thoughts tab retired) ──
+    @ObservedObject private var customStore = CustomThoughtStore.shared
+    @AppStorage("holdToSendEnabled") private var holdToSendEnabled = false
+    @State private var personalSixRow: [String] = PersonalSet.load()
+    @State private var selectedToken: String? = nil
+    @State private var flightToken: String? = nil
+    @State private var flightFly = false
+    @State private var holdProgress: Double = 0
+    private let holdDuration = 2.0
+    private let holdTick = Timer.publish(every: 0.05, on: .main, in: .common).autoconnect()
+
+    private var holdToSendActive: Bool {
+        holdToSendEnabled && subscription.tier != .free
+    }
+    private var sendAlignDiff: Double {
+        let bearing = compass.state.bearingDegrees
+        return min(bearing, 360 - bearing)
+    }
+
     var body: some View {
         ZStack {
             // ── Background ──────────────────────────────────────────────────
@@ -140,19 +160,73 @@ struct CompassView: View {
 
                     Spacer(minLength: 12)
 
-                    // ── BOTTOM ZONE: distance · funny · tagline · send pill ───
+                    // ── BOTTOM ZONE: distance · funny · tagline · emojis ──────
                     bottomZone
                         .padding(.top, 24)
 
-                    sendPill
+                    // The six, always visible — sending lives right here
+                    emojiRow
                         .padding(.top, 16)
-                        .padding(.bottom, 16)
+
+                    sendControl
+                        .padding(.top, 10)
+                        .padding(.bottom, 12)
+
+                    // (send pill retired — the row replaced it; view kept)
+                    // sendPill
 
                     // (lock badge + always-on bearing readout retired from the
                     //  layout — bearing now appears on face tap; views kept)
                     // lockBadge
                     // bearingReadout
                 }
+            }
+
+            // ── The flight — the sent emoji crosses the screen in the
+            // real compass direction ──────────────────────────────────────────
+            if let token = flightToken {
+                let rad  = compass.state.bearingDegrees * .pi / 180
+                let edge = CGSize(width: CGFloat(sin(rad)) * 430,
+                                  height: -CGFloat(cos(rad)) * 430)
+
+                ForEach(0..<4, id: \.self) { i in
+                    sendSymbol(token, size: 13)
+                        .opacity(flightFly ? 0 : 0.65 - Double(i) * 0.14)
+                        .offset(flightFly ? edge : .zero)
+                        .animation(.easeIn(duration: 1.1).delay(0.10 + Double(i) * 0.08),
+                                   value: flightFly)
+                }
+                sendSymbol(token, size: 30)
+                    .scaleEffect(flightFly ? 1.7 : 0.7)
+                    .opacity(flightFly ? 0 : 1)
+                    .offset(flightFly ? edge : .zero)
+                    .animation(.easeIn(duration: 1.2).delay(0.05), value: flightFly)
+                    .shadow(color: Color(hex: "#9b7fc0").opacity(0.8), radius: 12)
+                    .allowsHitTesting(false)
+            }
+
+            // ── Felt receipt — "[name] felt your thought ✓" ───────────────────
+            if let notice = pings.feltNotice {
+                VStack {
+                    HStack(spacing: 6) {
+                        Image(systemName: "heart.fill")
+                            .font(.system(size: 10))
+                        Text(notice)
+                            .font(.system(size: 12, design: .serif).italic())
+                    }
+                    .foregroundColor(Color(hex: "#5dcaa5"))
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 8)
+                    .background(
+                        Capsule()
+                            .fill(DesignTokens.Color.background.opacity(0.85))
+                            .overlay(Capsule().stroke(Color(hex: "#5dcaa5").opacity(0.35), lineWidth: 1))
+                    )
+                    .padding(.top, 64)
+                    Spacer()
+                }
+                .transition(.opacity.combined(with: .move(edge: .top)))
+                .animation(.easeInOut(duration: 0.4), value: pings.feltNotice)
             }
 
             // ── Thought queue badge — pro mode only (core mode
@@ -341,6 +415,23 @@ struct CompassView: View {
         }
         .onChange(of: compass.state.isLocked)        { _, locked in handleLock(locked) }
         .sheet(isPresented: $showSkinPaywall) { PaywallView() }
+        // Hold to Send (Pro, opt-in): the ring fills while aligned within 15°
+        .onReceive(holdTick) { _ in
+            guard holdToSendActive, let token = selectedToken, flightToken == nil else {
+                if holdProgress > 0 { holdProgress = 0 }
+                return
+            }
+            if sendAlignDiff <= 15 {
+                holdProgress += 0.05 / holdDuration
+                if holdProgress >= 1.0 {
+                    holdProgress = 0
+                    HapticEngine.thoughtLaunched()
+                    sendThought(token)
+                }
+            } else if holdProgress > 0 {
+                withAnimation(.easeOut(duration: 0.3)) { holdProgress = 0 }
+            }
+        }
         .onChange(of: compass.state.personID)        { _, _      in handlePersonChange() }
         .onChange(of: pings.queue.isEmpty)           { _, empty  in
             withAnimation(AnimationSystem.pingGlow) { pingRingActive = !empty }
@@ -613,6 +704,149 @@ struct CompassView: View {
     private var hasCustomTagline: Bool {
         guard let t = compass.state.tagline else { return false }
         return !t.trimmingCharacters(in: .whitespaces).isEmpty
+    }
+
+    // MARK: - Send a thought (merged from the thoughts tab)
+
+    /// Free users carry the core six; Pro users their curated set.
+    private var rowTokens: [String] {
+        subscription.tier == .free ? PersonalSet.coreDefault : personalSixRow
+    }
+
+    /// The six, always visible in soft cards. Selection glows and stays.
+    private var emojiRow: some View {
+        HStack(spacing: 10) {
+            ForEach(rowTokens, id: \.self) { token in
+                let isSelected = selectedToken == token
+                Button {
+                    HapticEngine.personSelected()
+                    withAnimation(.spring(response: 0.32, dampingFraction: 0.6)) {
+                        selectedToken = isSelected ? nil : token
+                    }
+                } label: {
+                    sendSymbol(token, size: 26)
+                        .frame(width: 50, height: 50)
+                        .background(DesignTokens.Color.backgroundCard.opacity(isSelected ? 1 : 0.7))
+                        .cornerRadius(15)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 15)
+                                .stroke(isSelected ? DesignTokens.Color.accentMid
+                                                   : DesignTokens.Color.border.opacity(0.6),
+                                        lineWidth: 1)
+                        )
+                        .shadow(color: Color(hex: "#c4a8d4").opacity(isSelected ? 0.55 : 0),
+                                radius: 10)
+                        .scaleEffect(isSelected ? 1.1 : 1.0)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .onAppear { personalSixRow = PersonalSet.load() }
+    }
+
+    /// Below the row: tap-send button, or the hold ring (Pro opt-in).
+    @ViewBuilder
+    private var sendControl: some View {
+        if let token = selectedToken, flightToken == nil {
+            if holdToSendActive {
+                VStack(spacing: 5) {
+                    ZStack {
+                        Circle()
+                            .stroke(DesignTokens.Color.borderMid, lineWidth: 3)
+                            .frame(width: 40, height: 40)
+                        Circle()
+                            .trim(from: 0, to: holdProgress)
+                            .stroke(Color(hex: "#e0ccee"),
+                                    style: StrokeStyle(lineWidth: 3, lineCap: .round))
+                            .frame(width: 40, height: 40)
+                            .rotationEffect(.degrees(-90))
+                    }
+                    Text(sendAlignDiff <= 15
+                         ? "hold toward \(compass.state.personName)"
+                         : "point toward \(compass.state.personName) first")
+                        .font(.system(size: 11, design: .serif).italic())
+                        .foregroundColor(sendAlignDiff <= 15
+                                         ? Color(hex: "#e0ccee")
+                                         : DesignTokens.Color.textMuted)
+                }
+                .transition(.opacity)
+            } else {
+                Button {
+                    sendThought(token)
+                } label: {
+                    Text("send →")
+                        .font(DesignTokens.Font.label)
+                        .foregroundColor(DesignTokens.Color.textPrimary)
+                        .padding(.horizontal, 32)
+                        .padding(.vertical, 10)
+                        .background(DesignTokens.Color.accentStrong)
+                        .cornerRadius(DesignTokens.Radius.button)
+                        .shadow(color: Color(hex: "#9b7fc0").opacity(0.4), radius: 8)
+                }
+                .transition(.opacity.combined(with: .move(edge: .bottom)))
+            }
+        } else {
+            // Keeps the layout from jumping when nothing is selected
+            Color.clear.frame(height: 1)
+        }
+    }
+
+    /// Renders an emoji token, the gecko, or a custom thought's emoji.
+    @ViewBuilder
+    private func sendSymbol(_ token: String, size: CGFloat) -> some View {
+        if token == "gecko" {
+            LeopardGeckoView(size: size * 1.2)
+        } else if token.hasPrefix("yours:"),
+                  let id = UUID(uuidString: String(token.dropFirst(6))),
+                  let thought = customStore.thought(id: id) {
+            Text(thought.emoji).font(.system(size: size))
+        } else {
+            Text(token).font(.system(size: size))
+        }
+    }
+
+    private func sendRemoteEmoji(for token: String) -> String {
+        if token == "gecko" { return "🦎" }
+        if token.hasPrefix("yours:"),
+           let id = UUID(uuidString: String(token.dropFirst(6))),
+           let thought = customStore.thought(id: id) {
+            return thought.emoji
+        }
+        return token
+    }
+
+    private func playSendSound(_ token: String) {
+        if token.hasPrefix("yours:"),
+           let id = UUID(uuidString: String(token.dropFirst(6))),
+           let thought = customStore.thought(id: id) {
+            customStore.play(thought)
+        } else {
+            SoundEngine.shared.play(for: token)
+        }
+    }
+
+    /// The send: flight in the real compass direction, sound, clear.
+    private func sendThought(_ token: String) {
+        withAnimation(.easeOut(duration: 0.25)) { selectedToken = nil }
+        flightToken = token
+        flightFly = false
+        HapticEngine.thoughtReleased()
+
+        // Real delivery when paired
+        if let friend = SupabaseService.connectedFriendID {
+            let emoji = sendRemoteEmoji(for: token)
+            Task { try? await SupabaseService.shared.sendPing(to: friend, emoji: emoji) }
+        }
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) {
+            playSendSound(token)
+            HapticEngine.thoughtLaunched()
+            flightFly = true
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.6) {
+            flightToken = nil
+            flightFly = false
+        }
     }
 
     // MARK: - Compass face
