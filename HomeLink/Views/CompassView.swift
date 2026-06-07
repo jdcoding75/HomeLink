@@ -75,6 +75,16 @@ struct CompassView: View {
     @State private var showShareMoment = false
     @State private var shareCard: Image? = nil
 
+    // Bottom-zone distance line: 0 standard · 1 funny (Pro) · 2 light speed
+    @State private var distanceMode = 0
+
+    // Face interactions — tap pulse + brief bearing readout, long-press skins
+    @State private var faceTapPulse = false
+    @State private var bearingFlash = false
+    @State private var showSkinOverlay = false
+    @State private var showSkinPaywall = false
+    // (subscription env object already declared at the top)
+
     var body: some View {
         ZStack {
             // ── Background ──────────────────────────────────────────────────
@@ -88,16 +98,15 @@ struct CompassView: View {
                 emptyState
             } else {
                 VStack(spacing: 0) {
-                    Spacer(minLength: 0)
+                    // ── TOP ZONE: the name — largest text on screen ───────────
+                    nameHeader
+                        .padding(.top, 16)
 
-                    // ── Person header ────────────────────────────────────────
-                    personHeader
-                        .padding(.bottom, 4)
+                    Spacer(minLength: 12)
 
-                    // ── Compass face — the hero of the screen ────────────────
+                    // ── MIDDLE ZONE: the compass, dominant, nothing on it ─────
                     // Skins render at a fixed 240pt design size; scale the whole
-                    // composition so every face grows together. 370pt — near
-                    // edge-to-edge, matching the Send a Thought immersion.
+                    // composition so every face grows together.
                     compassFace
                         .frame(width: 240, height: 240)
                         .scaleEffect(370.0 / 240.0)
@@ -111,15 +120,38 @@ struct CompassView: View {
                                 .blur(radius: 42)
                                 .allowsHitTesting(false)
                         )
+                        // Tap: alive — pulse, brief bearing readout, soft haptic
+                        .scaleEffect(faceTapPulse ? 1.015 : 1.0)
+                        .overlay(
+                            Text("\(Int(compass.state.bearingDegrees.rounded()))°")
+                                .font(.system(size: 22, weight: .light))
+                                .foregroundColor(DesignTokens.Color.textSecondary.opacity(0.9))
+                                .monospacedDigit()
+                                .offset(y: -52)
+                                .opacity(bearingFlash ? 1 : 0)
+                                .allowsHitTesting(false)
+                        )
+                        .contentShape(Circle())
+                        .onTapGesture { tapFace() }
+                        .onLongPressGesture(minimumDuration: 0.45) {
+                            HapticEngine.personSelected()
+                            withAnimation(.easeOut(duration: 0.3)) { showSkinOverlay = true }
+                        }
 
-                    // ── Lock badge ───────────────────────────────────────────
-                    lockBadge
-                        .padding(.top, 2)
+                    Spacer(minLength: 12)
 
-                    // ── Bearing readout ──────────────────────────────────────
-                    bearingReadout
+                    // ── BOTTOM ZONE: distance · funny · tagline · send pill ───
+                    bottomZone
+                        .padding(.top, 24)
 
-                    Spacer(minLength: 0)
+                    sendPill
+                        .padding(.top, 16)
+                        .padding(.bottom, 16)
+
+                    // (lock badge + always-on bearing readout retired from the
+                    //  layout — bearing now appears on face tap; views kept)
+                    // lockBadge
+                    // bearingReadout
                 }
             }
 
@@ -253,13 +285,29 @@ struct CompassView: View {
             if showDiscoveryHint {
                 VStack {
                     Spacer()
-                    Text("tap the words to change them")
+                    Text("tap the words to explore")
                         .font(.system(size: 12, design: .serif).italic())
                         .foregroundColor(DesignTokens.Color.accentMid.opacity(0.8))
                         .padding(.bottom, 18)
                 }
                 .allowsHitTesting(false)
                 .transition(.opacity)
+            }
+
+            // ── Skin picker — long-press the face, switch right here ──────────
+            if showSkinOverlay {
+                SkinQuickPicker(
+                    isPro: subscription.tier != .free,
+                    onLockedTap: {
+                        showSkinOverlay = false
+                        showSkinPaywall = true
+                    },
+                    onDismiss: {
+                        withAnimation(.easeOut(duration: 0.25)) { showSkinOverlay = false }
+                    }
+                )
+                .transition(.opacity)
+                .zIndex(5)
             }
 
             // ── Pointing toast retired — ambient presence glow replaced it ────
@@ -292,6 +340,7 @@ struct CompassView: View {
             }
         }
         .onChange(of: compass.state.isLocked)        { _, locked in handleLock(locked) }
+        .sheet(isPresented: $showSkinPaywall) { PaywallView() }
         .onChange(of: compass.state.personID)        { _, _      in handlePersonChange() }
         .onChange(of: pings.queue.isEmpty)           { _, empty  in
             withAnimation(AnimationSystem.pingGlow) { pingRingActive = !empty }
@@ -400,50 +449,72 @@ struct CompassView: View {
 
     // MARK: - Person header
 
-    private var personHeader: some View {
-        VStack(spacing: 4) {
-            // Warm Editorial: refined overline with generous tracking
-            Text("pointing toward")
-                .font(.system(size: 11, weight: .medium))
-                .kerning(2.5)
-                .foregroundColor(DesignTokens.Color.textMuted)
+    // ── TOP ZONE ──────────────────────────────────────────────────────────
 
-            // The name — a dedication in a book. Serif, larger, crossfades.
-            // Tap to switch who you point toward (hidden with one person).
-            HStack(spacing: 6) {
-                Text(compass.state.personName)
-                    .font(.system(size: 30, weight: .semibold, design: .serif))
-                    .foregroundColor(DesignTokens.Color.textPrimary)
+    /// The name — largest text on screen, a dedication in a book.
+    /// ✦ marks it tappable when there's more than one person.
+    private var nameHeader: some View {
+        HStack(spacing: 7) {
+            Text(compass.state.personName)
+                .font(.system(size: 34, weight: .semibold, design: .serif))
+                .foregroundColor(DesignTokens.Color.textPrimary)
+                .contentTransition(.opacity)
+                .animation(.easeInOut(duration: 0.35), value: compass.state.personName)
+            if people.people.count > 1 {
+                Text("✦")
+                    .font(.system(size: 11))
+                    .foregroundColor(DesignTokens.Color.accentMid.opacity(0.7))
+            }
+        }
+        .onTapGesture {
+            guard people.people.count > 1 else { return }
+            HapticEngine.personSelected()
+            showPersonSwitcher = true
+        }
+        .sheet(isPresented: $showPersonSwitcher) {
+            PersonSwitcherSheet()
+                .presentationDetents([.height(min(420, CGFloat(people.people.count) * 64 + 90))])
+                .presentationDragIndicator(.visible)
+        }
+    }
+
+    // ── BOTTOM ZONE ───────────────────────────────────────────────────────
+
+    /// The mode line 1 cycles through: standard → funny (Pro) → light speed.
+    private var distanceLineText: String {
+        switch distanceMode {
+        case 1:  return DistanceFun.funnyText(km: compass.state.distanceKm, index: funnyIndex)
+        case 2:  return DistanceFun.lightSpeedText(km: compass.state.distanceKm)
+        default: return compass.state.formattedDistance
+        }
+    }
+
+    private var bottomZone: some View {
+        VStack(spacing: 12) {
+            // Line 1 — distance, tap cycles units with a crossfade
+            HStack(spacing: 5) {
+                Text(distanceLineText)
+                    .font(.system(size: 15, weight: .light))
+                    .foregroundColor(DesignTokens.Color.textSecondary)
+                    .monospacedDigit()
                     .contentTransition(.opacity)
-                    .animation(.easeInOut(duration: 0.35), value: compass.state.personName)
-                if people.people.count > 1 {
-                    Image(systemName: "chevron.down")
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundColor(DesignTokens.Color.accentMid.opacity(0.7))
-                }
+                Text("✦")
+                    .font(.system(size: 8))
+                    .foregroundColor(DesignTokens.Color.textDim.opacity(0.7))
             }
             .onTapGesture {
-                guard people.people.count > 1 else { return }
                 HapticEngine.personSelected()
-                showPersonSwitcher = true
-            }
-            .sheet(isPresented: $showPersonSwitcher) {
-                PersonSwitcherSheet()
-                    .presentationDetents([.height(min(420, CGFloat(people.people.count) * 64 + 90))])
-                    .presentationDragIndicator(.visible)
+                withAnimation(.easeInOut(duration: 0.3)) {
+                    // Free users skip the funny mode
+                    let next = (distanceMode + 1) % 3
+                    distanceMode = (next == 1 && !proOn) ? 2 : next
+                }
             }
 
-            // CORE distance: one clean muted line — "88 mi · 142 km"
-            Text(compass.state.formattedDistance)
-                .font(.system(size: 15, weight: .light))
-                .foregroundColor(DesignTokens.Color.textSecondary)
-                .monospacedDigit()
-
-            // PRO: the distance playground — random unit per launch,
-            // tap cycles through all seven (hidden in core mode)
-            if proOn {
+            // Line 2 — funny unit cycler (Pro, while the funny mode is up)
+            if proOn && distanceMode == 1 {
                 HStack(spacing: 5) {
-                    Text(DistanceFun.funnyText(km: compass.state.distanceKm, index: funnyIndex))
+                    Text("unit: \(DistanceFun.funnyLabels[funnyIndex])")
                         .font(.system(size: 12))
                         .foregroundColor(DesignTokens.Color.textMuted)
                         .contentTransition(.opacity)
@@ -451,6 +522,7 @@ struct CompassView: View {
                         .font(.system(size: 7))
                         .foregroundColor(DesignTokens.Color.textDim.opacity(0.7))
                 }
+                .transition(.opacity)
                 .onTapGesture {
                     HapticEngine.personSelected()
                     withAnimation(.easeInOut(duration: 0.25)) {
@@ -459,17 +531,7 @@ struct CompassView: View {
                 }
             }
 
-            // (Light-speed line retired from core — kept for possible return:)
-            // if showLightSpeed {
-            //     Text(DistanceFun.lightSpeedText(km: compass.state.distanceKm))
-            //         .font(.system(size: 11))
-            //         .foregroundColor(DesignTokens.Color.textDim)
-            //         .monospacedDigit()
-            //         .onTapGesture { withAnimation { showLightSpeed = false } }
-            // }
-
-            // The ONE tagline — the emotional anchor. Tap to cycle through
-            // the library with a crossfade; never repeats until all shown.
+            // Line 3 — the poetic tagline, never repeats until all shown
             HStack(spacing: 5) {
                 Text(TaglineSystem.poeticLibrary[taglineIndex])
                     .font(.system(size: 13, design: .serif).italic())
@@ -478,7 +540,6 @@ struct CompassView: View {
                     .font(.system(size: 8))
                     .foregroundColor(DesignTokens.Color.accentMid.opacity(0.55))
             }
-            .padding(.top, 1)
             .contentTransition(.opacity)
             .onTapGesture {
                 HapticEngine.personSelected()
@@ -492,25 +553,59 @@ struct CompassView: View {
                 }
             }
 
-            // ONE tagline only — the per-person custom tagline line is
-            // retired from this screen (kept below for reference).
-            // Group {
-            //     if hasCustomTagline {
-            //         Text(compass.state.resolvedTagline)
-            //             .font(.system(size: 15, design: .serif).italic())
-            //             .foregroundColor(DesignTokens.Color.accentMid)
-            //             .multilineTextAlignment(.center)
-            //             .padding(.horizontal, DesignTokens.Spacing.xl)
-            //             .id(taglineKey)
-            //     } else
             if compass.state.isFarFromHome {
                 Text("across the distance")
                     .font(.system(size: 12, design: .serif).italic())
                     .foregroundColor(Color(hex: "#c4845a"))
                     .transition(.opacity)
-                    .padding(.top, 2)
                     .animation(.easeInOut(duration: 0.45), value: compass.state.isFarFromHome)
             }
+        }
+        .animation(.easeInOut(duration: 0.3), value: distanceMode)
+    }
+
+    /// Line 4 — the thin pill that opens the emoji drawer (thoughts tab).
+    private var sendPill: some View {
+        Button {
+            HapticEngine.personSelected()
+            NotificationCenter.default.post(name: .pointwardOpenThoughts, object: nil)
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: "chevron.up")
+                    .font(.system(size: 10, weight: .medium))
+                Text("send a thought")
+                    .font(.system(size: 13, design: .serif).italic())
+            }
+            .foregroundColor(DesignTokens.Color.accentSoft)
+            .padding(.horizontal, 22)
+            .padding(.vertical, 9)
+            .background(
+                Capsule()
+                    .fill(DesignTokens.Color.backgroundLift.opacity(0.9))
+                    .overlay(Capsule().stroke(DesignTokens.Color.border, lineWidth: 1))
+            )
+        }
+        // Swipe up on the pill also opens the drawer
+        .gesture(
+            DragGesture(minimumDistance: 18)
+                .onEnded { value in
+                    if value.translation.height < -18 {
+                        NotificationCenter.default.post(name: .pointwardOpenThoughts, object: nil)
+                    }
+                }
+        )
+    }
+
+    /// Tap the face: it answers — pulse, brief bearing readout, soft haptic.
+    private func tapFace() {
+        HapticEngine.personSelected()
+        withAnimation(.spring(response: 0.35, dampingFraction: 0.55)) { faceTapPulse = true }
+        withAnimation(.easeIn(duration: 0.3)) { bearingFlash = true }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+            withAnimation(.easeOut(duration: 0.4)) { faceTapPulse = false }
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+            withAnimation(.easeOut(duration: 0.6)) { bearingFlash = false }
         }
     }
 
@@ -770,6 +865,98 @@ struct CompassView: View {
 extension Notification.Name {
     /// Posted by the "✦ Pro" badge — MainTabView jumps to Settings.
     static let pointwardOpenSettings = Notification.Name("pointwardOpenSettings")
+    /// Posted by the send-a-thought pill — MainTabView jumps to Thoughts.
+    static let pointwardOpenThoughts = Notification.Name("pointwardOpenThoughts")
+}
+
+// MARK: - SkinQuickPicker
+
+/// Long-press the compass face → switch skins right here, no Settings trip.
+struct SkinQuickPicker: View {
+
+    let isPro: Bool
+    let onLockedTap: () -> Void
+    let onDismiss: () -> Void
+
+    @EnvironmentObject var skinStore: SkinStore
+
+    private static let lavender = Color(hex: "#c4a8d4")
+
+    var body: some View {
+        ZStack {
+            Color.black.opacity(0.55)
+                .ignoresSafeArea()
+                .onTapGesture { onDismiss() }
+
+            VStack(spacing: 16) {
+                Text("compass skin")
+                    .font(.system(size: 15, design: .serif).italic())
+                    .foregroundColor(DesignTokens.Color.textMuted)
+
+                HStack(spacing: 14) {
+                    card(.minimal, locked: false)
+                    card(.vintage, locked: !isPro)
+                    card(.heart,   locked: !isPro)
+                }
+            }
+            .padding(22)
+            .background(DesignTokens.Color.backgroundCard)
+            .cornerRadius(22)
+            .overlay(
+                RoundedRectangle(cornerRadius: 22)
+                    .stroke(DesignTokens.Color.borderMid, lineWidth: 1)
+            )
+            .shadow(color: Color(hex: "#9b7fc0").opacity(0.3), radius: 24)
+            .padding(.horizontal, 36)
+        }
+    }
+
+    private func card(_ skin: CompassSkin, locked: Bool) -> some View {
+        let isActive = skinStore.activeSkin == skin
+        return Button {
+            if locked {
+                HapticEngine.paywallReached()
+                onLockedTap()
+            } else {
+                skinStore.activeSkin = skin
+                HapticEngine.skinSelected()
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { onDismiss() }
+            }
+        } label: {
+            VStack(spacing: 7) {
+                ZStack {
+                    Circle()
+                        .stroke(isActive ? Self.lavender : DesignTokens.Color.borderMid,
+                                lineWidth: isActive ? 2 : 1)
+                        .frame(width: 56, height: 56)
+                    if locked {
+                        Image(systemName: "lock.fill")
+                            .font(.system(size: 15))
+                            .foregroundColor(Self.lavender.opacity(0.8))
+                    } else {
+                        Image(systemName: "location.north.fill")
+                            .font(.system(size: 18))
+                            .foregroundColor(isActive ? Self.lavender : DesignTokens.Color.textDim)
+                    }
+                    if isActive {
+                        VStack { HStack { Spacer()
+                            Image(systemName: "checkmark.circle.fill")
+                                .font(.system(size: 14))
+                                .foregroundColor(Self.lavender)
+                        }; Spacer() }
+                        .frame(width: 62, height: 62)
+                    }
+                }
+                .shadow(color: isActive ? Self.lavender.opacity(0.55) : .clear, radius: 9)
+                Text(skin.displayName)
+                    .font(.system(size: 11))
+                    .foregroundColor(isActive ? DesignTokens.Color.textPrimary
+                                              : DesignTokens.Color.textMuted)
+            }
+            .frame(width: 76)
+        }
+        .buttonStyle(.plain)
+    }
 }
 
 // MARK: - PersonSwitcherSheet

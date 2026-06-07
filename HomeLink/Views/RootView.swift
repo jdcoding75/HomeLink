@@ -402,5 +402,9 @@ struct MainTabView: View {
         .onReceive(NotificationCenter.default.publisher(for: .pointwardOpenSettings)) { _ in
             selectedTab = 3
         }
+        // The compass send-pill opens the thoughts drawer
+        .onReceive(NotificationCenter.default.publisher(for: .pointwardOpenThoughts)) { _ in
+            selectedTab = 1
+        }
     }
 }
