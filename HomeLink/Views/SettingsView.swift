@@ -10,6 +10,7 @@ struct SettingsView: View {
 
     @EnvironmentObject var subscription: SubscriptionManager
     @EnvironmentObject var skinStore:    SkinStore
+    @EnvironmentObject var instrumentStore: InstrumentStore
 
     @AppStorage("quietMode")      private var quietMode      = false
     @AppStorage("hapticsEnabled") private var hapticsEnabled = true
@@ -99,9 +100,12 @@ struct SettingsView: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("✦ Pro Features")
                         .settingsLabel()
-                    Text(subscription.tier == .free
-                         ? "free · custom emojis, skins, and more"
-                         : (proFeatures ? "✦ active" : "pro · switched off"))
+                    // The current instrument at a glance —
+                    // "🏹 bow & arrow · pro active" / "🧭 compass · free"
+                    Text("\(instrumentStore.selected.icon) \(instrumentStore.selected.displayName) · "
+                         + (subscription.tier == .free
+                            ? "free"
+                            : (proFeatures ? "pro active" : "pro · switched off")))
                         .font(.system(size: 11))
                         .foregroundColor(subscription.tier != .free && proFeatures
                                          ? Color(hex: "#5dcaa5")
@@ -119,6 +123,7 @@ struct SettingsView: View {
             ProSetupView()
                 .environmentObject(subscription)
                 .environmentObject(skinStore)
+                .environmentObject(instrumentStore)
         }
     }
 

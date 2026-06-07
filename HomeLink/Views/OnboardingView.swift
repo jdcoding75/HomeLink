@@ -2,8 +2,8 @@
 // Pointward › Views
 //
 // The opening — six screens that feel like unwrapping something precious,
-// not filling out a form. Hero compass → the concept → send a thought →
-// Pro teaser → giving back → set your compass. Under 60 seconds.
+// not filling out a form. Hero → the four instruments → the flick mechanic →
+// Pro teaser (the bow) → giving back → set your compass. Under 60 seconds.
 //
 // (The previous single-flow ritual onboarding lives in git history.)
 //
@@ -12,6 +12,7 @@
 import SwiftUI
 import CoreLocation
 import UserNotifications
+import ContactsUI
 
 struct OnboardingView: View {
 
@@ -39,6 +40,7 @@ struct OnboardingView: View {
 
     private let locationManager = CLLocationManager()
     @State private var notificationsRequested = false
+    @State private var showContactPicker = false
 
     private static let lavender = Color(hex: "#c4a8d4")
     private static let glow     = Color(hex: "#9b7fc0")
@@ -60,7 +62,7 @@ struct OnboardingView: View {
                 VStack(spacing: 0) {
                     TabView(selection: $page) {
                         heroScreen.tag(0)
-                        compassScreen.tag(1)
+                        instrumentsScreen.tag(1)   // (was compassScreen — kept below)
                         thoughtScreen.tag(2)
                         proScreen.tag(3)
                         givingScreen.tag(4)
@@ -94,6 +96,36 @@ struct OnboardingView: View {
         }
         .animation(.easeInOut(duration: 0.5), value: showCompletion)
         .preferredColorScheme(.dark)
+        .sheet(isPresented: $showContactPicker) {
+            ContactPickerView { contact in
+                applyContact(contact)
+            }
+            .ignoresSafeArea()
+        }
+    }
+
+    // MARK: - Contacts (same behavior as AddPersonView)
+
+    private func applyContact(_ contact: CNContact) {
+        let nickname = contact.nickname.trimmingCharacters(in: .whitespaces)
+        let given    = contact.givenName.trimmingCharacters(in: .whitespaces)
+        let family   = contact.familyName.trimmingCharacters(in: .whitespaces)
+        let resolved = !nickname.isEmpty ? nickname : (!given.isEmpty ? given : family)
+        if !resolved.isEmpty {
+            name = resolved
+        }
+        // Pre-fill and geocode their address so "set my compass" is one
+        // tap away when the contact card already knows where they live
+        if let postal = contact.postalAddresses.first?.value {
+            let formatted = CNPostalAddressFormatter.string(from: postal, style: .mailingAddress)
+                .replacingOccurrences(of: "\n", with: ", ")
+                .trimmingCharacters(in: .whitespaces)
+            if !formatted.isEmpty {
+                selectedAddressText = formatted   // don't re-trigger the suggestion search
+                addressText         = formatted
+                geocodeTypedAddress()
+            }
+        }
     }
 
     private var pageDots: some View {
@@ -145,11 +177,17 @@ struct OnboardingView: View {
                 .foregroundColor(DesignTokens.Color.textPrimary)
                 .padding(.top, 18)
 
-            Text("a compass for the people you love")
-                .font(.system(size: 15, design: .serif).italic())
-                .foregroundColor(Self.lavender)
-                .opacity(heroTagline ? 1 : 0)
-                .padding(.top, 6)
+            VStack(spacing: 3) {
+                Text("your emotional instrument")
+                    .font(.system(size: 15, design: .serif).italic())
+                    .foregroundColor(Self.lavender)
+                Text("point toward the people you love")
+                    .font(.system(size: 12, design: .serif).italic())
+                    .foregroundColor(Self.lavender.opacity(0.7))
+            }
+            .opacity(heroTagline ? 1 : 0)
+            .padding(.top, 6)
+            // (previous: "a compass for the people you love")
 
             Spacer()
 
@@ -186,7 +224,87 @@ struct OnboardingView: View {
         }
     }
 
-    // MARK: - Screen 2 · The compass
+    // MARK: - Screen 2 · The four instruments
+
+    @State private var carouselIndex = 0
+
+    private var instrumentsScreen: some View {
+        VStack(spacing: 0) {
+            Spacer()
+
+            // The carousel — each instrument takes the stage for 2 s,
+            // its mechanic playing in miniature beneath the icon
+            let instrument = Instrument.allCases[carouselIndex]
+            VStack(spacing: 16) {
+                Text(instrument.icon)
+                    .font(.system(size: 64))
+                    .shadow(color: Self.glow.opacity(0.5), radius: 16)
+
+                ZStack {
+                    RoundedRectangle(cornerRadius: 18)
+                        .fill(DesignTokens.Color.backgroundCard.opacity(0.7))
+                    InstrumentPreview(instrument: instrument)
+                        .clipShape(RoundedRectangle(cornerRadius: 18))
+                }
+                .frame(width: 170, height: 110)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 18)
+                        .stroke(DesignTokens.Color.border, lineWidth: 1)
+                )
+
+                VStack(spacing: 3) {
+                    Text(instrument.displayName)
+                        .font(.system(size: 17, weight: .semibold, design: .serif))
+                        .foregroundColor(DesignTokens.Color.textPrimary)
+                    Text(instrument.tagline)
+                        .font(.system(size: 12, design: .serif).italic())
+                        .foregroundColor(Self.lavender.opacity(0.85))
+                }
+            }
+            .id(carouselIndex)   // crossfade the whole stage per instrument
+            .transition(.opacity.combined(with: .scale(scale: 0.94)))
+            .frame(height: 270)
+
+            // Which instrument is on stage
+            HStack(spacing: 6) {
+                ForEach(0..<Instrument.allCases.count, id: \.self) { i in
+                    Circle()
+                        .fill(i == carouselIndex ? Self.lavender
+                                                 : DesignTokens.Color.borderMid)
+                        .frame(width: 5, height: 5)
+                }
+            }
+            .padding(.top, 10)
+
+            Text("four ways to send a feeling")
+                .font(.system(size: 26, weight: .semibold, design: .serif))
+                .foregroundColor(DesignTokens.Color.textPrimary)
+                .padding(.top, 26)
+
+            Text("each one a different experience")
+                .font(.system(size: 14, design: .serif).italic())
+                .foregroundColor(Self.lavender.opacity(0.85))
+                .padding(.top, 8)
+
+            Spacer()
+
+            nextButton
+        }
+        .onAppear { cycleInstruments() }
+    }
+
+    /// 2-second pause on each instrument, looping while the screen shows.
+    private func cycleInstruments() {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+            guard page == 1, !showCompletion else { return }
+            withAnimation(.easeInOut(duration: 0.35)) {
+                carouselIndex = (carouselIndex + 1) % Instrument.allCases.count
+            }
+            cycleInstruments()
+        }
+    }
+
+    // MARK: - Screen 2 (previous) · The compass — superseded, kept
 
     @State private var conceptRight: Double = 200
     @State private var conceptLocked = false
@@ -242,58 +360,69 @@ struct OnboardingView: View {
         }
     }
 
-    // MARK: - Screen 3 · Send a thought
+    // MARK: - Screen 3 · Send a thought (the flick — most visual mechanic)
 
-    @State private var thoughtFly = false
+    @State private var flickPressed = false
+    @State private var flickProgress: CGFloat = 0
 
     private var thoughtScreen: some View {
         VStack(spacing: 0) {
             Spacer()
 
+            // The flick, staged: 💜 waits in its pocket, gets pressed,
+            // then launches across the stage on a curve with a trail
             ZStack {
-                miniCompass(skin: .minimal, bearing: -30, size: 190)
+                let start   = CGSize(width: -60, height: 80)
+                let end     = CGSize(width: 120, height: -150)
+                let control = CGSize(width: 10, height: -190)
 
-                // 💜 shoots from center outward with a trail — the real thing
-                ForEach(0..<5, id: \.self) { i in
-                    Text("💜")
-                        .font(.system(size: 13))
-                        .opacity(thoughtFly ? 0 : 0.7 - Double(i) * 0.12)
-                        .offset(x: thoughtFly ? -95 : 0, y: thoughtFly ? -165 : 0)
-                        .animation(.easeIn(duration: 1.1).delay(0.12 + Double(i) * 0.08),
-                                   value: thoughtFly)
+                // The pocket — where the thought is loaded
+                Capsule()
+                    .fill(DesignTokens.Color.backgroundCard)
+                    .frame(width: 56, height: 22)
+                    .overlay(Capsule().stroke(DesignTokens.Color.borderMid, lineWidth: 1))
+                    .offset(x: start.width, y: start.height + 16)
+
+                // The fingertip beneath, pressing
+                Circle()
+                    .fill(Color(hex: "#ece4f5").opacity(0.6))
+                    .frame(width: 18, height: 18)
+                    .offset(x: start.width, y: start.height + (flickPressed ? 12 : 16))
+                    .animation(.easeInOut(duration: 0.25), value: flickPressed)
+
+                // Trail — soft lavender circles hanging on the path
+                ForEach(0..<6, id: \.self) { i in
+                    Circle()
+                        .fill(Self.lavender.opacity(0.35))
+                        .frame(width: 8, height: 8)
+                        .blur(radius: 2)
+                        .opacity(flickProgress > 0 ? 1 - Double(flickProgress) * 0.9 : 0)
+                        .modifier(CurvedFlightEffect(progress: flickProgress, start: start,
+                                                     control: control, end: end))
+                        .animation(AnimationSystem.easeOutCubic(0.9)
+                                    .delay(0.05 * Double(i + 1)), value: flickProgress)
                 }
+
+                // The thought itself
                 Text("💜")
-                    .font(.system(size: 26))
-                    .scaleEffect(thoughtFly ? 1.6 : 0.7)
-                    .opacity(thoughtFly ? 0 : 1)
-                    .offset(x: thoughtFly ? -110 : 0, y: thoughtFly ? -190 : 0)
-                    .animation(.easeIn(duration: 1.2).delay(0.05), value: thoughtFly)
+                    .font(.system(size: 30))
+                    .scaleEffect(flickPressed ? 0.82 : 1.0)
+                    .scaleEffect(1 + flickProgress * 0.5)   // grows as it travels
+                    .opacity(1 - Double(flickProgress) * 0.85)
                     .shadow(color: Self.glow.opacity(0.8), radius: 10)
+                    .modifier(CurvedFlightEffect(progress: flickProgress, start: start,
+                                                 control: control, end: end))
+                    .animation(.easeInOut(duration: 0.25), value: flickPressed)
+                    .animation(AnimationSystem.easeOutCubic(0.9), value: flickProgress)
             }
-            .frame(height: 230)
+            .frame(height: 250)
 
-            // The emoji row lives on the compass — show it that way
-            HStack(spacing: 8) {
-                ForEach(["❤️","💋","🤗","✨","🌸","🌙"], id: \.self) { e in
-                    Text(e)
-                        .font(.system(size: 17))
-                        .frame(width: 34, height: 34)
-                        .background(DesignTokens.Color.backgroundCard.opacity(0.7))
-                        .cornerRadius(10)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 10)
-                                .stroke(DesignTokens.Color.border.opacity(0.6), lineWidth: 1)
-                        )
-                }
-            }
-            .padding(.top, 14)
-
-            Text("send a thought from the compass")
+            Text("load · aim · launch")
                 .font(.system(size: 26, weight: .semibold, design: .serif))
                 .foregroundColor(DesignTokens.Color.textPrimary)
-                .padding(.top, 30)
+                .padding(.top, 26)
 
-            Text("no words needed · just point and send")
+            Text("pro instruments unlock new ways to send")
                 .font(.system(size: 14, design: .serif).italic())
                 .foregroundColor(Self.lavender.opacity(0.85))
                 .padding(.top, 8)
@@ -302,14 +431,19 @@ struct OnboardingView: View {
 
             nextButton
         }
-        .onAppear { loopThought() }
+        .onAppear { loopFlick() }
     }
 
-    private func loopThought() {
-        thoughtFly = false
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { thoughtFly = true }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
-            if page == 2 && !showCompletion { loopThought() }
+    private func loopFlick() {
+        var snap = Transaction(); snap.disablesAnimations = true
+        withTransaction(snap) { flickProgress = 0; flickPressed = false }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { flickPressed = true }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.1) {
+            flickPressed = false
+            flickProgress = 1
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3.2) {
+            if page == 2 && !showCompletion { loopFlick() }
         }
     }
 
@@ -319,6 +453,47 @@ struct OnboardingView: View {
         VStack(spacing: 0) {
             Spacer()
 
+            // The bow — drawn back, trembling, released. The most
+            // dramatic mechanic carries the Pro moment.
+            ZStack {
+                Circle()
+                    .fill(Self.glow.opacity(0.18))
+                    .frame(width: 240, height: 240)
+                    .blur(radius: 34)
+                InstrumentPreview(instrument: .bow)
+                    .frame(width: 220, height: 220)
+            }
+            .frame(height: 250)
+
+            // The other three wait in the wings
+            HStack(spacing: 14) {
+                ForEach(Instrument.allCases) { instrument in
+                    Text(instrument.icon)
+                        .font(.system(size: instrument == .bow ? 26 : 20))
+                        .opacity(instrument == .bow ? 1 : 0.6)
+                }
+            }
+            .padding(.top, 4)
+
+            Text("unlock all four instruments")
+                .font(.system(size: 26, weight: .semibold, design: .serif))
+                .foregroundColor(DesignTokens.Color.textPrimary)
+                .padding(.top, 26)
+
+            Text("$1.99 · one time · yours forever")
+                .font(.system(size: 14, design: .serif).italic())
+                .foregroundColor(Self.lavender.opacity(0.85))
+                .padding(.top, 8)
+
+            Spacer()
+
+            nextButton
+        }
+    }
+
+    // (previous Pro teaser — three compass skins — superseded, kept)
+    private var proScreenSkins: some View {
+        VStack(spacing: 0) {
             HStack(alignment: .center, spacing: 16) {
                 miniCompass(skin: .minimal, bearing: -22.5, size: 92)
                     .shadow(color: Self.glow.opacity(0.3), radius: 12)
@@ -327,21 +502,11 @@ struct OnboardingView: View {
                 miniCompass(skin: .heart, bearing: -22.5, size: 92)
                     .shadow(color: Self.glow.opacity(0.3), radius: 12)
             }
-
-            Text("and so much more with Pro")
-                .font(.system(size: 26, weight: .semibold, design: .serif))
-                .foregroundColor(DesignTokens.Color.textPrimary)
-                .padding(.top, 36)
-
             Text("funny distances · custom emojis ·\nhold to send · and the gecko 🦎")
                 .font(.system(size: 14, design: .serif).italic())
                 .foregroundColor(Self.lavender.opacity(0.85))
                 .multilineTextAlignment(.center)
                 .padding(.top, 8)
-
-            Spacer()
-
-            nextButton
         }
     }
 
@@ -409,6 +574,28 @@ struct OnboardingView: View {
                     .padding(.bottom, 30)
 
                 VStack(alignment: .leading, spacing: 18) {
+                    // Or pick straight from the address book — fills the
+                    // name and pre-geocodes their address when it has one
+                    Button {
+                        showContactPicker = true
+                    } label: {
+                        HStack(spacing: 8) {
+                            Image(systemName: "person.crop.circle")
+                                .font(.system(size: 14))
+                            Text("choose from contacts")
+                                .font(DesignTokens.Font.label)
+                        }
+                        .foregroundColor(DesignTokens.Color.accentSoft)
+                        .frame(maxWidth: .infinity)
+                        .padding(DesignTokens.Spacing.md)
+                        .background(DesignTokens.Color.backgroundCard)
+                        .cornerRadius(DesignTokens.Radius.button)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: DesignTokens.Radius.button)
+                                .stroke(DesignTokens.Color.borderMid, lineWidth: 1)
+                        )
+                    }
+
                     // Name
                     TextField("Mum, Dad, Home...", text: $name)
                         .formInput()

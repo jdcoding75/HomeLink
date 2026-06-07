@@ -350,9 +350,12 @@ struct CompassView: View {
             if let playing = pings.nowPlaying {
                 CatchModeView(
                     ping: playing,
-                    // The SENDER's style shapes the catch — their thought
-                    // arrives the way they sent it (glow when unknown).
-                    style: SenderStyle.from(playing.senderStyle),
+                    // The RECEIVER's instrument shapes the catch — the
+                    // experience matches the instrument in your hand:
+                    // compass → glow orb · bow → arrow stuck at the edge ·
+                    // firefly → wandering orb · flick → bouncing emoji.
+                    // (was: SenderStyle.from(playing.senderStyle))
+                    style: instrumentStore.selected.senderStyle,
                     onRevealed: { pings.markOpened(playing) },
                     onFinished: {
                         pings.finishedPlaying(playing)

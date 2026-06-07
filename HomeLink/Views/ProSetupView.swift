@@ -42,10 +42,14 @@ struct ProSetupView: View {
                     VStack(alignment: .leading, spacing: 22) {
                         statusSection
                         instrumentSection
+                        // Skins only dress the compass — the subsection
+                        // shows only while the compass is in hand
+                        if instrumentStore.selected == .compass {
+                            skinSection
+                        }
                         // senderStyleSection   // superseded by the instrument selection
                         emojiSetSection
                         customSoundsSection
-                        skinSection
                         funnyDistanceSection
                         holdToSendSection
                         Spacer(minLength: 30)
@@ -155,13 +159,19 @@ struct ProSetupView: View {
     private var instrumentSection: some View {
         VStack(alignment: .leading, spacing: 8) {
             sectionLabel("your instrument")
-            card {
-                VStack(spacing: 12) {
-                    ForEach(Instrument.allCases) { instrument in
-                        instrumentCard(instrument)
-                    }
+            Text("choose how you send a feeling")
+                .font(.system(size: 12, design: .serif).italic())
+                .foregroundColor(DesignTokens.Color.textMuted)
+                .padding(.bottom, 2)
+
+            // Four large cards — icon, serif name, tagline, and the
+            // mechanic itself looping in miniature
+            LazyVGrid(columns: [GridItem(.flexible(), spacing: 10),
+                                GridItem(.flexible(), spacing: 10)],
+                      spacing: 10) {
+                ForEach(Instrument.allCases) { instrument in
+                    instrumentCard(instrument)
                 }
-                .padding(14)
             }
         }
     }
@@ -181,40 +191,64 @@ struct ProSetupView: View {
                 HapticEngine.skinSelected()
             }
         } label: {
-            HStack(spacing: 12) {
+            VStack(spacing: 8) {
+                // Free/Pro badge — top right
+                HStack {
+                    Spacer()
+                    if locked {
+                        HStack(spacing: 3) {
+                            Image(systemName: "lock.fill")
+                                .font(.system(size: 8))
+                            Text("pro")
+                                .font(.system(size: 9, design: .serif).italic())
+                        }
+                        .foregroundColor(Self.lavender.opacity(0.85))
+                    } else {
+                        Text(instrument.requiresPro ? "pro" : "free")
+                            .font(.system(size: 9, design: .serif).italic())
+                            .foregroundColor(instrument.requiresPro
+                                             ? Self.lavender.opacity(0.85)
+                                             : Self.green)
+                    }
+                }
+                .frame(height: 12)
+
                 Text(instrument.icon)
-                    .font(.system(size: 26))
-                    .frame(width: 40, height: 40)
-                    .background(DesignTokens.Color.backgroundLift)
-                    .cornerRadius(12)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 12)
-                            .stroke(isActive ? Self.lavender : DesignTokens.Color.borderMid,
-                                    lineWidth: isActive ? 1.5 : 1)
-                    )
-                    .shadow(color: isActive ? Self.lavender.opacity(0.5) : .clear, radius: 8)
+                    .font(.system(size: 48))
+                    .opacity(locked ? 0.55 : 1)
 
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(instrument.displayName)
-                        .font(.system(size: 14, weight: isActive ? .semibold : .regular))
-                        .foregroundColor(DesignTokens.Color.textPrimary)
-                    Text(instrument.tagline)
-                        .font(.system(size: 11, design: .serif).italic())
-                        .foregroundColor(DesignTokens.Color.textMuted)
+                Text(instrument.displayName)
+                    .font(.system(size: 15, weight: isActive ? .semibold : .regular,
+                                  design: .serif))
+                    .foregroundColor(DesignTokens.Color.textPrimary)
+
+                Text(instrument.tagline)
+                    .font(.system(size: 10, design: .serif).italic())
+                    .foregroundColor(DesignTokens.Color.textMuted)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+
+                // The mechanic, looping in miniature
+                ZStack {
+                    RoundedRectangle(cornerRadius: 11)
+                        .fill(DesignTokens.Color.backgroundLift)
+                    InstrumentPreview(instrument: instrument)
+                        .clipShape(RoundedRectangle(cornerRadius: 11))
+                        .opacity(locked ? 0.4 : 1)
                 }
-
-                Spacer()
-
-                if locked {
-                    Image(systemName: "lock.fill")
-                        .font(.system(size: 12))
-                        .foregroundColor(Self.lavender.opacity(0.8))
-                } else if isActive {
-                    Image(systemName: "checkmark.circle.fill")
-                        .font(.system(size: 16))
-                        .foregroundColor(Self.lavender)
-                }
+                .frame(height: 56)
             }
+            .padding(12)
+            .frame(maxWidth: .infinity)
+            .background(DesignTokens.Color.backgroundCard)
+            .cornerRadius(DesignTokens.Radius.card)
+            .overlay(
+                RoundedRectangle(cornerRadius: DesignTokens.Radius.card)
+                    .stroke(isActive ? Self.lavender : DesignTokens.Color.border,
+                            lineWidth: isActive ? 2 : 1)
+            )
+            // Selected: the full lavender border glow
+            .shadow(color: isActive ? Self.lavender.opacity(0.5) : .clear, radius: 10)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)

@@ -15,7 +15,7 @@ import Combine
 import Supabase
 import os
 
-enum SupabaseServiceError: LocalizedError {
+enum SupabaseServiceError: LocalizedError, Equatable {
     case notConfigured
     case notSignedIn
     case invalidCodeFormat
@@ -23,6 +23,7 @@ enum SupabaseServiceError: LocalizedError {
     case cannotPairWithSelf
     case codeAlreadyClaimed
     case networkProblem
+    case timedOut
 
     var errorDescription: String? {
         switch self {
@@ -33,6 +34,7 @@ enum SupabaseServiceError: LocalizedError {
         case .cannotPairWithSelf: return "That's your own code."
         case .codeAlreadyClaimed: return "That code is already paired with someone else."
         case .networkProblem:     return "Network problem — check your connection and try again."
+        case .timedOut:           return "That took too long — check your connection and try again."
         }
     }
 }
@@ -56,19 +58,85 @@ final class SupabaseService: ObservableObject {
     /// receipts, pointing) — opened on foreground, closed on background.
     private var realtimeChannel: RealtimeChannelV2?
 
+    // MARK: - Resilience (timeout · retry · friendly errors)
+
+    /// Hard timeout so a dead connection fails fast instead of hanging a
+    /// spinner forever — the URLSession default (60 s) is far too long for
+    /// an interactive pairing/sending moment.
+    private func withTimeout<T: Sendable>(
+        _ seconds: Double = 12,
+        _ operation: @escaping @Sendable () async throws -> T
+    ) async throws -> T {
+        try await withThrowingTaskGroup(of: T.self) { group in
+            group.addTask { try await operation() }
+            group.addTask {
+                try await Task.sleep(nanoseconds: UInt64(seconds * 1_000_000_000))
+                throw SupabaseServiceError.timedOut
+            }
+            let result = try await group.next()!
+            group.cancelAll()
+            return result
+        }
+    }
+
+    /// Retry transient (network/timeout) failures once after a short pause,
+    /// then surface a human-readable error. Non-transient errors (RLS,
+    /// schema, bad input) throw immediately — retrying won't fix those.
+    private func withRetry<T: Sendable>(
+        attempts: Int = 2,
+        label: String,
+        _ operation: @escaping @Sendable () async throws -> T
+    ) async throws -> T {
+        var lastError: Error = SupabaseServiceError.networkProblem
+        for attempt in 1...attempts {
+            do {
+                return try await withTimeout { try await operation() }
+            } catch {
+                lastError = error
+                guard Self.isTransient(error), attempt < attempts else { break }
+                log.warning("\(label, privacy: .public): transient failure (attempt \(attempt)/\(attempts)) — retrying: \(error.localizedDescription, privacy: .public)")
+                try? await Task.sleep(nanoseconds: 800_000_000)
+            }
+        }
+        log.error("\(label, privacy: .public): FAILED — \(String(describing: lastError), privacy: .public)")
+        throw Self.friendly(lastError)
+    }
+
+    private static func isTransient(_ error: Error) -> Bool {
+        if error is URLError { return true }
+        if let serviceError = error as? SupabaseServiceError {
+            return serviceError == .timedOut || serviceError == .networkProblem
+        }
+        return (error as NSError).domain == NSURLErrorDomain
+    }
+
+    /// Map low-level transport errors to a human message; pass ours through.
+    private static func friendly(_ error: Error) -> Error {
+        if let serviceError = error as? SupabaseServiceError { return serviceError }
+        if isTransient(error) { return SupabaseServiceError.networkProblem }
+        return error
+    }
+
     // MARK: - Auth (Apple Sign In)
 
     /// Exchange an ASAuthorizationAppleIDCredential's identity token for a
     /// Supabase session. Call from the Sign in with Apple completion handler.
     func signInWithApple(idToken: String, nonce: String) async throws {
         guard let client else { throw SupabaseServiceError.notConfigured }
-        try await client.auth.signInWithIdToken(
-            credentials: OpenIDConnectCredentials(
-                provider: .apple,
-                idToken: idToken,
-                nonce: nonce
+        log.info("auth: signInWithApple starting")
+        do {
+            try await client.auth.signInWithIdToken(
+                credentials: OpenIDConnectCredentials(
+                    provider: .apple,
+                    idToken: idToken,
+                    nonce: nonce
+                )
             )
-        )
+            log.info("auth: signInWithApple ✓")
+        } catch {
+            log.error("auth: signInWithApple FAILED: \(error.localizedDescription, privacy: .public)")
+            throw Self.friendly(error)
+        }
     }
 
     func signOut() async throws {
@@ -119,11 +187,17 @@ final class SupabaseService: ObservableObject {
     func ensureUser(appleUserID: String) async throws -> UUID {
         guard let client else { throw SupabaseServiceError.notConfigured }
         guard let me = await currentUserID else { throw SupabaseServiceError.notSignedIn }
-        try await client
-            .from("users")
-            .upsert(UserRow(id: me, appleUserID: appleUserID))
-            .execute()
+        try await withRetry(label: "ensureUser") {
+            try await client
+                .from("users")
+                .upsert(UserRow(id: me, appleUserID: appleUserID))
+                .execute()
+        }
         Self.localUserID = me
+        log.info("auth: user ensured ✓ id=\(me.uuidString, privacy: .public)")
+        // APNs may have delivered the device token BEFORE sign-in completed —
+        // registration was skipped then; flush the cached token now.
+        await registerCachedDeviceTokenIfNeeded()
         return me
     }
 
@@ -162,23 +236,29 @@ final class SupabaseService: ObservableObject {
         guard let client else { throw SupabaseServiceError.notConfigured }
         guard let me = await currentUserID else { throw SupabaseServiceError.notSignedIn }
 
-        let mine: [ConnectionRow] = try await client
-            .from("connections")
-            .select()
-            .eq("owner", value: me.uuidString)
-            .eq("owner_person_id", value: personID.uuidString)
-            .execute().value
+        log.info("pairing: createInvite for person \(personID.uuidString, privacy: .public)")
+        let mine: [ConnectionRow] = try await withRetry(label: "createInvite.lookup") {
+            try await client
+                .from("connections")
+                .select()
+                .eq("owner", value: me.uuidString)
+                .eq("owner_person_id", value: personID.uuidString)
+                .execute().value
+        }
         if let existing = mine.first {
+            log.info("pairing: reusing person invite \(existing.code, privacy: .public)")
             return existing.code
         }
 
         let code = Self.generatePairingCode()
-        try await client
-            .from("connections")
-            .insert(ConnectionRow(code: code, owner: me, friend: nil,
-                                  personName: personName, personEmoji: personEmoji,
-                                  ownerPersonID: personID))
-            .execute()
+        try await withRetry(label: "createInvite.insert") {
+            try await client
+                .from("connections")
+                .insert(ConnectionRow(code: code, owner: me, friend: nil,
+                                      personName: personName, personEmoji: personEmoji,
+                                      ownerPersonID: personID))
+                .execute()
+        }
         log.info("pairing: created person invite \(code, privacy: .public)")
         return code
     }
@@ -188,43 +268,64 @@ final class SupabaseService: ObservableObject {
     func lookupInvite(_ rawCode: String) async throws -> (name: String?, emoji: String?) {
         guard let client else { throw SupabaseServiceError.notConfigured }
         let code = Self.normalizePairingCode(rawCode)
-        let rows: [ConnectionRow] = try await client
-            .from("connections")
-            .select()
-            .eq("code", value: code)
-            .execute().value
-        guard let row = rows.first else { throw SupabaseServiceError.codeNotFound }
+        log.info("pairing: lookupInvite \(code, privacy: .public)")
+        let rows: [ConnectionRow] = try await withRetry(label: "lookupInvite") {
+            try await client
+                .from("connections")
+                .select()
+                .eq("code", value: code)
+                .execute().value
+        }
+        guard let row = rows.first else {
+            log.warning("pairing: lookupInvite — code not found")
+            throw SupabaseServiceError.codeNotFound
+        }
         return (row.personName, row.personEmoji)
     }
 
     /// Fetch (or create on first call) this user's pairing code, e.g. "POINT-4729".
+    /// Prefers a still-UNCLAIMED generic code: person invites belong to their
+    /// cards, and a claimed code can never pair anyone again — handing either
+    /// out as "your code" used to silently break the next pairing.
     func myPairingCode() async throws -> String {
         guard let client else { throw SupabaseServiceError.notConfigured }
         guard let me = await currentUserID else { throw SupabaseServiceError.notSignedIn }
 
-        let mine: [ConnectionRow] = try await client
-            .from("connections")
-            .select()
-            .eq("owner", value: me.uuidString)
-            .execute().value
-        if let existing = mine.first {
-            Self.localPairingCode = existing.code
-            return existing.code
-        }
-
-        let code = Self.generatePairingCode()
-        do {
+        let mine: [ConnectionRow] = try await withRetry(label: "myPairingCode.lookup") {
             try await client
                 .from("connections")
-                .insert(ConnectionRow(code: code, owner: me, friend: nil))
-                .execute()
-        } catch {
-            log.error("pairing: code insert failed: \(error.localizedDescription, privacy: .public)")
-            throw error
+                .select()
+                .eq("owner", value: me.uuidString)
+                .execute().value
         }
-        log.info("pairing: created code \(code, privacy: .public)")
-        Self.localPairingCode = code
-        return code
+        if let open = mine.first(where: { $0.friend == nil && $0.ownerPersonID == nil })
+                   ?? mine.first(where: { $0.friend == nil }) {
+            Self.localPairingCode = open.code
+            log.info("pairing: my code \(open.code, privacy: .public) (existing, unclaimed)")
+            return open.code
+        }
+
+        // All codes claimed (or none yet) — mint a fresh one. Retry with a
+        // different code on the (rare) primary-key collision.
+        var lastError: Error = SupabaseServiceError.networkProblem
+        for _ in 0..<3 {
+            let code = Self.generatePairingCode()
+            do {
+                try await withRetry(label: "myPairingCode.insert") {
+                    try await client
+                        .from("connections")
+                        .insert(ConnectionRow(code: code, owner: me, friend: nil))
+                        .execute()
+                }
+                log.info("pairing: created code \(code, privacy: .public)")
+                Self.localPairingCode = code
+                return code
+            } catch {
+                lastError = error
+                log.warning("pairing: code insert failed (collision/network) — \(error.localizedDescription, privacy: .public)")
+            }
+        }
+        throw lastError
     }
 
     /// Normalize whatever the user typed into the stored form "POINT-XXXX".
@@ -240,6 +341,16 @@ final class SupabaseService: ObservableObject {
 
     /// Enter a friend's code: claims their connection row. Returns the owner's
     /// id plus the person identity stored with the invite (for auto-adding).
+    ///
+    /// Failure-mode map (each one logged + thrown as a human message):
+    ///   bad format     → invalidCodeFormat, before any network call
+    ///   no such code   → codeNotFound
+    ///   own code       → cannotPairWithSelf
+    ///   already taken  → codeAlreadyClaimed (atomic: claim only lands on an
+    ///                    unclaimed row, then is verified with a read-back)
+    ///   network drop   → networkProblem/timedOut after a retry, at any step;
+    ///                    re-entering the same code later is idempotent —
+    ///                    a row already claimed by ME counts as success.
     @discardableResult
     func redeem(_ rawCode: String) async throws -> RedeemResult {
         guard let client else { throw SupabaseServiceError.notConfigured }
@@ -249,42 +360,55 @@ final class SupabaseService: ObservableObject {
         log.info("redeem: input '\(rawCode, privacy: .public)' → lookup '\(code, privacy: .public)'")
 
         // Wrong shape entirely? Say so before hitting the network.
-        guard code.count == 10 else { throw SupabaseServiceError.invalidCodeFormat }
+        guard Self.isValidPairingCode(code) else { throw SupabaseServiceError.invalidCodeFormat }
 
-        let rows: [ConnectionRow]
-        do {
-            rows = try await client
+        let rows: [ConnectionRow] = try await withRetry(label: "redeem.lookup") {
+            try await client
                 .from("connections")
                 .select()
                 .eq("code", value: code)
                 .execute().value
-        } catch let error as URLError {
-            log.error("redeem: network error: \(error.localizedDescription, privacy: .public)")
-            throw SupabaseServiceError.networkProblem
         }
         log.info("redeem: lookup matched \(rows.count) row(s)")
         guard let row = rows.first else { throw SupabaseServiceError.codeNotFound }
         guard row.owner != me else { throw SupabaseServiceError.cannotPairWithSelf }
 
-        do {
+        if let friend = row.friend, friend != me {
+            log.warning("redeem: code already claimed by another user")
+            throw SupabaseServiceError.codeAlreadyClaimed
+        }
+
+        // Already mine (a retry after a network drop mid-pair) → done.
+        if row.friend == me {
+            log.info("redeem: already claimed by me — idempotent success")
+            Self.connectedFriendID = row.owner
+            return RedeemResult(ownerID: row.owner,
+                                personName: row.personName,
+                                personEmoji: row.personEmoji)
+        }
+
+        // Atomic claim: only an UNCLAIMED row matches — two phones racing on
+        // the same code can't both win.
+        try await withRetry(label: "redeem.claim") {
             try await client
                 .from("connections")
                 .update(["friend": me.uuidString])
                 .eq("code", value: code)
+                .is("friend", value: nil)
                 .execute()
-        } catch {
-            log.error("redeem: claim update failed: \(error.localizedDescription, privacy: .public)")
-            throw error
         }
 
-        // Verify the claim landed — RLS can match zero rows and "succeed" silently
-        let check: [ConnectionRow] = try await client
-            .from("connections")
-            .select()
-            .eq("code", value: code)
-            .execute().value
+        // Verify the claim landed — RLS (or losing the race) can match zero
+        // rows and "succeed" silently.
+        let check: [ConnectionRow] = try await withRetry(label: "redeem.verify") {
+            try await client
+                .from("connections")
+                .select()
+                .eq("code", value: code)
+                .execute().value
+        }
         guard check.first?.friend == me else {
-            log.error("redeem: claim did not persist (already claimed by someone else?)")
+            log.error("redeem: claim did not persist (claimed by someone else in the race?)")
             throw SupabaseServiceError.codeAlreadyClaimed
         }
 
@@ -309,27 +433,35 @@ final class SupabaseService: ObservableObject {
 
         var found: [DiscoveredConnection] = []
 
-        let mine: [ConnectionRow] = try await client
-            .from("connections")
-            .select()
-            .eq("owner", value: me.uuidString)
-            .execute().value
+        let mine: [ConnectionRow] = try await withRetry(label: "refreshConnections.mine") {
+            try await client
+                .from("connections")
+                .select()
+                .eq("owner", value: me.uuidString)
+                .execute().value
+        }
         for row in mine where row.friend != nil {
             found.append(DiscoveredConnection(partnerID: row.friend!,
                                               myPersonID: row.ownerPersonID))
         }
 
-        let theirs: [ConnectionRow] = try await client
-            .from("connections")
-            .select()
-            .eq("friend", value: me.uuidString)
-            .execute().value
+        let theirs: [ConnectionRow] = try await withRetry(label: "refreshConnections.theirs") {
+            try await client
+                .from("connections")
+                .select()
+                .eq("friend", value: me.uuidString)
+                .execute().value
+        }
         for row in theirs {
             found.append(DiscoveredConnection(partnerID: row.owner, myPersonID: nil))
         }
 
-        if let first = found.first {
-            Self.connectedFriendID = first.partnerID
+        log.info("pairing: refreshConnections → \(found.count) connection(s)")
+        // Keep the cached partner stable across refreshes — only replace it
+        // when it's gone (unpaired) or never set.
+        let cached = Self.connectedFriendID
+        if cached == nil || !found.contains(where: { $0.partnerID == cached }) {
+            Self.connectedFriendID = found.first?.partnerID
         }
         return found
     }
@@ -340,35 +472,49 @@ final class SupabaseService: ObservableObject {
         guard let client else { throw SupabaseServiceError.notConfigured }
         guard let me = await currentUserID else { throw SupabaseServiceError.notSignedIn }
 
-        // Someone redeemed my code
-        let mine: [ConnectionRow] = try await client
-            .from("connections")
-            .select()
-            .eq("owner", value: me.uuidString)
-            .execute().value
-        if let friend = mine.first?.friend {
+        // Someone redeemed one of my codes. NOTE: scan ALL rows — with person
+        // invites a user owns several, and the claimed one is rarely first.
+        let mine: [ConnectionRow] = try await withRetry(label: "refreshConnection.mine") {
+            try await client
+                .from("connections")
+                .select()
+                .eq("owner", value: me.uuidString)
+                .execute().value
+        }
+        if let friend = mine.compactMap(\.friend).first {
             Self.connectedFriendID = friend
+            log.info("pairing: refreshConnection → partner \(friend.uuidString, privacy: .public) (they redeemed my code)")
             return friend
         }
 
         // I redeemed someone else's code
-        let theirs: [ConnectionRow] = try await client
-            .from("connections")
-            .select()
-            .eq("friend", value: me.uuidString)
-            .execute().value
+        let theirs: [ConnectionRow] = try await withRetry(label: "refreshConnection.theirs") {
+            try await client
+                .from("connections")
+                .select()
+                .eq("friend", value: me.uuidString)
+                .execute().value
+        }
         if let owner = theirs.first?.owner {
             Self.connectedFriendID = owner
+            log.info("pairing: refreshConnection → partner \(owner.uuidString, privacy: .public) (I redeemed theirs)")
             return owner
         }
+        log.info("pairing: refreshConnection → no connection yet")
         return nil
     }
 
     /// "POINT-" + four unambiguous characters (no 0/O/1/I/L).
-    private static func generatePairingCode() -> String {
+    static func generatePairingCode() -> String {
         let alphabet = Array("23456789ABCDEFGHJKMNPQRSTUVWXYZ")
         let suffix = String((0..<4).map { _ in alphabet.randomElement()! })
         return "POINT-\(suffix)"
+    }
+
+    /// True only for the canonical stored form: "POINT-" + 4 alphanumerics.
+    static func isValidPairingCode(_ code: String) -> Bool {
+        guard code.count == 10, code.hasPrefix("POINT-") else { return false }
+        return code.dropFirst(6).allSatisfy { $0.isLetter || $0.isNumber }
     }
 
     // MARK: - Device tokens (for push via Edge Function)
@@ -385,24 +531,44 @@ final class SupabaseService: ObservableObject {
         }
     }
 
+    /// The latest APNs token, kept locally so registration can be replayed
+    /// after sign-in or on the next launch if the upload ever fails.
+    private static var cachedDeviceToken: String? {
+        get { UserDefaults.standard.string(forKey: "apnsDeviceToken") }
+        set { UserDefaults.standard.set(newValue, forKey: "apnsDeviceToken") }
+    }
+
     func registerDeviceToken(_ token: String) async {
+        // Always remember the newest token first — whatever happens below,
+        // a later registerCachedDeviceTokenIfNeeded() can finish the job.
+        Self.cachedDeviceToken = token
+        log.info("push: APNs token received (\(token.prefix(8), privacy: .public)…)")
         guard let client else {
-            log.error("push: token registration skipped — not configured")
+            log.error("push: token registration deferred — backend not configured")
             return
         }
         guard let me = await currentUserID else {
-            log.error("push: token registration skipped — not signed in")
+            log.warning("push: token registration deferred — not signed in yet (will retry after sign-in)")
             return
         }
         do {
-            try await client
-                .from("device_tokens")
-                .upsert(DeviceTokenRow(token: token, userID: me, platform: "ios"))
-                .execute()
+            try await withRetry(label: "registerDeviceToken") {
+                try await client
+                    .from("device_tokens")
+                    .upsert(DeviceTokenRow(token: token, userID: me, platform: "ios"))
+                    .execute()
+            }
             log.info("push: device token registered ✓ (\(token.prefix(8), privacy: .public)…)")
         } catch {
-            log.error("push: token registration FAILED: \(error.localizedDescription, privacy: .public)")
+            log.error("push: token registration FAILED (cached for retry): \(error.localizedDescription, privacy: .public)")
         }
+    }
+
+    /// Replay a token that arrived before sign-in (or whose upload failed).
+    /// Called after ensureUser and on every app foreground — idempotent.
+    func registerCachedDeviceTokenIfNeeded() async {
+        guard let token = Self.cachedDeviceToken else { return }
+        await registerDeviceToken(token)
     }
 
     // MARK: - Pings
@@ -470,30 +636,47 @@ final class SupabaseService: ObservableObject {
     /// sender's style so the catch and replays play THEIR animation.
     /// If the database hasn't run the sender_style migration yet, the
     /// styled insert fails — retry once with the legacy payload so a
-    /// schema lag never blocks a thought.
-    func sendPing(to userID: UUID, emoji: String) async throws {
+    /// schema lag never blocks a thought. Network errors are retried and
+    /// then THROWN: the caller must surface them, never swallow them.
+    func sendPing(to userID: UUID, emoji: String, style: SenderStyle? = nil) async throws {
         guard let client else { throw SupabaseServiceError.notConfigured }
         guard let me = await currentUserID else { throw SupabaseServiceError.notSignedIn }
         // One selection defines everything: the wire style follows the
         // chosen instrument (falls back to the compass → glow for free).
-        let savedInstrument = UserDefaults.standard.string(forKey: InstrumentStore.storageKey) ?? ""
-        let savedTier = UserDefaults.standard.string(forKey: "subscriptionTier") ?? ""
-        let tier = SubscriptionTier(rawValue: savedTier) ?? .free
-        var instrument = Instrument(rawValue: savedInstrument) ?? .compass
-        if instrument.requiresPro && tier == .free { instrument = .compass }
-        let style = instrument.senderStyle.rawValue
+        // Callers that know the instrument pass `style` explicitly.
+        let styleRaw: String
+        if let style {
+            styleRaw = style.rawValue
+        } else {
+            let savedInstrument = UserDefaults.standard.string(forKey: InstrumentStore.storageKey) ?? ""
+            let savedTier = UserDefaults.standard.string(forKey: "subscriptionTier") ?? ""
+            let tier = SubscriptionTier(rawValue: savedTier) ?? .free
+            var instrument = Instrument(rawValue: savedInstrument) ?? .compass
+            if instrument.requiresPro && tier == .free { instrument = .compass }
+            styleRaw = instrument.senderStyle.rawValue
+        }
+        log.info("pings: sendPing → to=\(userID.uuidString, privacy: .public) emoji=\(emoji, privacy: .public) style=\(styleRaw, privacy: .public)")
         do {
-            try await client
-                .from("pings")
-                .insert(PingPayload(fromUser: me, toUser: userID, emoji: emoji,
-                                    senderStyle: style))
-                .execute()
+            try await withRetry(label: "sendPing") {
+                try await client
+                    .from("pings")
+                    .insert(PingPayload(fromUser: me, toUser: userID, emoji: emoji,
+                                        senderStyle: styleRaw))
+                    .execute()
+            }
+            log.info("pings: sendPing ✓ insert accepted")
+        } catch let error as SupabaseServiceError {
+            // Transport problem — a legacy retry can't help; surface it.
+            throw error
         } catch {
             log.error("pings: styled insert failed (pre-migration schema?) — retrying legacy: \(error.localizedDescription, privacy: .public)")
-            try await client
-                .from("pings")
-                .insert(PingPayload(fromUser: me, toUser: userID, emoji: emoji))
-                .execute()
+            try await withRetry(label: "sendPing.legacy") {
+                try await client
+                    .from("pings")
+                    .insert(PingPayload(fromUser: me, toUser: userID, emoji: emoji))
+                    .execute()
+            }
+            log.info("pings: sendPing ✓ insert accepted (legacy payload)")
         }
     }
 
@@ -528,24 +711,36 @@ final class SupabaseService: ObservableObject {
         log.info("realtime: consolidated channel subscribed (partner: \(partner?.uuidString ?? "none", privacy: .public))")
 
         // The streams end when the channel unsubscribes — loops exit cleanly.
-        Task {
+        Task { [log] in
             for await insert in pingInserts {
-                if let ping: PingEvent = try? insert.decodeRecord(decoder: JSONDecoder()) {
+                do {
+                    let ping: PingEvent = try insert.decodeRecord(decoder: JSONDecoder())
+                    log.info("realtime: ping insert received — emoji=\(ping.emoji, privacy: .public) style=\(ping.senderStyle ?? "nil", privacy: .public)")
                     onPing(ping)
+                } catch {
+                    // A decode failure here means a SILENTLY LOST thought —
+                    // log loudly so it's visible in Console during testing.
+                    log.error("realtime: ping insert DECODE FAILED: \(error.localizedDescription, privacy: .public)")
                 }
             }
         }
-        Task {
+        Task { [log] in
             for await update in feltUpdates {
-                if let ping: PingEvent = try? update.decodeRecord(decoder: JSONDecoder()),
-                   ping.openedAt != nil {
-                    onFelt(ping)
+                do {
+                    let ping: PingEvent = try update.decodeRecord(decoder: JSONDecoder())
+                    if ping.openedAt != nil {
+                        log.info("realtime: felt receipt — emoji=\(ping.emoji, privacy: .public)")
+                        onFelt(ping)
+                    }
+                } catch {
+                    log.error("realtime: felt update DECODE FAILED: \(error.localizedDescription, privacy: .public)")
                 }
             }
         }
         if let pointingChanges {
-            Task {
+            Task { [log] in
                 for await _ in pointingChanges {
+                    log.info("realtime: partner pointing event")
                     onPointed()
                 }
             }
@@ -562,24 +757,37 @@ final class SupabaseService: ObservableObject {
     /// Read receipt: the recipient marks a ping as opened/felt.
     func markPingOpened(_ id: UUID) async {
         guard let client else { return }
-        _ = try? await client
-            .from("pings")
-            .update(["opened_at": ISO8601DateFormatter().string(from: .now)])
-            .eq("id", value: id.uuidString)
-            .execute()
+        do {
+            try await withRetry(label: "markPingOpened") {
+                try await client
+                    .from("pings")
+                    .update(["opened_at": ISO8601DateFormatter().string(from: .now)])
+                    .eq("id", value: id.uuidString)
+                    .execute()
+            }
+            log.info("pings: marked opened ✓ id=\(id.uuidString, privacy: .public)")
+        } catch {
+            log.error("pings: markPingOpened FAILED id=\(id.uuidString, privacy: .public): \(error.localizedDescription, privacy: .public)")
+        }
     }
 
     /// All pings between me and one partner, newest first (ping history).
     func fetchPings(with partner: UUID) async -> [PingRecord] {
         guard let client, let me = await currentUserID else { return [] }
         let a = me.uuidString, b = partner.uuidString
-        let rows: [PingRecord]? = try? await client
-            .from("pings")
-            .select()
-            .or("and(from_user.eq.\(a),to_user.eq.\(b)),and(from_user.eq.\(b),to_user.eq.\(a))")
-            .order("created_at", ascending: false)
-            .execute().value
-        return rows ?? []
+        do {
+            let rows: [PingRecord] = try await client
+                .from("pings")
+                .select()
+                .or("and(from_user.eq.\(a),to_user.eq.\(b)),and(from_user.eq.\(b),to_user.eq.\(a))")
+                .order("created_at", ascending: false)
+                .execute().value
+            log.info("pings: history fetched — \(rows.count) row(s)")
+            return rows
+        } catch {
+            log.error("pings: history fetch FAILED: \(error.localizedDescription, privacy: .public)")
+            return []
+        }
     }
 
     // MARK: - Pointing (compass locked on them)
@@ -598,11 +806,16 @@ final class SupabaseService: ObservableObject {
                 case updatedAt = "updated_at"
             }
         }
-        _ = try? await client
-            .from("compass_bearings")
-            .upsert(Row(userID: me, bearing: bearing,
-                        updatedAt: ISO8601DateFormatter().string(from: .now)))
-            .execute()
+        do {
+            try await client
+                .from("compass_bearings")
+                .upsert(Row(userID: me, bearing: bearing,
+                            updatedAt: ISO8601DateFormatter().string(from: .now)))
+                .execute()
+            log.info("pointing: bearing reported ✓ (\(Int(bearing), privacy: .public)°)")
+        } catch {
+            log.error("pointing: bearing report FAILED: \(error.localizedDescription, privacy: .public)")
+        }
     }
 
     /// The "notify me when someone points toward me" preference, server-side

@@ -7,6 +7,10 @@
 
 import SwiftUI
 import CoreLocation
+import UserNotifications
+import os
+
+private let rootLog = Logger(subsystem: "com.jdcoding75.pointward", category: "root")
 
 struct RootView: View {
 
@@ -82,6 +86,12 @@ struct RootView: View {
             switch phase {
             case .active:
                 startRealtimePings()
+                // The badge counts unread thoughts server-side; opening the
+                // app is the moment to clear it.
+                UNUserNotificationCenter.current().setBadgeCount(0)
+                // Replay a device token that arrived signed-out or failed
+                // to upload — keeps push delivery alive across sign-ins.
+                Task { await SupabaseService.shared.registerCachedDeviceTokenIfNeeded() }
             case .background:
                 Task { await SupabaseService.shared.stopListening() }
             default:

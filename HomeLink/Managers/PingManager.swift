@@ -3,15 +3,22 @@
 
 import Foundation
 import Combine
+import os
 
 @MainActor
 final class PingManager: ObservableObject {
+
+    private let log = Logger(subsystem: "com.jdcoding75.pointward", category: "pings")
 
     /// Legacy single-slot ping (still mirrored to the widget store).
     @Published var pendingPing: ReceivedPing?
     @Published var isSending   = false
     /// "Mum felt your thought ✓" — set when a sent ping gets opened remotely.
     @Published var feltNotice: String?
+    /// "couldn't send — check your connection" — a real send failed after
+    /// retries. The animation already played; the user must know the
+    /// thought did NOT travel.
+    @Published var sendFailedNotice: String?
     /// "Mum is pointing toward you 🧭" — their compass just locked onto us.
     /// (Toast retired — the ambient presence glow replaced it. Kept.)
     @Published var pointingNotice: String?
@@ -70,6 +77,25 @@ final class PingManager: ObservableObject {
         HapticEngine.pingSent()
     }
 
+    /// THE real send. Fires the Supabase insert (with its own retry layer)
+    /// and — critically — surfaces failure instead of swallowing it: the
+    /// flight animation plays optimistically, but if the insert never lands
+    /// the user is told their thought did not travel.
+    func sendRemote(to userID: UUID, emoji: String, style: SenderStyle) {
+        log.info("sendRemote: → \(userID.uuidString, privacy: .public) emoji=\(emoji, privacy: .public) style=\(style.rawValue, privacy: .public)")
+        Task {
+            do {
+                try await SupabaseService.shared.sendPing(to: userID, emoji: emoji, style: style)
+                log.info("sendRemote: delivered ✓")
+            } catch {
+                log.error("sendRemote: FAILED — \(error.localizedDescription, privacy: .public)")
+                sendFailedNotice = "couldn't send — check your connection"
+                try? await Task.sleep(nanoseconds: 4_000_000_000)
+                sendFailedNotice = nil
+            }
+        }
+    }
+
     func showFelt(name: String) {
         feltNotice = "\(name) felt your thought ✓"
         Task {
@@ -113,6 +139,22 @@ final class PingManager: ObservableObject {
     /// History (it's already persisted server-side in the pings table).
     func receivePing(fromName: String, emoji: String, remoteID: UUID? = nil,
                      senderStyle: String? = nil) {
+        log.info("receivePing: from=\(fromName, privacy: .public) emoji=\(emoji, privacy: .public) remoteID=\(remoteID?.uuidString ?? "nil", privacy: .public) style=\(senderStyle ?? "nil", privacy: .public)")
+
+        // DEDUPE: in the foreground the same thought arrives twice — once
+        // over realtime (with remoteID) and once as the APNs push (without).
+        // Same id, or same emoji+sender within 15 s → one catch, not two.
+        let isDuplicate = ([nowPlaying].compactMap { $0 } + queue).contains { existing in
+            if let id = remoteID, existing.remoteID == id { return true }
+            return existing.emoji == emoji
+                && existing.fromName == fromName
+                && Date.now.timeIntervalSince(existing.timestamp) < 15
+        }
+        if isDuplicate {
+            log.info("receivePing: duplicate (realtime + push) — ignored")
+            return
+        }
+
         let ping = ReceivedPing(fromName: fromName, emoji: emoji, timestamp: .now,
                                 remoteID: remoteID, senderStyle: senderStyle)
         // The queue holds at most the newest un-caught thought — an older
@@ -144,7 +186,12 @@ final class PingManager: ObservableObject {
     /// The thought was actually experienced — bloom played, sound heard.
     func markOpened(_ ping: ReceivedPing) {
         if let remoteID = ping.remoteID {
+            log.info("markOpened: id=\(remoteID.uuidString, privacy: .public)")
             Task { await SupabaseService.shared.markPingOpened(remoteID) }
+        } else {
+            // Push-delivered pings used to arrive without an id — the felt
+            // receipt was silently lost. The push payload now carries pingId.
+            log.warning("markOpened: no remoteID — felt receipt cannot be recorded")
         }
     }
 

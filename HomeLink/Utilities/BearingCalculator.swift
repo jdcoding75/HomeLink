@@ -62,6 +62,26 @@ enum BearingCalculator {
             : "\(Int((miles * 5280).rounded())) ft"
     }
 
+    // MARK: - Alignment (single source of truth for the 5°/15° rules)
+
+    /// How far off-target a relative bearing is, as 0…180 — handles wrap
+    /// (359° relative is 1° off, not 359°).
+    static func alignmentError(relativeBearing: Double) -> Double {
+        var bearing = relativeBearing.truncatingRemainder(dividingBy: 360)
+        if bearing < 0 { bearing += 360 }
+        return min(bearing, 360 - bearing)
+    }
+
+    /// Within 5° — the lock threshold (compass lock, catch-mode lock-on).
+    static func isLockAligned(_ relativeBearing: Double) -> Bool {
+        alignmentError(relativeBearing: relativeBearing) <= 5
+    }
+
+    /// Within 15° — the send threshold (hold-to-send, bow, firefly, flick).
+    static func isSendAligned(_ relativeBearing: Double) -> Bool {
+        alignmentError(relativeBearing: relativeBearing) <= 15
+    }
+
     /// The feeling of the distance, not just the number. Shown on CompassView.
     static func emotionalDistance(_ km: Double) -> String {
         switch km {

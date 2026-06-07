@@ -14,17 +14,21 @@ struct PaywallView: View {
     @State private var isPurchasing = false
 
     private let features: [(emoji: String, text: String)] = [
-        ("🧭", "3 compass skins — minimal, vintage brass, heart"),
-        ("😤", "pro emojis — playful, chaotic, honestly human"),
-        ("📏", "funny distances — football fields, chocolate bars, leopard geckos"),
-        ("🎤", "custom emoji + sound — record your voice, pick any emoji"),
-        ("⏱", "hold to send — point and hold to send a thought physically"),
+        ("🏹", "bow & arrow — draw and release"),
+        ("🫧", "firefly — hold and guide"),
+        ("👆", "flick — load aim launch"),
+        ("😤", "pro emojis and custom sounds"),
+        ("📏", "funny distances"),
+        ("🎨", "vintage brass and heart compass skins"),
         ("👥", "up to 5 people"),
         ("🦎", "the gecko · obviously"),
     ]
-    // (previous list:)
-    // ("👥", "unlimited people"), ("🎨", "all compass skins"),
-    // ("📱", "home screen widget")
+    // (previous list — pre-instruments:)
+    // ("🧭", "3 compass skins — minimal, vintage brass, heart"),
+    // ("😤", "pro emojis — playful, chaotic, honestly human"),
+    // ("📏", "funny distances — football fields, chocolate bars, leopard geckos"),
+    // ("🎤", "custom emoji + sound — record your voice, pick any emoji"),
+    // ("⏱", "hold to send — point and hold to send a thought physically"),
 
     var body: some View {
         ZStack {
@@ -67,8 +71,8 @@ struct PaywallView: View {
                             .padding(.bottom, 28)
                         // (previous: "one small unlock. everything, forever.")
 
-                        // ── Live sender-style previews — looping, no tap ──
-                        senderStyleShowcase
+                        // ── Live instrument previews — looping, no tap ──
+                        instrumentShowcase
                             .padding(.bottom, 18)
 
                         // Feature list — clean and simple
@@ -186,46 +190,42 @@ struct PaywallView: View {
         }
     }
 
-    // MARK: - Live sender-style showcase
+    // MARK: - Live instrument showcase
 
-    /// The Pro send styles, playing on a loop — seeing beats reading.
-    /// Reuses SenderStylePreview (ProSetupView), which animates itself.
-    private var senderStyleShowcase: some View {
+    /// The four instruments, playing on a loop — seeing beats reading.
+    /// Each preview is its full mechanic in miniature (InstrumentPreview
+    /// animates itself, restarting every 3–4 seconds).
+    private var instrumentShowcase: some View {
         VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 5) {
-                Text("HOW YOUR THOUGHTS TRAVEL")
-                    .font(.system(size: 10, weight: .medium))
-                    .kerning(1.8)
-                    .foregroundColor(DesignTokens.Color.textMuted)
-                Spacer()
-                Text("pro")
-                    .font(.system(size: 9, design: .serif).italic())
-                    .foregroundColor(DesignTokens.Color.accentMid)
-            }
-            .padding(.horizontal, 2)
+            Text("see what Pro feels like")
+                .font(.system(size: 13, design: .serif).italic())
+                .foregroundColor(DesignTokens.Color.accentSoft)
+                .padding(.horizontal, 2)
 
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 10) {
-                    ForEach(SenderStyle.allCases.filter(\.requiresPro)) { style in
+                    ForEach(Instrument.allCases) { instrument in
                         VStack(spacing: 6) {
                             ZStack {
-                                RoundedRectangle(cornerRadius: 13)
+                                RoundedRectangle(cornerRadius: 14)
                                     .fill(DesignTokens.Color.backgroundLift)
-                                SenderStylePreview(style: style)
-                                    .clipShape(RoundedRectangle(cornerRadius: 13))
+                                InstrumentPreview(instrument: instrument)
+                                    .clipShape(RoundedRectangle(cornerRadius: 14))
                             }
-                            .frame(width: 108, height: 62)
+                            .frame(width: 120, height: 120)
                             .overlay(
-                                RoundedRectangle(cornerRadius: 13)
+                                RoundedRectangle(cornerRadius: 14)
                                     .stroke(DesignTokens.Color.borderMid, lineWidth: 1)
                             )
 
-                            Text("\(style.emoji) \(style.displayName)")
+                            Text("\(instrument.icon) \(instrument.displayName)")
                                 .font(.system(size: 11))
                                 .foregroundColor(DesignTokens.Color.textPrimary)
-                            Text(style.blurb)
+                            Text(instrument.requiresPro ? "pro" : "free")
                                 .font(.system(size: 9, design: .serif).italic())
-                                .foregroundColor(DesignTokens.Color.textDim)
+                                .foregroundColor(instrument.requiresPro
+                                                 ? DesignTokens.Color.accentMid
+                                                 : Color(hex: "#5dcaa5"))
                         }
                     }
                 }
@@ -234,4 +234,6 @@ struct PaywallView: View {
             }
         }
     }
+
+    // (previous sender-style showcase retired — see git history)
 }
