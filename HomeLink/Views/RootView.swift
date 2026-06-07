@@ -141,10 +141,14 @@ struct RootView: View {
                 },
                 onFelt: { event in
                     Task { @MainActor in
-                        let name = people.people.first {
-                            $0.pairedUserID == event.toUser.uuidString
-                        }?.name ?? "they"
-                        pings.showFelt(name: name)
+                        // Caught confirmation — the emoji we sent reappears
+                        // briefly at the compass center. No text, no receipt.
+                        // (Text toast retired; showFelt kept for reuse.)
+                        // let name = people.people.first {
+                        //     $0.pairedUserID == event.toUser.uuidString
+                        // }?.name ?? "they"
+                        // pings.showFelt(name: name)
+                        pings.showCaught(emoji: event.emoji)
                     }
                 },
                 onPointed: {

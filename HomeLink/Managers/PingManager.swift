@@ -31,6 +31,18 @@ final class PingManager: ObservableObject {
 
     private let networkService: NetworkServiceProtocol
 
+    /// State machine — wired by ServiceContainer. Catch mode and the
+    /// caught-confirmation queueing rules flow through here.
+    private weak var appState: AppStateManager?
+
+    /// SENDER CAUGHT — the recipient caught our thought. The emoji we sent
+    /// reappears briefly at the compass center. No text, no timestamp.
+    struct CaughtMoment: Equatable {
+        let emoji: String
+        let at:    Date
+    }
+    @Published var caughtMoment: CaughtMoment?
+
     struct ReceivedPing: Equatable, Identifiable {
         let id = UUID()
         let fromName:  String
@@ -39,8 +51,9 @@ final class PingManager: ObservableObject {
         var remoteID:  UUID? = nil   // Supabase ping id, for read receipts
     }
 
-    init(networkService: NetworkServiceProtocol) {
+    init(networkService: NetworkServiceProtocol, appState: AppStateManager? = nil) {
         self.networkService = networkService
+        self.appState = appState
     }
 
     func sendPing(to person: Person, emoji: String) async {
@@ -59,6 +72,25 @@ final class PingManager: ObservableObject {
         }
     }
 
+    /// They caught it. A warm symbolic moment on the sender's compass —
+    /// the emoji we sent, briefly, then gone. Never interrupts sending
+    /// (or any other moment): it queues and plays when the screen is free.
+    func showCaught(emoji: String) {
+        let show: () -> Void = { [weak self] in
+            guard let self else { return }
+            self.caughtMoment = CaughtMoment(emoji: emoji, at: .now)
+            Task {
+                try? await Task.sleep(nanoseconds: 900_000_000)   // 600 ms + fade
+                self.caughtMoment = nil
+            }
+        }
+        if let appState, appState.currentState != .idle {
+            appState.queueAnimation(show)
+        } else {
+            show()
+        }
+    }
+
     /// Gentle "they're pointing at you" moment — soft double haptic, 4s toast.
     func showPointing(name: String) {
         guard UserDefaults.standard.object(forKey: "notifyPointing") as? Bool ?? true else { return }
@@ -70,21 +102,22 @@ final class PingManager: ObservableObject {
         }
     }
 
-    /// New thought arrives → joins the queue. Core mode starts the
-    /// direction-reveal immediately (the compass IS the inbox); Pro
-    /// mode shows the badge and waits for the tap.
+    /// New thought arrives → catch mode. RULE: only the NEWEST incoming
+    /// thought triggers the catch — anything older slips quietly into
+    /// History (it's already persisted server-side in the pings table).
     func receivePing(fromName: String, emoji: String, remoteID: UUID? = nil) {
         let ping = ReceivedPing(fromName: fromName, emoji: emoji, timestamp: .now, remoteID: remoteID)
-        queue.append(ping)
-        if queue.count > Self.maxQueued {
-            queue.removeFirst(queue.count - Self.maxQueued)   // oldest drops off
-        }
+        // The queue holds at most the newest un-caught thought — an older
+        // waiting one is superseded (→ History, never lost).
+        queue = [ping]
         AppGroupStore.pendingPingEmoji     = emoji
         AppGroupStore.pendingPingFromName  = fromName
         AppGroupStore.pendingPingTimestamp = .now
         HapticEngine.thoughtArrived()   // soft directional pull, not an alert
 
-        if !ProFeatures.isOn && nowPlaying == nil {
+        // A catch already on screen finishes its moment; the newest waits
+        // its turn and starts the instant the screen frees up.
+        if nowPlaying == nil {
             playNext()
         }
     }

@@ -79,6 +79,12 @@ final class SoundEngine {
             ("💥",    0.80, makePunch),
             ("🎉",    0.55, makeChampagne),
             ("gecko", 0.50, makeGecko),
+
+            // ── SENDER STYLE voices (animation system overhaul) ─────────
+            ("style.whoosh",  0.55, makeStyleWhoosh),    // shooting star send
+            ("style.chime",   0.40, makeStyleChime),     // firefly send
+            ("style.bell",    0.45, makeStyleBell),      // catch reveal
+            ("style.shimmer", 0.35, makeStyleShimmer),   // caught confirmation
         ]
         // (Commented out of the core flow, voices kept below for reuse:)
         // ("💜", 0.50, makeHeart), ("💋", 0.55, makeKiss),
@@ -691,6 +697,108 @@ final class SoundEngine {
                 s += hp * sparkle * exp(-tt * 3.2) * 0.5
             }
             data[i] = Float(max(-1, min(1, s * 0.55)))
+        }
+        return buf
+    }
+
+    // MARK: - Sender style voices (animation system overhaul)
+
+    /// SHOOTING STAR — a whoosh of air opening up, with a shimmer landing.
+    /// 0.45 s: low-passed noise sweeping brighter, detuned sparkle at the end.
+    private func makeStyleWhoosh() -> AVAudioPCMBuffer? {
+        let d = 0.45
+        guard let (buf, data, n) = makeBuffer(duration: d) else { return nil }
+        var rng = SystemRandomNumberGenerator()
+        var lp = 0.0
+        for i in 0..<n {
+            let t = Double(i) / sampleRate
+            let p = t / d
+            // Air rushing past: noise through an opening low-pass
+            let noise  = Double.random(in: -1...1, using: &rng)
+            let cutoff = 0.035 + 0.30 * p * p
+            lp += (noise - lp) * cutoff
+            var s = lp * envelope(p, attack: 0.15, release: 0.30) * 0.9
+            // Shimmer at the end — light catching the comet's tail
+            if p > 0.62 {
+                let tt = (p - 0.62) / 0.38
+                s += (sin(2 * .pi * 2105 * t) + sin(2 * .pi * 2118 * t)) * 0.5
+                     * exp(-tt * 3.5) * 0.10 * min(1, tt * 4)
+            }
+            data[i] = Float(max(-1, min(1, s)))
+        }
+        return buf
+    }
+
+    /// FIREFLY — a soft chime, gentle and airy. Two warm detuned partials
+    /// over a breath of filtered noise, 0.7 s, nothing sharp anywhere.
+    private func makeStyleChime() -> AVAudioPCMBuffer? {
+        let d = 0.7
+        guard let (buf, data, n) = makeBuffer(duration: d) else { return nil }
+        var rng = SystemRandomNumberGenerator()
+        var lp = 0.0
+        for i in 0..<n {
+            let t = Double(i) / sampleRate
+            let p = t / d
+            // Warm pair around G5, slightly detuned for slow beating
+            var s = sin(2 * .pi * 784 * t) * exp(-t * 4.2) * 0.5
+            s += sin(2 * .pi * 789 * t) * exp(-t * 4.6) * 0.4
+            s += sin(2 * .pi * 1568 * t) * exp(-t * 7.0) * 0.12
+            // The airy part — barely-there high noise breath
+            let noise = Double.random(in: -1...1, using: &rng)
+            lp += (noise - lp) * 0.35
+            s += lp * 0.05 * exp(-t * 3.0)
+            data[i] = Float(s * 0.5 * envelope(p, attack: 0.06, release: 0.5))
+        }
+        return buf
+    }
+
+    /// CATCH REVEAL — a soft bell with shimmer. Decaying inharmonic
+    /// partials (bell), detuned highs blooming after (shimmer). 0.9 s.
+    private func makeStyleBell() -> AVAudioPCMBuffer? {
+        let d = 0.9
+        guard let (buf, data, n) = makeBuffer(duration: d) else { return nil }
+        // Soft bell partials — rounded, never church-bell loud
+        let partials: [(f: Double, a: Double, decay: Double)] = [
+            (523.25, 0.50, 3.2),   // C5
+            (659.25, 0.28, 4.0),   // E5
+            (1046.5, 0.18, 5.5),   // C6
+            (1318.5, 0.10, 6.5),   // E6
+        ]
+        let shimmer: [Double] = [2093, 2102, 2637, 2649]
+        for i in 0..<n {
+            let t = Double(i) / sampleRate
+            var s = 0.0
+            for partial in partials {
+                s += sin(2 * .pi * partial.f * t) * partial.a * exp(-t * partial.decay)
+            }
+            // Shimmer blooms slightly after the strike
+            if t > 0.08 {
+                let tt = t - 0.08
+                for (k, f) in shimmer.enumerated() {
+                    s += sin(2 * .pi * f * tt) * 0.04 * exp(-tt * (5.0 + Double(k)))
+                }
+            }
+            let attack = min(1, t / 0.012)
+            data[i] = Float(s * 0.45 * attack)
+        }
+        return buf
+    }
+
+    /// SENDER CAUGHT — 80 ms of soft shimmer, the smallest sound in the
+    /// app. A held breath of high detuned light, gone before it registers
+    /// as a notification.
+    private func makeStyleShimmer() -> AVAudioPCMBuffer? {
+        let d = 0.08
+        guard let (buf, data, n) = makeBuffer(duration: d) else { return nil }
+        let tones: [Double] = [1760, 1767, 2217, 2226]
+        for i in 0..<n {
+            let t = Double(i) / sampleRate
+            let p = t / d
+            var s = 0.0
+            for (k, f) in tones.enumerated() {
+                s += sin(2 * .pi * f * t) * exp(-t * (18 + Double(k) * 3))
+            }
+            data[i] = Float(s * 0.12 * envelope(p, attack: 0.25, release: 0.45))
         }
         return buf
     }

@@ -14,6 +14,81 @@ enum HapticEngine {
         UserDefaults.standard.bool(forKey: "hapticsEnabled")
     }
 
+    // ════════════════════════════════════════════════════════════════════
+    // MARK: - Intensity scaling — Pro feels everything 1.3× stronger
+    // ════════════════════════════════════════════════════════════════════
+
+    private static var intensityMultiplier: CGFloat {
+        let saved = UserDefaults.standard.string(forKey: "subscriptionTier") ?? ""
+        let tier  = SubscriptionTier(rawValue: saved) ?? .free
+        return tier == .free ? 1.0 : 1.3
+    }
+
+    /// Pro users: all haptics at 1.3× intensity (capped at the hardware max).
+    private static func scaled(_ intensity: CGFloat) -> CGFloat {
+        min(1.0, intensity * intensityMultiplier)
+    }
+
+    // ════════════════════════════════════════════════════════════════════
+    // MARK: - The four canonical moments (animation system overhaul)
+    // ════════════════════════════════════════════════════════════════════
+
+    /// SEND — a single light tap, fired at the moment of send.
+    static func send() {
+        guard hapticsEnabled else { return }
+        UIImpactFeedbackGenerator(style: .light).impactOccurred(intensity: scaled(0.6))
+    }
+
+    /// FIREFLY SEND — very soft, slightly delayed (the drift begins first).
+    static func sendSoft() {
+        guard hapticsEnabled else { return }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+            UIImpactFeedbackGenerator(style: .light).impactOccurred(intensity: scaled(0.3))
+        }
+    }
+
+    /// CATCH ALIGNMENT — pulses speed up and strengthen as the user turns
+    /// toward the sender. Call freely (e.g. every heading tick); the band
+    /// interval throttling lives here.
+    ///   outside 30°  silent
+    ///   within 30°   very soft, every 2 s, 0.2
+    ///   within 15°   soft, every 1 s, 0.4
+    ///   within 5°    medium pulse rate, every 0.5 s, 0.6
+    private static var lastAlignmentPulse = Date.distantPast
+    static func catchAlignment(angleError: Double) {
+        guard hapticsEnabled else { return }
+        let interval: TimeInterval
+        let intensity: CGFloat
+        switch angleError {
+        case ..<5:   interval = 0.5; intensity = 0.6
+        case ..<15:  interval = 1.0; intensity = 0.4
+        case ..<30:  interval = 2.0; intensity = 0.2
+        default:     return
+        }
+        guard Date.now.timeIntervalSince(lastAlignmentPulse) >= interval else { return }
+        lastAlignmentPulse = .now
+        UIImpactFeedbackGenerator(style: .soft).impactOccurred(intensity: scaled(intensity))
+    }
+
+    /// LOCK-ON — one clean medium tap, exactly at the alignment moment.
+    static func lockOn() {
+        guard hapticsEnabled else { return }
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred(intensity: scaled(0.8))
+    }
+
+    /// REVEAL — success notification as the emoji blooms.
+    static func reveal() {
+        guard hapticsEnabled else { return }
+        UINotificationFeedbackGenerator().notificationOccurred(.success)
+    }
+
+    /// SENDER CAUGHT CONFIRMATION — a very soft single tap. No text,
+    /// no receipt — just a warm symbolic moment.
+    static func caughtConfirmation() {
+        guard hapticsEnabled else { return }
+        UIImpactFeedbackGenerator(style: .light).impactOccurred(intensity: scaled(0.25))
+    }
+
     static func connectionFelt() {
         guard hapticsEnabled else { return }
         let intensity: CGFloat = isQuiet ? 0.35 : 0.65

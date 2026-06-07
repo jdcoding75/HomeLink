@@ -407,6 +407,11 @@ struct PingHistoryView: View {
     @State private var records: [SupabaseService.PingRecord] = []
     @State private var loaded = false
     @State private var replayingID: UUID?   // brief swell on tapped row
+    /// Full replay — the thought re-enters from its original direction.
+    @State private var replayRecord: SupabaseService.PingRecord?
+
+    @EnvironmentObject var appState: AppStateManager
+    @EnvironmentObject var subscription: SubscriptionManager
 
     private static let lavender = Color(red: 196/255, green: 168/255, blue: 212/255)
 
@@ -438,6 +443,22 @@ struct PingHistoryView: View {
                     .padding(.horizontal, 24)
                     .padding(.vertical, 16)
                 }
+            }
+            // ── REPLAY — a memory, not a new message ─────────────────────
+            // 30 % dim, original direction, compressed duration,
+            // easeInOutQuad throughout.
+            if let record = replayRecord {
+                let sent = record.toUser == partnerID
+                ReplayOverlayView(
+                    emoji: record.emoji,
+                    bearingDegrees: sent ? bearing : bearing + 180,
+                    // Free users replay in glow; Pro replays in their style
+                    style: SenderStyle.effective(for: subscription.tier)
+                ) {
+                    replayRecord = nil
+                    appState.transition(to: .idle)
+                }
+                .zIndex(5)
             }
         }
         .navigationTitle("thoughts with \(personName)")
@@ -490,13 +511,19 @@ struct PingHistoryView: View {
         .buttonStyle(.plain)
     }
 
-    /// Tap to feel again — the sound plays, the emoji swells briefly.
+    /// Tap to feel again — the full replay: background dims, the thought
+    /// re-enters from its original direction and blooms at center.
+    /// NEVER interrupts catch mode (the state machine refuses).
     private func replay(_ record: SupabaseService.PingRecord) {
-        SoundEngine.shared.play(for: record.emoji)
-        HapticEngine.thoughtArrived()
+        guard appState.transition(to: .replay) else { return }
+        // The row acknowledges the touch with a brief swell
         withAnimation(.easeOut(duration: 0.35)) { replayingID = record.id }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) {
             withAnimation(.easeIn(duration: 0.4)) { replayingID = nil }
         }
+        replayRecord = record
+        // (sound now plays at the overlay's bloom moment)
+        // SoundEngine.shared.play(for: record.emoji)
+        // HapticEngine.thoughtArrived()
     }
 }

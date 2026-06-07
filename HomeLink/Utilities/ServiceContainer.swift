@@ -21,6 +21,7 @@ final class ServiceContainer: ObservableObject {
     let subscriptionManager: SubscriptionManager
     let notificationHandler: NotificationHandler
     let brandManager:        BrandManager
+    let appStateManager:     AppStateManager
 
     init() {
         let schema       = Schema([Person.self, Ping.self])
@@ -31,9 +32,11 @@ final class ServiceContainer: ObservableObject {
         notificationService = LocalNotificationService()
         geocodingService = CLGeocodingService()
         subscriptionManager = SubscriptionManager(skinStore: skinStore)
+        appStateManager  = AppStateManager()
         compassManager   = CompassManager(skinStore: skinStore)
         peopleManager    = PeopleManager(subscriptionManager: subscriptionManager)
-        pingManager      = PingManager(networkService: networkService)
+        pingManager      = PingManager(networkService: networkService,
+                                       appState: appStateManager)
         notificationHandler = NotificationHandler(pingManager: pingManager)
         brandManager     = BrandManager()
     }

@@ -16,6 +16,7 @@ struct ProSetupView: View {
     @AppStorage(ProFeatures.storageKey) private var proOn = false
     @AppStorage("holdToSendEnabled")    private var holdToSend = false
     @AppStorage("funnyUnitLocked")      private var funnyUnitLocked = -1
+    @AppStorage(SenderStyle.storageKey) private var senderStyleRaw = SenderStyle.glow.rawValue
 
     @ObservedObject private var customStore = CustomThoughtStore.shared
     @StateObject private var recorder = AudioRecorder()
@@ -40,6 +41,7 @@ struct ProSetupView: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 22) {
                         statusSection
+                        senderStyleSection
                         emojiSetSection
                         customSoundsSection
                         skinSection
@@ -143,6 +145,79 @@ struct ProSetupView: View {
             .frame(maxWidth: .infinity)
             .padding(.vertical, 6)
         }
+    }
+
+    // MARK: - How you send (sender styles)
+
+    private var senderStyleSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            sectionLabel("how you send")
+            card {
+                HStack(alignment: .top, spacing: 10) {
+                    ForEach(SenderStyle.allCases) { style in
+                        senderStyleCard(style)
+                    }
+                }
+                .padding(14)
+            }
+        }
+    }
+
+    private func senderStyleCard(_ style: SenderStyle) -> some View {
+        let locked   = style.requiresPro && !isPro
+        let isActive = senderStyleRaw == style.rawValue && !locked
+
+        return Button {
+            if locked {
+                HapticEngine.paywallReached()
+                showPaywall = true
+            } else {
+                senderStyleRaw = style.rawValue
+                HapticEngine.skinSelected()
+            }
+        } label: {
+            VStack(spacing: 7) {
+                // Mini animation preview — looping
+                ZStack {
+                    RoundedRectangle(cornerRadius: 13)
+                        .fill(DesignTokens.Color.backgroundLift)
+                    SenderStylePreview(style: style)
+                        .opacity(locked ? 0.35 : 1)
+                        .clipShape(RoundedRectangle(cornerRadius: 13))
+                    if locked {
+                        Image(systemName: "lock.fill")
+                            .font(.system(size: 13))
+                            .foregroundColor(Self.lavender.opacity(0.85))
+                    }
+                    if isActive {
+                        VStack { HStack { Spacer()
+                            Image(systemName: "checkmark.circle.fill")
+                                .font(.system(size: 12))
+                                .foregroundColor(Self.lavender)
+                                .padding(4)
+                        }; Spacer() }
+                    }
+                }
+                .frame(height: 58)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 13)
+                        .stroke(isActive ? Self.lavender : DesignTokens.Color.borderMid,
+                                lineWidth: isActive ? 2 : 1)
+                )
+                // Selected style: lavender border glow
+                .shadow(color: isActive ? Self.lavender.opacity(0.5) : .clear, radius: 8)
+
+                Text("\(style.emoji) \(style.displayName)")
+                    .font(.system(size: 11, weight: isActive ? .semibold : .regular))
+                    .foregroundColor(isActive ? DesignTokens.Color.textPrimary
+                                              : DesignTokens.Color.textMuted)
+                Text(style.blurb)
+                    .font(.system(size: 9, design: .serif).italic())
+                    .foregroundColor(DesignTokens.Color.textDim)
+            }
+            .frame(maxWidth: .infinity)
+        }
+        .buttonStyle(.plain)
     }
 
     // MARK: - Your emoji set
@@ -399,6 +474,92 @@ struct ProSetupView: View {
                     )
             }
             .buttonStyle(.plain)
+        }
+    }
+}
+
+// MARK: - SenderStylePreview
+
+/// A tiny looping echo of the real send — a hue-true dot drifting along a
+/// curve, restarting gently. Lives inside the "how you send" cards.
+struct SenderStylePreview: View {
+
+    let style: SenderStyle
+
+    @State private var progress: CGFloat = 0
+    @State private var visible = true
+
+    private var duration: Double {
+        switch style {
+        case .glow:         return 0.9
+        case .shootingStar: return 0.7
+        case .firefly:      return 1.7
+        }
+    }
+
+    private var travel: Animation {
+        switch style {
+        case .glow:         return AnimationSystem.easeOutCubic(duration)
+        case .shootingStar: return AnimationSystem.easeOutCubic(duration)
+        case .firefly:      return AnimationSystem.easeInOutSine(duration)
+        }
+    }
+
+    var body: some View {
+        GeometryReader { geo in
+            let w = geo.size.width, h = geo.size.height
+            let start   = CGSize(width: -w * 0.30, height: h * 0.16)
+            let end     = CGSize(width:  w * 0.30, height: -h * 0.16)
+            let control = CGSize(width: 0, height: -h * 0.34)
+
+            dot
+                .opacity(visible ? 1 : 0)
+                .modifier(CurvedFlightEffect(progress: progress, start: start,
+                                             control: control, end: end))
+                .animation(travel, value: progress)
+                .animation(.easeOut(duration: 0.25), value: visible)
+                .position(x: w / 2, y: h / 2)
+        }
+        .allowsHitTesting(false)
+        .onAppear { loop() }
+    }
+
+    @ViewBuilder
+    private var dot: some View {
+        switch style {
+        case .glow:
+            Circle()
+                .fill(Color(hex: "#c4a8d4"))
+                .frame(width: 7, height: 7)
+                .blur(radius: 0.5)
+                .shadow(color: Color(hex: "#c4a8d4").opacity(0.7), radius: 5)
+        case .shootingStar:
+            Capsule()
+                .fill(LinearGradient(colors: [.white, Color(hex: "#FFD700").opacity(0.7), .clear],
+                                     startPoint: .trailing, endPoint: .leading))
+                .frame(width: 16, height: 4)
+                .rotationEffect(.degrees(-24))
+                .shadow(color: Color(hex: "#FFD700").opacity(0.5), radius: 4)
+        case .firefly:
+            Circle()
+                .fill(Color(hex: "#90EE90"))
+                .frame(width: 6, height: 6)
+                .blur(radius: 1)
+                .shadow(color: Color(hex: "#90EE90").opacity(0.7), radius: 6)
+        }
+    }
+
+    private func loop() {
+        visible  = true
+        progress = 1
+        DispatchQueue.main.asyncAfter(deadline: .now() + duration) {
+            visible = false
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                var snap = Transaction()
+                snap.disablesAnimations = true
+                withTransaction(snap) { progress = 0 }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { loop() }
+            }
         }
     }
 }

@@ -34,6 +34,7 @@ struct PointwardApp: App {
                 .environmentObject(container.notificationHandler)
                 .environmentObject(container.skinStore)
                 .environmentObject(container.brandManager)
+                .environmentObject(container.appStateManager)
                 .environmentObject(AppEnvironment(geocodingService: container.geocodingService))
                 .modelContainer(container.modelContainer)
                 .preferredColorScheme(.dark)

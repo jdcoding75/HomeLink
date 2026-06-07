@@ -26,6 +26,7 @@ struct CompassView: View {
     @EnvironmentObject var skinStore: SkinStore
     @EnvironmentObject var subscription: SubscriptionManager
     @EnvironmentObject var appEnv:   AppEnvironment
+    @EnvironmentObject var appState: AppStateManager
 
     // @AppStorage("quietMode") private var quietMode = false   // retired
     private let quietMode = false
@@ -200,52 +201,76 @@ struct CompassView: View {
                 }
             }
 
-            // ── The flight — the sent emoji crosses the screen in the
-            // real compass direction ──────────────────────────────────────────
+            // ── The flight — the chosen sender style carries the thought
+            // out in the real compass direction (glow · star · firefly) ──────
             if let token = flightToken {
-                let rad  = compass.state.bearingDegrees * .pi / 180
-                let edge = CGSize(width: CGFloat(sin(rad)) * 430,
-                                  height: -CGFloat(cos(rad)) * 430)
-
-                ForEach(0..<4, id: \.self) { i in
-                    sendSymbol(token, size: 13)
-                        .opacity(flightFly ? 0 : 0.65 - Double(i) * 0.14)
-                        .offset(flightFly ? edge : .zero)
-                        .animation(.easeIn(duration: 1.1).delay(0.10 + Double(i) * 0.08),
-                                   value: flightFly)
+                SenderAnimationView(
+                    style: SenderStyle.effective(for: subscription.tier),
+                    emoji: sendRemoteEmoji(for: token),
+                    bearingDegrees: compass.state.bearingDegrees,
+                    symbol: sendSymbol(token, size: 30)
+                ) {
+                    flightToken = nil
+                    flightFly   = false
+                    appState.transition(to: .idle)
                 }
-                sendSymbol(token, size: 30)
-                    .scaleEffect(flightFly ? 1.7 : 0.7)
-                    .opacity(flightFly ? 0 : 1)
-                    .offset(flightFly ? edge : .zero)
-                    .animation(.easeIn(duration: 1.2).delay(0.05), value: flightFly)
-                    .shadow(color: Color(hex: "#9b7fc0").opacity(0.8), radius: 12)
-                    .allowsHitTesting(false)
+                .zIndex(6)
+            }
+            // (previous straight-line flight retired — curves only now)
+            // if let token = flightToken {
+            //     let rad  = compass.state.bearingDegrees * .pi / 180
+            //     let edge = CGSize(width: CGFloat(sin(rad)) * 430,
+            //                       height: -CGFloat(cos(rad)) * 430)
+            //
+            //     ForEach(0..<4, id: \.self) { i in
+            //         sendSymbol(token, size: 13)
+            //             .opacity(flightFly ? 0 : 0.65 - Double(i) * 0.14)
+            //             .offset(flightFly ? edge : .zero)
+            //             .animation(.easeIn(duration: 1.1).delay(0.10 + Double(i) * 0.08),
+            //                        value: flightFly)
+            //     }
+            //     sendSymbol(token, size: 30)
+            //         .scaleEffect(flightFly ? 1.7 : 0.7)
+            //         .opacity(flightFly ? 0 : 1)
+            //         .offset(flightFly ? edge : .zero)
+            //         .animation(.easeIn(duration: 1.2).delay(0.05), value: flightFly)
+            //         .shadow(color: Color(hex: "#9b7fc0").opacity(0.8), radius: 12)
+            //         .allowsHitTesting(false)
+            // }
+
+            // ── Sender caught confirmation — the emoji they sent appears
+            // briefly at the compass center. No text. No timestamp. No read
+            // receipt. Just a warm symbolic moment (600 ms, then gone). ──────
+            if let caught = pings.caughtMoment {
+                CaughtConfirmationView(emoji: caught.emoji)
+                    .id(caught.at)
+                    .zIndex(6)
             }
 
-            // ── Felt receipt — "[name] felt your thought ✓" ───────────────────
-            if let notice = pings.feltNotice {
-                VStack {
-                    HStack(spacing: 6) {
-                        Image(systemName: "heart.fill")
-                            .font(.system(size: 10))
-                        Text(notice)
-                            .font(.system(size: 12, design: .serif).italic())
-                    }
-                    .foregroundColor(Color(hex: "#5dcaa5"))
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 8)
-                    .background(
-                        Capsule()
-                            .fill(DesignTokens.Color.background.opacity(0.85))
-                            .overlay(Capsule().stroke(Color(hex: "#5dcaa5").opacity(0.35), lineWidth: 1))
-                    )
-                    .padding(.top, 64)
-                    Spacer()
-                }
-                .transition(.opacity.combined(with: .move(edge: .top)))
-                .animation(.easeInOut(duration: 0.4), value: pings.feltNotice)
-            }
+            // (felt-receipt text capsule retired — replaced by the symbolic
+            //  caught confirmation above; view kept for reference)
+            // if let notice = pings.feltNotice {
+            //     VStack {
+            //         HStack(spacing: 6) {
+            //             Image(systemName: "heart.fill")
+            //                 .font(.system(size: 10))
+            //             Text(notice)
+            //                 .font(.system(size: 12, design: .serif).italic())
+            //         }
+            //         .foregroundColor(Color(hex: "#5dcaa5"))
+            //         .padding(.horizontal, 14)
+            //         .padding(.vertical, 8)
+            //         .background(
+            //             Capsule()
+            //                 .fill(DesignTokens.Color.background.opacity(0.85))
+            //                 .overlay(Capsule().stroke(Color(hex: "#5dcaa5").opacity(0.35), lineWidth: 1))
+            //         )
+            //         .padding(.top, 64)
+            //         Spacer()
+            //     }
+            //     .transition(.opacity.combined(with: .move(edge: .top)))
+            //     .animation(.easeInOut(duration: 0.4), value: pings.feltNotice)
+            // }
 
             // ── Thought queue badge — pro mode only (core mode
             // reveals thoughts automatically through the compass itself) ──────
@@ -285,39 +310,35 @@ struct CompassView: View {
                 }
             }
 
-            // ── Arrival ───────────────────────────────────────────────────────
-            // Core: direction reveals content — the edge glows from their
-            // direction, and you must physically turn toward them to feel it.
-            // Pro: the immediate dramatic shooting animation.
+            // ── Arrival → CATCH MODE ──────────────────────────────────────────
+            // Only the newest thought triggers the catch; the orb waits at
+            // the sender's edge until you physically turn toward them.
+            // opened_at is set at the reveal — felt means felt.
             if let playing = pings.nowPlaying {
-                if proOn {
-                    ThoughtArrivalView(
-                        ping: playing,
-                        incomingBearing: compass.state.bearingDegrees,
-                        onFinished: { pings.finishedPlaying(playing) },
-                        onSkip: { pings.skip(playing) }
-                    )
-                    .transition(.opacity)
-                    .onAppear { pings.markOpened(playing) }
-                } else {
-                    DirectionalArrivalView(
-                        ping: playing,
-                        onContinue: { pings.skip(playing) }
-                    )
-                    .transition(.opacity)
-                    .onAppear {
-                        // Fully received the moment it blooms — no chores
-                        pings.markOpened(playing)
-                        // Swing the needle to the sender so the direction
-                        // (and the optional replay) means something
-                        if let sender = people.people.first(where: { $0.name == playing.fromName }),
-                           people.selectedPerson?.id != sender.id {
-                            people.select(sender)
-                            compass.start(tracking: sender)
-                        }
+                CatchModeView(
+                    ping: playing,
+                    style: SenderStyle.effective(for: subscription.tier),
+                    onRevealed: { pings.markOpened(playing) },
+                    onFinished: {
+                        pings.finishedPlaying(playing)
+                        appState.transition(to: .idle)
+                    }
+                )
+                .transition(.opacity)
+                .zIndex(7)
+                .onAppear {
+                    appState.transition(to: .catchMode)
+                    // Swing the needle to the sender so the catch direction
+                    // is real, not whoever was selected before
+                    if let sender = people.people.first(where: { $0.name == playing.fromName }),
+                       people.selectedPerson?.id != sender.id {
+                        people.select(sender)
+                        compass.start(tracking: sender)
                     }
                 }
             }
+            // (previous arrival flows retired — views kept for reference:
+            //  proOn → ThoughtArrivalView, core → DirectionalArrivalView)
 
             // ── Ambient presence — their needle is resting on us ──────────────
             if presenceGlowVisible {
@@ -829,12 +850,16 @@ struct CompassView: View {
         }
     }
 
-    /// The send: flight in the real compass direction, sound, clear.
+    /// The send: styled flight in the real compass direction, sound, clear.
+    /// SenderAnimationView owns the haptics and the style voice; the
+    /// thought's own sound still plays here.
     private func sendThought(_ token: String) {
+        // One state at a time — a catch in progress owns the screen
+        guard appState.transition(to: .sending) else { return }
         withAnimation(.easeOut(duration: 0.25)) { selectedToken = nil }
         flightToken = token
-        flightFly = false
-        HapticEngine.thoughtReleased()
+        flightFly = true   // legacy flag (the style view drives its own motion)
+        // HapticEngine.thoughtReleased()   // retired — style haptic fires at launch
 
         // Real delivery when paired
         if let friend = SupabaseService.connectedFriendID {
@@ -844,13 +869,13 @@ struct CompassView: View {
 
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) {
             playSendSound(token)
-            HapticEngine.thoughtLaunched()
-            flightFly = true
+            // HapticEngine.thoughtLaunched()   // retired — single .light at launch
         }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.6) {
-            flightToken = nil
-            flightFly = false
-        }
+        // Cleanup moved to SenderAnimationView.onComplete (duration varies by style)
+        // DispatchQueue.main.asyncAfter(deadline: .now() + 1.6) {
+        //     flightToken = nil
+        //     flightFly = false
+        // }
     }
 
     // MARK: - Compass face
@@ -1856,5 +1881,6 @@ struct ThoughtArrivalView: View {
         .environmentObject(ServiceContainer().pingManager)
         .environmentObject(ServiceContainer().skinStore)
         .environmentObject(ServiceContainer().subscriptionManager)
+        .environmentObject(ServiceContainer().appStateManager)
         .preferredColorScheme(.dark)
 }
