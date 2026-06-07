@@ -175,15 +175,16 @@ struct CompassView: View {
                     .transition(.opacity)
                     .onAppear { pings.markOpened(playing) }
                 } else {
-                    RevealArrivalView(
+                    DirectionalArrivalView(
                         ping: playing,
-                        onRevealed: { pings.markOpened(playing) },
                         onContinue: { pings.skip(playing) }
                     )
                     .transition(.opacity)
                     .onAppear {
-                        // Swing the needle to the sender so "turn toward
-                        // them" means something
+                        // Fully received the moment it blooms — no chores
+                        pings.markOpened(playing)
+                        // Swing the needle to the sender so the direction
+                        // (and the optional replay) means something
                         if let sender = people.people.first(where: { $0.name == playing.fromName }),
                            people.selectedPerson?.id != sender.id {
                             people.select(sender)
@@ -841,7 +842,157 @@ struct PersonSwitcherSheet: View {
     }
 }
 
-// MARK: - RevealArrivalView
+// MARK: - DirectionalArrivalView
+
+/// DIRECTIONAL ARRIVAL — direction feels physical, requires nothing.
+/// The emoji blooms in FROM the screen edge matching the sender's bearing
+/// (north → top, east → right…), travels to center, and settles. Fully
+/// received on arrival. Pointing toward them within 30 s replays the bloom
+/// warmer — bonus magic, never a requirement.
+struct DirectionalArrivalView: View {
+
+    let ping: PingManager.ReceivedPing
+    let onContinue: () -> Void
+
+    @EnvironmentObject var compass: CompassManager
+
+    @State private var arrived    = false   // edge → center travel + bloom
+    @State private var named      = false
+    @State private var breathing  = false
+    @State private var hintShown  = false   // "turn toward them…" (3 s)
+    @State private var replayGlow = false   // warmer second bloom
+    @State private var mutualNote = false   // "pointing toward them ✦"
+    @State private var replayArmed = true   // 30 s window
+    @State private var replaying  = false
+
+    private static let lavender = Color(hex: "#c4a8d4")
+    private static let warm     = Color(hex: "#d4b08c")
+
+    private var alignmentDiff: Double {
+        let bearing = compass.state.bearingDegrees
+        return min(bearing, 360 - bearing)
+    }
+    private var isAligned: Bool { alignmentDiff <= 15 }
+
+    var body: some View {
+        GeometryReader { geo in
+            let rad   = compass.state.bearingDegrees * .pi / 180
+            let reach = max(geo.size.width, geo.size.height) * 0.62
+            let start = CGSize(width: CGFloat(sin(rad)) * reach,
+                               height: -CGFloat(cos(rad)) * reach)
+
+            ZStack {
+                // Quiet veil
+                Color.black.opacity(0.45).ignoresSafeArea()
+
+                // Glow anchored at the sender's edge — warms on replay
+                RadialGradient(
+                    colors: [(replayGlow ? Self.warm : Self.lavender)
+                                .opacity(replayGlow ? 0.36 : 0.28), .clear],
+                    center: UnitPoint(x: 0.5 + 0.62 * sin(rad),
+                                      y: 0.5 - 0.62 * cos(rad)),
+                    startRadius: 10,
+                    endRadius: 420
+                )
+                .ignoresSafeArea()
+
+                VStack(spacing: 14) {
+                    if named {
+                        VStack(spacing: 3) {
+                            Text("\(ping.fromName) sent you this")
+                                .font(.system(size: 15, design: .serif).italic())
+                                .foregroundColor(Self.lavender)
+                            Text(PoeticTime.string(for: ping.timestamp))
+                                .font(.system(size: 11))
+                                .foregroundColor(DesignTokens.Color.textMuted)
+                        }
+                        .transition(.opacity)
+                    }
+
+                    // The bloom — travels in from the sender's edge,
+                    // settles at center. Same easeOut, no bounce.
+                    Text(ping.emoji)
+                        .font(.system(size: 76))
+                        .opacity(arrived ? 1 : 0.25)
+                        .scaleEffect((arrived ? 1.0 : 0.35) * (breathing ? 1.03 : 1.0))
+                        .offset(arrived ? .zero : start)
+                        .shadow(color: (replayGlow ? Self.warm : Self.lavender).opacity(0.55),
+                                radius: replayGlow ? 24 : 18)
+
+                    if mutualNote {
+                        Text("pointing toward them ✦")
+                            .font(.system(size: 12, design: .serif).italic())
+                            .foregroundColor(Self.warm)
+                            .transition(.opacity)
+                    } else if hintShown {
+                        Text("turn toward them to feel it again")
+                            .font(.system(size: 10, design: .serif).italic())
+                            .foregroundColor(Self.lavender.opacity(0.75))
+                            .transition(.opacity)
+                    }
+                }
+            }
+            .contentShape(Rectangle())
+            .onTapGesture { onContinue() }
+            .onAppear { arrive() }
+            .onChange(of: isAligned) { _, aligned in
+                // Optional replay — bonus magic within the 30 s window
+                if aligned && replayArmed && !replaying && arrived {
+                    replayFromDirection()
+                }
+            }
+        }
+    }
+
+    private func arrive() {
+        HapticEngine.thoughtArrived()
+        SoundEngine.shared.play(for: ping.emoji)
+        withAnimation(.easeOut(duration: 1.2)) { arrived = true }
+        withAnimation(.easeOut(duration: 0.6).delay(1.1)) { named = true }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.4) {
+            withAnimation(.easeInOut(duration: 2.4).repeatForever(autoreverses: true)) {
+                breathing = true
+            }
+            // The soft optional hint — fades after 3 s, no consequence
+            withAnimation(.easeIn(duration: 0.5)) { hintShown = true }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
+                withAnimation(.easeOut(duration: 0.8)) { hintShown = false }
+            }
+        }
+        // Replay window closes after 30 seconds
+        DispatchQueue.main.asyncAfter(deadline: .now() + 30) { replayArmed = false }
+    }
+
+    private func replayFromDirection() {
+        replaying = true
+        HapticEngine.thoughtArrived()
+        SoundEngine.shared.play(for: ping.emoji)
+        withAnimation(.easeIn(duration: 0.4)) {
+            replayGlow = true
+            mutualNote = true
+        }
+        // Pull back toward the edge and bloom in again
+        breathing = false
+        withAnimation(.easeIn(duration: 0.35)) { arrived = false }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+            withAnimation(.easeOut(duration: 1.0)) { arrived = true }
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.6) {
+            withAnimation(.easeInOut(duration: 2.4).repeatForever(autoreverses: true)) {
+                breathing = true
+            }
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 4.0) {
+            withAnimation(.easeOut(duration: 0.8)) {
+                mutualNote = false
+                replayGlow = false
+            }
+            replaying = false
+        }
+    }
+}
+
+// MARK: - RevealArrivalView (superseded by DirectionalArrivalView; kept)
 
 /// DIRECTION REVEALS CONTENT — the compass IS the inbox.
 /// A thought arrives: no emoji shown. The screen edge glows from the

@@ -20,6 +20,7 @@ struct SettingsView: View {
     @AppStorage("funnyUnitLocked")      private var funnyUnitLocked      = -1
     @AppStorage("thoughtTaglineLocked") private var thoughtTaglineLocked = -1
     @AppStorage(ExpressionMode.storageKey) private var expressiveMode = false
+    @AppStorage("holdToSendEnabled") private var holdToSend = false
 
     @State private var showCopied     = false
     @State private var showSkinPicker = false
@@ -290,6 +291,42 @@ struct SettingsView: View {
                             showUnlock = true     // Expressive Mode is the paid tier
                         } else {
                             expressiveMode = wantsOn
+                        }
+                    }
+                ))
+                .tint(Self.toggleOn)
+                .labelsHidden()
+            }
+
+            Divider().background(DesignTokens.Color.border).padding(.leading, 44)
+
+            // Hold to Send — the purely physical send (paid)
+            settingsRow {
+                Image(systemName: "timer")
+                    .settingsIcon()
+                VStack(alignment: .leading, spacing: 2) {
+                    HStack(spacing: 6) {
+                        Text("Hold to Send")
+                            .settingsLabel()
+                        if subscription.tier == .free {
+                            Image(systemName: "lock.fill")
+                                .font(.system(size: 10))
+                                .foregroundColor(DesignTokens.Color.accentSoft)
+                        }
+                    }
+                    Text("hold your phone toward them for 3 seconds to send a thought instead of tapping")
+                        .font(.system(size: 11))
+                        .foregroundColor(DesignTokens.Color.textDim)
+                }
+                Spacer()
+                Toggle("", isOn: Binding(
+                    get: { holdToSend && subscription.tier != .free },
+                    set: { wantsOn in
+                        if subscription.tier == .free {
+                            HapticEngine.paywallReached()
+                            showUnlock = true
+                        } else {
+                            holdToSend = wantsOn
                         }
                     }
                 ))

@@ -69,10 +69,15 @@ struct PingView: View {
     @AppStorage("curationHintShown") private var curationHintShown = false
     @State private var showCurationHint = false
 
-    // ── Hold to send — no button, ever. The holding still IS the send. ───
+    // ── Hold to send — optional premium: the holding still IS the send ───
+    @AppStorage("holdToSendEnabled") private var holdToSendEnabled = false
     @State private var holdProgress: Double = 0
     private let holdDuration: Double = 3.0
     private let holdTick = Timer.publish(every: 0.05, on: .main, in: .common).autoconnect()
+
+    private var holdToSendActive: Bool {
+        holdToSendEnabled && subscription.tier != .free
+    }
 
     private static let lavender   = Color(hex: "#c4a8d4")
     private static let lavenderHi = Color(hex: "#e0ccee")
@@ -199,12 +204,20 @@ struct PingView: View {
                             .transition(.opacity.animation(.easeIn(duration: 0.5).delay(0.4)))
                     }
 
-                    // Hold to send — the ring fills while you physically
-                    // hold the phone toward them. No button. Ever.
+                    // Hold to send (paid, opt-in): no button — the ring fills
+                    // while you physically hold the phone toward them.
+                    // Default: the aligned tap-send button.
                     if let emoji = selectedEmoji, phase == .idle, !drawerExpanded {
-                        holdToSendIndicator(emoji: emoji)
-                            .padding(.bottom, 10)
-                            .transition(.opacity.combined(with: .move(edge: .bottom)))
+                        if holdToSendActive {
+                            holdToSendIndicator(emoji: emoji)
+                                .padding(.bottom, 10)
+                                .transition(.opacity.combined(with: .move(edge: .bottom)))
+                        } else {
+                            sendButton(emoji: emoji)
+                                .padding(.horizontal, 24)
+                                .padding(.bottom, 10)
+                                .transition(.opacity.combined(with: .move(edge: .bottom)))
+                        }
                     }
 
                     drawer
@@ -227,7 +240,7 @@ struct PingView: View {
             // The hold-to-send clock: fills over 3 s while aligned within 15°,
             // resets the moment the phone drifts off target.
             .onReceive(holdTick) { _ in
-                guard selectedEmoji != nil, phase == .idle else {
+                guard holdToSendActive, selectedEmoji != nil, phase == .idle else {
                     if holdProgress > 0 { holdProgress = 0 }
                     return
                 }
@@ -406,8 +419,8 @@ struct PingView: View {
                             radius: isAligned ? 10 : 4)
             }
             Text(isAligned
-                 ? (holdProgress > 0 ? "keep holding…" : "hold steady")
-                 : "hold toward \(people.selectedPerson?.name ?? "them") to send")
+                 ? (holdProgress > 0 ? "keep holding…" : "hold toward \(people.selectedPerson?.name ?? "them") to send")
+                 : "point toward \(people.selectedPerson?.name ?? "them") first")
                 .font(.system(size: 11, design: .serif).italic())
                 .foregroundColor(isAligned ? Self.lavenderHi : DesignTokens.Color.textMuted)
 

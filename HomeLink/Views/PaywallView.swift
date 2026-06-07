@@ -17,6 +17,7 @@ struct PaywallView: View {
         ("😤", "expressive emojis — playful, chaotic, honestly human"),
         ("📏", "funny distances — football fields, chocolate bars, leopard geckos"),
         ("🎤", "custom emoji + sound — record your voice, pick any emoji"),
+        ("⏱", "hold to send — point and hold to send a thought physically"),
         ("🦎", "the gecko · obviously"),
         ("🎨", "all compass skins"),
         ("👥", "up to 5 people"),
