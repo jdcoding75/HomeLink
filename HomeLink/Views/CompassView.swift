@@ -169,9 +169,11 @@ struct CompassView: View {
                     bottomZone
                         .padding(.top, 24)
 
-                    // The six, always visible — sending lives right here
+                    // The six, always visible — sending lives right here.
+                    // The gap above equals one tagline line height (26pt):
+                    // the tagline breathes clearly, not crowded, not far.
                     emojiRow
-                        .padding(.top, 16)
+                        .padding(.top, 26)
 
                     sendControl
                         .padding(.top, 10)
@@ -615,7 +617,9 @@ struct CompassView: View {
     private var distanceLine: some View {
         HStack(spacing: 5) {
             Text(distanceLineText)
-                .font(.system(size: 15, weight: .light))
+                // Halfway between the old distance (15) and the name (34) —
+                // important information, not a footnote
+                .font(.system(size: 24, weight: .light))
                 .foregroundColor(DesignTokens.Color.textSecondary)
                 .monospacedDigit()
                 .contentTransition(.opacity)
@@ -638,11 +642,14 @@ struct CompassView: View {
             // (distance moved to the top zone; the "unit:" cycler retired —
             //  the funny unit comes from Pro setup's lock or per-launch random)
 
-            // The poetic tagline, never repeats until all shown
+            // The poetic tagline, never repeats until all shown —
+            // doubled (13 → 26) so the words carry their weight
             HStack(spacing: 5) {
                 Text(TaglineSystem.poeticLibrary[taglineIndex])
-                    .font(.system(size: 13, design: .serif).italic())
+                    .font(.system(size: 26, design: .serif).italic())
                     .foregroundColor(DesignTokens.Color.accentMid)
+                    .minimumScaleFactor(0.6)   // long lines stay on one line
+                    .lineLimit(1)
                 Text("✦")
                     .font(.system(size: 8))
                     .foregroundColor(DesignTokens.Color.accentMid.opacity(0.55))
