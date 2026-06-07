@@ -1,11 +1,20 @@
 // SenderAnimationView.swift
 // Pointward › Views
 //
-// The send made visible — three personalities for one gesture:
+// The send made DRAMATIC — every thought is an event, not a blink:
 //
-//   GLOW (free)          350 ms · curved arc · soft hue-derived trail
-//   SHOOTING STAR (pro)  300 ms · dramatic sweep · gold comet tail · edge flash
-//   FIREFLY (pro)        ~1.2 s · organic wandering drift · pulsing orb
+//   GLOW (free)          1.2 s · charge → launch → flight → impact
+//   SHOOTING STAR (pro)  0.9 s · gold charge → blazing streak → flash
+//   FIREFLY (pro)        2.0 s · glow gathers → wandering drift → soft land
+//   FINGER FLICK (pro)   ~.8 s · press → snap → playful arc
+//   BOW & ARROW (pro)    ~.95 s · draw → trembling hold → release
+//
+// Global rules (all styles):
+//   · launches from the COMPASS RING EDGE, not center — maximum travel
+//   · the emoji GROWS in flight (1.0 → 1.5), accelerating toward them
+//   · the whole screen reacts — a warm lavender pulse at impact
+//   · trails LINGER 0.8–1.2 s — a comet tail, not a sneeze
+//   · two-part haptic — light at launch, medium at the screen edge
 //
 // Every path is a curve (never a straight line), every glow is soft and
 // diffused, every particle is a circle (never a star). Also home to the
@@ -92,6 +101,19 @@ struct SenderAnimationView<Symbol: View>: View {
     @State private var orbPulse   = false    // firefly breathing
     @State private var edgeFlash  = false    // shooting star landing
 
+    // Finger flick phases
+    @State private var ffCompress  = false   // 80 ms press-down
+    @State private var ffFlick     = false   // 50 ms snap-up
+    @State private var ffSparks    = false   // fingertip sparks, 80 ms life
+    @State private var ffFingerGone = false  // silhouette fade, 150 ms
+
+    // Bow & arrow phases
+    @State private var baDraw      = false   // 200 ms string pull
+    @State private var baJitter    = false   // 100 ms hold tremble
+    @State private var baReleased  = false   // string snap + flight
+    @State private var baVibrate   = false   // ±3 px bow oscillation
+    @State private var baBowGone   = false   // bow fade
+
     // Wander offsets are frozen once per flight so the drift doesn't reroll
     @State private var wander1 = CGSize(width: .random(in: -70...70),
                                         height: .random(in: -70...10))
@@ -125,6 +147,8 @@ struct SenderAnimationView<Symbol: View>: View {
                 case .glow:         glowSend(end: end)
                 case .shootingStar: shootingStarSend(end: end)
                 case .firefly:      fireflySend(end: end)
+                case .fingerFlick:  fingerFlickSend(end: end)
+                case .bowArrow:     bowArrowSend(end: end)
                 }
             }
             .position(x: geo.size.width / 2, y: geo.size.height / 2)
@@ -285,6 +309,148 @@ struct SenderAnimationView<Symbol: View>: View {
         .animation(.easeOut(duration: 0.3), value: faded)
     }
 
+    // ── FINGER FLICK SEND (pro) — 400 ms ─────────────────────────────────
+    // Compress 80 ms → flick release 50 ms with fingertip sparks →
+    // 270 ms curved flight. Quick and playful.
+
+    private static var flickGold: Color { Color(hex: "#FFD700") }
+
+    @ViewBuilder
+    private func fingerFlickSend(end: CGSize) -> some View {
+        let control = controlOffset(for: end, drama: 55)
+
+        // The finger silhouette — 22×60, tip r11 top, base r8 bottom,
+        // white 70 %, 8 px soft shadow. Sits just below the emoji.
+        ZStack {
+            Capsule()
+                .fill(.white.opacity(0.7))
+                .frame(width: 16, height: 60)
+            Circle()
+                .fill(.white.opacity(0.7))
+                .frame(width: 22, height: 22)
+                .offset(y: -19)
+            Circle()
+                .fill(.white.opacity(0.7))
+                .frame(width: 16, height: 16)
+                .offset(y: 22)
+        }
+        .shadow(color: .black.opacity(0.35), radius: 8)
+        .scaleEffect(y: ffFlick ? 1.1 : (ffCompress ? 0.9 : 1.0), anchor: .bottom)
+        .animation(AnimationSystem.easeInOutSine(0.08), value: ffCompress)
+        .animation(.spring(response: 0.12, dampingFraction: 0.5), value: ffFlick)
+        .opacity(ffFingerGone ? 0 : 1)
+        .animation(.easeOut(duration: 0.15), value: ffFingerGone)
+        .offset(y: 46)
+
+        // Fingertip sparks — 5 particles, 2–3 px, white/gold, scatter
+        // in the send direction, 80 ms lifetime
+        if ffSparks {
+            ForEach(0..<5, id: \.self) { i in
+                Circle()
+                    .fill(i % 2 == 0 ? .white : Self.flickGold)
+                    .frame(width: i % 2 == 0 ? 2.5 : 3, height: i % 2 == 0 ? 2.5 : 3)
+                    .offset(x: CGFloat(sin(rad)) * 18 + CGFloat(i - 2) * 5,
+                            y: -CGFloat(cos(rad)) * 18 + CGFloat((i * 7) % 9) - 4)
+                    .opacity(ffFlick ? 0 : 0.9)
+                    .animation(.easeOut(duration: 0.08).delay(0.02), value: ffFlick)
+                    .offset(y: 16)
+            }
+        }
+
+        // Trail: 6 soft circles in the emoji's hue, 300 ms fade
+        ForEach(0..<6, id: \.self) { i in
+            Circle()
+                .fill(hue.opacity(AnimationSystem.Trail.opacity))
+                .frame(width: AnimationSystem.Trail.width,
+                       height: AnimationSystem.Trail.width)
+                .blur(radius: 2)
+                .opacity(faded ? 0 : 1)
+                .modifier(CurvedFlightEffect(progress: progress, start: .zero,
+                                             control: control, end: end))
+                .animation(AnimationSystem.easeOutCubic(0.27)
+                            .delay(0.02 * Double(i + 1)), value: progress)
+                .animation(.easeOut(duration: 0.3).delay(0.04 * Double(i)), value: faded)
+        }
+
+        // The emoji — pressed down with the finger, launched off the tip
+        symbol
+            .scaleEffect(x: squashed ? 0.93 : 1.0, y: 1.0)   // 7 % squash, 100 ms return
+            .rotationEffect(.degrees(progress > 0 ? 6 * (sin(rad) >= 0 ? 1 : -1) : 0))
+            .shadow(color: hue.opacity(AnimationSystem.Glow.opacity),
+                    radius: AnimationSystem.Glow.radius)
+            .opacity(faded ? 0 : 1)
+            .offset(y: ffCompress && !ffFlick ? 5 : 0)        // rides the press
+            .animation(AnimationSystem.easeInOutSine(0.08), value: ffCompress)
+            .modifier(CurvedFlightEffect(progress: progress, start: .zero,
+                                         control: control, end: end))
+            .animation(AnimationSystem.easeOutCubic(0.27), value: progress)
+            .animation(.easeOut(duration: 0.15), value: faded)
+    }
+
+    // ── BOW & ARROW SEND (pro) — 600 ms ──────────────────────────────────
+    // Draw 200 ms → trembling hold 100 ms → release: string snaps 50 ms,
+    // bow vibrates, the emoji-arrow flies a fast decisive arc.
+
+    private static var amber: Color { Color(hex: "#E8B64C") }
+
+    @ViewBuilder
+    private func bowArrowSend(end: CGSize) -> some View {
+        let control = controlOffset(for: end, drama: 70)
+        let pull: CGFloat = baReleased ? 0 : (baDraw ? 9 : 0)   // ~15 % of 60
+
+        // The bow rig — 60×80 silhouette, aimed along the bearing.
+        // Arch limbs (4 px), string (2 px) pulled to the nock.
+        ZStack {
+            BowArchShape()
+                .stroke(.white.opacity(0.7), lineWidth: 4)
+            BowStringShape(pull: pull)
+                .stroke(.white.opacity(0.7), lineWidth: 2)
+        }
+        .frame(width: 60, height: 80)
+        .shadow(color: .black.opacity(0.35), radius: 8)
+        .rotationEffect(.radians(rad))
+        .offset(x: baVibrate ? 3 : 0)
+        .animation(.spring(response: 0.15, dampingFraction: 0.28), value: baVibrate)
+        .animation(.easeOut(duration: 0.05), value: baReleased)   // string snap
+        .animation(AnimationSystem.easeInOutSine(0.2), value: baDraw)
+        .opacity(baBowGone ? 0 : 1)
+        .animation(.easeOut(duration: 0.2), value: baBowGone)
+
+        // Trail: 8 elongated amber particles — an arrow in flight, 400 ms fade
+        ForEach(0..<8, id: \.self) { i in
+            Capsule()
+                .fill(LinearGradient(colors: [Self.amber.opacity(0.85), .clear],
+                                     startPoint: .leading, endPoint: .trailing))
+                .frame(width: 16, height: 3)
+                .blur(radius: 1)
+                .rotationEffect(.radians(rad - .pi / 2))
+                .opacity(faded ? 0 : 0.85 - Double(i) * 0.08)
+                .modifier(CurvedFlightEffect(progress: progress, start: .zero,
+                                             control: control, end: end))
+                .animation(AnimationSystem.easeOutCubic(0.3)
+                            .delay(0.012 * Double(i + 1)), value: progress)
+                .animation(.easeOut(duration: 0.4).delay(0.02 * Double(i)), value: faded)
+        }
+
+        // The emoji as arrowhead — elongated toward travel, amber-lit,
+        // nocked against the string during the draw
+        symbol
+            .scaleEffect(x: squashed ? 0.85 : (baDraw && !baReleased ? 0.78 : 1.0),
+                         y: baDraw && !baReleased ? 1.22 : 1.0)
+            .rotationEffect(.degrees(progress > 0 ? 8 * (sin(rad) >= 0 ? 1 : -1) : 0))
+            .shadow(color: Self.amber.opacity(0.75), radius: 9)   // the gold overlay glow
+            .opacity(faded ? 0 : 1)
+            .offset(x: CGFloat(sin(rad)) * -pull * 1.4,
+                    y: CGFloat(cos(rad)) * pull * 1.4)            // drawn back with the string
+            .offset(x: baJitter ? 1 : 0, y: baJitter ? -1 : 0)    // ±1 px hold tremble
+            .animation(.linear(duration: 0.025), value: baJitter)
+            .animation(AnimationSystem.easeInOutSine(0.2), value: baDraw)
+            .modifier(CurvedFlightEffect(progress: progress, start: .zero,
+                                         control: control, end: end))
+            .animation(AnimationSystem.easeOutCubic(0.3), value: progress)
+            .animation(.easeOut(duration: 0.15), value: faded)
+    }
+
     // ── Launch sequencing ─────────────────────────────────────────────────
 
     private func launch() {
@@ -301,6 +467,62 @@ struct SenderAnimationView<Symbol: View>: View {
                             .repeatForever(autoreverses: true)) {
                 orbPulse = true
             }
+
+        case .fingerFlick:
+            // compress 80 ms → flick + sparks 50 ms → flight 270 ms
+            ffCompress = true
+            ffSparks   = true
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) {
+                ffFlick = true
+                HapticEngine.send()
+                SoundEngine.shared.play(for: "style.shimmer")
+                progress = 1
+                withAnimation(.easeOut(duration: 0.1)) { squashed = false }
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.13) {
+                ffFingerGone = true
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.28) {
+                faded = true
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + style.sendDuration
+                                          + AnimationSystem.Trail.fadeMax + 0.15) {
+                onComplete()
+            }
+            return   // flick runs its own schedule
+
+        case .bowArrow:
+            // draw 200 ms → trembling hold 100 ms → release + flight 300 ms
+            HapticEngine.sendSoft()                          // pulse as the string draws
+            baDraw = true
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.20) {
+                HapticEngine.lockOn()                        // strong pulse at full draw
+                withAnimation(.linear(duration: 0.025)
+                                .repeatCount(4, autoreverses: true)) {
+                    baJitter = true
+                }
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.30) {
+                baJitter   = false
+                baReleased = true                            // string snaps, 50 ms
+                baVibrate  = true                            // bow rings, dampening
+                HapticEngine.send()
+                SoundEngine.shared.play(for: "style.whoosh")
+                progress = 1
+                withAnimation(.easeOut(duration: 0.1)) { squashed = false }
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) {
+                baVibrate = false
+                baBowGone = true
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.50) {
+                faded = true
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + style.sendDuration
+                                          + AnimationSystem.Trail.fadeMax + 0.25) {
+                onComplete()
+            }
+            return   // bow runs its own schedule
         }
 
         progress = 1   // per-layer .animation() drives the easing
@@ -472,5 +694,41 @@ struct CaughtConfirmationView: View {
                 gone = true                                  // 600 ms total
             }
         }
+    }
+}
+
+
+// ════════════════════════════════════════════════════════════════════════
+// MARK: - Bow silhouette shapes
+// ════════════════════════════════════════════════════════════════════════
+
+/// The bow's limbs — an upward arch across the frame (aimed pre-rotation).
+struct BowArchShape: Shape {
+    func path(in rect: CGRect) -> Path {
+        var p = Path()
+        let y = rect.height * 0.55
+        p.move(to: CGPoint(x: 0, y: y))
+        p.addQuadCurve(to: CGPoint(x: rect.width, y: y),
+                       control: CGPoint(x: rect.width / 2, y: -rect.height * 0.18))
+        return p
+    }
+}
+
+/// The string — straight limb-to-limb, bending back to the nock as drawn.
+struct BowStringShape: Shape {
+    var pull: CGFloat   // 0 = straight, ~9 = full draw
+
+    var animatableData: CGFloat {
+        get { pull }
+        set { pull = newValue }
+    }
+
+    func path(in rect: CGRect) -> Path {
+        var p = Path()
+        let y = rect.height * 0.55
+        p.move(to: CGPoint(x: 0, y: y))
+        p.addLine(to: CGPoint(x: rect.width / 2, y: y + pull * 2.2))
+        p.addLine(to: CGPoint(x: rect.width, y: y))
+        return p
     }
 }

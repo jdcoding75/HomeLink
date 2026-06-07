@@ -260,6 +260,38 @@ struct CatchModeView: View {
                 .opacity(orbBrightness * (orbPulse ? 1.0 : 0.8))
                 .shadow(color: Color(hex: "#90EE90").opacity(0.4),
                         radius: AnimationSystem.Glow.radiusMax)
+
+        case .fingerFlick:
+            // A bouncing orb — the bounce is the personality. It quickens
+            // with alignment (the shared pulse does), steadies inside 5°.
+            Circle()
+                .fill(RadialGradient(colors: [hue.opacity(0.95), hue.opacity(0.35), .clear],
+                                     center: .center, startRadius: 4, endRadius: 20))
+                .frame(width: 36, height: 36)
+                .blur(radius: 1.5)
+                .offset(y: angleError < 5 ? 0 : (orbPulse ? -4 : 4))
+                .scaleEffect(angleError < 5 ? 1.0 : (orbPulse ? 1.05 : 0.95))
+                .opacity(orbBrightness)
+                .shadow(color: hue.opacity(AnimationSystem.Glow.opacityMax),
+                        radius: AnimationSystem.Glow.radiusMax)
+
+        case .bowArrow:
+            // An arrow stuck in the compass face — shaft showing more as
+            // you align, gold-bright inside 5°.
+            HStack(spacing: 0) {
+                Capsule()
+                    .fill(Color(hex: "#E8B64C").opacity(angleError < 15 ? 0.9 : 0.45))
+                    .frame(width: angleError < 15 ? 22 : 13, height: 3)
+                Triangle()
+                    .fill(angleError < 5 ? Color(hex: "#FFD700") : Color(hex: "#E8B64C"))
+                    .frame(width: 9, height: 11)
+                    .rotationEffect(.degrees(90))
+            }
+            // Embedded pointing inward, toward the center
+            .rotationEffect(.radians(compass.state.bearingDegrees * .pi / 180 + .pi / 2))
+            .opacity(orbBrightness * (orbPulse ? 1.0 : 0.7))
+            .shadow(color: Color(hex: "#FFD700").opacity(angleError < 5 ? 0.7 : 0.3),
+                    radius: AnimationSystem.Glow.radiusMax)
         }
     }
 
@@ -313,9 +345,26 @@ struct CatchModeView: View {
     }
 
     /// Step 4 — the orb flies home on a curved arc, shrinking slightly.
+    /// Bow & arrow first gets PULLED OUT — a 5 px outward slide — before
+    /// it releases and flies home.
     private func beginCatch() {
         phase = .flying
         jitter = .zero
+        if style == .bowArrow {
+            let rad = compass.state.bearingDegrees * .pi / 180
+            withAnimation(.easeOut(duration: 0.12)) {
+                jitter = CGSize(width: CGFloat(sin(rad)) * 5,
+                                height: -CGFloat(cos(rad)) * 5)
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                jitter = .zero
+                flightProgress = 1
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15 + style.catchTravelDuration) {
+                reveal()
+            }
+            return
+        }
         flightProgress = 1
         DispatchQueue.main.asyncAfter(deadline: .now() + style.catchTravelDuration) {
             reveal()

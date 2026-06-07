@@ -11,6 +11,8 @@ enum SenderStyle: String, CaseIterable, Identifiable {
     case glow          = "glow"            // free default
     case shootingStar  = "shootingStar"    // pro
     case firefly       = "firefly"         // pro
+    case fingerFlick   = "fingerFlick"     // pro
+    case bowArrow      = "bowArrow"        // pro
 
     var id: String { rawValue }
 
@@ -23,6 +25,8 @@ enum SenderStyle: String, CaseIterable, Identifiable {
         case .glow:         return "glow"
         case .shootingStar: return "shooting star"
         case .firefly:      return "firefly"
+        case .fingerFlick:  return "finger flick"
+        case .bowArrow:     return "bow & arrow"
         }
     }
 
@@ -31,6 +35,8 @@ enum SenderStyle: String, CaseIterable, Identifiable {
         case .glow:         return "✨"
         case .shootingStar: return "🌟"
         case .firefly:      return "🫧"
+        case .fingerFlick:  return "👆"
+        case .bowArrow:     return "🏹"
         }
     }
 
@@ -40,6 +46,8 @@ enum SenderStyle: String, CaseIterable, Identifiable {
         case .glow:         return "warm and direct"
         case .shootingStar: return "fast and brilliant"
         case .firefly:      return "slow and intimate"
+        case .fingerFlick:  return "quick and playful"
+        case .bowArrow:     return "drawn and released"
         }
     }
 
@@ -49,6 +57,8 @@ enum SenderStyle: String, CaseIterable, Identifiable {
         case .glow:         return 0.35
         case .shootingStar: return 0.30
         case .firefly:      return 1.20   // slow, drifting
+        case .fingerFlick:  return 0.40   // compress 80 · flick 50 · flight 270
+        case .bowArrow:     return 0.60   // draw 200 · hold 100 · release 300
         }
     }
 
@@ -58,6 +68,8 @@ enum SenderStyle: String, CaseIterable, Identifiable {
         case .glow:         return 0.40
         case .shootingStar: return 0.25   // faster than glow
         case .firefly:      return 0.60   // organic drift
+        case .fingerFlick:  return 0.45   // bounces once mid-flight
+        case .bowArrow:     return 0.50   // pulled out, flies home
         }
     }
 

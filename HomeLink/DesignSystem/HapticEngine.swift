@@ -33,10 +33,18 @@ enum HapticEngine {
     // MARK: - The four canonical moments (animation system overhaul)
     // ════════════════════════════════════════════════════════════════════
 
-    /// SEND — a single light tap, fired at the moment of send.
+    /// SEND — a strong light tap, fired at the moment of launch.
+    /// (Part one of the two-part send haptic; sendImpact is part two.)
     static func send() {
         guard hapticsEnabled else { return }
-        UIImpactFeedbackGenerator(style: .light).impactOccurred(intensity: scaled(0.6))
+        UIImpactFeedbackGenerator(style: .light).impactOccurred(intensity: scaled(0.7))
+    }
+
+    /// SEND IMPACT — the medium tap as the thought reaches the screen edge.
+    /// Launch tap → flight → this. Two-part, physical.
+    static func sendImpact() {
+        guard hapticsEnabled else { return }
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred(intensity: scaled(0.7))
     }
 
     /// FIREFLY SEND — very soft, slightly delayed (the drift begins first).

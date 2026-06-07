@@ -494,6 +494,8 @@ struct SenderStylePreview: View {
         case .glow:         return 0.9
         case .shootingStar: return 0.7
         case .firefly:      return 1.7
+        case .fingerFlick:  return 0.8
+        case .bowArrow:     return 1.0
         }
     }
 
@@ -502,6 +504,8 @@ struct SenderStylePreview: View {
         case .glow:         return AnimationSystem.easeOutCubic(duration)
         case .shootingStar: return AnimationSystem.easeOutCubic(duration)
         case .firefly:      return AnimationSystem.easeInOutSine(duration)
+        case .fingerFlick:  return AnimationSystem.easeOutCubic(duration)
+        case .bowArrow:     return AnimationSystem.easeOutCubic(duration)
         }
     }
 
@@ -546,6 +550,25 @@ struct SenderStylePreview: View {
                 .frame(width: 6, height: 6)
                 .blur(radius: 1)
                 .shadow(color: Color(hex: "#90EE90").opacity(0.7), radius: 6)
+        case .fingerFlick:
+            // A flicked spark — white core, gold halo
+            Circle()
+                .fill(.white.opacity(0.95))
+                .frame(width: 7, height: 7)
+                .shadow(color: Color(hex: "#FFD700").opacity(0.8), radius: 5)
+        case .bowArrow:
+            // A tiny arrow in flight
+            HStack(spacing: 0) {
+                Capsule()
+                    .fill(Color(hex: "#E8B64C").opacity(0.9))
+                    .frame(width: 12, height: 2.5)
+                Triangle()
+                    .fill(Color(hex: "#FFD700"))
+                    .frame(width: 6, height: 7)
+                    .rotationEffect(.degrees(90))
+            }
+            .rotationEffect(.degrees(-24))
+            .shadow(color: Color(hex: "#FFD700").opacity(0.6), radius: 4)
         }
     }
 

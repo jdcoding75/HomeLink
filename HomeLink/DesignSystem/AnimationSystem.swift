@@ -100,14 +100,20 @@ enum AnimationSystem {
     }
 
     enum Trail {
-        /// Width 6–12 px, no hard edges, soft and subtle.
+        /// Width 6–14 px, no hard edges, soft and subtle.
         static let widthMin: CGFloat = 6
         static let width: CGFloat    = 8
-        static let widthMax: CGFloat = 12
+        static let widthMax: CGFloat = 14
         static let opacity: Double   = 0.30
-        /// Fade over 200–350 ms.
+        static let opacityBold: Double = 0.40   // send trails read clearly
+        /// Quick fade (catch-mode wisps): 200–350 ms.
         static let fade: Double      = 0.25
         static let fadeMax: Double   = 0.35
+        /// LINGER (send trails): 800–1200 ms — the trail hangs in the air
+        /// after the emoji passes. A comet tail, not a sneeze.
+        static let lingerMin: Double = 0.8
+        static let linger: Double    = 1.0
+        static let lingerMax: Double = 1.2
     }
 
     enum Particles {
