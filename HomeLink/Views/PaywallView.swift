@@ -67,6 +67,10 @@ struct PaywallView: View {
                             .padding(.bottom, 28)
                         // (previous: "one small unlock. everything, forever.")
 
+                        // ── Live sender-style previews — looping, no tap ──
+                        senderStyleShowcase
+                            .padding(.bottom, 18)
+
                         // Feature list — clean and simple
                         VStack(spacing: 0) {
                             ForEach(features, id: \.text) { feature in
@@ -178,6 +182,55 @@ struct PaywallView: View {
                     }
                     .padding(.horizontal, 24)
                 }
+            }
+        }
+    }
+
+    // MARK: - Live sender-style showcase
+
+    /// The Pro send styles, playing on a loop — seeing beats reading.
+    /// Reuses SenderStylePreview (ProSetupView), which animates itself.
+    private var senderStyleShowcase: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 5) {
+                Text("HOW YOUR THOUGHTS TRAVEL")
+                    .font(.system(size: 10, weight: .medium))
+                    .kerning(1.8)
+                    .foregroundColor(DesignTokens.Color.textMuted)
+                Spacer()
+                Text("pro")
+                    .font(.system(size: 9, design: .serif).italic())
+                    .foregroundColor(DesignTokens.Color.accentMid)
+            }
+            .padding(.horizontal, 2)
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 10) {
+                    ForEach(SenderStyle.allCases.filter(\.requiresPro)) { style in
+                        VStack(spacing: 6) {
+                            ZStack {
+                                RoundedRectangle(cornerRadius: 13)
+                                    .fill(DesignTokens.Color.backgroundLift)
+                                SenderStylePreview(style: style)
+                                    .clipShape(RoundedRectangle(cornerRadius: 13))
+                            }
+                            .frame(width: 108, height: 62)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 13)
+                                    .stroke(DesignTokens.Color.borderMid, lineWidth: 1)
+                            )
+
+                            Text("\(style.emoji) \(style.displayName)")
+                                .font(.system(size: 11))
+                                .foregroundColor(DesignTokens.Color.textPrimary)
+                            Text(style.blurb)
+                                .font(.system(size: 9, design: .serif).italic())
+                                .foregroundColor(DesignTokens.Color.textDim)
+                        }
+                    }
+                }
+                .padding(.horizontal, 2)
+                .padding(.vertical, 2)
             }
         }
     }
