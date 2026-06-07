@@ -6,6 +6,7 @@
 // Configures PeopleManager with the SwiftData model context.
 
 import SwiftUI
+import CoreLocation
 
 struct RootView: View {
 
@@ -26,6 +27,7 @@ struct RootView: View {
 
     @State private var showSplash = true
     @State private var pairRequest: PairRequest? = nil   // from universal links
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
         ZStack {
@@ -58,6 +60,18 @@ struct RootView: View {
             people.configure(with: modelContext)
             startCompassIfNeeded()
         }
+        // Realtime lives only in the foreground — reopen on activate,
+        // close gracefully when backgrounding.
+        .onChange(of: scenePhase) { _, phase in
+            switch phase {
+            case .active:
+                startRealtimePings()
+            case .background:
+                Task { await SupabaseService.shared.stopListening() }
+            default:
+                break
+            }
+        }
         // Universal links: pointward.app/pair/POINT-XXXX (and /join/ fallback).
         // SwiftUI delivers them via user activity; onOpenURL covers scheme opens.
         .onOpenURL { handleIncomingURL($0) }
@@ -81,50 +95,53 @@ struct RootView: View {
         pairRequest = PairRequest(code: code)
     }
 
-    /// Phase 2: live pings over Supabase realtime → the existing in-app
-    /// ping animation, plus felt receipts and presence. No-op when signed out.
+    /// Phase 2: discover pairings, stamp presence, and open the single
+    /// consolidated realtime channel. No-op when signed out.
     private func startRealtimePings() {
         guard SupabaseService.localUserID != nil else { return }
         Task { await SupabaseService.shared.touchLastSeen() }   // "active recently"
         Task {
-            await SupabaseService.shared.startListeningForPings { event in
-                Task { @MainActor in
-                    // Name the sender if they match a saved person, else stay warm
-                    let fromName = people.people.first {
-                        $0.pairedUserID == event.fromUser.uuidString
-                    }?.name ?? "someone who loves you"
-                    pings.receivePing(fromName: fromName, emoji: event.emoji,
-                                      remoteID: event.id)
-                }
-            }
-        }
-        Task {
-            await SupabaseService.shared.startListeningForFeltReceipts { event in
-                Task { @MainActor in
-                    let name = people.people.first {
-                        $0.pairedUserID == event.toUser.uuidString
-                    }?.name ?? people.selectedPerson?.name ?? "they"
-                    pings.showFelt(name: name)
-                }
-            }
-        }
-        // Discover pairings made from the other side (the code owner never
-        // redeems anything), bind them to a person, then listen for pointing.
-        Task {
+            // Discover connections made from either side and bind them to
+            // the correct person cards (owner_person_id when known).
             var partner = SupabaseService.connectedFriendID
-            if let fresh = try? await SupabaseService.shared.refreshConnection() {
-                partner = fresh
-                await MainActor.run { people.bindConnection(friendID: fresh) }
-            }
-            guard let partner else { return }
-            await SupabaseService.shared.startListeningForPointing(partner: partner) {
-                Task { @MainActor in
-                    let name = people.people.first {
-                        $0.pairedUserID == partner.uuidString
-                    }?.name ?? "someone"
-                    pings.showPointing(name: name)
+            if let connections = try? await SupabaseService.shared.refreshConnections() {
+                await MainActor.run {
+                    for connection in connections {
+                        people.bindConnection(friendID: connection.partnerID,
+                                              toPersonID: connection.myPersonID)
+                    }
                 }
+                partner = connections.first?.partnerID ?? partner
             }
+
+            await SupabaseService.shared.startRealtime(
+                partner: partner,
+                onPing: { event in
+                    Task { @MainActor in
+                        let fromName = people.people.first {
+                            $0.pairedUserID == event.fromUser.uuidString
+                        }?.name ?? "someone who loves you"
+                        pings.receivePing(fromName: fromName, emoji: event.emoji,
+                                          remoteID: event.id)
+                    }
+                },
+                onFelt: { event in
+                    Task { @MainActor in
+                        let name = people.people.first {
+                            $0.pairedUserID == event.toUser.uuidString
+                        }?.name ?? "they"
+                        pings.showFelt(name: name)
+                    }
+                },
+                onPointed: {
+                    Task { @MainActor in
+                        let name = partner.flatMap { p in
+                            people.people.first { $0.pairedUserID == p.uuidString }?.name
+                        } ?? "someone"
+                        pings.showPointing(name: name)
+                    }
+                }
+            )
         }
     }
 
@@ -144,18 +161,22 @@ struct PairRequest: Identifiable {
     var id: String { code }
 }
 
-/// Confirmation sheet for a tapped pairing link — the code arrives pre-filled;
-/// one Accept completes the connection.
+/// Confirmation sheet for a tapped pairing link — shows who the invite is
+/// from (the identity stored with the connection), one Accept pairs AND
+/// auto-adds them to the People list.
 struct PairRequestView: View {
 
     let code: String
     let onDone: () -> Void
 
     @EnvironmentObject var people: PeopleManager
+    @EnvironmentObject var compass: CompassManager
 
     @State private var isBusy = false
     @State private var connected = false
     @State private var errorMessage: String?
+    @State private var inviteName: String?
+    @State private var inviteEmoji: String?
 
     var body: some View {
         ZStack {
@@ -169,14 +190,18 @@ struct PairRequestView: View {
             VStack(spacing: 0) {
                 Spacer()
 
-                Text("🧭")
+                Text(inviteEmoji ?? "🧭")
                     .font(.system(size: 48))
                     .padding(.bottom, 16)
 
-                Text(connected ? "connected ✓" : "someone wants to connect")
+                Text(connected
+                     ? "connected ✓"
+                     : "\(inviteName ?? "someone") wants to connect with you")
                     .font(.system(size: 24, weight: .semibold, design: .serif))
                     .foregroundColor(connected ? Color(hex: "#5dcaa5")
                                                : DesignTokens.Color.textPrimary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 24)
                     .padding(.bottom, 8)
 
                 Text(connected
@@ -248,6 +273,17 @@ struct PairRequestView: View {
             }
         }
         .presentationDetents([.medium])
+        .onAppear {
+            // Show who the invite came from before asking to accept
+            Task {
+                if let info = try? await SupabaseService.shared.lookupInvite(code) {
+                    withAnimation(.easeOut(duration: 0.3)) {
+                        inviteName  = info.name
+                        inviteEmoji = info.emoji
+                    }
+                }
+            }
+        }
     }
 
     private func accept() {
@@ -260,8 +296,14 @@ struct PairRequestView: View {
         Task {
             defer { isBusy = false }
             do {
-                let friend = try await SupabaseService.shared.redeemCode(code)
-                people.bindConnection(friendID: friend)
+                let result = try await SupabaseService.shared.redeem(code)
+                // Auto-add them to the People list with the invite's identity
+                people.addFromInvite(
+                    name:  result.personName  ?? inviteName  ?? "Someone",
+                    emoji: result.personEmoji ?? inviteEmoji ?? "💜",
+                    friendID: result.ownerID,
+                    near: compass.userLocation?.coordinate
+                )
                 HapticEngine.connectionFelt()
                 withAnimation(.easeOut(duration: 0.4)) { connected = true }
             } catch {

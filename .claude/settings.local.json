@@ -44,7 +44,9 @@
       "Bash(dig +short www.pointward.app CNAME)",
       "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\(d.get\\('full_name', d.get\\('message'\\)\\), '| default branch:', d.get\\('default_branch'\\), '| private:', d.get\\('private'\\)\\)\")",
       "Bash(gh api *)",
-      "Bash(python3 -m json.tool)"
+      "Bash(python3 -m json.tool)",
+      "Bash(git add *)",
+      "Bash(git -c core.hooksPath=/dev/null commit -m ' *)"
     ]
   }
 }

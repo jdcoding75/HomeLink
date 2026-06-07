@@ -156,7 +156,14 @@ extension CompassManager: CLLocationManagerDelegate {
         updateCompassState()
     }
     func locationManager(_ manager: CLLocationManager, didUpdateHeading newHeading: CLHeading) {
-        currentHeading    = newHeading.magneticHeading
+        // Throttle: ignore sub-degree magnetometer jitter — this gates both
+        // the math and the SwiftUI redraws to meaningful changes only.
+        let heading = newHeading.magneticHeading
+        let delta = abs(heading - currentHeading)
+        let wrapped = min(delta, 360 - delta)
+        guard wrapped >= 1.0 || !isHeadingAvailable else { return }
+
+        currentHeading     = heading
         isHeadingAvailable = true
         updateCompassState()
     }

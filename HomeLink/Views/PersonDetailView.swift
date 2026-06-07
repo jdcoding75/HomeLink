@@ -19,6 +19,7 @@ struct PersonDetailView: View {
     @State private var lastSeen: Date?
     @State private var showConnectOptions = false
     @State private var connectedNow = false   // refresh after in-sheet pairing
+    @State private var personInvite: String?  // deep-link invite tied to THIS person
 
     private var isConnected: Bool {
         if connectedNow { return true }
@@ -155,6 +156,7 @@ struct PersonDetailView: View {
                 if !showConnectOptions {
                     Button {
                         withAnimation(.easeOut(duration: 0.25)) { showConnectOptions = true }
+                        prepareInvite()
                     } label: {
                         Text("Connect with \(person.name)")
                             .font(DesignTokens.Font.label)
@@ -165,8 +167,9 @@ struct PersonDetailView: View {
                             .cornerRadius(DesignTokens.Radius.button)
                     }
                 } else {
-                    // a) Send them everything they need
-                    ShareLink(item: AppLinks.friendInvite(code: SupabaseService.localPairingCode)) {
+                    // PRIMARY: a deep-link invite tied to THIS person — the
+                    // recipient sees "[name] wants to connect" and one tap pairs
+                    ShareLink(item: personInvite ?? AppLinks.inviteMessage(pairingCode: SupabaseService.localPairingCode)) {
                         HStack(spacing: 8) {
                             Image(systemName: "square.and.arrow.up")
                             Text("send invite")
@@ -178,10 +181,11 @@ struct PersonDetailView: View {
                         .background(DesignTokens.Color.accentStrong)
                         .cornerRadius(DesignTokens.Radius.button)
                     }
+                    .disabled(personInvite == nil && isBusy)
 
-                    // b) Or redeem theirs
+                    // FALLBACK: manual code entry
                     VStack(alignment: .leading, spacing: 6) {
-                        Text("enter their code")
+                        Text("or enter their code")
                             .font(DesignTokens.Font.overline)
                             .foregroundColor(DesignTokens.Color.textMuted)
                         HStack(spacing: 10) {
@@ -223,6 +227,24 @@ struct PersonDetailView: View {
         }
     }
 
+    /// Create the invite tied to this exact person (name + emoji travel
+    /// with it; owner_person_id re-links the card when they accept).
+    private func prepareInvite() {
+        guard personInvite == nil else { return }
+        guard SupabaseService.localUserID != nil else {
+            errorMessage = "Sign in first (Settings → account)."
+            return
+        }
+        isBusy = true
+        Task {
+            defer { isBusy = false }
+            if let code = try? await SupabaseService.shared.createInvite(
+                personName: person.name, personEmoji: person.emoji, personID: person.id) {
+                personInvite = AppLinks.inviteMessage(pairingCode: code)
+            }
+        }
+    }
+
     private func connect() {
         guard SupabaseService.localUserID != nil else {
             errorMessage = "Sign in first (Settings → account)."
@@ -233,8 +255,8 @@ struct PersonDetailView: View {
         Task {
             defer { isBusy = false }
             do {
-                let friend = try await SupabaseService.shared.redeemCode(codeInput)
-                person.pairedUserID = friend.uuidString   // bind connection to this person
+                let result = try await SupabaseService.shared.redeem(codeInput)
+                person.pairedUserID = result.ownerID.uuidString   // bind to this person
                 try? people.save()
                 connectedNow = true
                 HapticEngine.connectionFelt()
@@ -342,14 +364,15 @@ struct PingHistoryView: View {
 
             Spacer()
 
-            // Read receipts on the thoughts we sent
+            // Read receipts on the thoughts we sent — WhatsApp-style ticks:
+            // single grey → sent, double green ✓✓ felt
             if sent {
                 if record.openedAt != nil {
-                    Text("felt ✓")
-                        .font(.system(size: 12, weight: .medium))
+                    Text("✓✓ felt")
+                        .font(.system(size: 12, weight: .semibold))
                         .foregroundColor(Color(hex: "#5dcaa5"))
                 } else {
-                    Text("sent")
+                    Text("→ sent")
                         .font(.system(size: 12))
                         .foregroundColor(DesignTokens.Color.textDim)
                 }

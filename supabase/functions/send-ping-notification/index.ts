@@ -65,6 +65,24 @@ async function apnsJWT(): Promise<string> {
   return token;
 }
 
+const PROD_HOST    = "https://api.push.apple.com";
+const SANDBOX_HOST = "https://api.sandbox.push.apple.com";
+
+async function pushToDevice(host: string, token: string, jwt: string,
+                            topic: string, aps: Record<string, unknown>): Promise<number> {
+  const res = await fetch(`${host}/3/device/${token}`, {
+    method: "POST",
+    headers: {
+      "authorization": `bearer ${jwt}`,
+      "apns-topic": topic,
+      "apns-push-type": "alert",
+      "apns-priority": "10",
+    },
+    body: JSON.stringify(aps),
+  });
+  return res.status;
+}
+
 async function sendPush(toUser: string, aps: Record<string, unknown>): Promise<Response> {
   const { data: tokens, error } = await supabase
     .from("device_tokens")
@@ -75,26 +93,26 @@ async function sendPush(toUser: string, aps: Record<string, unknown>): Promise<R
     return new Response("no devices", { status: 200 });
   }
 
-  const host = Deno.env.get("APNS_SANDBOX") === "true"
-    ? "https://api.sandbox.push.apple.com"
-    : "https://api.push.apple.com";
   const topic = Deno.env.get("APNS_TOPIC")!;
   const jwt = await apnsJWT();
+  // TestFlight/App Store devices use PRODUCTION APNs; Xcode dev builds use
+  // SANDBOX. Tokens don't say which they are, so try prod first and fall
+  // back to sandbox on BadDeviceToken (400/410). APNS_SANDBOX=true flips
+  // the order for dev-heavy periods.
+  const preferSandbox = Deno.env.get("APNS_SANDBOX") === "true";
+  const order = preferSandbox ? [SANDBOX_HOST, PROD_HOST] : [PROD_HOST, SANDBOX_HOST];
 
   const results = await Promise.all(
-    tokens.map((t) =>
-      fetch(`${host}/3/device/${t.token}`, {
-        method: "POST",
-        headers: {
-          "authorization": `bearer ${jwt}`,
-          "apns-topic": topic,
-          "apns-push-type": "alert",
-          "apns-priority": "10",
-        },
-        body: JSON.stringify(aps),
-      }).then((r) => r.status)
-    ),
+    tokens.map(async (t) => {
+      const first = await pushToDevice(order[0], t.token, jwt, topic, aps);
+      if (first === 400 || first === 410) {
+        const second = await pushToDevice(order[1], t.token, jwt, topic, aps);
+        return { token: t.token.slice(0, 8), first, second };
+      }
+      return { token: t.token.slice(0, 8), first };
+    }),
   );
+  console.log("push results:", JSON.stringify(results));
   return new Response(JSON.stringify({ sent: results }), { status: 200 });
 }
 
@@ -144,15 +162,23 @@ Deno.serve(async (req) => {
     }
 
     // ── Pings: insert → notify the recipient ───────────────────────────────
+    // First unread = full notification; a backlog collapses into a count so
+    // we never spam multiple full alerts.
     if (!record.to_user) return new Response("no recipient", { status: 400 });
+
+    const { count } = await supabase
+      .from("pings")
+      .select("id", { count: "exact", head: true })
+      .eq("to_user", record.to_user)
+      .is("opened_at", null);
+    const unread = count ?? 1;
+
+    const alert = unread > 1
+      ? { title: "Pointward", body: `you have ${unread} thoughts waiting ✦` }
+      : { title: record.emoji ?? "💜", body: "someone sent you a thought" };
+
     return await sendPush(record.to_user, {
-      aps: {
-        alert: {
-          title: record.emoji ?? "💜",
-          body: "someone sent you a thought",
-        },
-        sound: "default",
-      },
+      aps: { alert, sound: "default", badge: unread },
       pingEmoji: record.emoji ?? "💜",
       fromName: "someone who loves you",
     });

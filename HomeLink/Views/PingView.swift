@@ -37,12 +37,16 @@ struct PingView: View {
     @State private var editingThought: CustomThought? = nil   // long-press → edit
     @State private var deleteCandidate: CustomThought? = nil  // long-press → delete (confirmed)
     @State private var slotPulse = false    // soft pulsing border on the create cell
+    @State private var alignBypass = false  // DEBUG: skip the 15° aim gate (Simulator)
+    @State private var lockPulse   = false  // brilliant send-button pulse within 5°
+    @State private var foodWobble  = false  // playful rocking during food flights
 
     // Focused set — each emoji has its own synthesized voice in SoundEngine.
     // "gecko" renders the custom-drawn LeopardGeckoView — a personal touch
     // for the leopard-gecko lover in the family
     private let loveEmojis    = ["💜","💋","🫂","🌸","gecko","✨"]
     private let feelingEmojis = ["😢","😤","🤬","⚡️","🔥","💨"]
+    private let foodEmojis    = ["🍕","🍫","🍺","🍷","🍰","☕","🧁","🍜","🍣","🥂"]
 
     private static let lavender   = Color(hex: "#c4a8d4")
     private static let lavenderHi = Color(hex: "#e0ccee")
@@ -71,6 +75,20 @@ struct PingView: View {
         // Custom thoughts ride the "with feeling" launch animation
         return feelingEmojis.contains(e) || e.hasPrefix("yours:")
     }
+
+    private var selectedIsFood: Bool {
+        guard let e = selectedEmoji else { return false }
+        return foodEmojis.contains(e)
+    }
+
+    // ── 15° alignment gate ───────────────────────────────────────────────
+    /// How far off-target the needle is (0 = pointing straight at them).
+    private var alignmentDiff: Double {
+        let bearing = compass.state.bearingDegrees
+        return min(bearing, 360 - bearing)
+    }
+    private var isAligned: Bool     { alignBypass || alignmentDiff <= 15 }
+    private var isLockAligned: Bool { alignBypass || alignmentDiff <= 5 }
 
     /// The CustomThought behind a "yours:<uuid>" token, if it is one.
     private func customThought(for token: String) -> CustomThought? {
@@ -298,6 +316,26 @@ struct PingView: View {
                                                   : Self.dim.opacity(0.5)),
                                lineWidth: major ? 1.0 : 0.5)
                 }
+
+                // The 15° send window — same visual language as the lock moment.
+                // Fixed at the top: the needle must settle inside it to send.
+                var arc = Path()
+                arc.addArc(center: CGPoint(x: cx, y: cy), radius: 88,
+                           startAngle: .degrees(-90 - 15), endAngle: .degrees(-90 + 15),
+                           clockwise: false)
+                ctx.stroke(arc,
+                           with: .color(Self.lavender.opacity(isAligned ? 0.9 : 0.30)),
+                           style: StrokeStyle(lineWidth: isAligned ? 3 : 2, lineCap: .round))
+                if isAligned {
+                    // Warm glow halo when the needle is in the window
+                    var halo = Path()
+                    halo.addArc(center: CGPoint(x: cx, y: cy), radius: 88,
+                                startAngle: .degrees(-90 - 17), endAngle: .degrees(-90 + 17),
+                                clockwise: false)
+                    ctx.stroke(halo,
+                               with: .color(Self.purpleGlow.opacity(isLockAligned ? 0.55 : 0.30)),
+                               style: StrokeStyle(lineWidth: 9, lineCap: .round))
+                }
             }
             .frame(width: 195, height: 195)
 
@@ -323,7 +361,9 @@ struct PingView: View {
 
             // ── The flight ───────────────────────────────────────────────────
             if phase == .flying, let emoji = selectedEmoji {
-                if selectedIsFeeling {
+                if selectedIsFood {
+                    foodFlight(emoji: emoji)
+                } else if selectedIsFeeling {
                     furyFlight(emoji: emoji)
                 } else {
                     loveFlight(emoji: emoji)
@@ -400,6 +440,34 @@ struct PingView: View {
             .offset(fly ? edge : .zero)
             .animation(.easeOut(duration: 2.6).delay(0.1), value: fly)
             .shadow(color: (isGecko ? Self.geckoGold : Self.purpleGlow).opacity(0.7), radius: 10)
+    }
+
+    // MARK: - Food flight — floats and wobbles, leaving crumbs
+
+    @ViewBuilder
+    private func foodFlight(emoji: String) -> some View {
+        let dir  = flightDirection
+        let edge = CGSize(width: dir.width * 150, height: dir.height * 150)
+
+        // Trail of little food particles tumbling behind
+        ForEach(0..<6, id: \.self) { i in
+            Text(emoji)
+                .font(.system(size: CGFloat(9 + (i * 2) % 5)))
+                .rotationEffect(.degrees(Double((i * 47) % 70) - 35))
+                .opacity(fly ? 0 : 0.7 - Double(i) * 0.1)
+                .offset(fly ? edge : .zero)
+                .animation(.easeInOut(duration: 2.8).delay(0.25 + Double(i) * 0.16), value: fly)
+        }
+
+        // The dish itself — slower, playful, rocking side to side as it goes
+        Text(emoji)
+            .font(.system(size: 30))
+            .rotationEffect(.degrees(foodWobble ? 12 : -12))
+            .scaleEffect(fly ? 1.5 : 0.7)
+            .opacity(fly ? 0 : 1)
+            .offset(fly ? edge : .zero)
+            .animation(.easeInOut(duration: 3.0).delay(0.1), value: fly)
+            .shadow(color: Self.amber.opacity(0.7), radius: 10)
     }
 
     // MARK: - Fury flight — fired, not floated
@@ -480,6 +548,13 @@ struct PingView: View {
 
             sectionLabel("with feeling", color: Self.ember)
             emojiGrid(feelingEmojis)
+
+            Divider()
+                .background(DesignTokens.Color.border)
+                .padding(.vertical, 8)
+
+            sectionLabel("with food & drink", color: Self.amber)
+            emojiGrid(foodEmojis)
 
             Divider()
                 .background(DesignTokens.Color.border)
@@ -654,27 +729,65 @@ struct PingView: View {
     // MARK: - Send
 
     private func sendButton(emoji: String) -> some View {
-        Button {
-            sendThought()
-        } label: {
-            HStack(spacing: 8) {
-                Text(selectedIsFeeling ? "launch" : "release")
-                thoughtSymbol(emoji, size: 17)
-            }
+        VStack(spacing: 6) {
+            Button {
+                sendThought()
+            } label: {
+                HStack(spacing: 8) {
+                    if isAligned {
+                        Text(selectedIsFeeling ? "launch" : selectedIsFood ? "serve" : "release")
+                        thoughtSymbol(emoji, size: 17)
+                    } else {
+                        Image(systemName: "location.north.line")
+                            .font(.system(size: 13))
+                        Text("turn toward \(people.selectedPerson?.name ?? "them") to send")
+                    }
+                }
                 .font(DesignTokens.Font.label)
-                .foregroundColor(DesignTokens.Color.textPrimary)
+                .foregroundColor(isAligned ? DesignTokens.Color.textPrimary
+                                           : DesignTokens.Color.textMuted)
                 .frame(maxWidth: .infinity)
                 .padding(DesignTokens.Spacing.md)
-                .background(selectedIsFeeling
-                            ? Self.fire.opacity(0.25)
+                .background(!isAligned
+                            ? DesignTokens.Color.backgroundCard
+                            : selectedIsFeeling ? Self.fire.opacity(0.25)
                             : DesignTokens.Color.accentStrong)
                 .cornerRadius(DesignTokens.Radius.button)
                 .overlay(
                     RoundedRectangle(cornerRadius: DesignTokens.Radius.button)
-                        .stroke(selectedIsFeeling ? Self.ember.opacity(0.7)
-                                                  : DesignTokens.Color.accentMid,
+                        .stroke(!isAligned ? DesignTokens.Color.border
+                                : selectedIsFeeling ? Self.ember.opacity(0.7)
+                                : DesignTokens.Color.accentMid,
                                 lineWidth: 1)
                 )
+                // Aligned: soft glow. Locked (≤5°): brilliant pulse — the most
+                // satisfying moment to send from.
+                .shadow(color: Self.purpleGlow.opacity(
+                            !isAligned ? 0
+                            : isLockAligned ? (lockPulse ? 0.85 : 0.45)
+                            : 0.30),
+                        radius: isLockAligned ? 14 : 8)
+                .scaleEffect(isLockAligned && lockPulse ? 1.03 : 1.0)
+            }
+            .disabled(!isAligned)
+            .onChange(of: isLockAligned) { _, locked in
+                if locked && !quietMode {
+                    withAnimation(.easeInOut(duration: 0.7).repeatForever(autoreverses: true)) {
+                        lockPulse = true
+                    }
+                } else {
+                    withAnimation(.easeOut(duration: 0.3)) { lockPulse = false }
+                }
+            }
+
+            #if DEBUG
+            // Simulator has no compass — allow bypassing the aim gate
+            Button(alignBypass ? "⚙︎ aim bypass: on" : "⚙︎ aim bypass: off (sim)") {
+                alignBypass.toggle()
+            }
+            .font(.system(size: 10))
+            .foregroundColor(DesignTokens.Color.textDim)
+            #endif
         }
     }
 
@@ -694,7 +807,23 @@ struct PingView: View {
             Task { try? await SupabaseService.shared.sendPing(to: friend, emoji: emoji) }
         }
 
-        if isFeeling {
+        if selectedIsFood {
+            // Served: slow playful float with a wobble, ~3s of deliciousness
+            foodWobble = false
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                HapticEngine.pingSent()
+                SoundEngine.shared.play(for: token)
+                fly = true
+                withAnimation(.easeInOut(duration: 0.5).repeatForever(autoreverses: true)) {
+                    foodWobble = true
+                }
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 3.3) {
+                foodWobble = false
+                withAnimation { phase = .sent }
+                scheduleConfirmationDismiss()
+            }
+        } else if isFeeling {
             // Fired: sharp launch, screen flash, ~1s flight, pop at the edge
             flashGreen = (token == "💨")
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {

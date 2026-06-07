@@ -52,9 +52,9 @@ final class SupabaseService: ObservableObject {
         return SupabaseClient(supabaseURL: url, supabaseKey: SupabaseConfig.anonKey)
     }()
 
+    /// One consolidated realtime channel for everything (pings in, felt
+    /// receipts, pointing) — opened on foreground, closed on background.
     private var realtimeChannel: RealtimeChannelV2?
-    private var feltChannel: RealtimeChannelV2?
-    private var pointingChannel: RealtimeChannelV2?
 
     // MARK: - Auth (Apple Sign In)
 
@@ -127,12 +127,74 @@ final class SupabaseService: ObservableObject {
         return me
     }
 
-    // MARK: - Pairing (connections table: code · owner · friend)
+    // MARK: - Pairing (connections: code · owner · friend · person identity)
 
     private struct ConnectionRow: Codable {
         let code: String
         let owner: UUID
         var friend: UUID?
+        var personName: String?      // who the owner says this connection is
+        var personEmoji: String?
+        var ownerPersonID: UUID?     // the owner's local Person.id, to re-link
+
+        enum CodingKeys: String, CodingKey {
+            case code, owner, friend
+            case personName    = "person_name"
+            case personEmoji   = "person_emoji"
+            case ownerPersonID = "owner_person_id"
+        }
+    }
+
+    struct RedeemResult {
+        let ownerID: UUID
+        let personName: String?
+        let personEmoji: String?
+    }
+
+    struct DiscoveredConnection {
+        let partnerID: UUID
+        let myPersonID: UUID?   // set when I'm the owner — which card to bind
+    }
+
+    /// Create (or reuse) an invite code tied to a specific person card —
+    /// the recipient sees the name/emoji and gets the person auto-added.
+    func createInvite(personName: String, personEmoji: String, personID: UUID) async throws -> String {
+        guard let client else { throw SupabaseServiceError.notConfigured }
+        guard let me = await currentUserID else { throw SupabaseServiceError.notSignedIn }
+
+        let mine: [ConnectionRow] = try await client
+            .from("connections")
+            .select()
+            .eq("owner", value: me.uuidString)
+            .eq("owner_person_id", value: personID.uuidString)
+            .execute().value
+        if let existing = mine.first {
+            return existing.code
+        }
+
+        let code = Self.generatePairingCode()
+        try await client
+            .from("connections")
+            .insert(ConnectionRow(code: code, owner: me, friend: nil,
+                                  personName: personName, personEmoji: personEmoji,
+                                  ownerPersonID: personID))
+            .execute()
+        log.info("pairing: created person invite \(code, privacy: .public)")
+        return code
+    }
+
+    /// Peek at an invite without claiming it — powers the accept sheet's
+    /// "[name] wants to connect with you".
+    func lookupInvite(_ rawCode: String) async throws -> (name: String?, emoji: String?) {
+        guard let client else { throw SupabaseServiceError.notConfigured }
+        let code = Self.normalizePairingCode(rawCode)
+        let rows: [ConnectionRow] = try await client
+            .from("connections")
+            .select()
+            .eq("code", value: code)
+            .execute().value
+        guard let row = rows.first else { throw SupabaseServiceError.codeNotFound }
+        return (row.personName, row.personEmoji)
     }
 
     /// Fetch (or create on first call) this user's pairing code, e.g. "POINT-4729".
@@ -176,9 +238,10 @@ final class SupabaseService: ObservableObject {
         return "POINT-\(suffix)"
     }
 
-    /// Enter a friend's code: claims their connection row and returns their id.
+    /// Enter a friend's code: claims their connection row. Returns the owner's
+    /// id plus the person identity stored with the invite (for auto-adding).
     @discardableResult
-    func redeemCode(_ rawCode: String) async throws -> UUID {
+    func redeem(_ rawCode: String) async throws -> RedeemResult {
         guard let client else { throw SupabaseServiceError.notConfigured }
         guard let me = await currentUserID else { throw SupabaseServiceError.notSignedIn }
 
@@ -227,7 +290,48 @@ final class SupabaseService: ObservableObject {
 
         Self.connectedFriendID = row.owner
         log.info("redeem: connected ✓ partner=\(row.owner.uuidString, privacy: .public)")
-        return row.owner
+        return RedeemResult(ownerID: row.owner,
+                            personName: row.personName,
+                            personEmoji: row.personEmoji)
+    }
+
+    /// Legacy shape — returns just the partner id.
+    @discardableResult
+    func redeemCode(_ rawCode: String) async throws -> UUID {
+        try await redeem(rawCode).ownerID
+    }
+
+    /// Every established connection, both directions, with the owner-side
+    /// person id so the right card gets bound.
+    func refreshConnections() async throws -> [DiscoveredConnection] {
+        guard let client else { throw SupabaseServiceError.notConfigured }
+        guard let me = await currentUserID else { throw SupabaseServiceError.notSignedIn }
+
+        var found: [DiscoveredConnection] = []
+
+        let mine: [ConnectionRow] = try await client
+            .from("connections")
+            .select()
+            .eq("owner", value: me.uuidString)
+            .execute().value
+        for row in mine where row.friend != nil {
+            found.append(DiscoveredConnection(partnerID: row.friend!,
+                                              myPersonID: row.ownerPersonID))
+        }
+
+        let theirs: [ConnectionRow] = try await client
+            .from("connections")
+            .select()
+            .eq("friend", value: me.uuidString)
+            .execute().value
+        for row in theirs {
+            found.append(DiscoveredConnection(partnerID: row.owner, myPersonID: nil))
+        }
+
+        if let first = found.first {
+            Self.connectedFriendID = first.partnerID
+        }
+        return found
     }
 
     /// Look both directions for an established connection and cache the partner.
@@ -282,11 +386,23 @@ final class SupabaseService: ObservableObject {
     }
 
     func registerDeviceToken(_ token: String) async {
-        guard let client, let me = await currentUserID else { return }
-        _ = try? await client
-            .from("device_tokens")
-            .upsert(DeviceTokenRow(token: token, userID: me, platform: "ios"))
-            .execute()
+        guard let client else {
+            log.error("push: token registration skipped — not configured")
+            return
+        }
+        guard let me = await currentUserID else {
+            log.error("push: token registration skipped — not signed in")
+            return
+        }
+        do {
+            try await client
+                .from("device_tokens")
+                .upsert(DeviceTokenRow(token: token, userID: me, platform: "ios"))
+                .execute()
+            log.info("push: device token registered ✓ (\(token.prefix(8), privacy: .public)…)")
+        } catch {
+            log.error("push: token registration FAILED: \(error.localizedDescription, privacy: .public)")
+        }
     }
 
     // MARK: - Pings
@@ -350,59 +466,66 @@ final class SupabaseService: ObservableObject {
             .execute()
     }
 
-    /// Subscribe to pings addressed to the signed-in user. The handler fires
-    /// on every realtime insert until `stopListening()` is called.
-    func startListeningForPings(onReceive: @escaping (PingEvent) -> Void) async {
+    /// Open the single consolidated realtime channel: incoming pings, felt
+    /// receipts on our sent pings, and partner pointing events.
+    /// Safe to call repeatedly — tears down any existing channel first.
+    func startRealtime(
+        partner: UUID?,
+        onPing: @escaping (PingEvent) -> Void,
+        onFelt: @escaping (PingEvent) -> Void,
+        onPointed: @escaping () -> Void
+    ) async {
         guard let client, let me = await currentUserID else { return }
+        await stopListening()
 
-        let channel = client.channel("incoming-pings")
+        let channel = client.channel("pointward")
         realtimeChannel = channel
 
-        let inserts = channel.postgresChange(
-            InsertAction.self,
-            schema: "public",
-            table: "pings",
-            filter: "to_user=eq.\(me.uuidString)"
-        )
+        let pingInserts = channel.postgresChange(
+            InsertAction.self, schema: "public", table: "pings",
+            filter: "to_user=eq.\(me.uuidString)")
+        let feltUpdates = channel.postgresChange(
+            UpdateAction.self, schema: "public", table: "pings",
+            filter: "from_user=eq.\(me.uuidString)")
+        let pointingChanges = partner.map { p in
+            channel.postgresChange(
+                AnyAction.self, schema: "public", table: "compass_bearings",
+                filter: "user_id=eq.\(p.uuidString)")
+        }
 
         await channel.subscribe()
+        log.info("realtime: consolidated channel subscribed (partner: \(partner?.uuidString ?? "none", privacy: .public))")
 
-        for await insert in inserts {
-            if let ping: PingEvent = try? insert.decodeRecord(decoder: JSONDecoder()) {
-                onReceive(ping)
+        // The streams end when the channel unsubscribes — loops exit cleanly.
+        Task {
+            for await insert in pingInserts {
+                if let ping: PingEvent = try? insert.decodeRecord(decoder: JSONDecoder()) {
+                    onPing(ping)
+                }
             }
         }
-    }
-
-    /// Felt receipts: fires when a ping WE sent gets opened by the recipient.
-    func startListeningForFeltReceipts(onFelt: @escaping (PingEvent) -> Void) async {
-        guard let client, let me = await currentUserID else { return }
-
-        let channel = client.channel("felt-receipts")
-        feltChannel = channel
-
-        let updates = channel.postgresChange(
-            UpdateAction.self,
-            schema: "public",
-            table: "pings",
-            filter: "from_user=eq.\(me.uuidString)"
-        )
-
-        await channel.subscribe()
-
-        for await update in updates {
-            if let ping: PingEvent = try? update.decodeRecord(decoder: JSONDecoder()),
-               ping.openedAt != nil {
-                onFelt(ping)
+        Task {
+            for await update in feltUpdates {
+                if let ping: PingEvent = try? update.decodeRecord(decoder: JSONDecoder()),
+                   ping.openedAt != nil {
+                    onFelt(ping)
+                }
+            }
+        }
+        if let pointingChanges {
+            Task {
+                for await _ in pointingChanges {
+                    onPointed()
+                }
             }
         }
     }
 
     func stopListening() async {
-        await realtimeChannel?.unsubscribe()
-        await feltChannel?.unsubscribe()
+        guard let channel = realtimeChannel else { return }
+        await channel.unsubscribe()
         realtimeChannel = nil
-        feltChannel = nil
+        log.info("realtime: channel closed")
     }
 
     /// Read receipt: the recipient marks a ping as opened/felt.
@@ -460,28 +583,6 @@ final class SupabaseService: ObservableObject {
             .update(["notify_pointing": enabled])
             .eq("id", value: me.uuidString)
             .execute()
-    }
-
-    /// Fires whenever the paired partner's compass locks onto us (in-app path;
-    /// closed-app delivery comes via push).
-    func startListeningForPointing(partner: UUID, onPointed: @escaping () -> Void) async {
-        guard let client, await currentUserID != nil else { return }
-
-        let channel = client.channel("pointing")
-        pointingChannel = channel
-
-        let changes = channel.postgresChange(
-            AnyAction.self,
-            schema: "public",
-            table: "compass_bearings",
-            filter: "user_id=eq.\(partner.uuidString)"
-        )
-
-        await channel.subscribe()
-
-        for await _ in changes {
-            onPointed()
-        }
     }
 
     // MARK: - Presence (last seen)

@@ -5,10 +5,9 @@
 // generated sample-by-sample in Swift and played through AVAudioEngine.
 // No audio files anywhere.
 //
-// Each emoji has its own designed voice (see the play(for:) dispatch):
-// warm sine pulses for love, filtered noise and distorted rumbles for
-// feeling. Volumes are mixed subtle-and-warm vs aggressive per lane,
-// and everything drops to 40% in quiet mode.
+// PERFORMANCE: all buffers are pre-generated once at init and cached;
+// play(for:) schedules a cached buffer instantly — nothing is synthesized
+// on the tap path.
 
 import AVFoundation
 
@@ -20,88 +19,108 @@ final class SoundEngine {
     private let sampleRate: Double = 44_100
     private let format: AVAudioFormat
 
+    /// Token → ready-to-play buffer + lane volume. Built once at startup.
+    private var cache: [String: (buffer: AVAudioPCMBuffer, volume: Float)] = [:]
+
     private init() {
         format = AVAudioFormat(standardFormatWithSampleRate: 44_100, channels: 1)!
         // Ambient: respects the silent switch, mixes with the user's music.
         try? AVAudioSession.sharedInstance().setCategory(.ambient, options: [.mixWithOthers])
+        buildCache()
     }
 
     private var isQuiet: Bool { UserDefaults.standard.bool(forKey: "quietMode") }
 
-    // MARK: - Dispatch
+    // MARK: - Cache
 
-    /// Play the designed sound for an emoji token. Fire-and-forget;
-    /// returns immediately so it runs simultaneously with the animation.
-    func play(for token: String) {
-        switch token {
-        case "💜":    playHeart()
-        case "💋":    playKiss()
-        case "🫂":    playLaugh()
-        case "🌸":    playBlossom()
-        case "gecko": playGecko()
-        case "✨":    playSparkle()
-        case "😢":    playSad()
-        case "😤":    playFrustrated()
-        case "🤬":    playAngry()
-        case "⚡️":    playLightning()
-        case "🔥":    playFire()
-        case "💨":    playFart()
-        default:      break
+    private func buildCache() {
+        let builders: [(token: String, volume: Float, make: () -> AVAudioPCMBuffer?)] = [
+            // with love
+            ("💜",    0.50, makeHeart),
+            ("💋",    0.55, makeKiss),
+            ("🫂",    0.55, makeLaugh),
+            ("🌸",    0.50, makeBlossom),
+            ("gecko", 0.50, makeGecko),
+            ("✨",    0.50, makeSparkle),
+            // with feeling
+            ("😢",    0.55, makeSad),
+            ("😤",    0.80, makeFrustrated),
+            ("🤬",    0.85, makeAngry),
+            ("⚡️",    0.90, makeLightning),
+            ("🔥",    0.85, makeFire),
+            ("💨",    0.85, makeFart),
+            // with food & drink
+            ("🍕",    0.55, makePizzaDoorbell),
+            ("🍫",    0.50, makeChocolateCrinkle),
+            ("🍺",    0.55, makeBeerPour),
+            ("🍷",    0.50, makeWineClink),
+            ("🍰",    0.50, makeCakeChime),
+            ("☕",    0.50, makeEspresso),
+            ("🧁",    0.50, makeCupcakePop),
+            ("🍜",    0.55, makeNoodleSlurp),
+            ("🍣",    0.50, makeSushiPlop),
+            ("🥂",    0.55, makeChampagne),
+        ]
+        for entry in builders {
+            if let buffer = entry.make() {
+                cache[entry.token] = (buffer, entry.volume)
+            }
         }
+    }
+
+    /// Instant playback from cache — safe to call on the tap path.
+    func play(for token: String) {
+        guard let entry = cache[token] else { return }
+        play(entry.buffer, volume: entry.volume)
     }
 
     // MARK: - With love
 
     /// 💜 Soft warm sine pulse, 440→520 Hz over 0.8 s, gentle fades.
-    func playHeart() {
+    private func makeHeart() -> AVAudioPCMBuffer? {
         let d = 0.8
-        guard let (buf, data, n) = makeBuffer(duration: d) else { return }
+        guard let (buf, data, n) = makeBuffer(duration: d) else { return nil }
         for i in 0..<n {
             let t = Double(i) / sampleRate
             let p = t / d
             let phase = sweepPhase(t, f0: 440, f1: 520, d: d)
-            let tone  = sin(phase) + 0.3 * sin(phase * 2)   // warm second partial
+            let tone  = sin(phase) + 0.3 * sin(phase * 2)
             data[i] = Float(tone * 0.22 * envelope(p, attack: 0.30, release: 0.40))
         }
-        play(buf, volume: 0.5)
+        return buf
     }
 
-    /// 💋 Exaggerated kiss — sharp lip smack, then a comic rounded "mwah"
-    /// whose pitch swoops up and falls away. 0.5 s. Unmistakably a kiss.
-    func playKiss() {
+    /// 💋 Exaggerated kiss — sharp lip smack, then a comic rounded "mwah".
+    private func makeKiss() -> AVAudioPCMBuffer? {
         let d = 0.5
-        guard let (buf, data, n) = makeBuffer(duration: d) else { return }
+        guard let (buf, data, n) = makeBuffer(duration: d) else { return nil }
         var rng = SystemRandomNumberGenerator()
         var phase = 0.0
         for i in 0..<n {
             let t = Double(i) / sampleRate
             var s = 0.0
-            // Sharp lip smack: noise pop + a bright resonant ping
             if t < 0.045 {
                 s += Double.random(in: -1...1, using: &rng) * exp(-t * 120) * 1.2
                 s += sin(2 * .pi * 1400 * t) * exp(-t * 90) * 0.8
             }
-            // The "mwah": pitch swoops 320→540, then falls comically to 240
             if t >= 0.06 {
                 let tt = t - 0.06
                 let dd = d - 0.06
-                let f: Double = tt < 0.10
-                    ? 320 + 2200 * tt
-                    : 540 - 300 * ((tt - 0.10) / (dd - 0.10))
+                let f: Double = tt < 0.10 ? 320 + 2200 * tt
+                                          : 540 - 300 * ((tt - 0.10) / (dd - 0.10))
                 phase += 2 * .pi * f / sampleRate
-                let tone = sin(phase) + 0.4 * sin(2 * phase)   // warm, rounded
+                let tone = sin(phase) + 0.4 * sin(2 * phase)
                 s += tone * envelope(tt / dd, attack: 0.12, release: 0.35) * 0.7
             }
             data[i] = Float(max(-1, min(1, s * 0.6)))
         }
-        play(buf, volume: 0.65)
+        return buf
     }
 
-    /// 🫂 Warm laughter — four quick "ha" bursts, each a falling voiced tone
-    /// with a breathy onset, fading gently across the run. Joyful, not mocking. 0.8 s.
-    func playLaugh() {
+    /// 🫂 Warm laughter — four quick "ha" bursts, falling and fading.
+    private func makeLaugh() -> AVAudioPCMBuffer? {
         let d = 0.8
-        guard let (buf, data, n) = makeBuffer(duration: d) else { return }
+        guard let (buf, data, n) = makeBuffer(duration: d) else { return nil }
         var rng = SystemRandomNumberGenerator()
         let has: [(start: Double, f0: Double)] = [
             (0.00, 300), (0.18, 285), (0.36, 270), (0.54, 255),
@@ -112,41 +131,38 @@ final class SoundEngine {
             for (idx, ha) in has.enumerated() where t >= ha.start && t < ha.start + 0.15 {
                 let tt = t - ha.start
                 let pp = tt / 0.15
-                // Voiced "a": fundamental falling ~60 Hz with warm harmonics
                 let ph = sweepPhase(tt, f0: ha.f0, f1: ha.f0 - 60, d: 0.15)
                 let voice = sin(ph) + 0.5 * sin(2 * ph) + 0.25 * sin(3 * ph)
-                // Breathy "h" onset
                 let breath = Double.random(in: -1...1, using: &rng) * exp(-tt * 50) * 0.5
-                let fade = 1.0 - Double(idx) * 0.12   // each ha a touch softer
+                let fade = 1.0 - Double(idx) * 0.12
                 s += (voice * envelope(pp, attack: 0.18, release: 0.45) * 0.5 + breath) * fade
             }
             data[i] = Float(max(-1, min(1, s * 0.45)))
         }
-        play(buf, volume: 0.55)
+        return buf
     }
 
-    /// 🌸 Three ascending chimes — C5, E5, G5 — overlapping. Light and delicate.
-    func playBlossom() {
+    /// 🌸 Three ascending chimes — C5, E5, G5 — overlapping.
+    private func makeBlossom() -> AVAudioPCMBuffer? {
         let d = 0.65
-        guard let (buf, data, n) = makeBuffer(duration: d) else { return }
+        guard let (buf, data, n) = makeBuffer(duration: d) else { return nil }
         let notes: [(start: Double, f: Double)] = [(0.00, 523.25), (0.15, 659.25), (0.30, 783.99)]
         for i in 0..<n {
             let t = Double(i) / sampleRate
             var s = 0.0
             for note in notes where t >= note.start && t < note.start + 0.3 {
                 let tt = t - note.start
-                s += sin(2 * .pi * note.f * tt)
-                   * envelope(tt / 0.3, attack: 0.08, release: 0.55)
+                s += sin(2 * .pi * note.f * tt) * envelope(tt / 0.3, attack: 0.08, release: 0.55)
             }
             data[i] = Float(s * 0.18)
         }
-        play(buf, volume: 0.5)
+        return buf
     }
 
     /// 🦎 Rapid soft clicks — five quick pips, like a real leopard gecko chirp.
-    func playGecko() {
+    private func makeGecko() -> AVAudioPCMBuffer? {
         let d = 0.45
-        guard let (buf, data, n) = makeBuffer(duration: d) else { return }
+        guard let (buf, data, n) = makeBuffer(duration: d) else { return nil }
         let clicks: [(start: Double, f: Double)] = [
             (0.00, 1900), (0.08, 2150), (0.16, 1850), (0.24, 2250), (0.32, 2000),
         ]
@@ -159,13 +175,13 @@ final class SoundEngine {
             }
             data[i] = Float(s * 0.5)
         }
-        play(buf, volume: 0.5)
+        return buf
     }
 
-    /// ✨ High shimmer — randomized pings 800–1200 Hz over 0.6 s.
-    func playSparkle() {
+    /// ✨ High shimmer — randomized pings 800–1200 Hz.
+    private func makeSparkle() -> AVAudioPCMBuffer? {
         let d = 0.6
-        guard let (buf, data, n) = makeBuffer(duration: d) else { return }
+        guard let (buf, data, n) = makeBuffer(duration: d) else { return nil }
         var rng = SystemRandomNumberGenerator()
         let pings: [(start: Double, f: Double)] = (0..<7).map { i in
             (Double(i) * 0.075 + Double.random(in: 0...0.03, using: &rng),
@@ -181,16 +197,16 @@ final class SoundEngine {
             }
             data[i] = Float(s * 0.16)
         }
-        play(buf, volume: 0.5)
+        return buf
     }
 
     // MARK: - With feeling
 
-    /// 😢 Soft descending tone 400→220 Hz with a slight vibrato. Melancholy. 1.2 s.
-    func playSad() {
+    /// 😢 Soft descending tone with vibrato. Melancholy.
+    private func makeSad() -> AVAudioPCMBuffer? {
         let d = 1.2
-        guard let (buf, data, n) = makeBuffer(duration: d) else { return }
-        var phase = 0.0   // incremental phase so the vibrato stays smooth
+        guard let (buf, data, n) = makeBuffer(duration: d) else { return nil }
+        var phase = 0.0
         for i in 0..<n {
             let t = Double(i) / sampleRate
             let p = t / d
@@ -199,13 +215,13 @@ final class SoundEngine {
             let tone = sin(phase) + 0.25 * sin(2 * phase)
             data[i] = Float(tone * 0.22 * envelope(p, attack: 0.15, release: 0.30))
         }
-        play(buf, volume: 0.55)
+        return buf
     }
 
-    /// 😤 Sharp exhale — a 0.3 s burst of mid-resonant noise.
-    func playFrustrated() {
+    /// 😤 Sharp exhale — mid-resonant noise burst.
+    private func makeFrustrated() -> AVAudioPCMBuffer? {
         let d = 0.3
-        guard let (buf, data, n) = makeBuffer(duration: d) else { return }
+        guard let (buf, data, n) = makeBuffer(duration: d) else { return nil }
         var rng = SystemRandomNumberGenerator()
         let omega = 2 * Double.pi * 900 / sampleRate
         let r = 0.95
@@ -215,16 +231,15 @@ final class SoundEngine {
             let x = Double.random(in: -1...1, using: &rng)
             let y = x + 2 * r * cos(omega) * y1 - r * r * y2
             y2 = y1; y1 = y
-            let s = max(-1, min(1, y * 0.05)) * envelope(p, attack: 0.04, release: 0.50)
-            data[i] = Float(s)
+            data[i] = Float(max(-1, min(1, y * 0.05)) * envelope(p, attack: 0.04, release: 0.50))
         }
-        play(buf, volume: 0.8)
+        return buf
     }
 
-    /// 🤬 Low aggressive rumble — 80→120 Hz, driven into distortion. 0.6 s.
-    func playAngry() {
+    /// 🤬 Low aggressive rumble, driven into distortion.
+    private func makeAngry() -> AVAudioPCMBuffer? {
         let d = 0.6
-        guard let (buf, data, n) = makeBuffer(duration: d) else { return }
+        guard let (buf, data, n) = makeBuffer(duration: d) else { return nil }
         var rng = SystemRandomNumberGenerator()
         var phase = 0.0
         for i in 0..<n {
@@ -232,59 +247,52 @@ final class SoundEngine {
             let f = 80 + 40 * p
             phase += 2 * .pi * f / sampleRate
             var s = sin(phase) * 2.5
-            s += 0.35 * Double.random(in: -1...1, using: &rng) * sin(phase)  // growl roughness
-            s = tanh(s)                                                       // distortion
+            s += 0.35 * Double.random(in: -1...1, using: &rng) * sin(phase)
+            s = tanh(s)
             data[i] = Float(s * 0.5 * envelope(p, attack: 0.08, release: 0.25))
         }
-        play(buf, volume: 0.85)
+        return buf
     }
 
-    /// ⚡️ Real thunder — a sharp electrical crack, then a deep rolling rumble
-    /// (40–80 Hz) with a long natural decay. 1.5 s. Powerful and atmospheric.
-    func playLightning() {
+    /// ⚡️ Crack, then deep rolling 40–80 Hz thunder with a long decay.
+    private func makeLightning() -> AVAudioPCMBuffer? {
         let d = 1.5
-        guard let (buf, data, n) = makeBuffer(duration: d) else { return }
+        guard let (buf, data, n) = makeBuffer(duration: d) else { return nil }
         var rng = SystemRandomNumberGenerator()
         var prevX = 0.0
-        var lp    = 0.0   // deep low-pass: the body of the rumble
-        var roll  = 0.0   // very slow follower: the "rolling" undulation
-        var phase = 0.0   // wandering sub-bass
+        var lp    = 0.0
+        var roll  = 0.0
+        var phase = 0.0
         for i in 0..<n {
             let t = Double(i) / sampleRate
             var s = 0.0
-
-            // 1) The crack — instant attack, gone in ~80 ms
             if t < 0.08 {
                 let x = Double.random(in: -1...1, using: &rng)
                 let hp = x - 0.92 * prevX
                 prevX = x
                 s += hp * exp(-t * 60) * 0.9
             }
-
-            // 2) The thunder — arrives right behind the crack and rolls away
             if t >= 0.05 {
                 let tt = t - 0.05
                 let x = Double.random(in: -1...1, using: &rng)
-                lp   += 0.015  * (x - lp)          // keep only the lows
-                roll += 0.0006 * (abs(x) - roll)   // slow amplitude undulation
-                // Sub-bass wandering between 40 and 80 Hz
+                lp   += 0.015  * (x - lp)
+                roll += 0.0006 * (abs(x) - roll)
                 let f = 60 + 20 * sin(2 * .pi * 0.7 * tt)
                 phase += 2 * .pi * f / sampleRate
                 let body   = lp * 6.0 + sin(phase) * 0.5
-                let attack = min(1, tt / 0.06)     // sharp arrival
-                let decay  = exp(-tt * 2.0)        // long thunder tail
+                let attack = min(1, tt / 0.06)
+                let decay  = exp(-tt * 2.0)
                 s += body * (0.5 + roll * 6) * attack * decay * 0.8
             }
-
             data[i] = Float(max(-1, min(1, s)))
         }
-        play(buf, volume: 0.9)
+        return buf
     }
 
-    /// 🔥 Igniting whoosh — resonant noise sweeping 400→2000 Hz with crackles. 0.8 s.
-    func playFire() {
+    /// 🔥 Igniting whoosh — resonant noise sweeping up with crackles.
+    private func makeFire() -> AVAudioPCMBuffer? {
         let d = 0.8
-        guard let (buf, data, n) = makeBuffer(duration: d) else { return }
+        guard let (buf, data, n) = makeBuffer(duration: d) else { return nil }
         var rng = SystemRandomNumberGenerator()
         let r = 0.93
         var y1 = 0.0, y2 = 0.0
@@ -293,43 +301,240 @@ final class SoundEngine {
             let fc = 400 + 1600 * p
             let omega = 2 * Double.pi * fc / sampleRate
             var x = Double.random(in: -1...1, using: &rng)
-            if Double.random(in: 0...1, using: &rng) < 0.0015 { x += 3.0 }   // crackle
+            if Double.random(in: 0...1, using: &rng) < 0.0015 { x += 3.0 }
             let y = x + 2 * r * cos(omega) * y1 - r * r * y2
             y2 = y1; y1 = y
-            let s = max(-1, min(1, y * 0.06)) * envelope(p, attack: 0.15, release: 0.30)
-            data[i] = Float(s)
+            data[i] = Float(max(-1, min(1, y * 0.06)) * envelope(p, attack: 0.15, release: 0.30))
         }
-        play(buf, volume: 0.85)
+        return buf
     }
 
-    /// 💨 Classic wet fart — a sputtering 60–120 Hz buzz with a drunken pitch
-    /// walk, irregular amplitude wobble, and a bubbly low-passed noise layer,
-    /// drooping as it runs out of steam. 0.7 s. Unmistakable, comical, satisfying.
-    func playFart() {
+    /// 💨 Wet sputtering fart — drunken pitch walk, bubbly noise, drooping.
+    private func makeFart() -> AVAudioPCMBuffer? {
         let d = 0.7
-        guard let (buf, data, n) = makeBuffer(duration: d) else { return }
+        guard let (buf, data, n) = makeBuffer(duration: d) else { return nil }
         var rng = SystemRandomNumberGenerator()
         var phase    = 0.0
         var wobPhase = 0.0
-        var f        = 95.0   // fundamental wanders within 60–120 Hz
-        var lp       = 0.0    // wet/bubbly noise state
+        var f        = 95.0
+        var lp       = 0.0
         for i in 0..<n {
             let t = Double(i) / sampleRate
             let p = t / d
-            // Drunken pitch walk, drooping ~25% by the end
             f = max(60, min(120, f + Double.random(in: -1.5...1.5, using: &rng)))
             phase += 2 * .pi * f * (1.0 - 0.25 * p) / sampleRate
-            // Irregular sputter: 16–28 Hz amplitude wobble with random depth
             wobPhase += 2 * .pi * (22 + 6 * sin(2 * .pi * 3.1 * t)) / sampleRate
             let sputter = 0.55 + 0.45 * sin(wobPhase)
                           * (0.7 + 0.3 * Double.random(in: 0...1, using: &rng))
-            // Wet texture: heavily low-passed noise riding the same sputter
             lp += 0.06 * (Double.random(in: -1...1, using: &rng) - lp)
             var s = (sin(phase) + 0.5 * sin(2 * phase)) * sputter + lp * 1.6 * sputter
-            s = tanh(s * 1.8)   // body
+            s = tanh(s * 1.8)
             data[i] = Float(s * 0.5 * envelope(p, attack: 0.04, release: 0.30))
         }
-        play(buf, volume: 0.85)
+        return buf
+    }
+
+    // MARK: - With food & drink
+
+    /// 🍕 Cartoon delivery doorbell — classic two-tone ding-dong.
+    private func makePizzaDoorbell() -> AVAudioPCMBuffer? {
+        let d = 0.8
+        guard let (buf, data, n) = makeBuffer(duration: d) else { return nil }
+        let notes: [(start: Double, f: Double, len: Double)] = [
+            (0.00, 659.25, 0.35),   // ding (E5)
+            (0.28, 523.25, 0.50),   // dong (C5)
+        ]
+        for i in 0..<n {
+            let t = Double(i) / sampleRate
+            var s = 0.0
+            for note in notes where t >= note.start && t < note.start + note.len {
+                let tt = t - note.start
+                s += (sin(2 * .pi * note.f * tt) + 0.4 * sin(2 * .pi * note.f * 2 * tt))
+                   * exp(-tt * 6)
+            }
+            data[i] = Float(s * 0.3)
+        }
+        return buf
+    }
+
+    /// 🍫 Satisfying wrapper crinkle — clustered bright noise bursts.
+    private func makeChocolateCrinkle() -> AVAudioPCMBuffer? {
+        let d = 0.6
+        guard let (buf, data, n) = makeBuffer(duration: d) else { return nil }
+        var rng = SystemRandomNumberGenerator()
+        // Pre-place ~14 tiny crinkle bursts
+        let bursts: [(start: Double, len: Double)] = (0..<14).map { _ in
+            (Double.random(in: 0...(d - 0.05), using: &rng),
+             Double.random(in: 0.01...0.04, using: &rng))
+        }
+        var prev = 0.0
+        for i in 0..<n {
+            let t = Double(i) / sampleRate
+            var s = 0.0
+            for burst in bursts where t >= burst.start && t < burst.start + burst.len {
+                let x = Double.random(in: -1...1, using: &rng)
+                let hp = x - 0.85 * prev
+                prev = x
+                s += hp * 0.7
+            }
+            data[i] = Float(max(-1, min(1, s)) * envelope(t / d, attack: 0.05, release: 0.2))
+        }
+        return buf
+    }
+
+    /// 🍺 Pour, then a satisfying clink.
+    private func makeBeerPour() -> AVAudioPCMBuffer? {
+        let d = 0.9
+        guard let (buf, data, n) = makeBuffer(duration: d) else { return nil }
+        var rng = SystemRandomNumberGenerator()
+        var lp = 0.0
+        for i in 0..<n {
+            let t = Double(i) / sampleRate
+            var s = 0.0
+            // The pour: rising band of bubbly noise (0–0.6 s)
+            if t < 0.6 {
+                lp += (0.04 + 0.10 * t) * (Double.random(in: -1...1, using: &rng) - lp)
+                s += lp * 2.2 * (0.3 + t)
+            }
+            // The clink at 0.65 s
+            if t >= 0.65 {
+                let tt = t - 0.65
+                s += (sin(2 * .pi * 1800 * tt) + 0.5 * sin(2 * .pi * 2700 * tt)) * exp(-tt * 24)
+            }
+            data[i] = Float(max(-1, min(1, s * 0.45)))
+        }
+        return buf
+    }
+
+    /// 🍷 One elegant glass clink with a long ring.
+    private func makeWineClink() -> AVAudioPCMBuffer? {
+        let d = 1.0
+        guard let (buf, data, n) = makeBuffer(duration: d) else { return nil }
+        for i in 0..<n {
+            let t = Double(i) / sampleRate
+            let s = (sin(2 * .pi * 2100 * t)
+                   + 0.5 * sin(2 * .pi * 3150 * t)
+                   + 0.25 * sin(2 * .pi * 4350 * t)) * exp(-t * 5)
+            data[i] = Float(s * 0.3)
+        }
+        return buf
+    }
+
+    /// 🍰 Happy little chime — quick rising major arpeggio.
+    private func makeCakeChime() -> AVAudioPCMBuffer? {
+        let d = 0.6
+        guard let (buf, data, n) = makeBuffer(duration: d) else { return nil }
+        let notes: [(start: Double, f: Double)] = [
+            (0.00, 523.25), (0.10, 659.25), (0.20, 783.99), (0.30, 1046.5),
+        ]
+        for i in 0..<n {
+            let t = Double(i) / sampleRate
+            var s = 0.0
+            for note in notes where t >= note.start {
+                let tt = t - note.start
+                s += sin(2 * .pi * note.f * tt) * exp(-tt * 9)
+            }
+            data[i] = Float(s * 0.2)
+        }
+        return buf
+    }
+
+    /// ☕ Espresso machine — pulsing pressurized hiss over a low motor hum.
+    private func makeEspresso() -> AVAudioPCMBuffer? {
+        let d = 0.9
+        guard let (buf, data, n) = makeBuffer(duration: d) else { return nil }
+        var rng = SystemRandomNumberGenerator()
+        var prev = 0.0
+        var motorPhase = 0.0
+        for i in 0..<n {
+            let t = Double(i) / sampleRate
+            let p = t / d
+            let x = Double.random(in: -1...1, using: &rng)
+            let hiss = x - 0.6 * prev
+            prev = x
+            motorPhase += 2 * .pi * 95 / sampleRate
+            let pulse = 0.65 + 0.35 * sin(2 * .pi * 11 * t)
+            let s = hiss * 0.5 * pulse + sin(motorPhase) * 0.18
+            data[i] = Float(max(-1, min(1, s)) * envelope(p, attack: 0.10, release: 0.25))
+        }
+        return buf
+    }
+
+    /// 🧁 Soft little pop.
+    private func makeCupcakePop() -> AVAudioPCMBuffer? {
+        let d = 0.2
+        guard let (buf, data, n) = makeBuffer(duration: d) else { return nil }
+        var rng = SystemRandomNumberGenerator()
+        for i in 0..<n {
+            let t = Double(i) / sampleRate
+            var s = sin(sweepPhase(t, f0: 320, f1: 150, d: 0.08)) * exp(-t * 30)
+            if t < 0.012 { s += Double.random(in: -1...1, using: &rng) * 0.4 }
+            data[i] = Float(s * 0.5)
+        }
+        return buf
+    }
+
+    /// 🍜 The slurp — noise sweeping up with a comic wobble.
+    private func makeNoodleSlurp() -> AVAudioPCMBuffer? {
+        let d = 0.6
+        guard let (buf, data, n) = makeBuffer(duration: d) else { return nil }
+        var rng = SystemRandomNumberGenerator()
+        let r = 0.94
+        var y1 = 0.0, y2 = 0.0
+        var phase = 0.0
+        for i in 0..<n {
+            let t = Double(i) / sampleRate
+            let p = t / d
+            let fc = 400 + 1000 * p + 180 * sin(2 * .pi * 9 * t)   // wobbling sweep
+            let omega = 2 * Double.pi * fc / sampleRate
+            let x = Double.random(in: -1...1, using: &rng)
+            let y = x + 2 * r * cos(omega) * y1 - r * r * y2
+            y2 = y1; y1 = y
+            phase += 2 * .pi * (fc * 0.5) / sampleRate
+            let s = max(-1, min(1, y * 0.05)) + sin(phase) * 0.12
+            data[i] = Float(s * envelope(p, attack: 0.10, release: 0.20))
+        }
+        return buf
+    }
+
+    /// 🍣 A soft satisfying plop.
+    private func makeSushiPlop() -> AVAudioPCMBuffer? {
+        let d = 0.25
+        guard let (buf, data, n) = makeBuffer(duration: d) else { return nil }
+        for i in 0..<n {
+            let t = Double(i) / sampleRate
+            let s = sin(sweepPhase(t, f0: 400, f1: 120, d: 0.15)) * exp(-t * 18)
+            data[i] = Float(s * 0.55)
+        }
+        return buf
+    }
+
+    /// 🥂 Champagne — the pop, then a long fading fizz.
+    private func makeChampagne() -> AVAudioPCMBuffer? {
+        let d = 1.0
+        guard let (buf, data, n) = makeBuffer(duration: d) else { return nil }
+        var rng = SystemRandomNumberGenerator()
+        var prev = 0.0
+        for i in 0..<n {
+            let t = Double(i) / sampleRate
+            var s = 0.0
+            // The pop: thump + burst
+            if t < 0.06 {
+                s += sin(sweepPhase(t, f0: 260, f1: 110, d: 0.06)) * exp(-t * 40) * 1.2
+                s += Double.random(in: -1...1, using: &rng) * exp(-t * 90) * 0.8
+            }
+            // The fizz: bright sparse noise fading away
+            if t >= 0.06 {
+                let tt = t - 0.06
+                let x = Double.random(in: -1...1, using: &rng)
+                let hp = x - 0.9 * prev
+                prev = x
+                let sparkle = Double.random(in: 0...1, using: &rng) < 0.35 ? 1.0 : 0.25
+                s += hp * sparkle * exp(-tt * 3.2) * 0.5
+            }
+            data[i] = Float(max(-1, min(1, s * 0.55)))
+        }
+        return buf
     }
 
     // MARK: - Synthesis plumbing
@@ -342,14 +547,12 @@ final class SoundEngine {
         return (buf, data, Int(frames))
     }
 
-    /// Linear attack/release envelope; attack/release as fractions of duration.
     private func envelope(_ p: Double, attack: Double, release: Double) -> Double {
         if p < attack       { return p / attack }
         if p > 1 - release  { return max(0, (1 - p) / release) }
         return 1
     }
 
-    /// Phase of a linear frequency sweep f0→f1 over duration d, at time t.
     private func sweepPhase(_ t: Double, f0: Double, f1: Double, d: Double) -> Double {
         2 * .pi * (f0 * t + (f1 - f0) * t * t / (2 * d))
     }

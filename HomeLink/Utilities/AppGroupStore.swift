@@ -52,7 +52,13 @@ struct AppGroupStore {
         defaults.removeObject(forKey: "pendingPingTimestamp")
         reloadWidgets()
     }
+    // Debounced: rapid successive property writes (every compass tick sets
+    // several keys) collapse into at most one widget reload per 15 seconds.
+    private static var lastWidgetReload: Date = .distantPast
+
     private static func reloadWidgets() {
+        guard Date.now.timeIntervalSince(lastWidgetReload) >= 15 else { return }
+        lastWidgetReload = .now
         WidgetCenter.shared.reloadAllTimelines()
     }
 }

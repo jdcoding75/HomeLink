@@ -16,6 +16,8 @@ struct SettingsView: View {
     @AppStorage("useMiles") private var useMiles = Locale.current.measurementSystem == .us
     @AppStorage("lockScreenWidgetEnabled") private var lockScreenWidget = false
     @AppStorage("notifyPointing") private var notifyPointing = true
+    @AppStorage("funnyUnitLocked")      private var funnyUnitLocked      = -1
+    @AppStorage("thoughtTaglineLocked") private var thoughtTaglineLocked = -1
 
     @State private var showSkinPicker = false
     @State private var showAbout      = false
@@ -209,6 +211,42 @@ struct SettingsView: View {
                 Toggle("", isOn: $useMiles)
                     .tint(DesignTokens.Color.accentMid)
                     .labelsHidden()
+            }
+
+            Divider().background(DesignTokens.Color.border).padding(.leading, 44)
+
+            settingsRow {
+                Image(systemName: "sportscourt")
+                    .settingsIcon()
+                Text("funny distance unit")
+                    .settingsLabel()
+                Spacer()
+                Picker("", selection: $funnyUnitLocked) {
+                    Text("surprise me").tag(-1)
+                    ForEach(0..<DistanceFun.funnyCount, id: \.self) { i in
+                        Text(DistanceFun.funnyLabels[i]).tag(i)
+                    }
+                }
+                .pickerStyle(.menu)
+                .tint(DesignTokens.Color.accentSoft)
+            }
+
+            Divider().background(DesignTokens.Color.border).padding(.leading, 44)
+
+            settingsRow {
+                Image(systemName: "sparkle")
+                    .settingsIcon()
+                Text("thought speed tagline")
+                    .settingsLabel()
+                Spacer()
+                Picker("", selection: $thoughtTaglineLocked) {
+                    Text("surprise me").tag(-1)
+                    ForEach(0..<DistanceFun.thoughtTaglines.count, id: \.self) { i in
+                        Text(DistanceFun.thoughtTaglines[i]).tag(i)
+                    }
+                }
+                .pickerStyle(.menu)
+                .tint(DesignTokens.Color.accentSoft)
             }
 
             Divider().background(DesignTokens.Color.border).padding(.leading, 44)

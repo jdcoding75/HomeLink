@@ -7,6 +7,7 @@ import Combine
 @MainActor
 final class PingManager: ObservableObject {
 
+    /// Legacy single-slot ping (still mirrored to the widget store).
     @Published var pendingPing: ReceivedPing?
     @Published var isSending   = false
     /// "Mum felt your thought ✓" — set when a sent ping gets opened remotely.
@@ -14,9 +15,18 @@ final class PingManager: ObservableObject {
     /// "Mum is pointing toward you 🧭" — their compass just locked onto us.
     @Published var pointingNotice: String?
 
+    // ── Thought queue ────────────────────────────────────────────────────
+    /// Received thoughts waiting to be watched. Max 10; oldest drops off.
+    @Published private(set) var queue: [ReceivedPing] = []
+    /// The thought currently playing its arrival animation, if any.
+    @Published var nowPlaying: ReceivedPing?
+
+    static let maxQueued = 10
+
     private let networkService: NetworkServiceProtocol
 
-    struct ReceivedPing: Equatable {
+    struct ReceivedPing: Equatable, Identifiable {
+        let id = UUID()
         let fromName:  String
         let emoji:     String
         let timestamp: Date
@@ -54,17 +64,52 @@ final class PingManager: ObservableObject {
         }
     }
 
+    /// New thought arrives → joins the queue (badge shows on the compass).
     func receivePing(fromName: String, emoji: String, remoteID: UUID? = nil) {
         let ping = ReceivedPing(fromName: fromName, emoji: emoji, timestamp: .now, remoteID: remoteID)
-        pendingPing = ping
+        queue.append(ping)
+        if queue.count > Self.maxQueued {
+            queue.removeFirst(queue.count - Self.maxQueued)   // oldest drops off
+        }
         AppGroupStore.pendingPingEmoji     = emoji
         AppGroupStore.pendingPingFromName  = fromName
         AppGroupStore.pendingPingTimestamp = .now
         HapticEngine.pingReceived()
-        Task {
-            try? await Task.sleep(nanoseconds: 600_000_000_000)
-            if pendingPing?.timestamp == ping.timestamp { clearPendingPing() }
+    }
+
+    /// Start (or skip to) the next queued thought's arrival animation.
+    /// Marks it felt (opened_at) the moment it begins to play.
+    func playNext() {
+        guard !queue.isEmpty else {
+            nowPlaying = nil
+            return
         }
+        let ping = queue.removeFirst()
+        nowPlaying = ping
+        if let remoteID = ping.remoteID {
+            Task { await SupabaseService.shared.markPingOpened(remoteID) }
+        }
+    }
+
+    /// Called when an arrival animation completes — auto-advances to the
+    /// next thought after 2 seconds (tap skips ahead immediately).
+    func finishedPlaying(_ ping: ReceivedPing) {
+        guard nowPlaying?.id == ping.id else { return }
+        nowPlaying = nil
+        AppGroupStore.clearPendingPing()
+        guard !queue.isEmpty else { return }
+        Task {
+            try? await Task.sleep(nanoseconds: 2_000_000_000)
+            if nowPlaying == nil { playNext() }
+        }
+    }
+
+    /// Tap-to-skip: jump straight to the next thought, no 2-second gap.
+    func skip(_ ping: ReceivedPing) {
+        guard nowPlaying?.id == ping.id else { return }
+        nowPlaying = nil
+        AppGroupStore.clearPendingPing()
+        playNext()
     }
 
     func clearPendingPing() {

@@ -16,11 +16,17 @@ create policy "users read"         on public.users for select using (true);
 
 -- ── connections (pairing codes) ───────────────────────────────────────
 create table if not exists public.connections (
-  code       text primary key,
-  owner      uuid not null references public.users(id) on delete cascade,
-  friend     uuid references public.users(id) on delete set null,
-  created_at timestamptz default now()
+  code            text primary key,
+  owner           uuid not null references public.users(id) on delete cascade,
+  friend          uuid references public.users(id) on delete set null,
+  person_name     text,        -- identity the invite travels with
+  person_emoji    text,
+  owner_person_id uuid,        -- the owner's local Person.id, to re-link
+  created_at      timestamptz default now()
 );
+alter table public.connections add column if not exists person_name text;
+alter table public.connections add column if not exists person_emoji text;
+alter table public.connections add column if not exists owner_person_id uuid;
 alter table public.connections enable row level security;
 create policy "connections read"       on public.connections for select using (true);
 create policy "connections insert own" on public.connections for insert with check (auth.uid() = owner);

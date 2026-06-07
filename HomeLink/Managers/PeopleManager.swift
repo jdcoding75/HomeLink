@@ -4,6 +4,7 @@
 import Foundation
 import Combine
 import SwiftData
+import CoreLocation
 
 @MainActor
 final class PeopleManager: ObservableObject {
@@ -59,12 +60,41 @@ final class PeopleManager: ObservableObject {
 
     /// Make sure some local person carries the connected friend's Supabase id —
     /// per-person status, pointing reports, and ping naming all key off it.
-    /// Binds to the selected person (or the first) when no one has it yet.
-    func bindConnection(friendID: UUID) {
+    /// When the connection knows which card it belongs to (owner_person_id),
+    /// binds that exact person; otherwise falls back to selected/first.
+    func bindConnection(friendID: UUID, toPersonID personID: UUID? = nil) {
         guard !people.contains(where: { $0.pairedUserID == friendID.uuidString }) else { return }
-        guard let target = selectedPerson ?? people.first else { return }
+        let target = personID.flatMap { id in people.first(where: { $0.id == id }) }
+                     ?? selectedPerson ?? people.first
+        guard let target else { return }
         target.pairedUserID = friendID.uuidString
         try? save()
+    }
+
+    /// Accepting an invite auto-adds the person it came labeled as.
+    /// Connection-initiated, so it bypasses the free-tier person gate.
+    /// Location starts at the recipient's own position (distance ~0) until
+    /// they edit the person and set a real address.
+    @discardableResult
+    func addFromInvite(name: String, emoji: String, friendID: UUID,
+                       near coordinate: CLLocationCoordinate2D?) -> Person? {
+        if let existing = people.first(where: { $0.pairedUserID == friendID.uuidString }) {
+            return existing
+        }
+        let person = Person(
+            name: name,
+            emoji: emoji,
+            latitude: coordinate?.latitude ?? 0,
+            longitude: coordinate?.longitude ?? 0,
+            displayAddress: "",
+            locationDisplayName: name
+        )
+        person.pairedUserID = friendID.uuidString
+        modelContext?.insert(person)
+        try? modelContext?.save()
+        fetchAll()
+        if selectedPerson == nil { selectedPerson = person }
+        return person
     }
 
     enum PeopleError: Error, LocalizedError {
