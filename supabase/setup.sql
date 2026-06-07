@@ -36,14 +36,16 @@ create policy "connections claim"      on public.connections for update
 
 -- ── pings ─────────────────────────────────────────────────────────────
 create table if not exists public.pings (
-  id         uuid primary key default gen_random_uuid(),
-  from_user  uuid not null references public.users(id) on delete cascade,
-  to_user    uuid not null references public.users(id) on delete cascade,
-  emoji      text not null,
-  opened_at  timestamptz,                    -- read receipt ("felt ✓")
-  created_at timestamptz default now()
+  id           uuid primary key default gen_random_uuid(),
+  from_user    uuid not null references public.users(id) on delete cascade,
+  to_user      uuid not null references public.users(id) on delete cascade,
+  emoji        text not null,
+  sender_style text default 'glow',          -- glow | shootingStar | firefly
+  opened_at    timestamptz,                  -- read receipt ("felt ✓")
+  created_at   timestamptz default now()
 );
 alter table public.pings add column if not exists opened_at timestamptz;
+alter table public.pings add column if not exists sender_style text default 'glow';
 alter table public.pings enable row level security;
 create policy "pings send as self" on public.pings for insert with check (auth.uid() = from_user);
 create policy "pings read own"     on public.pings for select

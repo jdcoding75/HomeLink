@@ -83,4 +83,18 @@ enum SenderStyle: String, CaseIterable, Identifiable {
         if style.requiresPro && tier == .free { return .glow }
         return style
     }
+
+    /// Same guard for non-view code (SupabaseService) — reads the tier
+    /// straight from UserDefaults.
+    static var effectiveForCurrentUser: SenderStyle {
+        let saved = UserDefaults.standard.string(forKey: "subscriptionTier") ?? ""
+        return effective(for: SubscriptionTier(rawValue: saved) ?? .free)
+    }
+
+    /// The style a ping travels with — sender_style from the wire/history,
+    /// falling back to glow when missing or unknown (pre-migration rows,
+    /// future styles this build doesn't know).
+    static func from(_ raw: String?) -> SenderStyle {
+        SenderStyle(rawValue: raw ?? "") ?? .glow
+    }
 }

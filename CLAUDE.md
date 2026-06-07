@@ -67,7 +67,7 @@
 - users (id, apple_user_id, last_seen)
 - connections (code, owner, friend, 
   person_name, person_emoji, owner_person_id)
-- pings (from_user, to_user, emoji, opened_at)
+- pings (from_user, to_user, emoji, sender_style, opened_at)
 - device_tokens (token, user_id, platform)
 - compass_bearings (user_id, bearing, updated_at)
 - giving (total_donated_cents, charity_name)

@@ -317,7 +317,9 @@ struct CompassView: View {
             if let playing = pings.nowPlaying {
                 CatchModeView(
                     ping: playing,
-                    style: SenderStyle.effective(for: subscription.tier),
+                    // The SENDER's style shapes the catch — their thought
+                    // arrives the way they sent it (glow when unknown).
+                    style: SenderStyle.from(playing.senderStyle),
                     onRevealed: { pings.markOpened(playing) },
                     onFinished: {
                         pings.finishedPlaying(playing)

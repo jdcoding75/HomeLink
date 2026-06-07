@@ -407,16 +407,20 @@ final class SupabaseService: ObservableObject {
 
     // MARK: - Pings
 
-    /// Insert shape for the `pings` table.
+    /// Insert shape for the `pings` table. senderStyle is optional so the
+    /// nil (legacy) payload omits the key entirely — sends keep working on
+    /// a database that hasn't run the sender_style migration yet.
     struct PingPayload: Codable {
         let fromUser: UUID
         let toUser: UUID
         let emoji: String
+        var senderStyle: String? = nil
 
         enum CodingKeys: String, CodingKey {
-            case fromUser = "from_user"
-            case toUser   = "to_user"
+            case fromUser    = "from_user"
+            case toUser      = "to_user"
             case emoji
+            case senderStyle = "sender_style"
         }
     }
 
@@ -427,13 +431,16 @@ final class SupabaseService: ObservableObject {
         let toUser: UUID
         let emoji: String
         let openedAt: String?
+        /// glow | shootingStar | firefly — nil on rows from before the migration.
+        let senderStyle: String?
 
         enum CodingKeys: String, CodingKey {
             case id
-            case fromUser = "from_user"
-            case toUser   = "to_user"
+            case fromUser    = "from_user"
+            case toUser      = "to_user"
             case emoji
-            case openedAt = "opened_at"
+            case openedAt    = "opened_at"
+            case senderStyle = "sender_style"
         }
     }
 
@@ -445,25 +452,42 @@ final class SupabaseService: ObservableObject {
         let emoji: String
         let createdAt: Date
         let openedAt: Date?
+        /// glow | shootingStar | firefly — nil on rows from before the migration.
+        let senderStyle: String?
 
         enum CodingKeys: String, CodingKey {
             case id
-            case fromUser  = "from_user"
-            case toUser    = "to_user"
+            case fromUser    = "from_user"
+            case toUser      = "to_user"
             case emoji
-            case createdAt = "created_at"
-            case openedAt  = "opened_at"
+            case createdAt   = "created_at"
+            case openedAt    = "opened_at"
+            case senderStyle = "sender_style"
         }
     }
 
-    /// Send a ping (a "thought") to another Pointward user.
+    /// Send a ping (a "thought") to another Pointward user, carrying the
+    /// sender's style so the catch and replays play THEIR animation.
+    /// If the database hasn't run the sender_style migration yet, the
+    /// styled insert fails — retry once with the legacy payload so a
+    /// schema lag never blocks a thought.
     func sendPing(to userID: UUID, emoji: String) async throws {
         guard let client else { throw SupabaseServiceError.notConfigured }
         guard let me = await currentUserID else { throw SupabaseServiceError.notSignedIn }
-        try await client
-            .from("pings")
-            .insert(PingPayload(fromUser: me, toUser: userID, emoji: emoji))
-            .execute()
+        let style = SenderStyle.effectiveForCurrentUser.rawValue
+        do {
+            try await client
+                .from("pings")
+                .insert(PingPayload(fromUser: me, toUser: userID, emoji: emoji,
+                                    senderStyle: style))
+                .execute()
+        } catch {
+            log.error("pings: styled insert failed (pre-migration schema?) — retrying legacy: \(error.localizedDescription, privacy: .public)")
+            try await client
+                .from("pings")
+                .insert(PingPayload(fromUser: me, toUser: userID, emoji: emoji))
+                .execute()
+        }
     }
 
     /// Open the single consolidated realtime channel: incoming pings, felt

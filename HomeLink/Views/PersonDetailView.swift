@@ -452,8 +452,9 @@ struct PingHistoryView: View {
                 ReplayOverlayView(
                     emoji: record.emoji,
                     bearingDegrees: sent ? bearing : bearing + 180,
-                    // Free users replay in glow; Pro replays in their style
-                    style: SenderStyle.effective(for: subscription.tier)
+                    // The ORIGINAL sender style from the record — a memory
+                    // replays the way it first arrived (glow when unknown)
+                    style: SenderStyle.from(record.senderStyle)
                 ) {
                     replayRecord = nil
                     appState.transition(to: .idle)

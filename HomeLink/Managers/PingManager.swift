@@ -48,7 +48,10 @@ final class PingManager: ObservableObject {
         let fromName:  String
         let emoji:     String
         let timestamp: Date
-        var remoteID:  UUID? = nil   // Supabase ping id, for read receipts
+        var remoteID:  UUID? = nil      // Supabase ping id, for read receipts
+        /// sender_style from the wire — the SENDER's animation personality.
+        /// nil (pre-migration rows) falls back to glow at the call site.
+        var senderStyle: String? = nil
     }
 
     init(networkService: NetworkServiceProtocol, appState: AppStateManager? = nil) {
@@ -60,6 +63,9 @@ final class PingManager: ObservableObject {
         isSending = true
         defer { isSending = false }
         let pairedID = person.pairedUserID ?? "local-stub"
+        // The real Supabase insert (SupabaseService.sendPing) carries
+        // sender_style = SenderStyle.effectiveForCurrentUser; this legacy
+        // mock path stays style-less.
         try? await networkService.sendPing(toPairedUserID: pairedID, emoji: emoji)
         HapticEngine.pingSent()
     }
@@ -105,8 +111,10 @@ final class PingManager: ObservableObject {
     /// New thought arrives → catch mode. RULE: only the NEWEST incoming
     /// thought triggers the catch — anything older slips quietly into
     /// History (it's already persisted server-side in the pings table).
-    func receivePing(fromName: String, emoji: String, remoteID: UUID? = nil) {
-        let ping = ReceivedPing(fromName: fromName, emoji: emoji, timestamp: .now, remoteID: remoteID)
+    func receivePing(fromName: String, emoji: String, remoteID: UUID? = nil,
+                     senderStyle: String? = nil) {
+        let ping = ReceivedPing(fromName: fromName, emoji: emoji, timestamp: .now,
+                                remoteID: remoteID, senderStyle: senderStyle)
         // The queue holds at most the newest un-caught thought — an older
         // waiting one is superseded (→ History, never lost).
         queue = [ping]

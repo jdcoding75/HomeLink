@@ -136,7 +136,8 @@ struct RootView: View {
                             $0.pairedUserID == event.fromUser.uuidString
                         }?.name ?? "someone who loves you"
                         pings.receivePing(fromName: fromName, emoji: event.emoji,
-                                          remoteID: event.id)
+                                          remoteID: event.id,
+                                          senderStyle: event.senderStyle)
                     }
                 },
                 onFelt: { event in
