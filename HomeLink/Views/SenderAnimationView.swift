@@ -834,6 +834,7 @@ struct SenderAnimationView<Symbol: View>: View {
                 faded = true                            // trail lingers 1 s
             }
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.30) {
+                impact()                                // flash · screen pulse · medium tap
                 instrumentGone = true                   // the exhale
             }
             finish(after: 1.3 + 1.0 + 0.3)
@@ -876,7 +877,8 @@ struct SenderAnimationView<Symbol: View>: View {
             }
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.50) {
                 faded = true                            // trail lingers 1.2 s
-            }
+                impact(flash: false)                    // screen pulse + medium tap
+            }                                           // (the bow has its own bloom)
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.60) {
                 instrumentGone = true                   // string relaxed, exhale
             }
