@@ -244,6 +244,11 @@ struct ProSetupView: View {
                         .frame(width: 240, height: 240)
                         .scaleEffect(44.0 / 240.0)
                         .frame(width: 44, height: 44)
+                    } else if option == .plane {
+                        // [5/6] Coming-Soon plane card — its own looping preview
+                        PlaneLaunchPreview()
+                            .clipShape(RoundedRectangle(cornerRadius: 10))
+                            .opacity(0.55)
                     } else {
                         InstrumentPreview(instrument: option.instrument)
                             .clipShape(RoundedRectangle(cornerRadius: 10))

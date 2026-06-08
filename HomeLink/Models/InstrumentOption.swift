@@ -25,17 +25,19 @@ enum InstrumentOption: String, CaseIterable, Identifiable {
     case rocket = "rocket"   // fuel · aim · blast off
     case wind   = "wind"     // replaced the firefly
     case wand   = "wand"     // load · shake · release
+    case plane  = "plane"    // ✈️ coming soon — wind · release · glide
 
     var id: String { rawValue }
 
     var requiresPro: Bool {
         switch self {
-        case .compassMinimal, .compassVintage:    return false
-        case .bow, .flick, .rocket, .wind, .wand: return true
+        case .compassMinimal, .compassVintage:           return false
+        case .bow, .flick, .rocket, .wind, .wand, .plane: return true
         }
     }
 
-    var comingSoon: Bool { false }   // rocket has launched 🚀
+    /// [5/6] The plane is a Coming-Soon teaser — visible, not selectable.
+    var comingSoon: Bool { self == .plane }
 
     var displayName: String {
         switch self {
@@ -47,6 +49,7 @@ enum InstrumentOption: String, CaseIterable, Identifiable {
         case .rocket:         return "rocket"
         case .wind:           return "wind"
         case .wand:           return "wand"
+        case .plane:          return "plane"
         }
     }
 
@@ -58,6 +61,7 @@ enum InstrumentOption: String, CaseIterable, Identifiable {
         case .rocket: return "🚀"
         case .wind:   return "🌬️"
         case .wand:   return "🪄"
+        case .plane:  return "✈️"
         }
     }
 
@@ -71,11 +75,12 @@ enum InstrumentOption: String, CaseIterable, Identifiable {
         case .rocket:         return "fuel · aim · blast off"
         case .wind:           return "breathe · release"
         case .wand:           return "load · shake · release"
+        case .plane:          return "wind · release · glide"
         }
     }
 
-    /// The underlying instrument this option routes to.
-    /// (Wind rides the firefly slot — same wire format, new experience.)
+    /// The underlying instrument this option routes to. (Plane is Coming Soon,
+    /// so it parks on the compass until it ships — never actually selected.)
     var instrument: Instrument {
         switch self {
         case .compassMinimal, .compassVintage: return .compass
@@ -84,6 +89,7 @@ enum InstrumentOption: String, CaseIterable, Identifiable {
         case .wind:   return .firefly
         case .rocket: return .rocket
         case .wand:   return .wand
+        case .plane:  return .compass
         }
     }
 

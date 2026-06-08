@@ -65,6 +65,7 @@ final class CompassManager: NSObject, ObservableObject {
         wasLocked = false
         state = CompassState(
             bearingDegrees:   bearing,
+            faceRotationDegrees: -currentHeading,
             distanceKm:       distance,
             personID:         person.id,
             personName:       person.name,
@@ -131,6 +132,7 @@ final class CompassManager: NSObject, ObservableObject {
     func setPendingPing(emoji: String?) {
         state = CompassState(
             bearingDegrees:   state.bearingDegrees,
+            faceRotationDegrees: state.faceRotationDegrees,
             distanceKm:       state.distanceKm,
             personID:         state.personID,
             personName:       state.personName,
@@ -176,6 +178,7 @@ final class CompassManager: NSObject, ObservableObject {
         let activeSkin = resolvedSkin(for: target)
         state = CompassState(
             bearingDegrees:   relativeBearing,
+            faceRotationDegrees: -currentHeading,
             distanceKm:       distance,
             personID:         target.id,
             personName:       target.name,

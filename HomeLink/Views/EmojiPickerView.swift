@@ -1,9 +1,14 @@
 // EmojiPickerView.swift
 // Pointward › Views
 //
-// "✦ edit" — choose your personal six from the full library.
-// Free: only the core six are selectable (the rest show a quiet lock).
-// Pro (paid): the entire library, including your recordings.
+// THE SLOT PICKER — your personal six as six visible slots (two rows of
+// three). Empty slots invite a tap ("+ tap to add") and open the full emoji
+// library; filled slots glow in the thought's hue. Long-press to wiggle and
+// reveal a ✕ to clear, or drag a slot onto another to reorder. A status line
+// keeps the count honest.
+//
+// Free: only the core six are addable (the rest show a quiet lock in the
+// library). Pro (paid): the entire library, including your recordings.
 
 import SwiftUI
 
@@ -16,7 +21,303 @@ struct EmojiPickerView: View {
     @EnvironmentObject var subscription: SubscriptionManager
     @Environment(\.dismiss) private var dismiss
 
-    @State private var selected: [String] = PersonalSet.load()
+    /// Six optional slots — nil is an empty, addable slot.
+    @State private var slots: [String?] = EmojiPickerView.loadSlots()
+    @State private var targetSlot: Int? = nil       // which slot the library fills
+    @State private var showLibrary = false
+    @State private var showCreateSheet = false
+    @State private var editMode = false             // long-press → wiggle + ✕
+    @State private var fillAnimSlot: Int? = nil     // the slot currently popping in
+    @State private var wiggle = false
+
+    private var isPaid: Bool { subscription.tier != .free }
+    private var filledCount: Int { slots.compactMap { $0 }.count }
+
+    private static let lavender = Color(hex: "#c4a8d4")
+    private static let emptyBorder = Color(hex: "#3a2e50")
+    private static let emptyFill   = Color(hex: "#1a1228")
+    private static let emptyPlus   = Color(hex: "#4a3860")
+    private static let filledFill  = Color(hex: "#1e1828")
+
+    private let columns = Array(repeating: GridItem(.flexible(), spacing: 16), count: 3)
+
+    static func loadSlots() -> [String?] {
+        var s: [String?] = PersonalSet.load().map { Optional($0) }
+        while s.count < PersonalSet.slotCount { s.append(nil) }
+        return Array(s.prefix(PersonalSet.slotCount))
+    }
+
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                DesignTokens.Color.background.ignoresSafeArea()
+
+                VStack(spacing: 22) {
+                    Text("these appear on your send screen")
+                        .font(.system(size: 14, design: .serif).italic())
+                        .foregroundColor(DesignTokens.Color.textMuted)
+                        .padding(.top, 10)
+
+                    // ── The six slots, two rows of three ──
+                    LazyVGrid(columns: columns, spacing: 16) {
+                        ForEach(0..<PersonalSet.slotCount, id: \.self) { i in
+                            slotCard(i)
+                        }
+                    }
+                    .padding(.horizontal, 28)
+
+                    // ── Status line ──
+                    statusLine
+
+                    Spacer()
+
+                    // ── Save ──
+                    Button {
+                        let tokens = slots.compactMap { $0 }
+                        PersonalSet.save(tokens)
+                        onDone(tokens)
+                        dismiss()
+                    } label: {
+                        Text("save my set")
+                            .font(DesignTokens.Font.label)
+                            .foregroundColor(DesignTokens.Color.textPrimary)
+                            .frame(maxWidth: .infinity)
+                            .padding(DesignTokens.Spacing.md)
+                            .background(DesignTokens.Color.accentStrong)
+                            .cornerRadius(DesignTokens.Radius.button)
+                    }
+                    .disabled(filledCount == 0)
+                    .opacity(filledCount == 0 ? 0.4 : 1)
+                    .padding(.horizontal, 28)
+                    .padding(.bottom, 16)
+                }
+            }
+            .navigationTitle("your six")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                if editMode {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button("done") { withAnimation { editMode = false; wiggle = false } }
+                            .foregroundColor(Self.lavender)
+                    }
+                }
+            }
+        }
+        .preferredColorScheme(.dark)
+        .sheet(isPresented: $showLibrary) {
+            EmojiLibrarySheet(customStore: customStore,
+                              recorder: recorder,
+                              isPaid: isPaid,
+                              existing: Set(slots.compactMap { $0 })) { token in
+                fillSlot(with: token)
+            }
+        }
+        .sheet(isPresented: $showCreateSheet) {
+            CreateThoughtSheet(recorder: recorder, store: customStore)
+                .presentationDetents([.large])
+        }
+    }
+
+    // ── A single slot ─────────────────────────────────────────────────────
+
+    @ViewBuilder
+    private func slotCard(_ i: Int) -> some View {
+        let token = slots[i]
+        ZStack {
+            if let token {
+                filledSlot(token, index: i)
+            } else {
+                emptySlot(index: i)
+            }
+        }
+        .frame(width: 64, height: 64)
+        .rotationEffect(.degrees(editMode && token != nil && wiggle ? 2.2 : (editMode && token != nil ? -2.2 : 0)))
+        .animation(editMode ? .easeInOut(duration: 0.14).repeatForever(autoreverses: true) : .default,
+                   value: wiggle)
+        // Drag a filled slot onto another to reorder (swap).
+        .ifLet(token) { view, tok in
+            view.draggable(tok)
+        }
+        .dropDestination(for: String.self) { items, _ in
+            guard let dropped = items.first else { return false }
+            swapToken(dropped, into: i)
+            return true
+        }
+        .contextMenu { EmptyView() }   // suppress default; we use long-press below
+        .onLongPressGesture(minimumDuration: 0.45) {
+            if token != nil {
+                HapticEngine.personSelected()
+                withAnimation { editMode = true; wiggle = true }
+            }
+        }
+    }
+
+    private func emptySlot(index i: Int) -> some View {
+        Button {
+            targetSlot = i
+            showLibrary = true
+            HapticEngine.personSelected()
+        } label: {
+            VStack(spacing: 3) {
+                Image(systemName: "plus")
+                    .font(.system(size: 22, weight: .light))
+                    .foregroundColor(Self.emptyPlus)
+                Text("tap to add")
+                    .font(.system(size: 8))
+                    .foregroundColor(Self.emptyPlus)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(Self.emptyFill)
+            .cornerRadius(15)
+            .overlay(
+                RoundedRectangle(cornerRadius: 15)
+                    .stroke(Self.emptyBorder,
+                            style: StrokeStyle(lineWidth: 2, dash: [5, 4]))
+            )
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func filledSlot(_ token: String, index i: Int) -> some View {
+        let hue = EmojiHue.color(for: displayEmoji(token))
+        let popping = fillAnimSlot == i
+        return Button {
+            // Tap a filled slot → replace it via the library.
+            if editMode { return }
+            targetSlot = i
+            showLibrary = true
+        } label: {
+            ZStack {
+                symbol(token, size: 32)
+                    .scaleEffect(popping ? 1.1 : 1.0)
+
+                if token.hasPrefix("yours:") {
+                    VStack { Spacer()
+                        HStack { Spacer(); Text("🎤").font(.system(size: 9)) }
+                    }.padding(3)
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(Self.filledFill)
+            .cornerRadius(15)
+            .overlay(
+                RoundedRectangle(cornerRadius: 15)
+                    .stroke(Self.lavender, lineWidth: 2)
+            )
+            .shadow(color: hue.opacity(0.45), radius: 8)
+        }
+        .buttonStyle(.plain)
+        .scaleEffect(popping ? 1.0 : (fillAnimSlot == nil ? 1.0 : 1.0))
+        .overlay(alignment: .topTrailing) {
+            if editMode {
+                Button {
+                    clearSlot(i)
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 18))
+                        .foregroundColor(.white)
+                        .background(Circle().fill(Color.black.opacity(0.6)))
+                        .shadow(radius: 2)
+                }
+                .offset(x: 6, y: -6)
+                .transition(.scale.combined(with: .opacity))
+            }
+        }
+    }
+
+    // ── Status line ───────────────────────────────────────────────────────
+
+    private var statusLine: some View {
+        Group {
+            if filledCount == PersonalSet.slotCount {
+                Text("all 6 filled ✦")
+                    .foregroundColor(Self.lavender)
+            } else {
+                Text("\(filledCount) of 6 · tap empty slots to add")
+                    .foregroundColor(DesignTokens.Color.textMuted)
+            }
+        }
+        .font(.system(size: 12, design: .serif).italic())
+        .animation(.easeOut(duration: 0.2), value: filledCount)
+    }
+
+    // ── Mutations ─────────────────────────────────────────────────────────
+
+    private func fillSlot(with token: String) {
+        // Don't double-add the same token.
+        if slots.contains(token) { return }
+        let target = targetSlot ?? slots.firstIndex(where: { $0 == nil })
+        guard let idx = target else { return }
+        slots[idx] = token
+        HapticEngine.personSelected()
+        // Satisfying fill pop: border lights, emoji scales 0.3 → 1.1 → 1.0
+        fillAnimSlot = idx
+        withAnimation(AnimationSystem.easeOutBack(0.4)) { }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) {
+            if fillAnimSlot == idx { fillAnimSlot = nil }
+        }
+        targetSlot = nil
+    }
+
+    private func clearSlot(_ i: Int) {
+        HapticEngine.personSelected()
+        withAnimation(.easeOut(duration: 0.25)) {
+            slots[i] = nil
+        }
+        if filledCount == 0 { withAnimation { editMode = false; wiggle = false } }
+    }
+
+    /// Reorder: swap the dragged token into slot `dest`.
+    private func swapToken(_ token: String, into dest: Int) {
+        guard let src = slots.firstIndex(where: { $0 == token }), src != dest else { return }
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+            slots.swapAt(src, dest)
+        }
+        HapticEngine.sendSoft()
+    }
+
+    // ── Token rendering ───────────────────────────────────────────────────
+
+    private func displayEmoji(_ token: String) -> String {
+        if token == "gecko" { return "🦎" }
+        if token.hasPrefix("yours:"),
+           let id = UUID(uuidString: String(token.dropFirst(6))),
+           let thought = customStore.thought(id: id) {
+            return thought.emoji
+        }
+        return token
+    }
+
+    @ViewBuilder
+    private func symbol(_ token: String, size: CGFloat) -> some View {
+        if token == "gecko" {
+            LeopardGeckoView(size: size * 1.1)
+        } else if token.hasPrefix("yours:"),
+                  let id = UUID(uuidString: String(token.dropFirst(6))),
+                  let thought = customStore.thought(id: id) {
+            Text(thought.emoji).font(.system(size: size))
+        } else {
+            Text(token).font(.system(size: size))
+        }
+    }
+}
+
+// ════════════════════════════════════════════════════════════════════════
+// MARK: - EmojiLibrarySheet
+// ════════════════════════════════════════════════════════════════════════
+
+/// The full emoji library — Core · Feeling · Food · Silly · Yours. Tapping
+/// an emoji fills the target slot and dismisses. Locked sections (free tier)
+/// route to the paywall.
+struct EmojiLibrarySheet: View {
+
+    @ObservedObject var customStore: CustomThoughtStore
+    @ObservedObject var recorder: AudioRecorder
+    let isPaid: Bool
+    let existing: Set<String>
+    let onPick: (String) -> Void
+
+    @Environment(\.dismiss) private var dismiss
     @State private var showCreateSheet = false
     @State private var showPaywall = false
 
@@ -25,81 +326,34 @@ struct EmojiPickerView: View {
     private let food    = ["🍕","🍫","🍺","🍷","🍰","☕","🧁","🍜","🍣","🥂"]
     private let silly   = ["😂","🤪","🥳","💥","🎉","gecko"]
 
-    private var isPaid: Bool { subscription.tier != .free }
-    private var atLimit: Bool { selected.count >= PersonalSet.slotCount }
-
     private static let lavender = Color(hex: "#c4a8d4")
+    private let grid = Array(repeating: GridItem(.flexible(), spacing: 10), count: 5)
 
     var body: some View {
         NavigationStack {
             ZStack {
                 DesignTokens.Color.background.ignoresSafeArea()
-
-                VStack(spacing: 0) {
-                    ScrollView {
-                        VStack(alignment: .leading, spacing: 18) {
-                            Text("these appear on your send screen")
-                                .font(.system(size: 14, design: .serif).italic())
-                                .foregroundColor(DesignTokens.Color.textMuted)
-                                .padding(.top, 6)
-
-                            section("core", tokens: core, locked: false)
-                            section("with feeling", tokens: feeling, locked: !isPaid)
-                            section("with food & drink", tokens: food, locked: !isPaid)
-                            section("silly", tokens: silly, locked: !isPaid)
-                            yoursSection
-
-                            Spacer(minLength: 24)
-                        }
-                        .padding(.horizontal, 22)
-                    }
-
-                    // ── Live preview of the chosen six + save ─────────────
-                    VStack(spacing: 10) {
-                        HStack(spacing: 10) {
-                            ForEach(0..<PersonalSet.slotCount, id: \.self) { i in
-                                ZStack {
-                                    RoundedRectangle(cornerRadius: 11)
-                                        .fill(DesignTokens.Color.backgroundLift)
-                                        .overlay(
-                                            RoundedRectangle(cornerRadius: 11)
-                                                .stroke(i < selected.count
-                                                        ? Self.lavender.opacity(0.5)
-                                                        : DesignTokens.Color.border,
-                                                        lineWidth: 1)
-                                        )
-                                    if i < selected.count {
-                                        previewSymbol(selected[i])
-                                    }
-                                }
-                                .frame(width: 42, height: 42)
-                            }
-                        }
-                        .animation(.easeOut(duration: 0.2), value: selected)
-
-                        Button {
-                            PersonalSet.save(selected)
-                            onDone(selected)
-                            dismiss()
-                        } label: {
-                            Text("save my set")
-                                .font(DesignTokens.Font.label)
-                                .foregroundColor(DesignTokens.Color.textPrimary)
-                                .frame(maxWidth: .infinity)
-                                .padding(DesignTokens.Spacing.md)
-                                .background(DesignTokens.Color.accentStrong)
-                                .cornerRadius(DesignTokens.Radius.button)
-                        }
-                        .disabled(selected.count != PersonalSet.slotCount)
-                        .opacity(selected.count == PersonalSet.slotCount ? 1 : 0.4)
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 18) {
+                        section("core", tokens: core, locked: false)
+                        section("with feeling", tokens: feeling, locked: !isPaid)
+                        section("with food & drink", tokens: food, locked: !isPaid)
+                        section("silly", tokens: silly, locked: !isPaid)
+                        yoursSection
+                        Spacer(minLength: 24)
                     }
                     .padding(.horizontal, 22)
-                    .padding(.vertical, 12)
-                    .background(DesignTokens.Color.background.opacity(0.97))
+                    .padding(.top, 8)
                 }
             }
-            .navigationTitle("choose your 6 · \(selected.count) of \(PersonalSet.slotCount) chosen")
+            .navigationTitle("choose an emoji")
             .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("cancel") { dismiss() }
+                        .foregroundColor(DesignTokens.Color.textMuted)
+                }
+            }
         }
         .preferredColorScheme(.dark)
         .sheet(isPresented: $showCreateSheet) {
@@ -108,8 +362,6 @@ struct EmojiPickerView: View {
         }
         .sheet(isPresented: $showPaywall) { PaywallView() }
     }
-
-    // MARK: - Sections
 
     private func section(_ title: String, tokens: [String], locked: Bool) -> some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -123,8 +375,7 @@ struct EmojiPickerView: View {
                         .foregroundColor(Self.lavender.opacity(0.7))
                 }
             }
-            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 5),
-                      spacing: 10) {
+            LazyVGrid(columns: grid, spacing: 10) {
                 ForEach(tokens, id: \.self) { token in
                     cell(token, locked: locked)
                 }
@@ -144,8 +395,7 @@ struct EmojiPickerView: View {
                         .foregroundColor(Self.lavender.opacity(0.7))
                 }
             }
-            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 5),
-                      spacing: 10) {
+            LazyVGrid(columns: grid, spacing: 10) {
                 ForEach(customStore.thoughts) { thought in
                     cell("yours:\(thought.id.uuidString)", locked: !isPaid,
                          displayEmoji: thought.emoji)
@@ -170,37 +420,17 @@ struct EmojiPickerView: View {
         }
     }
 
-    /// Renders a token for the preview row (emoji, gecko, or custom).
-    @ViewBuilder
-    private func previewSymbol(_ token: String) -> some View {
-        if token == "gecko" {
-            LeopardGeckoView(size: 20)
-        } else if token.hasPrefix("yours:"),
-                  let id = UUID(uuidString: String(token.dropFirst(6))),
-                  let thought = customStore.thought(id: id) {
-            Text(thought.emoji).font(.system(size: 20))
-        } else {
-            Text(token).font(.system(size: 20))
-        }
-    }
-
-    // MARK: - Cell
-
     private func cell(_ token: String, locked: Bool, displayEmoji: String? = nil) -> some View {
-        let isSelected = selected.contains(token)
-        let dimmed = locked || (atLimit && !isSelected)
+        let alreadyIn = existing.contains(token)
         return Button {
             if locked {
                 HapticEngine.paywallReached()
                 showPaywall = true
                 return
             }
-            if isSelected {
-                selected.removeAll { $0 == token }
-            } else if !atLimit {
-                selected.append(token)
-                HapticEngine.personSelected()
-            }
+            if alreadyIn { return }
+            onPick(token)
+            dismiss()
         } label: {
             ZStack {
                 Group {
@@ -210,46 +440,39 @@ struct EmojiPickerView: View {
                         Text(displayEmoji ?? token).font(.system(size: 24))
                     }
                 }
-                .opacity(dimmed && !isSelected ? 0.35 : 1)
+                .opacity(locked || alreadyIn ? 0.3 : 1)
 
-                // Custom recordings carry a small 🎤 marker
                 if token.hasPrefix("yours:") {
                     VStack { Spacer()
-                        HStack { Spacer()
-                            Text("🎤").font(.system(size: 9))
-                        }
-                    }
-                    .padding(3)
+                        HStack { Spacer(); Text("🎤").font(.system(size: 9)) }
+                    }.padding(3)
                 }
-
-                // Selected → quiet ✓ in the corner
-                if isSelected {
-                    VStack {
-                        HStack {
-                            Spacer()
-                            Image(systemName: "checkmark.circle.fill")
-                                .font(.system(size: 13))
-                                .foregroundColor(Self.lavender)
-                        }
-                        Spacer()
-                    }
-                    .padding(4)
+                if alreadyIn {
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundColor(Self.lavender)
                 }
             }
             .frame(maxWidth: .infinity)
             .aspectRatio(1, contentMode: .fit)
-            .background(isSelected
-                        ? DesignTokens.Color.accentStrong
-                        : DesignTokens.Color.backgroundCard.opacity(0.8))
+            .background(DesignTokens.Color.backgroundCard.opacity(0.8))
             .cornerRadius(13)
             .overlay(
                 RoundedRectangle(cornerRadius: 13)
-                    .stroke(isSelected ? DesignTokens.Color.accentMid
-                                       : DesignTokens.Color.border,
-                            lineWidth: 1)
+                    .stroke(DesignTokens.Color.border, lineWidth: 1)
             )
         }
-        .disabled(atLimit && !isSelected && !locked)
-        .animation(.easeOut(duration: 0.2), value: isSelected)
+        .disabled(alreadyIn && !locked)
+    }
+}
+
+// ── A tiny conditional-modifier helper ───────────────────────────────────
+
+private extension View {
+    /// Applies `transform` only when `value` is non-nil, passing it through.
+    @ViewBuilder
+    func ifLet<V, Content: View>(_ value: V?,
+                                 @ViewBuilder _ transform: (Self, V) -> Content) -> some View {
+        if let value { transform(self, value) } else { self }
     }
 }

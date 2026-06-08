@@ -58,6 +58,18 @@ struct CatchModeView: View {
     @State private var debugBypass = false
     @State private var arrivalLine = false   // "A feeling is coming your way…"
 
+    // 🪄 WAND full-screen sparkle storm (most dramatic receive)
+    private struct StormSpark: Identifiable {
+        let id = UUID()
+        var scatter: CGSize
+        var gold: Bool
+        var size: CGFloat
+    }
+    @State private var sparks: [StormSpark] = []
+    @State private var stormActive = false
+    @State private var sparksScattered = false
+    @State private var sparksConverged = false
+
     /// 10 Hz heartbeat: haptic bands, jitter drift, hold-to-confirm.
     private let tick = Timer.publish(every: 0.1, on: .main, in: .common).autoconnect()
 
@@ -65,6 +77,8 @@ struct CatchModeView: View {
     private static let lavender = Color(hex: "#c4a8d4")
     private static let wandGold = Color(hex: "#D4AF37")
     private static let wandPurple = Color(hex: "#9b7fc0")
+    private static let slingAmber = Color(hex: "#E8B64C")
+    private static let slingOrange = Color(hex: "#e08a3c")
 
     // ── Alignment ─────────────────────────────────────────────────────────
 
@@ -146,6 +160,24 @@ struct CatchModeView: View {
                                    : AnimationSystem.easeInOutCubic(style.catchTravelDuration),
                                    value: flightProgress)
                         .position(x: geo.size.width / 2, y: geo.size.height / 2)
+                }
+
+                // ── 🪄 WAND sparkle storm — over everything, then converges
+                // to the sender edge to become the catch orb ──
+                if stormActive {
+                    ForEach(sparks) { spark in
+                        let pos: CGSize = sparksConverged ? edge
+                                        : (sparksScattered ? spark.scatter : .zero)
+                        Circle()
+                            .fill(spark.gold ? Self.wandGold : Self.wandPurple)
+                            .frame(width: spark.size, height: spark.size)
+                            .shadow(color: (spark.gold ? Self.wandGold : Self.wandPurple).opacity(0.8),
+                                    radius: 3)
+                            .position(x: geo.size.width / 2 + pos.width,
+                                      y: geo.size.height / 2 + pos.height)
+                            .opacity(sparksConverged ? 0.35 : 0.95)
+                    }
+                    .zIndex(10)
                 }
 
                 // ── Step 5: the reveal ────────────────────────────────────
@@ -288,25 +320,34 @@ struct CatchModeView: View {
             // vibrates inside 5°, and the catch PULLS it free.
             // (previous bouncing orb retired)
             ZStack {
+                // Slingshot energy — it hit the wall like a launched stone,
+                // ringed in an orange/amber glow.
+                Circle()
+                    .fill(RadialGradient(colors: [Self.slingAmber.opacity(0.5 * orbBrightness),
+                                                  .clear],
+                                         center: .center, startRadius: 2, endRadius: 34))
+                    .frame(width: 68, height: 68)
+                    .blur(radius: 3)
+
                 // The embedding point — a dark recess, glowing from within
                 Circle()
                     .fill(Color.black.opacity(0.45))
                     .frame(width: 44, height: 44)
                 Circle()
-                    .stroke(hue.opacity(0.3 + orbBrightness * 0.5), lineWidth: 1.5)
+                    .stroke(Self.slingAmber.opacity(0.4 + orbBrightness * 0.5), lineWidth: 1.5)
                     .frame(width: 44, height: 44)
-                    .shadow(color: hue.opacity(orbBrightness * 0.8),
+                    .shadow(color: Self.slingOrange.opacity(orbBrightness * 0.8),
                             radius: AnimationSystem.Glow.radiusMin)
 
-                // Loose dust — small particles shake free as the grip loosens
+                // Elastic snap particles — flicked free, amber/orange embers
                 if angleError < 15 {
-                    ForEach(0..<5, id: \.self) { i in
+                    ForEach(0..<6, id: \.self) { i in
                         Circle()
-                            .fill(hue.opacity(0.55))
-                            .frame(width: 3, height: 3)
-                            .offset(x: CGFloat(i - 2) * 9 + (orbPulse ? 2 : -2),
-                                    y: CGFloat((i * 7) % 11) - 5 + (orbPulse ? -3 : 1))
-                            .opacity(orbPulse ? 0.9 : 0.4)
+                            .fill((i % 2 == 0 ? Self.slingAmber : Self.slingOrange).opacity(0.7))
+                            .frame(width: i % 2 == 0 ? 3 : 4, height: i % 2 == 0 ? 3 : 4)
+                            .offset(x: CGFloat(i - 3) * 9 + (orbPulse ? 3 : -3),
+                                    y: CGFloat((i * 7) % 13) - 6 + (orbPulse ? -4 : 2))
+                            .opacity(orbPulse ? 0.95 : 0.4)
                             .transition(.opacity)
                     }
                 }
@@ -407,6 +448,31 @@ struct CatchModeView: View {
         withAnimation(AnimationSystem.easeInOutSine(AnimationSystem.Timing.glowPulseSlow)
                         .repeatForever(autoreverses: true)) {
             orbPulse = true
+        }
+        // 🪄 WAND — a full-screen sparkle storm bursts everywhere, then the
+        // sparks converge to the sender's edge and form the catch orb.
+        if style == .wand { beginWandStorm() }
+    }
+
+    /// 50+ gold/purple sparks scatter across the whole screen for ~2 s, then
+    /// stream to the sender's bearing edge where the catch orb waits.
+    private func beginWandStorm() {
+        HapticEngine.thoughtArrived()
+        SoundEngine.shared.play(for: "style.shimmer")
+        sparks = (0..<54).map { _ in
+            StormSpark(scatter: CGSize(width: .random(in: -250...250),
+                                       height: .random(in: -460...460)),
+                       gold: Bool.random(),
+                       size: .random(in: 3...6))
+        }
+        stormActive = true
+        withAnimation(.easeOut(duration: 0.5)) { sparksScattered = true }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.3) {
+            HapticEngine.sendSoft()
+            withAnimation(.easeIn(duration: 0.8)) { sparksConverged = true }
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.2) {
+            withAnimation(.easeOut(duration: 0.35)) { stormActive = false }
         }
     }
 

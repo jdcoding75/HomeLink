@@ -1,10 +1,14 @@
 // BowInstrumentView.swift
 // Pointward › Views
 //
-// INSTRUMENT 2 — BOW & ARROW (Pro). The middle zone becomes a living bow:
-// the arrow tracks the person's bearing, the user loads an emoji, draws
-// the string back with a real drag, and releases. Aimed within 15° the
-// arrow flies; off-target it bounces home.
+// INSTRUMENT 2 — BOW & ARROW (Pro). The middle zone becomes a living bow.
+// [1/6] AIMING IS BY FINGER-SPIN — no phone movement, ever: place a finger on
+// the bow and rotate it (RotationGesture). The bow turns to face your finger;
+// the arrow always points where the bow faces. Spin the bow toward the person
+// (their initial marker rides the ring): within 30° the arrow warms amber,
+// within 15° it's bright gold and "draw to send" appears, within 5° it locks
+// with a strong haptic and tip sparkles. Then draw the string back and
+// release — the arrow flies in the direction the bow faces.
 
 import SwiftUI
 import Combine
@@ -14,11 +18,18 @@ struct BowInstrumentView: View {
     /// The loaded thought (nil = nothing nocked yet).
     let loadedToken: String?
     let loadedSymbol: AnyView?
+    /// The person's real-world bearing — only used to place their marker and
+    /// to know which way to spin the bow. The aim itself is the finger-spin.
     let bearingDegrees: Double
     let personName: String
     var personEmoji: String = "💜"
     /// Fires when a valid aligned release happens.
     let onSend: () -> Void
+
+    // [1/6] FINGER-SPIN aim — the bow's facing direction in degrees (0 = up).
+    @State private var spinAngle: Double = 0
+    @State private var spinBase:  Double = 0        // accumulates across spins
+    @State private var lockHapticFired = false      // strong tap once at 5°
 
     @State private var breathe = false
     @State private var drawAmount: CGFloat = 0      // 0…1
@@ -41,9 +52,15 @@ struct BowInstrumentView: View {
     private static let lavender = Color(hex: "#c4a8d4")
     private static let slackGrey = Color(hex: "#8a8694")
 
-    private var rad: Double { bearingDegrees * .pi / 180 }
-    private var alignDiff: Double { BearingCalculator.alignmentError(relativeBearing: bearingDegrees) }
-    private var aligned: Bool { BearingCalculator.isSendAligned(bearingDegrees) }
+    /// The bow now faces the FINGER-SPUN angle, not the phone bearing.
+    private var rad: Double { spinAngle * .pi / 180 }
+    /// How far the bow's facing is from the person's bearing (handles wrap).
+    private var alignDiff: Double {
+        BearingCalculator.alignmentError(relativeBearing: spinAngle - bearingDegrees)
+    }
+    private var aligned: Bool {
+        BearingCalculator.isSendAligned(spinAngle - bearingDegrees)
+    }
 
     /// Progressive aim bands: 0 outside 30° · 1 within 30° · 2 within 15° ·
     /// 3 within 5°. Everything — string, arrow, haptics — keys off this.
@@ -86,12 +103,15 @@ struct BowInstrumentView: View {
                 .ignoresSafeArea()
                 .allowsHitTesting(false)
 
-            // ── Where they are — marker + alignment arc (hints are ours) ──
+            // ── Where they are — the person-initial marker rides the ring at
+            // their bearing; it brightens as the FINGER-SPIN aim closes in
+            // (approachError = the bow-vs-person angle, not the phone). ──
             DirectionIndicator(bearingDegrees: bearingDegrees,
                                personName: personName,
                                personEmoji: personEmoji,
                                ringRadius: 172,
-                               showHint: false)
+                               showHint: false,
+                               approachError: alignDiff)
 
             // ── The bow — a real handcrafted traditional bow: warm wood
             // grain limbs (dark at the tips, chestnut at the grip), a taut
@@ -200,20 +220,20 @@ struct BowInstrumentView: View {
             VStack {
                 Spacer()
                 if showAimFirstHint {
-                    Text("aim toward \(personName) first")
+                    Text("spin the bow toward \(personName) first")
                         .font(.system(size: 12, design: .serif).italic())
                         .foregroundColor(Self.orange)
                         .transition(.opacity)
                 } else if showMissHint {
-                    Text("aim toward \(personName)")
+                    Text("spin the bow toward \(personName)")
                         .font(.system(size: 12, design: .serif).italic())
                         .foregroundColor(Self.orange)
                         .transition(.opacity)
                 } else if loadedToken != nil {
                     Text(drawAmount >= 0.97 ? "release to send"
                          : dragging ? ""
-                         : aimBand >= 2 ? "ready · draw to send"
-                         : "aim toward \(personName)")
+                         : aimBand >= 2 ? "draw to send"
+                         : "spin the bow toward \(personName)")
                         .font(.system(size: 12, design: .serif).italic())
                         .foregroundColor(aimBand >= 2 ? Self.lavender.opacity(0.95)
                                                       : Self.lavender.opacity(0.65))
@@ -225,7 +245,10 @@ struct BowInstrumentView: View {
         }
         .frame(width: 370, height: 370)
         .contentShape(Circle())
+        // [1/6] Two gestures coexist: a one-finger drag draws the string, a
+        // two-finger twist spins the bow to aim. No phone movement needed.
         .gesture(drawGesture)
+        .simultaneousGesture(spinGesture)
         .onAppear {
             withAnimation(AnimationSystem.easeInOutSine(3.0)
                             .repeatForever(autoreverses: true)) {
@@ -255,6 +278,24 @@ struct BowInstrumentView: View {
         }
         .animation(.easeOut(duration: 0.25), value: showMissHint)
         .animation(.easeOut(duration: 0.25), value: showAimFirstHint)
+    }
+
+    // ── [1/6] The spin — place a finger on the bow and rotate to aim ───────
+
+    private var spinGesture: some Gesture {
+        RotationGesture()
+            .onChanged { angle in
+                spinAngle = spinBase + angle.degrees
+                // Strong satisfying haptic + sparkles the moment it locks at 5°
+                if loadedToken != nil, aimBand == 3, !lockHapticFired {
+                    lockHapticFired = true
+                    HapticEngine.lockOn()
+                }
+                if aimBand < 3 { lockHapticFired = false }
+            }
+            .onEnded { _ in
+                spinBase = spinAngle
+            }
     }
 
     // ── The draw: drag away from the person to pull the string ──

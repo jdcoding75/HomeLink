@@ -1,16 +1,18 @@
 // WandInstrumentView.swift
 // Pointward › Views
 //
-// INSTRUMENT 5 — WAND 🪄 (Pro). A dark atmospheric circle with an elegant
-// wand at its heart: a tapered dark-wood staff, gold trim rings, and a
-// faceted crystal at the tip that points toward the person. Load a thought
-// into the crystal, SHAKE to charge the magic (five shakes to full), and at
-// full charge within 15° it releases — a burst of sparkles carrying the
-// thought away.
+// INSTRUMENT — WAND 🪄 (Pro). A dark magical night with an elegant wand at
+// its heart: a tapered dark-wood staff, gold trim rings, and a large faceted
+// crystal at the tip. The wand is MAGIC — no aiming, no direction, ever. Load
+// a thought into the crystal, SHAKE to charge (five shakes to full), and at
+// full charge it releases all on its own: the crystal implodes then explodes
+// and the magic carries the thought to the person. Direction is irrelevant —
+// magic finds them.
 //
 // Charge comes from the accelerometer (ShakeDetector). Where motion isn't
 // available (Simulator), tap the crystal to charge instead — same feel,
-// same release.
+// same release. [3/6] All alignment removed; the crystal now physically
+// swings (lags) as the wand moves, and the orbital system runs two speeds.
 
 import SwiftUI
 import Combine
@@ -29,11 +31,14 @@ struct WandInstrumentView: View {
     @StateObject private var shake = ShakeDetector()
 
     @State private var crystalPulse = false      // 0.95–1.05 gentle pulse
-    @State private var orbitPhase: Double = 0     // particles orbiting the wand
-    @State private var fullAlignedSeconds = 0.0   // auto-send countdown
+    @State private var orbitPhase: Double = 0     // fast orbital ring
+    @State private var orbitPhaseSlow: Double = 0 // slow outer orbital ring
+    @State private var fullChargeSeconds = 0.0    // auto-send countdown
     @State private var released = false           // guard against double-send
-    @State private var showAimHint = false
     @State private var sparkleSeed = 0            // re-rolls tip sparkles
+    @State private var crystalSwing: CGSize = .zero   // physics lag on shake
+    @State private var crystalFlare = 0.0         // 0…1 bright flare per shake
+    @State private var imploding = false          // release: crystal collapses
 
     private let tick = Timer.publish(every: 0.1, on: .main, in: .common).autoconnect()
 
@@ -42,36 +47,27 @@ struct WandInstrumentView: View {
     private static let gold     = Color(hex: "#D4AF37")
     private static let crystalP = Color(hex: "#9b7fc0")
 
-    private var rad: Double { bearingDegrees * .pi / 180 }
-    private var aligned: Bool { BearingCalculator.isSendAligned(bearingDegrees) }
     private var charge: Double { shake.charge }
     private var loaded: Bool { loadedToken != nil }
+    private var full: Bool { charge >= 1 }
 
     /// The crystal wears the thought's hue once one is loaded.
     private var crystalColor: Color {
         loaded ? EmojiHue.color(for: loadedEmoji ?? "💜") : Self.crystalP
     }
 
-    /// Crystal brightness rises with the charge bands (spec).
+    /// Crystal brightness rises with the charge bands, flaring on each shake.
     private var crystalGlow: Double {
+        let base: Double
         switch charge {
-        case 0:        return aligned ? 0.45 : 0.3   // idle, brighter aimed
-        case ..<0.2:   return 0.4
-        case ..<0.4:   return 0.55
-        case ..<0.6:   return 0.7
-        case ..<0.8:   return 0.85
-        default:       return 1.0
+        case 0:        base = 0.35
+        case ..<0.2:   base = 0.45
+        case ..<0.4:   base = 0.6
+        case ..<0.6:   base = 0.72
+        case ..<0.8:   base = 0.85
+        default:       base = 1.0
         }
-    }
-
-    /// Orbiting particle count grows with charge: 8 idle → 4/6/8 bands.
-    private var orbitCount: Int {
-        switch charge {
-        case 0:       return 8
-        case ..<0.6:  return 8
-        case ..<0.8:  return 4 + 2            // 6
-        default:      return 8
-        }
+        return min(1.0, base + crystalFlare * 0.6)
     }
 
     var body: some View {
@@ -86,37 +82,26 @@ struct WandInstrumentView: View {
                 .overlay(Circle().stroke(Color.white.opacity(0.06), lineWidth: 1))
                 .frame(width: 360, height: 360)
 
-            // ── Where they are — marker · arc · hint ──
-            DirectionIndicator(bearingDegrees: bearingDegrees,
-                               personName: personName,
-                               personEmoji: personEmoji,
-                               ringRadius: 168,
-                               showHint: loadedToken == nil)
+            // ── [3/6] NO direction marker / arc / scope — magic needs no aim ──
 
-            // ── Magic particles orbiting the wand ──
+            // ── Two-speed orbital system — a little solar system charging up ──
             orbitingParticles
 
-            // ── The wand — staff + gold rings + crystal, aimed at them ──
+            // ── The wand — staff + gold rings + crystal, standing upright.
+            // (No longer rotates toward a bearing — direction is irrelevant.) ──
             wand
-                .rotationEffect(.radians(rad))   // tip points toward the person
 
-            // ── Instructions ──
+            // ── Instructions — never mentions direction ──
             VStack {
                 Spacer()
-                if showAimHint {
-                    Text("aim toward \(personName)")
-                        .font(.system(size: 12, design: .serif).italic())
-                        .foregroundColor(Color(hex: "#e08a3c"))
-                        .transition(.opacity)
-                } else if loaded {
+                if loaded {
                     Text(instruction)
                         .font(.system(size: 12, design: .serif).italic())
-                        .foregroundColor(Self.crystalP.opacity(aligned ? 0.95 : 0.7))
+                        .foregroundColor(Self.crystalP.opacity(full ? 0.95 : 0.7))
                         .transition(.opacity)
                 }
             }
             .padding(.bottom, 4)
-            .animation(.easeOut(duration: 0.25), value: showAimHint)
         }
         .frame(width: 370, height: 370)
         .onAppear {
@@ -128,7 +113,8 @@ struct WandInstrumentView: View {
         .onChange(of: loadedToken) { _, token in
             if token != nil {
                 released = false
-                fullAlignedSeconds = 0
+                imploding = false
+                fullChargeSeconds = 0
                 shake.onShake = { onShakeCounted($0) }
                 shake.onFull  = { HapticEngine.lockOn() }
                 shake.start()
@@ -140,12 +126,13 @@ struct WandInstrumentView: View {
         .onReceive(tick) { _ in heartbeat() }
     }
 
+    /// Magic finds them — the instruction never names a direction.
     private var instruction: String {
-        if charge >= 1 {
-            return aligned ? "release to send" : "aim toward \(personName)"
-        }
-        if charge > 0 { return "keep charging…" }
-        return shake.motionAvailable ? "shake to charge" : "tap the crystal to charge"
+        if full { return "magic ready — releasing…" }
+        if charge > 0 { return "keep shaking…" }
+        return shake.motionAvailable
+            ? "shake to send to \(personName)"
+            : "tap the crystal to send to \(personName)"
     }
 
     // ── The wand ──────────────────────────────────────────────────────────
@@ -188,80 +175,139 @@ struct WandInstrumentView: View {
             .shadow(color: Self.gold.opacity(0.5), radius: 2)
     }
 
-    /// Multi-faceted crystal — a diamond gem with an inner glow that pulses
-    /// and brightens with the charge. The loaded thought sits inside it.
+    /// Multi-faceted crystal — a LARGE diamond gem with an inner glow that
+    /// pulses and brightens with the charge, flares on each shake, swings on
+    /// the staff with physics lag, and implodes at release. The loaded
+    /// thought sits inside it.
     private var crystal: some View {
         ZStack {
-            // Outer halo
+            // Outer halo — bigger, brighter
             Circle()
-                .fill(crystalColor.opacity(crystalGlow * 0.5))
-                .frame(width: 46, height: 46)
-                .blur(radius: 12 + crystalGlow * 10)
+                .fill(crystalColor.opacity(crystalGlow * 0.55))
+                .frame(width: 62, height: 62)
+                .blur(radius: 14 + crystalGlow * 14)
 
-            // Faceted gem body — two stacked diamonds
+            // Faceted gem body — larger (30 × 42), brighter on flare
             GemShape()
                 .fill(
-                    LinearGradient(colors: [crystalColor.opacity(0.95),
+                    LinearGradient(colors: [Color.white.opacity(0.4 + crystalFlare * 0.6),
+                                            crystalColor.opacity(0.95),
                                             crystalColor.opacity(0.55)],
                                    startPoint: .top, endPoint: .bottom)
                 )
-                .frame(width: 22, height: 30)
+                .frame(width: 30, height: 42)
                 .overlay(
-                    GemShape().stroke(Color.white.opacity(0.5), lineWidth: 0.8)
+                    GemShape().stroke(Color.white.opacity(0.55), lineWidth: 0.9)
                 )
-                .shadow(color: crystalColor.opacity(crystalGlow), radius: 6 + crystalGlow * 12)
+                .shadow(color: crystalColor.opacity(crystalGlow), radius: 8 + crystalGlow * 16)
 
             // The loaded thought, glowing inside the gem
             if let loadedSymbol {
                 loadedSymbol
-                    .scaleEffect(0.6)
+                    .scaleEffect(0.7)
             }
 
-            // Tip sparkles — 4–6 tiny stars drifting up from the crystal
+            // Tip sparkles — tiny stars drifting up from the crystal
             ForEach(0..<6, id: \.self) { i in
+                let sx: CGFloat = CGFloat((i * 13 + sparkleSeed * 7) % 22) - 11
+                let sy: CGFloat = -12 - CGFloat((i * 9 + sparkleSeed * 5) % 20) - (crystalPulse ? 8 : 0)
+                let sparkleSize: CGFloat = i % 2 == 0 ? 5 : 7
                 Image(systemName: "sparkle")
-                    .font(.system(size: i % 2 == 0 ? 5 : 7))
+                    .font(.system(size: sparkleSize))
                     .foregroundColor(Self.gold.opacity(crystalPulse ? 0.0 : 0.8))
-                    .offset(x: CGFloat((i * 13 + sparkleSeed * 7) % 20) - 10,
-                            y: -10 - CGFloat((i * 9 + sparkleSeed * 5) % 18)
-                               - (crystalPulse ? 8 : 0))
+                    .offset(x: sx, y: sy)
                     .animation(AnimationSystem.easeInOutSine(1.4 + Double(i) * 0.2)
                                 .repeatForever(autoreverses: true), value: crystalPulse)
             }
         }
-        .scaleEffect(crystalPulse ? 1.05 : 0.95)
-        // Keep the crystal upright as the wand rotates, so it reads as a gem
-        // and the thought inside it is never upside down.
-        .rotationEffect(.radians(-rad))
+        // Release implosion → 0.3; otherwise breathe; flare adds a quick swell
+        .scaleEffect(crystalScale)
+        // Physics lag — the heavy crystal swings as the wand is shaken
+        .offset(crystalSwing)
+        .animation(.spring(response: 0.35, dampingFraction: 0.45), value: crystalSwing)
+        .animation(.easeOut(duration: 0.18), value: imploding)
         .contentShape(Circle())
         .onTapGesture { tapCrystal() }
     }
 
-    // ── Orbiting magic particles ──────────────────────────────────────────
+    /// Crystal scale: implodes on release, breathes otherwise, flares on shake.
+    private var crystalScale: CGFloat {
+        if imploding { return 0.3 }
+        let breathe: CGFloat = crystalPulse ? 1.05 : 0.95
+        return breathe + CGFloat(crystalFlare) * 0.18
+    }
+
+    // ── Two-speed orbital system — a little solar system charging up ───────
+
+    /// Fast inner ring: 6 idle → 12 at full charge.
+    private var fastCount: Int {
+        switch charge {
+        case ..<0.3:  return 6
+        case ..<0.6:  return 8
+        case ..<0.85: return 10
+        default:      return 12
+        }
+    }
+    /// Slow outer ring of larger bodies — only once fully charged (6).
+    private var slowCount: Int { full ? 6 : 0 }
 
     private var orbitingParticles: some View {
         ZStack {
-            ForEach(0..<orbitCount, id: \.self) { i in
-                let a = orbitPhase + Double(i) / Double(orbitCount) * 2 * .pi
-                let r = 70.0 + sin(orbitPhase * 1.3 + Double(i)) * 10
+            // Fast inner ring — small bright sparks
+            ForEach(0..<fastCount, id: \.self) { i in
+                let a: Double = orbitPhase + Double(i) / Double(fastCount) * 2 * .pi
+                let r: Double = 62.0 + sin(orbitPhase * 1.3 + Double(i)) * 8
+                let dot: CGFloat = 3 + CGFloat(charge) * 2
+                let ox: CGFloat = CGFloat(cos(a)) * CGFloat(r)
+                let oy: CGFloat = CGFloat(sin(a)) * CGFloat(r)
                 Circle()
-                    .fill(Self.gold.opacity(0.3 + crystalGlow * 0.5))
-                    .frame(width: 3 + CGFloat(charge) * 2, height: 3 + CGFloat(charge) * 2)
+                    .fill(Self.gold.opacity(0.35 + crystalGlow * 0.55))
+                    .frame(width: dot, height: dot)
                     .blur(radius: 0.6)
-                    .shadow(color: Self.crystalP.opacity(crystalGlow * 0.6), radius: 3)
-                    .offset(x: CGFloat(cos(a)) * r, y: CGFloat(sin(a)) * r)
+                    .shadow(color: Self.crystalP.opacity(crystalGlow * 0.7), radius: 3)
+                    .offset(x: ox, y: oy)
+            }
+            // Slow outer ring — larger bodies, opposite direction (full only)
+            ForEach(0..<slowCount, id: \.self) { i in
+                let a: Double = orbitPhaseSlow + Double(i) / Double(max(1, slowCount)) * 2 * .pi
+                let r: Double = 98.0 + sin(orbitPhaseSlow * 1.1 + Double(i)) * 6
+                let ox: CGFloat = CGFloat(cos(a)) * CGFloat(r)
+                let oy: CGFloat = CGFloat(sin(a)) * CGFloat(r)
+                Circle()
+                    .fill(crystalColor.opacity(0.5 + crystalGlow * 0.4))
+                    .frame(width: 7, height: 7)
+                    .blur(radius: 0.8)
+                    .shadow(color: crystalColor.opacity(0.8), radius: 5)
+                    .offset(x: ox, y: oy)
             }
         }
+        // On release everything rushes inward to the crystal center
+        .scaleEffect(imploding ? 0.0 : 1.0)
+        .opacity(imploding ? 0.0 : 1.0)
+        .animation(.easeIn(duration: 0.2), value: imploding)
         .animation(.linear(duration: 0.1), value: orbitPhase)
     }
 
     // ── Mechanic ──────────────────────────────────────────────────────────
 
-    /// Each counted shake: brighter crystal, light tap, magical shimmer,
-    /// a fresh burst of tip sparkles. Bands add a heavier haptic.
+    /// Each counted shake: the crystal flares bright then settles, swings on
+    /// the staff (physics lag), a magical shimmer, fresh tip sparkles, and a
+    /// haptic that strengthens with the band.
     private func onShakeCounted(_ shakes: Int) {
         sparkleSeed += 1
         SoundEngine.shared.play(for: "style.shimmer")
+        // Flare bright, then settle back to glow
+        withAnimation(.easeOut(duration: 0.08)) { crystalFlare = 1.0 }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.10) {
+            withAnimation(.easeIn(duration: 0.35)) { crystalFlare = 0.0 }
+        }
+        // Physics swing — the heavy crystal lags the wand's motion
+        let amp: CGFloat = 7
+        crystalSwing = CGSize(width: .random(in: -amp...amp),
+                              height: .random(in: -amp ... 1))
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.18) {
+            crystalSwing = .zero
+        }
         switch shakes {
         case 4:  HapticEngine.send()        // 80 % — medium
         case 5:  break                      // 100 % handled by onFull (strong)
@@ -269,65 +315,49 @@ struct WandInstrumentView: View {
         }
     }
 
-    /// 10 Hz: orbit the particles (faster when aimed/charged), run the
-    /// full-charge auto-send countdown, and drive the no-motion fallback.
+    /// 10 Hz: spin both orbital rings (faster as charge climbs) and run the
+    /// full-charge auto-release countdown. No alignment, ever — magic finds
+    /// them.
     private func heartbeat() {
-        // Orbit speed: gentle idle, quicker within 15°, quicker still charged.
-        let speed = (aligned ? 0.22 : 0.10) + charge * 0.25
-        orbitPhase += speed
+        // Dramatic speed-up with charge; the two rings counter-rotate.
+        orbitPhase     += 0.10 + charge * 0.45
+        orbitPhaseSlow -= 0.05 + charge * 0.18
 
         guard loaded, !released else { return }
 
-        // No accelerometer (Simulator): drift a little charge so it's still
-        // reachable — but the real path is the tap-to-charge below.
-        // (Intentionally no auto-charge — keeps the Simulator deliberate.)
-
-        // Full charge + aimed → auto-send after 1 second of holding aligned.
-        if charge >= 1 {
-            if aligned {
-                fullAlignedSeconds += 0.1
-                if fullAlignedSeconds >= 1.0 { release() }
-            } else {
-                fullAlignedSeconds = 0   // charge holds; countdown waits
-            }
+        // Full charge → release on its own after a held beat. Direction is
+        // irrelevant; the magic simply goes.
+        if full {
+            fullChargeSeconds += 0.1
+            if fullChargeSeconds >= 1.0 { release() }
         }
     }
 
     /// Tapping the crystal: charge it where there's no accelerometer, or
-    /// release early once it's full and aimed.
+    /// release early once it's full.
     private func tapCrystal() {
         guard loaded, !released else { return }
-
-        if charge >= 1 {
-            if aligned {
-                release()
-            } else {
-                flashAimHint()
-            }
-            return
-        }
-
-        // Below full: shake normally charges. Without motion hardware, the
-        // crystal accepts taps so the wand still works in the Simulator.
+        if full { release(); return }
+        // Without motion hardware, taps charge so the wand works in the Sim.
         if !shake.motionAvailable {
             shake.holdCharge(1.0 / Double(ShakeDetector.shakesToFull))
         }
     }
 
+    /// The most magical send in the app: the crystal IMPLODES (and the
+    /// orbital system spirals inward), then the full-screen .wand send takes
+    /// over with the explosion, scatter, and emoji launch.
     private func release() {
         guard !released else { return }
         released = true
-        fullAlignedSeconds = 0
-        HapticEngine.send()
-        shake.stop()
-        onSend()
-    }
-
-    private func flashAimHint() {
-        HapticEngine.sendSoft()
-        withAnimation { showAimHint = true }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
-            withAnimation { showAimHint = false }
+        fullChargeSeconds = 0
+        HapticEngine.lockOn()
+        SoundEngine.shared.play(for: "style.shimmer")
+        withAnimation(.easeIn(duration: 0.18)) { imploding = true }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.18) {
+            HapticEngine.send()
+            shake.stop()
+            onSend()       // → full-screen wand explosion (SenderAnimationView)
         }
     }
 }

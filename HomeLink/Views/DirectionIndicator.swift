@@ -24,6 +24,11 @@ struct DirectionIndicator: View {
     var ringRadius: CGFloat = 180
     /// Bow & wind draw their own richer hints — they pass false.
     var showHint: Bool = true
+    /// Instruments that aim by something other than the phone bearing (the
+    /// bow's finger-spin) pass their own approach error so the marker and arc
+    /// brighten as *that* aim closes in, while the marker stays at the
+    /// person's real-world bearing. nil → use the phone-bearing error.
+    var approachError: Double? = nil
 
     @State private var pulse = false
 
@@ -31,7 +36,13 @@ struct DirectionIndicator: View {
 
     private var rad: Double { bearingDegrees * .pi / 180 }
     private var angleError: Double {
-        BearingCalculator.alignmentError(relativeBearing: bearingDegrees)
+        approachError ?? BearingCalculator.alignmentError(relativeBearing: bearingDegrees)
+    }
+
+    /// The person's first initial, shown inside the marker (• when unknown).
+    private var initial: String {
+        let trimmed = personName.trimmingCharacters(in: .whitespaces)
+        return trimmed.first.map { String($0).uppercased() } ?? "•"
     }
 
     /// Outside 15°: 0.2 · within 15°: 0.6 · within 5°: pulsing to 1.0
@@ -40,6 +51,16 @@ struct DirectionIndicator: View {
         case ..<5:   return pulse ? 1.0 : 0.75
         case ..<15:  return 0.6
         default:     return 0.2
+        }
+    }
+
+    /// Marker brightness — brightens steadily as the aim approaches.
+    private var markerOpacity: Double {
+        switch angleError {
+        case ..<5:   return pulse ? 1.0 : 0.9
+        case ..<15:  return 0.9
+        case ..<30:  return 0.65
+        default:     return 0.45
         }
     }
 
@@ -62,17 +83,14 @@ struct DirectionIndicator: View {
                         radius: 8)
                 .animation(AnimationSystem.easeInOutSine(0.3), value: arcOpacity)
 
-            // ── Direction marker — a small needle, purely navigational.
-            // (emoji marker retired: Text(personEmoji) — kept in the param)
-            Triangle()
-                .fill(Self.lavender)
-                .frame(width: 8, height: 20)
-                .scaleEffect(angleError < 5 ? 1.3 : (angleError < 15 ? 1.15 : 1.0))
-                .shadow(color: Self.lavender.opacity(angleError < 15 ? 0.8 : 0.4),
-                        radius: 6)
-                .offset(x: CGFloat(sin(rad)) * (ringRadius + 16),
-                        y: -CGFloat(cos(rad)) * (ringRadius + 16))
-                .rotationEffect(.radians(rad), anchor: .center)
+            // ── Person initial marker — a small crosshaired circle bearing
+            // the person's first initial, floating just outside the ring at
+            // their real-world bearing. Brightens as the aim closes in.
+            // (previous bare navigational triangle retired.)
+            PersonInitialMarker(initial: initial, opacity: markerOpacity,
+                                close: angleError < 15, perfect: angleError < 5)
+                .offset(x: CGFloat(sin(rad)) * (ringRadius + 22),
+                        y: -CGFloat(cos(rad)) * (ringRadius + 22))
                 .animation(.easeOut(duration: 0.2), value: bearingDegrees)
                 .animation(.easeOut(duration: 0.25), value: angleError < 15)
 
@@ -95,6 +113,47 @@ struct DirectionIndicator: View {
                 pulse = true
             }
         }
+    }
+}
+
+/// A 28 pt soft-lavender circle holding the person's initial, with four thin
+/// crosshair lines extending 8 pt outward — "aim here." Shared by every
+/// instrument (it replaced the scope button + targeting reticle).
+struct PersonInitialMarker: View {
+
+    let initial: String
+    var opacity: Double = 0.7
+    var close: Bool = false      // within 15°
+    var perfect: Bool = false    // within 5°
+
+    private static let lavender = Color(hex: "#c4a8d4")
+
+    var body: some View {
+        ZStack {
+            // Four crosshair ticks extending 8 pt beyond the rim
+            ForEach(0..<4, id: \.self) { i in
+                Capsule()
+                    .fill(Self.lavender.opacity(opacity))
+                    .frame(width: 1.4, height: 8)
+                    .offset(y: -22)
+                    .rotationEffect(.degrees(Double(i) * 90))
+            }
+            // The disc
+            Circle()
+                .fill(DesignTokens.Color.background.opacity(0.85))
+                .frame(width: 28, height: 28)
+                .overlay(
+                    Circle().stroke(Self.lavender.opacity(opacity),
+                                    lineWidth: perfect ? 2 : 1.3)
+                )
+            // The initial
+            Text(initial)
+                .font(.system(size: 13, weight: .semibold, design: .rounded))
+                .foregroundColor(Self.lavender.opacity(min(1, opacity + 0.1)))
+        }
+        .scaleEffect(perfect ? 1.18 : (close ? 1.08 : 1.0))
+        .shadow(color: Self.lavender.opacity(close ? 0.7 : 0.25),
+                radius: close ? 8 : 4)
     }
 }
 

@@ -90,7 +90,7 @@ struct CompassView: View {
     @State private var showSkinOverlay = false
     @State private var showSkinPaywall = false
     @State private var showConnectSheet = false
-    @State private var showScopeReticle = false   // [2/6] 🎯
+    // @State private var showScopeReticle = false   // [4/6] scope retired
 
     /// The three alignment layers wake whenever aiming or catching.
     private var alignmentActive: Bool {
@@ -106,6 +106,7 @@ struct CompassView: View {
     @State private var flightToken: String? = nil
     // Full-compass sender styles dim the skin to 20 % while they play
     @State private var faceDimmedForInstrument = false
+    @State private var faceSendPulse = false           // [4/4] compass send pulse
     @State private var flightFly = false
     @State private var holdProgress: Double = 0
     private let holdDuration = 2.0
@@ -151,6 +152,9 @@ struct CompassView: View {
                                 .frame(width: 240, height: 240)
                                 .scaleEffect(370.0 / 240.0)
                                 .frame(width: 370, height: 370)
+                                // [4/4] SEND — the face pulses once on launch
+                                .scaleEffect(faceSendPulse ? 1.05 : 1.0)
+                                .animation(.easeInOut(duration: 0.18), value: faceSendPulse)
                                 // Where they are — marker · arc · hint
                                 .overlay(
                                     DirectionIndicator(
@@ -256,30 +260,32 @@ struct CompassView: View {
                                 .allowsHitTesting(false)
                         }
                     }
-                    // [2/6] 🎯 scope — always reachable, bottom right
-                    .overlay(alignment: .bottomTrailing) {
-                        ScopeButton(active: showScopeReticle) {
-                            HapticEngine.personSelected()
-                            withAnimation(.easeOut(duration: 0.25)) {
-                                showScopeReticle.toggle()
-                            }
-                        }
-                        .padding(6)
-                    }
-                    .overlay {
-                        if showScopeReticle {
-                            ScopeReticleOverlay(
-                                relativeBearing: compass.state.bearingDegrees,
-                                personName: compass.state.personName,
-                                onDismiss: {
-                                    withAnimation(.easeOut(duration: 0.25)) {
-                                        showScopeReticle = false
-                                    }
-                                }
-                            )
-                            .transition(.opacity)
-                        }
-                    }
+                    // [4/6] 🎯 scope button + targeting reticle RETIRED — every
+                    // instrument now carries the person-initial marker (the
+                    // crosshaired circle in DirectionIndicator) instead.
+                    // .overlay(alignment: .bottomTrailing) {
+                    //     ScopeButton(active: showScopeReticle) {
+                    //         HapticEngine.personSelected()
+                    //         withAnimation(.easeOut(duration: 0.25)) {
+                    //             showScopeReticle.toggle()
+                    //         }
+                    //     }
+                    //     .padding(6)
+                    // }
+                    // .overlay {
+                    //     if showScopeReticle {
+                    //         ScopeReticleOverlay(
+                    //             relativeBearing: compass.state.bearingDegrees,
+                    //             personName: compass.state.personName,
+                    //             onDismiss: {
+                    //                 withAnimation(.easeOut(duration: 0.25)) {
+                    //                     showScopeReticle = false
+                    //                 }
+                    //             }
+                    //         )
+                    //         .transition(.opacity)
+                    //     }
+                    // }
                     // The catch dims the instrument beneath it, slightly
                     .opacity(appState.currentState == .catchMode ? 0.55 : 1.0)
                     .animation(.easeInOut(duration: 0.3),
@@ -1033,6 +1039,13 @@ struct CompassView: View {
         flightToken = token
         flightFly = true   // legacy flag (the style view drives its own motion)
 
+        // [4/4] The compass face pulses once as the thought launches — even
+        // the free instrument feels alive and powerful.
+        if instrumentStore.selected == .compass {
+            faceSendPulse = true
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.18) { faceSendPulse = false }
+        }
+
         // ONE SELECTION DEFINES EVERYTHING: the flight personality follows
         // the chosen instrument (compass→glow, bow→bowArrow, firefly→firefly,
         // flick→fingerFlick). Free users hold the compass, so glow.
@@ -1077,9 +1090,10 @@ struct CompassView: View {
 
     private var compassFace: some View {
         ZStack {
-            // ── The rose is STATIC: N at top, always. Real-world
-            // orientation comes from the fixed face; emotional direction
-            // from the needle (bearing - heading) alone.
+            // ── [2/6] REAL COMPASS: the rose ROTATES with the phone so N
+            // always points to true north (faceRotation = -heading). The
+            // needle keeps pointing at the person; the user turns the phone
+            // until the needle points up. ──
             Group {
                 // Skin-specific rings and decorations
                 SkinFaceView(
@@ -1101,13 +1115,17 @@ struct CompassView: View {
                         .offset(x: CGFloat(sin(rad)) * 113, y: -CGFloat(cos(rad)) * 113)
                 }
             }
-            // .rotationEffect(.degrees(compass.state.faceRotationDegrees))
-            //   — face rotation removed: the rose never turns
+            // The rose card spins to keep N pointing at real-world north.
+            .rotationEffect(.degrees(compass.state.faceRotationDegrees))
+            .animation(.easeOut(duration: 0.18), value: compass.state.faceRotationDegrees)
 
-            // Emoji presence system — always at center
+            // Emoji presence system — always at center, never rotates
             emojiPresence
 
-            // Needle — shared geometry, skin-tinted colours
+            // Needle — points at the person. On the spinning rose its mark
+            // sits at the absolute bearing; on screen that lands at the
+            // relative bearing (bearing - heading), so it points up when
+            // the phone faces them. (Shared geometry, skin-tinted colours.)
             NeedleView(
                 bearing: compass.state.bearingDegrees,
                 skin: compass.state.activeSkin,

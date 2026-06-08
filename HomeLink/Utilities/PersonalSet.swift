@@ -16,13 +16,14 @@ enum PersonalSet {
     static let coreDefault = ["❤️", "💋", "🤗", "✨", "🌸", "🌙"]
 
     static func load() -> [String] {
-        let saved = UserDefaults.standard.stringArray(forKey: storageKey) ?? coreDefault
-        // Always exactly six — pad from core if anything went missing
-        var tokens = saved
-        for core in coreDefault where tokens.count < slotCount && !tokens.contains(core) {
-            tokens.append(core)
+        // A saved set is honoured as-is (1…6 tokens — the slot picker lets
+        // people carry fewer than six). Only a brand-new user gets the core
+        // six as a starting point.
+        guard let saved = UserDefaults.standard.stringArray(forKey: storageKey),
+              !saved.isEmpty else {
+            return coreDefault
         }
-        return Array(tokens.prefix(slotCount))
+        return Array(saved.prefix(slotCount))
     }
 
     static func save(_ tokens: [String]) {

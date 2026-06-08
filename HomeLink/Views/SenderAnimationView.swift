@@ -108,6 +108,12 @@ struct SenderAnimationView<Symbol: View>: View {
     @State private var trailFaded  = false          // lingering comet-tail fade
     @State private var bgPulse     = false          // whole-screen lavender wash
     @State private var flashVisible = false         // impact flash at the edge
+    @State private var goldRing    = false          // compass: expanding gold ring
+    @State private var windSky     = false          // wind: full-screen sky takeover
+    @State private var streakIn    = false          // flick: full-screen light streak
+    @State private var wandWhiteFlash = false       // wand: full-screen white flash
+    @State private var wandExplode    = false       // wand: implosion → explosion scatter
+    @State private var compassExpand  = false       // compass: face expand/contract pulse
 
     // Full-compass instrument phases (finger flick + bow & arrow)
     @State private var instrumentShown = false   // 300 ms transform in
@@ -205,6 +211,12 @@ struct SenderAnimationView<Symbol: View>: View {
                 .opacity(bgPulse ? 0.15 : 0)
                 .ignoresSafeArea()
 
+            // 🌬️ WIND — the whole screen becomes sky during the send, then
+            // recedes. Fast-drifting clouds carry the thought away.
+            if style == .firefly {
+                windSkyLayer
+            }
+
             GeometryReader { geo in
                 let end = endOffset(in: geo)
                 ZStack {
@@ -252,6 +264,23 @@ struct SenderAnimationView<Symbol: View>: View {
     private func glowSend(end: CGSize) -> some View {
         let start   = ringStart
         let control = controlOffset(from: start, to: end, drama: 50)
+
+        // [6/6] FULL-SCREEN GLOW PULSE — the whole compass breathes with the
+        // send: a hue-true wash expanding and contracting behind everything.
+        RadialGradient(colors: [hue.opacity(compassExpand ? 0.32 : 0), .clear],
+                       center: .center, startRadius: 20, endRadius: 520)
+            .ignoresSafeArea()
+            .scaleEffect(compassExpand ? 1.12 : 0.82)
+            .animation(.easeInOut(duration: 0.5), value: compassExpand)
+
+        // GOLDEN RING — expands from the compass center as the needle locks,
+        // opacity 0.6 → 0 over 400 ms. The compass feels alive and powerful.
+        Circle()
+            .stroke(Self.gold.opacity(goldRing ? 0 : 0.6), lineWidth: 3)
+            .frame(width: 90, height: 90)
+            .scaleEffect(goldRing ? 3.2 : 0.35)
+            .blur(radius: goldRing ? 2 : 0)
+            .animation(.easeOut(duration: 0.4), value: goldRing)
 
         // Trail: 10 soft circles (10–14 px), emoji hue at 40 %,
         // lingering 1 s after the emoji passes — the visible path
@@ -367,45 +396,79 @@ struct SenderAnimationView<Symbol: View>: View {
         let c2 = CGSize(width: start.width + (end.width - start.width) * 0.70 + wander2.width,
                         height: start.height + (end.height - start.height) * 0.70 + wander2.height)
 
-        // Faint light trail — 5 particles lingering 1.2 s behind the drift
-        ForEach(0..<5, id: \.self) { i in
-            Circle()
-                .fill(Self.fireflyGreen.opacity(0.18))
-                .frame(width: 7, height: 7)
-                .blur(radius: 2)
+        // A STREAM of dandelion seeds following the thought on the breeze
+        ForEach(0..<12, id: \.self) { i in
+            DandelionSeed(size: 8 + CGFloat(i % 3) * 2, opacity: 0.75)
                 .opacity(trailFaded ? 0 : 1)
                 .modifier(WanderingFlightEffect(progress: progress, start: start,
                                                 control1: c1, control2: c2, end: end))
                 .animation(AnimationSystem.easeInOutSine(fireflyFlight)
-                            .delay(0.07 * Double(i + 1)), value: progress)
+                            .delay(0.05 * Double(i + 1)), value: progress)
                 .animation(.easeOut(duration: AnimationSystem.Trail.lingerMax)
-                            .delay(0.06 * Double(i)), value: trailFaded)
+                            .delay(0.05 * Double(i)), value: trailFaded)
         }
 
-        // The orb — the emoji becomes a soft glowing light
-        ZStack {
-            Circle()
-                .fill(
-                    RadialGradient(colors: [Self.fireflyGreen.opacity(0.9),
-                                            Self.fireflyGreen.opacity(0.35), .clear],
-                                   center: .center, startRadius: 2, endRadius: 16)
-                )
-                .frame(width: 30, height: 30)
-                .blur(radius: 2)
-            symbol
-                .scaleEffect(0.55)
-                .opacity(0.35)   // a memory of the emoji inside the light
+        // The thought itself — floating in the sky, growing as it drifts away
+        symbol
+            .scaleEffect(orbPulse ? 1.03 : 0.97)
+            .scaleEffect(flightScale)
+            .rotationEffect(.degrees(orbPulse ? 3 : -3))
+            .shadow(color: .white.opacity(0.85), radius: 10)
+            .shadow(color: Color(hex: "#FFF3A3").opacity(0.6), radius: 16)   // sunlight
+            .opacity(faded ? 0 : 1)
+            .modifier(WanderingFlightEffect(progress: progress, start: start,
+                                            control1: c1, control2: c2, end: end))
+            .animation(AnimationSystem.easeInOutSine(fireflyFlight), value: progress)
+            .animation(.easeOut(duration: 0.3), value: faded)
+    }
+
+    // ── WIND full-screen sky takeover ─────────────────────────────────────
+
+    private static var wSkyTop: Color { Color(hex: "#87CEEB") }
+    private static var wSkyMid: Color { Color(hex: "#B8D4E8") }
+    private static var wSkyLow: Color { Color(hex: "#E8F4F8") }
+
+    /// The whole screen becomes sky during a wind send, then recedes —
+    /// clouds drifting fast across the phone.
+    private var windSkyLayer: some View {
+        LinearGradient(colors: [Self.wSkyTop, Self.wSkyMid, Self.wSkyLow],
+                       startPoint: .top, endPoint: .bottom)
+            .overlay(fastClouds)
+            .opacity(windSky ? 1 : 0)
+            .ignoresSafeArea()
+            .animation(.easeInOut(duration: 0.7), value: windSky)
+            .allowsHitTesting(false)
+    }
+
+    private var fastClouds: some View {
+        GeometryReader { geo in
+            TimelineView(.animation) { tl in
+                let t = tl.date.timeIntervalSinceReferenceDate
+                let ys: [CGFloat] = [0.16, 0.4, 0.64, 0.84]
+                let periods: [Double] = [6, 9, 7, 5]   // fast drift
+                ZStack {
+                    ForEach(0..<4, id: \.self) { i in
+                        windCloud
+                            .scaleEffect(0.7 + CGFloat(i) * 0.22)
+                            .position(
+                                x: CGFloat(((t / periods[i]).truncatingRemainder(dividingBy: 1)))
+                                   * (geo.size.width + 200) - 100,
+                                y: geo.size.height * ys[i])
+                    }
+                }
+            }
         }
-        .scaleEffect(orbPulse ? 1.05 : 0.95)   // 600 ms easeInOutSine pulse
-        .scaleEffect(flightScale)              // grows gently as it travels
-        .shadow(color: Self.fireflyGreen.opacity(chargeGlow ? 0.50 : 0.20),
-                radius: AnimationSystem.Glow.radiusMax)   // the light gathers
-        .opacity(faded ? 0 : 1)   // fades softly at the edge, 300 ms
-        .modifier(WanderingFlightEffect(progress: progress, start: start,
-                                        control1: c1, control2: c2, end: end))
-        .animation(AnimationSystem.easeInOutSine(fireflyFlight), value: progress)
-        .animation(.easeIn(duration: 0.3), value: chargeGlow)
-        .animation(.easeOut(duration: 0.3), value: faded)
+    }
+
+    private var windCloud: some View {
+        ZStack {
+            Circle().frame(width: 50, height: 50).offset(x: -32, y: 6)
+            Circle().frame(width: 70, height: 70)
+            Circle().frame(width: 54, height: 54).offset(x: 32, y: 4)
+            Capsule().frame(width: 104, height: 32).offset(y: 16)
+        }
+        .foregroundColor(Color(hex: "#FFFAF0").opacity(0.8))
+        .blur(radius: 4)
     }
 
     // ════ LEGACY small-overlay versions — superseded by the full
@@ -648,18 +711,42 @@ struct SenderAnimationView<Symbol: View>: View {
                 .animation(.easeOut(duration: 1.0).delay(0.06 * Double(i)), value: faded)
         }
 
-        // ── The emoji — waits glowing at the tip, then launches ──
+        // ── A bright LIGHT STREAK trailing the launch ──
+        if emojiAtTip {
+            Capsule()
+                .fill(LinearGradient(colors: [.white, Self.flickGold2.opacity(0.7), .clear],
+                                     startPoint: .leading, endPoint: .trailing))
+                .frame(width: 60, height: 8)
+                .blur(radius: 2)
+                .rotationEffect(.radians(rad - .pi / 2))
+                .opacity(faded ? 0 : (progress > 0 ? 0.9 : 0))
+                .modifier(CurvedFlightEffect(progress: progress, start: fingerTipOffset,
+                                             control: control, end: end))
+                .animation(AnimationSystem.easeOutCubic(0.5), value: progress)
+                .animation(.easeOut(duration: 0.2), value: faded)
+        }
+
+        // ── The emoji — explodes from the pocket and streaks away ──
         if emojiAtTip {
             symbol
-                .scaleEffect(flightScale)   // 1.0 → 1.6 mid-flight
-                .rotationEffect(.degrees(progress > 0 ? 6 * (sin(rad) >= 0 ? 1 : -1) : 0))
-                .shadow(color: hue.opacity(0.6), radius: 12)
+                .scaleEffect(flightScale)   // 1.0 → 1.8 mid-flight
+                .rotationEffect(.degrees(progress > 0 ? 8 * (sin(rad) >= 0 ? 1 : -1) : 0))
+                .shadow(color: hue.opacity(0.7), radius: 14)
                 .opacity(faded ? 0 : 1)
                 .modifier(CurvedFlightEffect(progress: progress, start: fingerTipOffset,
                                              control: control, end: end))
-                .animation(AnimationSystem.easeOutCubic(0.8), value: progress)
-                .animation(.easeOut(duration: 0.4), value: flightScale)
-                .animation(.easeOut(duration: 0.2), value: faded)
+                .animation(AnimationSystem.easeOutCubic(0.5), value: progress)   // blazing
+                .animation(.easeOut(duration: 0.3), value: flightScale)
+                .animation(.easeOut(duration: 0.15), value: faded)
+        }
+
+        // ── Full-screen white flash as it explodes free ──
+        if streakIn {
+            Rectangle()
+                .fill(Color.white)
+                .opacity(0.22)
+                .ignoresSafeArea()
+                .transition(.opacity)
         }
     }
 
@@ -765,46 +852,79 @@ struct SenderAnimationView<Symbol: View>: View {
 
     @ViewBuilder
     private func wandSend(end: CGSize) -> some View {
-        let start   = ringStart
-        let control = controlOffset(from: start, to: end, drama: 80)
+        // [6/6] THE MOST MAGICAL SEND: the crystal imploded on the wand; here
+        // the magic EXPLODES from screen-center — a white flash fills the
+        // screen, particles scatter in every direction, and the thought
+        // launches from the explosion on a trail of stars.
+        let control = controlOffset(for: end, drama: 60)
+        return ZStack {
+            wandWhiteFlashLayer
+            wandExplosionCore
+            wandScatter
+            wandStarTrail(control: control, end: end)
+            wandThought(control: control, end: end)
+        }
+    }
 
-        // BURST — sparkles scattering from the crystal as it releases
-        ForEach(0..<24, id: \.self) { i in
-            let a = Double(i) / 24 * 2 * .pi
-            let dist: CGFloat = squashed ? 60 + CGFloat(i % 5) * 8 : 0
+    /// Full-screen white flash, 0 → 0.6 → 0.
+    private var wandWhiteFlashLayer: some View {
+        Color.white.opacity(wandWhiteFlash ? 0.6 : 0)
+            .ignoresSafeArea()
+            .animation(.easeOut(duration: 0.15), value: wandWhiteFlash)
+    }
+
+    /// The core — implodes to a point, then explodes 0.3 → 2.0 and fades.
+    private var wandExplosionCore: some View {
+        Circle()
+            .fill(RadialGradient(colors: [.white, Self.wandGold.opacity(0.6), .clear],
+                                 center: .center, startRadius: 2, endRadius: 84))
+            .frame(width: 168, height: 168)
+            .scaleEffect(wandExplode ? 2.0 : 0.3)
+            .opacity(wandExplode ? 0 : (chargeGlow ? 1 : 0))
+            .animation(.easeOut(duration: 0.45), value: wandExplode)
+    }
+
+    /// 30 sparks flying outward in every direction from the explosion.
+    private var wandScatter: some View {
+        ForEach(0..<30, id: \.self) { i in
+            let a: Double = Double(i) / 30 * 2 * .pi
+            let dist: CGFloat = wandExplode ? 220 + CGFloat(i % 6) * 22 : 0
+            let dot: CGFloat = i % 3 == 0 ? 5 : 3
             Circle()
                 .fill(i % 2 == 0 ? Self.wandGold : Self.wandPurple)
-                .frame(width: i % 3 == 0 ? 4 : 3, height: i % 3 == 0 ? 4 : 3)
-                .blur(radius: 0.5)
-                .offset(x: start.width + CGFloat(cos(a)) * dist,
-                        y: start.height + CGFloat(sin(a)) * dist)
-                .opacity(squashed ? 0 : (chargeGlow ? 0.95 : 0))
-                .animation(.easeOut(duration: 0.5), value: squashed)
+                .frame(width: dot, height: dot)
+                .blur(radius: 0.6)
+                .offset(x: CGFloat(cos(a)) * dist, y: CGFloat(sin(a)) * dist)
+                .opacity(wandExplode ? 0 : (chargeGlow ? 0.95 : 0))
+                .animation(.easeOut(duration: 0.85), value: wandExplode)
         }
+    }
 
-        // TRAIL — gold/purple sparkles following the thought, fading 1.5 s
-        ForEach(0..<12, id: \.self) { i in
-            Circle()
-                .fill((i % 2 == 0 ? Self.wandGold : Self.wandPurple).opacity(0.7))
-                .frame(width: 6, height: 6)
-                .blur(radius: 1.5)
+    /// A trail of stars following the thought as it launches from center.
+    private func wandStarTrail(control: CGSize, end: CGSize) -> some View {
+        ForEach(0..<14, id: \.self) { i in
+            let c: Color = (i % 2 == 0 ? Self.wandGold : Self.wandPurple).opacity(0.7)
+            Image(systemName: "sparkle")
+                .font(.system(size: i % 3 == 0 ? 9 : 6))
+                .foregroundColor(c)
                 .opacity(trailFaded ? 0 : 1)
-                .modifier(CurvedFlightEffect(progress: progress, start: start,
+                .modifier(CurvedFlightEffect(progress: progress, start: .zero,
                                              control: control, end: end))
                 .animation(AnimationSystem.easeOutCubic(wandFlight)
                             .delay(0.02 * Double(i + 1)), value: progress)
                 .animation(.easeOut(duration: 1.5).delay(0.05 * Double(i)),
                            value: trailFaded)
         }
+    }
 
-        // The thought — launches from the crystal tip, grows mid-flight
+    /// The thought — launches from the explosion center, grows mid-flight.
+    private func wandThought(control: CGSize, end: CGSize) -> some View {
         symbol
             .scaleEffect(flightScale)
-            .rotationEffect(.degrees(progress > 0 ? 10 * (sin(rad) >= 0 ? 1 : -1) : 0))
             .shadow(color: Self.wandPurple.opacity(chargeGlow ? 0.7 : 0.2),
                     radius: chargeGlow ? 18 : 8)
             .opacity(faded ? 0 : 1)
-            .modifier(CurvedFlightEffect(progress: progress, start: start,
+            .modifier(CurvedFlightEffect(progress: progress, start: .zero,
                                          control: control, end: end))
             .animation(AnimationSystem.easeOutCubic(wandFlight), value: progress)
             .animation(.easeOut(duration: 0.35), value: flightScale)
@@ -841,21 +961,24 @@ struct SenderAnimationView<Symbol: View>: View {
             launchRocket()
 
         case .wand:
-            // RELEASE — the charge was built on the wand; here the crystal
-            // bursts and the thought streaks away on a sparkle trail.
-            // BURST 200 ms — bright flash, scatter, strong haptic
+            // [6/6] RELEASE — implosion → explosion → scatter → emoji launch.
+            // The white flash fills the screen; the magic finds them.
             chargeGlow = true
-            HapticEngine.send()
+            HapticEngine.lockOn()
             SoundEngine.shared.play(for: "style.shimmer")
-            withAnimation(.easeOut(duration: 0.1)) { squashed = true }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
-                withAnimation(.easeOut(duration: 0.1)) { squashed = false }
+            // FLASH 150 ms — the screen goes white as the crystal implodes
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                withAnimation(.easeOut(duration: 0.12)) { wandWhiteFlash = true }
+                HapticEngine.send()
+                SoundEngine.shared.play(for: "rocket.blast")   // a magical boom
             }
-            // FLIGHT 1000 ms — curved arc, grows to 1.6, fades the last 250 ms
+            // EXPLODE 200 ms — core blooms 0.3 → 2.0, sparks scatter, launch
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.20) {
+                wandExplode = true
+                withAnimation(.easeOut(duration: 0.18)) { wandWhiteFlash = false }
                 progress = 1
                 withAnimation(AnimationSystem.easeOutCubic(wandFlight)) {
-                    flightScale = 1.6
+                    flightScale = 1.7
                 }
             }
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.95) {
@@ -866,9 +989,13 @@ struct SenderAnimationView<Symbol: View>: View {
             finish(after: 1.2 + AnimationSystem.Trail.linger + 0.4)
 
         case .glow:
-            // CHARGE 200 ms — pulse 1.0 → 1.2 → 1.0, warm glow builds
+            // [6/6] CHARGE 200 ms — the whole compass face expands and glows,
+            // the needle locks, the golden ring blooms from center.
             chargeScale = 1.2
             chargeGlow  = true
+            HapticEngine.lockOn()                     // the satisfying needle snap
+            goldRing = true                           // expands 0.4 s, fades out
+            withAnimation(.easeOut(duration: 0.25)) { compassExpand = true }  // face swells
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.10) {
                 chargeScale = 1.0
             }
@@ -877,13 +1004,15 @@ struct SenderAnimationView<Symbol: View>: View {
                 withAnimation(.easeOut(duration: 0.08)) { squashed = true }
                 HapticEngine.send()
             }
-            // FLIGHT 700 ms — grows to 1.5, fades the last 200 ms
+            // FLIGHT 900 ms — grows to 1.4 from the needle tip, fades last 200 ms.
+            // The face contracts back as the thought launches away.
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.30) {
                 progress = 1
                 withAnimation(AnimationSystem.easeOutCubic(glowFlight)) {
-                    flightScale = 1.5
+                    flightScale = 1.4
                 }
                 withAnimation(.easeOut(duration: 0.15)) { squashed = false }
+                withAnimation(.easeInOut(duration: 0.5)) { compassExpand = false }  // contract
             }
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.80) {
                 faded = true
@@ -914,13 +1043,18 @@ struct SenderAnimationView<Symbol: View>: View {
             finish(after: 0.7 + 0.9 + 0.55)
 
         case .firefly:
-            // GATHER 300 ms — the light gathers, the pulse begins
+            // GATHER 300 ms — the sky takes over the screen, the pulse begins
             HapticEngine.sendSoft()                          // soft, slightly delayed
             SoundEngine.shared.play(for: "style.chime")      // soft, gentle, airy
             chargeGlow = true
+            windSky = true                                   // full-screen sky in
             withAnimation(AnimationSystem.easeInOutSine(0.6)
                             .repeatForever(autoreverses: true)) {
                 orbPulse = true
+            }
+            // The sky recedes near the end, returning to the instrument
+            DispatchQueue.main.asyncAfter(deadline: .now() + 3.4) {
+                windSky = false
             }
             // DRIFT 3000 ms — wind: slow, gentle, beautiful wandering
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.30) {
@@ -939,32 +1073,30 @@ struct SenderAnimationView<Symbol: View>: View {
             finish(after: 3.3 + AnimationSystem.Trail.lingerMax + 0.45)
 
         case .fingerFlick:
-            // FULL COMPASS: transform 300 → compress 200 → snap 80 with
-            // sparks → 800 ms full-screen flight → 400 ms return exhale
+            // SLINGSHOT LAUNCH — blazing 600 ms. The thought explodes from the
+            // pocket on a light streak, grows to 1.8, the band shudders behind.
             instrumentShown = true
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.30) {
-                ffCompress = true                       // drawing back
-                emojiAtTip = true                       // glowing, ready
-                ffSparks   = true                       // staged, burst on flick
-                HapticEngine.sendSoft()                 // subtle tension
-            }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.50) {
-                ffFlick = true                          // SNAP — 8 % overshoot
-                HapticEngine.send()                     // satisfying strong-light
-                SoundEngine.shared.play(for: "style.shimmer")
-                progress = 1                            // 800 ms easeOutCubic
-                withAnimation(AnimationSystem.easeOutCubic(0.4)) {
-                    flightScale = 1.6                   // grows mid-flight
+            emojiAtTip = true
+            ffSparks   = true
+            ffFlick    = true                           // SNAP immediately
+            streakIn   = true                           // bright flash
+            HapticEngine.send()                         // satisfying snap
+            SoundEngine.shared.play(for: "style.shimmer")
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                progress = 1                            // streak away fast
+                withAnimation(AnimationSystem.easeOutCubic(0.5)) {
+                    flightScale = 1.8                   // grows big mid-flight
                 }
             }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1.20) {
-                faded = true                            // trail lingers 1 s
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.18) { streakIn = false }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) {
+                faded = true
             }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1.30) {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.60) {
                 impact()                                // flash · screen pulse · medium tap
-                instrumentGone = true                   // the exhale
+                instrumentGone = true
             }
-            finish(after: 1.3 + 1.0 + 0.3)
+            finish(after: 0.6 + AnimationSystem.Trail.linger + 0.3)
 
         case .bowArrow:
             // FULL COMPASS: transform 300 → draw 400 (tension) → trembling

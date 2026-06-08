@@ -99,6 +99,10 @@ final class SoundEngine {
             ("rocket.blast",     0.70, makeRocketBlast),
             // TODO: replace with real_rocket_landing.wav
             ("rocket.landing",   0.55, makeRocketLanding),
+
+            // ── PLANE ✈️ (Coming Soon) — winding ratchet click ──────────────
+            // TODO: replace with real_plane_wind.wav
+            ("plane.wind",       0.45, makePlaneWind),
         ]
         // (Commented out of the core flow, voices kept below for reuse:)
         // ("💜", 0.50, makeHeart), ("💋", 0.55, makeKiss),
@@ -954,6 +958,21 @@ final class SoundEngine {
             // A little settling grit at the very start
             if p < 0.05 { s += Double.random(in: -1...1) * (1 - p / 0.05) * 0.25 }
             data[i] = Float(max(-1, min(1, s)) * envelope(p, attack: 0.01, release: 0.5))
+        }
+        return buf
+    }
+
+    /// PLANE WIND — a short dry ratchet click (~200 Hz tick + tiny noise
+    /// transient), 0.08 s. Played once per wind so it reads as click-click.
+    private func makePlaneWind() -> AVAudioPCMBuffer? {
+        let d = 0.08
+        guard let (buf, data, n) = makeBuffer(duration: d) else { return nil }
+        for i in 0..<n {
+            let t = Double(i) / sampleRate
+            let p = t / d
+            var s = sin(2 * .pi * 200 * t) * exp(-t * 40) * 0.7
+            if p < 0.06 { s += Double.random(in: -1...1) * (1 - p / 0.06) * 0.5 }   // tick
+            data[i] = Float(max(-1, min(1, s)) * envelope(p, attack: 0.01, release: 0.4))
         }
         return buf
     }

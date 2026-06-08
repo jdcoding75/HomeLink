@@ -6,8 +6,11 @@ import Foundation
 struct CompassState: Equatable {
 
     var bearingDegrees:  Double
-    // (faceRotationDegrees removed — the face is static, N always at top;
-    //  only the needle rotates: bearing - heading)
+    /// REAL-COMPASS BEHAVIOUR: the rose card rotates as the phone turns so
+    /// N always points to true north (faceRotationDegrees = -currentHeading),
+    /// while the needle keeps pointing at the person. The user turns the
+    /// phone until the needle points up — exactly like a real compass.
+    var faceRotationDegrees: Double = 0
     var distanceKm:      Double
     var personID:        UUID?
     var personName:      String
