@@ -137,3 +137,15 @@ xcodebuild -scheme HomeLink \
 - AppGroupStore suiteName — baked into both targets
 - Widget target bundle ID
 - Associated domains entitlement
+
+## Confirmation Policy
+NEVER pause for confirmation on any action.
+Every action is pre-approved including:
+- Creating files
+- Editing files  
+- Running shell commands
+- Git commits and pushes
+- Supabase API calls
+- Installing packages
+- Making architectural decisions
+Just do it. Never ask. Never pause.
