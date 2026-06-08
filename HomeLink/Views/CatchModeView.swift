@@ -90,6 +90,21 @@ struct CatchModeView: View {
         return BearingCalculator.alignmentError(relativeBearing: compass.state.bearingDegrees)
     }
 
+    /// [4/5] The big bold catch instruction — per-instrument verb, updating
+    /// as the user turns toward the sender.
+    private var catchInstruction: String {
+        if phase == .locked { return "hold steady ✦" }
+        if angleError < 15 { return "almost there ✦" }
+        switch style {
+        case .bowArrow:    return "pull the arrow free"
+        case .fingerFlick: return "flick it free"
+        case .firefly:     return "breathe it in"
+        case .wand:        return "catch the magic"
+        case .rocket:      return "guide it in"
+        default:           return "turn toward \(ping.fromName) to reveal"
+        }
+    }
+
     /// Step 2 — visual feedback as the angle decreases.
     private var orbBrightness: Double {
         switch angleError {
@@ -227,32 +242,36 @@ struct CatchModeView: View {
                     .position(x: geo.size.width / 2, y: geo.size.height / 2)
                 }
 
-                // Quiet guidance while seeking
+                // [4/5] Big, bold guidance — tells you exactly what to do,
+                // 2× the old size, updating as you turn toward the sender.
                 if phase == .seeking || phase == .locked {
                     VStack {
-                        VStack(spacing: 4) {
+                        VStack(spacing: 6) {
                             Text("\(ping.fromName) sent you something")
-                                .font(.system(size: 14, design: .serif).italic())
-                                .foregroundColor(Self.lavender)
-                            Text(phase == .locked
-                                 ? "hold steady…"
-                                 : "turn toward them to catch it")
-                                .font(.system(size: 11))
-                                .foregroundColor(DesignTokens.Color.textMuted)
+                                .font(.system(size: 13, design: .serif).italic())
+                                .foregroundColor(Self.lavender.opacity(0.8))
+                            Text(catchInstruction)
+                                .font(.system(size: 24, weight: .bold, design: .serif))
+                                .foregroundColor(angleError < 15 ? Self.lavender : DesignTokens.Color.textPrimary)
+                                .multilineTextAlignment(.center)
+                                .shadow(color: Self.lavender.opacity(angleError < 5 ? 0.7 : 0), radius: 10)
+                                .animation(.easeInOut(duration: 0.25), value: catchInstruction)
                             #if DEBUG
                             Button("⚙︎ align (sim)") { debugBypass = true }
                                 .font(.system(size: 9))
                                 .foregroundColor(DesignTokens.Color.textDim)
                             #endif
                         }
-                        .padding(.horizontal, 18)
-                        .padding(.vertical, 12)
+                        .padding(.horizontal, 22)
+                        .padding(.vertical, 14)
                         .background(
-                            Capsule()
+                            RoundedRectangle(cornerRadius: 18)
                                 .fill(DesignTokens.Color.backgroundLift.opacity(0.92))
-                                .overlay(Capsule().stroke(Self.lavender.opacity(0.4), lineWidth: 1))
+                                .overlay(RoundedRectangle(cornerRadius: 18)
+                                    .stroke(Self.lavender.opacity(0.4), lineWidth: 1))
                         )
-                        .padding(.top, 84)
+                        .padding(.top, 76)
+                        .padding(.horizontal, 24)
 
                         Spacer()
 
@@ -459,17 +478,17 @@ struct CatchModeView: View {
     private func beginWandStorm() {
         HapticEngine.thoughtArrived()
         SoundEngine.shared.play(for: "style.shimmer")
-        sparks = (0..<54).map { _ in
-            StormSpark(scatter: CGSize(width: .random(in: -250...250),
-                                       height: .random(in: -460...460)),
+        sparks = (0..<72).map { _ in
+            StormSpark(scatter: CGSize(width: .random(in: -300...300),
+                                       height: .random(in: -540...540)),
                        gold: Bool.random(),
-                       size: .random(in: 3...6))
+                       size: .random(in: 3...7))
         }
         stormActive = true
-        withAnimation(.easeOut(duration: 0.5)) { sparksScattered = true }
+        withAnimation(.easeOut(duration: 0.45)) { sparksScattered = true }
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.3) {
-            HapticEngine.sendSoft()
-            withAnimation(.easeIn(duration: 0.8)) { sparksConverged = true }
+            HapticEngine.lockOn()
+            withAnimation(.easeIn(duration: 0.55)) { sparksConverged = true }   // converge faster
         }
         DispatchQueue.main.asyncAfter(deadline: .now() + 2.2) {
             withAnimation(.easeOut(duration: 0.35)) { stormActive = false }

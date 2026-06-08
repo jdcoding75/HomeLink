@@ -39,17 +39,18 @@ final class BreathDetector: ObservableObject {
     private var levelWindow: [Float] = []
     private let windowSize = 10
 
-    // Tuning — all in dB (spec). A breath is a long soft hill between
-    // ambient silence and the volume of speech.
-    private let silenceDb: Float  = -50   // below this → silence
-    private let breathLowDb: Float = -45  // breath band floor
-    private let breathHighDb: Float = -25 // breath band ceiling
-    private let speechDb: Float   = -20   // above this → speech/noise, ignore
-    private let spikeJumpDb: Float = 12    // a sharp jump = tap/speech onset
-    private let requiredSeconds   = 1.6    // within the 1.5–2 s window
+    // [3/7] Tuning — MUCH more sensitive. A breath is a soft hill above
+    // ambient silence; the old thresholds were so strict real breathing barely
+    // registered. Lowered the whole band and the required hold.
+    private let silenceDb: Float  = -40   // below this → silence (was -50)
+    private let breathLowDb: Float = -38  // breath detected from here (was -45)
+    private let breathHighDb: Float = -12 // breath band ceiling (was -25)
+    private let speechDb: Float   = -6    // above this → shouting/noise, ignore
+    private let spikeJumpDb: Float = 16    // a sharp jump = tap onset (was 12)
+    private let requiredSeconds   = 0.8    // sustain only 0.8 s now (was 1.6)
     // Live-arc normalization: map silence → full breath onto 0…1.
-    private let arcFloorDb: Float   = -50  // very dim lavender
-    private let arcCeilingDb: Float = -25  // full glow
+    private let arcFloorDb: Float   = -42  // very dim lavender
+    private let arcCeilingDb: Float = -16  // full glow
 
     func start() {
         guard !isListening else { return }

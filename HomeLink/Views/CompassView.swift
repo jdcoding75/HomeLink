@@ -103,6 +103,8 @@ struct CompassView: View {
     @AppStorage("holdToSendEnabled") private var holdToSendEnabled = false
     @State private var personalSixRow: [String] = PersonalSet.load()
     @State private var selectedToken: String? = nil
+    @State private var loadFlightToken: String? = nil       // [1/5] load flight
+    @State private var loadFlightProgress: CGFloat = 0
     @State private var flightToken: String? = nil
     // Full-compass sender styles dim the skin to 20 % while they play
     @State private var faceDimmedForInstrument = false
@@ -117,6 +119,43 @@ struct CompassView: View {
     }
     private var sendAlignDiff: Double {
         BearingCalculator.alignmentError(relativeBearing: compass.state.bearingDegrees)
+    }
+
+    /// [2/5] Best-effort current step for the progress dots. Load is done once
+    /// a thought is selected; aim-based instruments advance toward their final
+    /// action as the phone lines up; the magic instruments (wind · wand) sit
+    /// on their action step since their charge lives inside the instrument.
+    private var instrumentStep: Int {
+        guard selectedToken != nil else { return 0 }   // still on "load"
+        let inst = instrumentStore.selected
+        let total = StepProgressView.stepNames(for: inst).count
+        switch inst {
+        case .firefly, .wand:
+            return 1                                    // breathe / shake
+        default:
+            let aimed = compass.isHeadingAvailable ? sendAlignDiff <= 15 : true
+            return aimed ? total - 1 : 1
+        }
+    }
+
+    /// [1/5] + [5/5] A per-instrument confirmation as the thought loads in.
+    private func loadHaptic() {
+        switch instrumentStore.selected {
+        case .flick: HapticEngine.flickLoad()
+        default:     HapticEngine.personSelected()
+        }
+    }
+
+    private func triggerLoadFlight(_ token: String) {
+        loadFlightToken = token
+        loadFlightProgress = 0
+        loadHaptic()
+        withAnimation(.easeOut(duration: 0.4)) { loadFlightProgress = 1 }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.42) {
+            loadFlightToken = nil
+            faceSendPulse = true                        // soft pulse when loaded
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.18) { faceSendPulse = false }
+        }
     }
 
     var body: some View {
@@ -161,7 +200,8 @@ struct CompassView: View {
                                         bearingDegrees: compass.state.bearingDegrees,
                                         personName: compass.state.personName,
                                         personEmoji: compass.state.personEmoji,
-                                        ringRadius: 180
+                                        ringRadius: 180,
+                                        distanceText: compass.state.formattedDistance   // [3/5]
                                     )
                                 )
                                 // Full-compass send styles dim the skin
@@ -246,6 +286,27 @@ struct CompassView: View {
                                 .frame(width: 388, height: 388)
                                 .transition(.opacity)
                         }
+                    }
+                    // [1/5] LOAD FLIGHT — the chosen emoji arcs up from the row
+                    // into the instrument, scaling 0.5 → 1.0 over 400 ms.
+                    .overlay {
+                        if let token = loadFlightToken {
+                            sendSymbol(token, size: 30)
+                                .scaleEffect(0.5 + loadFlightProgress * 0.5)
+                                .offset(x: CGFloat(sin(Double(loadFlightProgress) * .pi)) * 26,
+                                        y: 230 * (1 - loadFlightProgress))
+                                .opacity(loadFlightProgress < 0.92 ? 1 : 0)
+                                .shadow(color: Color(hex: "#c4a8d4").opacity(0.6), radius: 8)
+                                .allowsHitTesting(false)
+                        }
+                    }
+                    // [2/5] STEP PROGRESS — dots beneath the instrument tracking
+                    // where you are in the send.
+                    .overlay(alignment: .bottom) {
+                        StepProgressView(instrument: instrumentStore.selected,
+                                         currentStep: instrumentStep)
+                            .offset(y: 22)
+                            .opacity(pings.nowPlaying == nil ? 1 : 0)
                     }
                     // [3/6] The compass hold-to-send progress rings the face
                     .overlay {
@@ -627,7 +688,7 @@ struct CompassView: View {
                 holdProgress += 0.05 / holdDuration
                 if holdProgress >= 1.0 {
                     holdProgress = 0
-                    HapticEngine.thoughtLaunched()
+                    HapticEngine.compassSend()      // [5/5] gentle double tap
                     sendThought(token)
                 }
             } else if holdProgress > 0 {
@@ -912,10 +973,12 @@ struct CompassView: View {
             ForEach(rowTokens, id: \.self) { token in
                 let isSelected = selectedToken == token
                 Button {
-                    HapticEngine.personSelected()
                     withAnimation(.spring(response: 0.32, dampingFraction: 0.6)) {
                         selectedToken = isSelected ? nil : token
                     }
+                    // [1/5] Selecting a thought flies it into the instrument.
+                    if !isSelected { triggerLoadFlight(token) }
+                    else { HapticEngine.personSelected() }
                 } label: {
                     sendSymbol(token, size: 26)
                         .frame(width: 50, height: 50)
@@ -1237,6 +1300,8 @@ struct CompassView: View {
 
     private func handleLock(_ locked: Bool) {
         guard !quietMode || locked else { return } // quiet mode: allow lock-on, skip unlock animation
+        // [5/5] COMPASS — a single satisfying medium tap as the needle locks.
+        if locked && instrumentStore.selected == .compass { HapticEngine.compassLock() }
         withAnimation(AnimationSystem.pingBurst) {
             emojiScaled    = locked
             lockGlowActive = locked

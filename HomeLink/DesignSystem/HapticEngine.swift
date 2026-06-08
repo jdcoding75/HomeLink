@@ -226,4 +226,133 @@ enum HapticEngine {
         guard hapticsEnabled else { return }
         UIImpactFeedbackGenerator(style: .medium).impactOccurred(intensity: scaled(0.6))
     }
+
+    // ════════════════════════════════════════════════════════════════════
+    // MARK: - [5/5] HAPTIC PERSONALITY — each instrument distinct, eyes shut
+    // ════════════════════════════════════════════════════════════════════
+    //
+    // BOW    tension building → sharp snap release
+    // FLICK  single sharp light flick
+    // WAND   rhythmic shake pulses → explosion
+    // WIND   barely there — a whisper
+    // PLANE  click-click-click winding → spring release
+    // COMPASS calm and steady
+    // (ROCKET lives above; all Pro haptics already ride the 1.3× `scaled`.)
+
+    // ── BOW: the draw tightens, the release snaps ──
+
+    /// Draw tension — pulses strengthen with how far the string is pulled (0…1).
+    private static var lastBowDraw = Date.distantPast
+    static func bowDraw(_ progress: CGFloat) {
+        guard hapticsEnabled else { return }
+        let interval = 0.18 - Double(progress) * 0.1     // quickens as it tightens
+        guard Date.now.timeIntervalSince(lastBowDraw) >= interval else { return }
+        lastBowDraw = .now
+        UIImpactFeedbackGenerator(style: .soft)
+            .impactOccurred(intensity: scaled(0.3 + progress * 0.4))
+    }
+
+    /// Release — one sharp medium tap as the arrow leaves the string.
+    static func bowRelease() {
+        guard hapticsEnabled else { return }
+        UIImpactFeedbackGenerator(style: .rigid).impactOccurred(intensity: scaled(0.85))
+    }
+
+    // ── FLICK: a single sharp light flick ──
+
+    static func flickLoad() {
+        guard hapticsEnabled else { return }
+        UIImpactFeedbackGenerator(style: .soft).impactOccurred(intensity: scaled(0.4))
+    }
+
+    static func flickRelease() {
+        guard hapticsEnabled else { return }
+        UIImpactFeedbackGenerator(style: .light).impactOccurred(intensity: scaled(0.75))
+    }
+
+    // ── WAND: rhythmic shake pulses, then an explosion ──
+
+    /// One light tap per shake as the crystal charges.
+    static func wandShake() {
+        guard hapticsEnabled else { return }
+        UIImpactFeedbackGenerator(style: .light).impactOccurred(intensity: scaled(0.5))
+    }
+
+    /// Full charge — a rapid triple tap, the magic crackling.
+    static func wandFull() {
+        guard hapticsEnabled else { return }
+        let gen = UIImpactFeedbackGenerator(style: .rigid)
+        for k in 0..<3 {
+            DispatchQueue.main.asyncAfter(deadline: .now() + Double(k) * 0.06) {
+                gen.impactOccurred(intensity: scaled(0.7))
+            }
+        }
+    }
+
+    /// Release — one heavy tap as the spell bursts free.
+    static func wandRelease() {
+        guard hapticsEnabled else { return }
+        UIImpactFeedbackGenerator(style: .heavy).impactOccurred(intensity: scaled(0.95))
+    }
+
+    // ── WIND: barely there, just a whisper ──
+
+    /// Breath detected — barely perceptible.
+    static func windBreath() {
+        guard hapticsEnabled else { return }
+        UIImpactFeedbackGenerator(style: .soft).impactOccurred(intensity: scaled(0.18))
+    }
+
+    /// Send — a very soft double tap as the seeds let go.
+    static func windSend() {
+        guard hapticsEnabled else { return }
+        let gen = UIImpactFeedbackGenerator(style: .soft)
+        gen.impactOccurred(intensity: scaled(0.3))
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
+            gen.impactOccurred(intensity: scaled(0.22))
+        }
+    }
+
+    // ── PLANE: click-click-click winding → spring release ──
+
+    /// One crisp light click per propeller wind.
+    static func planeWind() {
+        guard hapticsEnabled else { return }
+        UIImpactFeedbackGenerator(style: .rigid).impactOccurred(intensity: scaled(0.45))
+    }
+
+    /// Fully wound — a rapid triple click.
+    static func planeFull() {
+        guard hapticsEnabled else { return }
+        let gen = UIImpactFeedbackGenerator(style: .rigid)
+        for k in 0..<3 {
+            DispatchQueue.main.asyncAfter(deadline: .now() + Double(k) * 0.05) {
+                gen.impactOccurred(intensity: scaled(0.5))
+            }
+        }
+    }
+
+    /// Launch — a medium snap as the spring lets go.
+    static func planeLaunch() {
+        guard hapticsEnabled else { return }
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred(intensity: scaled(0.8))
+    }
+
+    // ── COMPASS: calm and steady ──
+
+    /// Lock — a single satisfying medium tap.
+    static func compassLock() {
+        guard hapticsEnabled else { return }
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred(intensity: scaled(0.7))
+    }
+
+    /// Send — a gentle double tap as the thought leaves true north.
+    static func compassSend() {
+        guard hapticsEnabled else { return }
+        let gen = UIImpactFeedbackGenerator(style: .soft)
+        gen.impactOccurred(intensity: scaled(0.55))
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.13) {
+            gen.impactOccurred(intensity: scaled(0.4))
+        }
+    }
 }

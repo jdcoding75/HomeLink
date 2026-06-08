@@ -2,13 +2,14 @@
 // Pointward › Views
 //
 // INSTRUMENT 2 — BOW & ARROW (Pro). The middle zone becomes a living bow.
-// [1/6] AIMING IS BY FINGER-SPIN — no phone movement, ever: place a finger on
-// the bow and rotate it (RotationGesture). The bow turns to face your finger;
-// the arrow always points where the bow faces. Spin the bow toward the person
-// (their initial marker rides the ring): within 30° the arrow warms amber,
-// within 15° it's bright gold and "draw to send" appears, within 5° it locks
-// with a strong haptic and tip sparkles. Then draw the string back and
-// release — the arrow flies in the direction the bow faces.
+// [1/7] AIMING IS BY FINGER-SPIN — no phone movement, ever. The fix that
+// finally works: ONE DragGesture, classified by where the finger lands. Drag
+// on the outer RING (a visible track with a handle) to spin the bow toward
+// the person; drag from the CENTER to pull the string. The old two-finger
+// RotationGesture was unreliable and fought the draw gesture — gone.
+// Spin the bow toward the person (their initial marker rides the ring):
+// within 30° the arrow warms amber, within 15° it's bright gold and "draw to
+// send" appears, within 5° it locks with a strong haptic and tip sparkles.
 
 import SwiftUI
 import Combine
@@ -26,10 +27,19 @@ struct BowInstrumentView: View {
     /// Fires when a valid aligned release happens.
     let onSend: () -> Void
 
-    // [1/6] FINGER-SPIN aim — the bow's facing direction in degrees (0 = up).
+    // [1/7] FINGER-SPIN aim — the bow's facing direction in degrees (0 = up).
+    // One DragGesture drives BOTH actions, classified by where the finger
+    // lands: out on the rim → SPIN (rotate the bow by the finger's angle),
+    // near the center → DRAW (pull the string). This replaced the unreliable
+    // two-finger RotationGesture, which fought the draw gesture and rarely
+    // fired. See `bowGesture`.
     @State private var spinAngle: Double = 0
-    @State private var spinBase:  Double = 0        // accumulates across spins
     @State private var lockHapticFired = false      // strong tap once at 5°
+    private enum BowGestureMode { case spin, draw }
+    @State private var gestureMode: BowGestureMode? = nil
+    @State private var lastFingerAngle: Double = 0  // for incremental spin
+    /// Spin happens when the touch starts beyond this radius from center.
+    private let spinRingInner: CGFloat = 118
 
     @State private var breathe = false
     @State private var drawAmount: CGFloat = 0      // 0…1
@@ -112,6 +122,32 @@ struct BowInstrumentView: View {
                                ringRadius: 172,
                                showHint: false,
                                approachError: alignDiff)
+
+            // ── [1/7] SPIN RING — the affordance for aiming. A faint dashed
+            // track with a grab handle at the bow's current facing; drag the
+            // handle (or anywhere on the rim) around to spin the bow. ──
+            if loadedToken != nil {
+                ZStack {
+                    Circle()
+                        .stroke(Self.lavender.opacity(0.18),
+                                style: StrokeStyle(lineWidth: 1.5, dash: [3, 6]))
+                        .frame(width: 316, height: 316)
+                    // The grab handle, riding the rim at the bow's facing angle
+                    ZStack {
+                        Circle()
+                            .fill(Self.lavender.opacity(aimBand >= 2 ? 0.95 : 0.7))
+                            .frame(width: 16, height: 16)
+                        Image(systemName: "arrow.clockwise")
+                            .font(.system(size: 9, weight: .bold))
+                            .foregroundColor(DesignTokens.Color.background)
+                    }
+                    .scaleEffect(aimPulse ? 1.12 : 1.0)
+                    .shadow(color: Self.lavender.opacity(0.6), radius: 5)
+                    .offset(x: CGFloat(sin(rad)) * 158, y: -CGFloat(cos(rad)) * 158)
+                }
+                .allowsHitTesting(false)   // the gesture lives on the whole frame
+                .transition(.opacity)
+            }
 
             // ── The bow — a real handcrafted traditional bow: warm wood
             // grain limbs (dark at the tips, chestnut at the grip), a taut
@@ -245,10 +281,10 @@ struct BowInstrumentView: View {
         }
         .frame(width: 370, height: 370)
         .contentShape(Circle())
-        // [1/6] Two gestures coexist: a one-finger drag draws the string, a
-        // two-finger twist spins the bow to aim. No phone movement needed.
-        .gesture(drawGesture)
-        .simultaneousGesture(spinGesture)
+        // [1/7] ONE reliable gesture: drag on the rim to spin/aim, drag from
+        // the center to draw the string. No phone movement, no two-finger
+        // twist — a single finger does everything.
+        .gesture(bowGesture)
         .onAppear {
             withAnimation(AnimationSystem.easeInOutSine(3.0)
                             .repeatForever(autoreverses: true)) {
@@ -280,99 +316,128 @@ struct BowInstrumentView: View {
         .animation(.easeOut(duration: 0.25), value: showAimFirstHint)
     }
 
-    // ── [1/6] The spin — place a finger on the bow and rotate to aim ───────
+    // ── [1/7] ONE gesture, classified by where the finger lands ────────────
+    // The instrument frame is 370×370 so its center is (185, 185).
 
-    private var spinGesture: some Gesture {
-        RotationGesture()
-            .onChanged { angle in
-                spinAngle = spinBase + angle.degrees
-                // Strong satisfying haptic + sparkles the moment it locks at 5°
-                if loadedToken != nil, aimBand == 3, !lockHapticFired {
-                    lockHapticFired = true
-                    HapticEngine.lockOn()
+    /// Finger angle around the center, in degrees, 0° = up, clockwise.
+    private func angleFromCenter(_ p: CGPoint) -> Double {
+        let dx = Double(p.x - 185), dy = Double(p.y - 185)
+        return atan2(dx, -dy) * 180 / .pi
+    }
+
+    private var bowGesture: some Gesture {
+        DragGesture(minimumDistance: 1)
+            .onChanged { value in
+                guard loadedToken != nil else { return }
+
+                // Classify on the first move: rim → spin, center → draw.
+                if gestureMode == nil {
+                    let r = hypot(value.startLocation.x - 185,
+                                  value.startLocation.y - 185)
+                    gestureMode = r > spinRingInner ? .spin : .draw
+                    if gestureMode == .spin {
+                        lastFingerAngle = angleFromCenter(value.startLocation)
+                    } else {
+                        dragging = true
+                    }
                 }
-                if aimBand < 3 { lockHapticFired = false }
+
+                if gestureMode == .spin {
+                    handleSpin(to: value.location)
+                } else {
+                    handleDraw(translation: value.translation)
+                }
             }
-            .onEnded { _ in
-                spinBase = spinAngle
+            .onEnded { value in
+                if gestureMode == .draw { endDraw() }
+                gestureMode = nil
             }
     }
 
-    // ── The draw: drag away from the person to pull the string ──
+    /// SPIN — rotate the bow by the incremental change in the finger's angle
+    /// around the center. Incremental (not absolute) so it never jumps on wrap.
+    private func handleSpin(to location: CGPoint) {
+        let cur = angleFromCenter(location)
+        var delta = cur - lastFingerAngle
+        while delta >  180 { delta -= 360 }
+        while delta < -180 { delta += 360 }
+        lastFingerAngle = cur
+        spinAngle += delta
+        // Strong satisfying haptic the moment it locks at 5°
+        if aimBand == 3, !lockHapticFired {
+            lockHapticFired = true
+            HapticEngine.lockOn()
+        }
+        if aimBand < 3 { lockHapticFired = false }
+    }
 
-    private var drawGesture: some Gesture {
-        DragGesture(minimumDistance: 4)
-            .onChanged { value in
-                guard loadedToken != nil else { return }
-                dragging = true
-                // Component of the drag opposite the bearing direction
-                let opposite = CGSize(width: -CGFloat(sin(rad)), height: CGFloat(cos(rad)))
-                let along = value.translation.width * opposite.width
-                          + value.translation.height * opposite.height
+    /// DRAW — pull the string back, opposite the bow's facing direction.
+    private func handleDraw(translation: CGSize) {
+        dragging = true
+        let opposite = CGSize(width: -CGFloat(sin(rad)), height: CGFloat(cos(rad)))
+        let along = translation.width * opposite.width
+                  + translation.height * opposite.height
 
-                // DRAW RESTRICTION — off-target the string is resistant:
-                // it barely budges, and pulling shows the aim-first hint.
-                guard aimBand >= 2 else {
-                    withAnimation(.interactiveSpring()) {
-                        drawAmount = max(0, min(0.04, along / 700))
-                    }
-                    if along > 30 && !showAimFirstHint {
-                        showAimFirstHint = true
-                        HapticEngine.sendSoft()
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
-                            withAnimation { showAimFirstHint = false }
-                        }
-                    }
-                    return
-                }
-
-                let newAmount = max(0, min(1, along / 120))
-                // Haptic milestones
-                if newAmount >= 0.6 && !halfDrawHapticFired {
-                    halfDrawHapticFired = true
-                    HapticEngine.sendSoft()
-                }
-                if newAmount >= 0.97 && !fullDrawHapticFired {
-                    fullDrawHapticFired = true
-                    HapticEngine.send()
-                }
-                if newAmount < 0.5 { halfDrawHapticFired = false }
-                if newAmount < 0.9 { fullDrawHapticFired = false }
-                withAnimation(.interactiveSpring()) { drawAmount = newAmount }
+        // DRAW RESTRICTION — off-target the string is resistant.
+        guard aimBand >= 2 else {
+            withAnimation(.interactiveSpring()) {
+                drawAmount = max(0, min(0.04, along / 700))
             }
-            .onEnded { _ in
-                dragging = false
-                defer {
-                    halfDrawHapticFired = false
-                    fullDrawHapticFired = false
-                }
-                guard loadedToken != nil, drawAmount > 0.35 else {
-                    withAnimation(.spring(response: 0.35, dampingFraction: 0.6)) {
-                        drawAmount = 0
-                    }
-                    return
-                }
-                if aligned {
-                    // String snaps — the instrument's own quick feedback;
-                    // the full flight is the bowArrow sender animation.
-                    withAnimation(.easeOut(duration: 0.05)) { drawAmount = 0 }
-                    onSend()
-                } else {
-                    // MISS: the arrow thuds home, hint appears
-                    HapticEngine.sendSoft()
-                    withAnimation(.spring(response: 0.4, dampingFraction: 0.45)) {
-                        drawAmount = 0
-                        bounceBack = true
-                    }
-                    showMissHint = true
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                        bounceBack = false
-                    }
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 2.2) {
-                        withAnimation { showMissHint = false }
-                    }
+            if along > 30 && !showAimFirstHint {
+                showAimFirstHint = true
+                HapticEngine.sendSoft()
+                DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                    withAnimation { showAimFirstHint = false }
                 }
             }
+            return
+        }
+
+        let newAmount = max(0, min(1, along / 120))
+        // [5/5] BOW — tension building: pulses strengthen and quicken as the
+        // string draws back.
+        HapticEngine.bowDraw(newAmount)
+        if newAmount >= 0.6 && !halfDrawHapticFired {
+            halfDrawHapticFired = true
+        }
+        if newAmount >= 0.97 && !fullDrawHapticFired {
+            fullDrawHapticFired = true
+        }
+        if newAmount < 0.5 { halfDrawHapticFired = false }
+        if newAmount < 0.9 { fullDrawHapticFired = false }
+        withAnimation(.interactiveSpring()) { drawAmount = newAmount }
+    }
+
+    private func endDraw() {
+        dragging = false
+        defer {
+            halfDrawHapticFired = false
+            fullDrawHapticFired = false
+        }
+        guard loadedToken != nil, drawAmount > 0.35 else {
+            withAnimation(.spring(response: 0.35, dampingFraction: 0.6)) {
+                drawAmount = 0
+            }
+            return
+        }
+        if aligned {
+            HapticEngine.bowRelease()       // [5/5] sharp snap as it fires
+            withAnimation(.easeOut(duration: 0.05)) { drawAmount = 0 }
+            onSend()
+        } else {
+            HapticEngine.sendSoft()
+            withAnimation(.spring(response: 0.4, dampingFraction: 0.45)) {
+                drawAmount = 0
+                bounceBack = true
+            }
+            showMissHint = true
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                bounceBack = false
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2.2) {
+                withAnimation { showMissHint = false }
+            }
+        }
     }
 }
 

@@ -39,6 +39,13 @@ struct WandInstrumentView: View {
     @State private var crystalSwing: CGSize = .zero   // physics lag on shake
     @State private var crystalFlare = 0.0         // 0…1 bright flare per shake
     @State private var imploding = false          // release: crystal collapses
+    // [2/7] DIRECTIONAL MOMENT — the wand swings to face the person for 500 ms
+    // before the explosion fires, so the magic feels intentional.
+    @State private var pointing = false           // wand rotates to the bearing
+    @State private var showSendingLabel = false   // "sending to [name] ✦"
+
+    /// The person's bearing in radians — the wand swings here at release.
+    private var bearingRad: Double { bearingDegrees * .pi / 180 }
 
     private let tick = Timer.publish(every: 0.1, on: .main, in: .common).autoconnect()
 
@@ -87,20 +94,41 @@ struct WandInstrumentView: View {
             // ── Two-speed orbital system — a little solar system charging up ──
             orbitingParticles
 
-            // ── The wand — staff + gold rings + crystal, standing upright.
-            // (No longer rotates toward a bearing — direction is irrelevant.) ──
+            // ── The wand — stands upright while charging; at release it
+            // swings to face the person (the [2/7] directional moment) before
+            // the explosion fires in their direction. ──
             wand
+                .rotationEffect(.radians(pointing ? bearingRad : 0))
+                .animation(.easeInOut(duration: 0.5), value: pointing)
 
-            // ── Instructions — never mentions direction ──
+            // ── [2/7] "sending to [name] ✦" — the directional beat ──
+            if showSendingLabel {
+                VStack {
+                    Text("sending to \(personName) ✦")
+                        .font(.system(size: 18, weight: .semibold, design: .serif).italic())
+                        .foregroundColor(Color(hex: "#e0ccee"))
+                        .shadow(color: Self.crystalP.opacity(0.8), radius: 10)
+                        .padding(.top, 70)
+                    Spacer()
+                }
+                .transition(.opacity)
+            }
+
+            // ── Instruction — bold, large, names the direction at release ──
             VStack {
                 Spacer()
                 if loaded {
                     Text(instruction)
-                        .font(.system(size: 12, design: .serif).italic())
-                        .foregroundColor(Self.crystalP.opacity(full ? 0.95 : 0.7))
+                        .font(.system(size: 22, weight: .bold, design: .rounded))
+                        .foregroundColor(full ? Color(hex: "#e0ccee")
+                                              : Self.crystalP.opacity(0.85))
+                        .minimumScaleFactor(0.7)
+                        .lineLimit(1)
+                        .shadow(color: Self.crystalP.opacity(0.5), radius: 6)
                         .transition(.opacity)
                 }
             }
+            .padding(.horizontal, 16)
             .padding(.bottom, 4)
         }
         .frame(width: 370, height: 370)
@@ -116,7 +144,7 @@ struct WandInstrumentView: View {
                 imploding = false
                 fullChargeSeconds = 0
                 shake.onShake = { onShakeCounted($0) }
-                shake.onFull  = { HapticEngine.lockOn() }
+                shake.onFull  = { HapticEngine.wandFull() }   // [5/5] rapid triple
                 shake.start()
             } else {
                 shake.stop()
@@ -126,13 +154,12 @@ struct WandInstrumentView: View {
         .onReceive(tick) { _ in heartbeat() }
     }
 
-    /// Magic finds them — the instruction never names a direction.
+    /// Magic — but the release names the direction for a satisfying beat.
     private var instruction: String {
-        if full { return "magic ready — releasing…" }
+        if pointing { return "releasing toward \(personName) ✦" }
+        if full { return "magic ready ✦" }
         if charge > 0 { return "keep shaking…" }
-        return shake.motionAvailable
-            ? "shake to send to \(personName)"
-            : "tap the crystal to send to \(personName)"
+        return "shake · release toward \(personName)"
     }
 
     // ── The wand ──────────────────────────────────────────────────────────
@@ -308,11 +335,8 @@ struct WandInstrumentView: View {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.18) {
             crystalSwing = .zero
         }
-        switch shakes {
-        case 4:  HapticEngine.send()        // 80 % — medium
-        case 5:  break                      // 100 % handled by onFull (strong)
-        default: HapticEngine.sendSoft()    // light tap
-        }
+        // [5/5] Each shake — a rhythmic light tap (the explosion is onFull).
+        if shakes < 5 { HapticEngine.wandShake() }
     }
 
     /// 10 Hz: spin both orbital rings (faster as charge climbs) and run the
@@ -344,20 +368,28 @@ struct WandInstrumentView: View {
         }
     }
 
-    /// The most magical send in the app: the crystal IMPLODES (and the
-    /// orbital system spirals inward), then the full-screen .wand send takes
-    /// over with the explosion, scatter, and emoji launch.
+    /// The most magical send in the app. [2/7] First a 500 ms DIRECTIONAL
+    /// MOMENT — the tip glows and the wand swings to face the person, "sending
+    /// to [name] ✦" appears — then the crystal IMPLODES and the full-screen
+    /// .wand send fires the explosion toward them.
     private func release() {
         guard !released else { return }
         released = true
         fullChargeSeconds = 0
+        // 1 · the wand points at the person, tip brightening, label in
         HapticEngine.lockOn()
         SoundEngine.shared.play(for: "style.shimmer")
-        withAnimation(.easeIn(duration: 0.18)) { imploding = true }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.18) {
-            HapticEngine.send()
-            shake.stop()
-            onSend()       // → full-screen wand explosion (SenderAnimationView)
+        withAnimation(.easeInOut(duration: 0.5)) { pointing = true }
+        withAnimation(.easeIn(duration: 0.3)) { showSendingLabel = true }
+        // 2 · after the swing settles, implode → explode toward them
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            withAnimation(.easeIn(duration: 0.18)) { imploding = true }
+            withAnimation(.easeOut(duration: 0.2)) { showSendingLabel = false }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.18) {
+                HapticEngine.wandRelease()       // heavy burst
+                shake.stop()
+                onSend()   // → full-screen wand explosion (SenderAnimationView)
+            }
         }
     }
 }

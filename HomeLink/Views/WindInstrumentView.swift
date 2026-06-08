@@ -3,12 +3,13 @@
 //
 // INSTRUMENT 3 — WIND 🌬️ (Pro). SKY REDESIGN: a bright window onto a warm
 // sunny sky — soft blue gradient, fluffy parallax clouds drifting, a gentle
-// sun, and white dandelion seeds floating on the breeze. Load a thought and
-// it bobs in the sky; a slow steady exhale into the microphone streams the
-// seeds and the thought toward the person.
+// sun, and white dandelion seeds floating on the breeze. [4/7] The loaded
+// thought rides on a LEAF that sways on the breeze; [3/7] a slow steady exhale
+// into the microphone lifts the leaf away — NO AIMING, ever: the wind finds
+// them. Breathing visibly moves the leaf and streams the seeds in real time.
 //
 // Graceful degradation: if mic permission is denied (or the engine can't
-// start), hold the phone within 15° for 2 seconds instead.
+// start), hold for ~2 seconds instead — still no direction required.
 
 import SwiftUI
 import Combine
@@ -39,9 +40,7 @@ struct WindInstrumentView: View {
     @State private var seeds: [Seed] = []
     @State private var holdProgress: Double = 0      // fallback hold-to-send
     @State private var lastPulseHaptic = Date.distantPast
-    @State private var showAimHint = false           // exhaled while off-target
-    @State private var bob = false                   // emoji vertical bob
-    @State private var sway = false                  // emoji rotation sway
+    @State private var lifting = false               // [4/7] leaf lifts on send
 
     private let driftTick = Timer.publish(every: 0.7, on: .main, in: .common).autoconnect()
     private let holdTick  = Timer.publish(every: 0.05, on: .main, in: .common).autoconnect()
@@ -62,7 +61,7 @@ struct WindInstrumentView: View {
     ]
 
     private var rad: Double { bearingDegrees * .pi / 180 }
-    private var aligned: Bool { BearingCalculator.isSendAligned(bearingDegrees) }
+    // [3/7] No `aligned` — the wind needs no aim; magic finds them.
     /// Breath when we can hear it; the steady hold when we can't.
     private var usingBreath: Bool { breath.isListening && !breath.micDenied }
     /// How gathered everything is — breath progress or hold progress.
@@ -80,27 +79,18 @@ struct WindInstrumentView: View {
                 .overlay(Circle().stroke(Color.white.opacity(0.55), lineWidth: 1.5))
                 .shadow(color: Self.skyTop.opacity(0.4), radius: 18)
 
-            // ── Where they are — marker · arc (not clipped) ──
-            DirectionIndicator(bearingDegrees: bearingDegrees,
-                               personName: personName,
-                               personEmoji: personEmoji,
-                               ringRadius: 168,
-                               showHint: loadedToken == nil)
+            // ── [3/7] NO direction marker / arc / scope — the wind needs no
+            // aim. (DirectionIndicator removed.) ──
 
             // ── The breath-level arc — the instrument listening ──
             if loadedToken != nil && usingBreath {
                 breathArc
             }
 
-            // ── The loaded thought — floating on the breeze ──
+            // ── [4/7] The loaded thought rides on a LEAF, swaying on the
+            // breeze — and swaying MORE as your breath is detected (live). ──
             if let loadedSymbol {
-                loadedSymbol
-                    .scaleEffect(1.0 + charge * 0.22)
-                    .shadow(color: Color.white.opacity(0.8), radius: 8 + charge * 12)
-                    .shadow(color: Self.sun.opacity(0.6 + charge * 0.4),
-                            radius: 6 + charge * 16)
-                    .offset(y: bob ? -5 : 5)                       // ±5 px, 3 s
-                    .rotationEffect(.degrees(sway ? 3 : -3))       // ±3°, 4 s
+                leafUnit(loadedSymbol)
             }
 
             // ── Instructions ──
@@ -109,12 +99,6 @@ struct WindInstrumentView: View {
         .frame(width: 370, height: 370)
         .onAppear {
             seedSeeds()
-            withAnimation(AnimationSystem.easeInOutSine(3.0).repeatForever(autoreverses: true)) {
-                bob = true
-            }
-            withAnimation(AnimationSystem.easeInOutSine(4.0).repeatForever(autoreverses: true)) {
-                sway = true
-            }
         }
         // The mic listens only while a thought is loaded
         .onChange(of: loadedToken) { _, token in
@@ -153,6 +137,25 @@ struct WindInstrumentView: View {
                             .offset(x: cloudX(cloud, t: t), y: cloud.y)
                             // Nearer (faster) clouds sit a touch more opaque
                             .opacity(0.55 + cloud.scale * 0.18)
+                    }
+                }
+            }
+
+            // [4/7] Background leaves — 3 small leaves drifting slowly, very
+            // subtle (20 %), for depth and atmosphere
+            TimelineView(.animation) { timeline in
+                let t = timeline.date.timeIntervalSinceReferenceDate
+                ZStack {
+                    ForEach(0..<3, id: \.self) { i in
+                        let p = (t / (26 + Double(i) * 7) + Double(i) * 0.37)
+                            .truncatingRemainder(dividingBy: 1)
+                        LeafShape()
+                            .fill(Self.leafGreen)
+                            .frame(width: 24 - CGFloat(i) * 4, height: 16 - CGFloat(i) * 2)
+                            .rotationEffect(.degrees(t * 12 + Double(i) * 90))
+                            .opacity(0.20)
+                            .offset(x: CGFloat(p) * 420 - 210,
+                                    y: CGFloat([-70, 40, 120][i]))
                     }
                 }
             }
@@ -209,20 +212,58 @@ struct WindInstrumentView: View {
         .opacity(0.85)
     }
 
+    // ── [4/7] The leaf carrying the emoji ───────────────────────────────────
+
+    private static let leafGreen = Color(hex: "#5a8a3a")
+
+    /// The emoji sits on a swaying leaf — together one unit. The sway grows
+    /// with the live breath level, so the user can SEE the breath working.
+    private func leafUnit(_ symbol: AnyView) -> some View {
+        TimelineView(.animation) { tl in
+            let t = tl.date.timeIntervalSinceReferenceDate
+            let phase = t * 2 * .pi / 3.0                 // 3 s cycle
+            let boost = 1 + liveLevel * 1.6 + charge * 0.6   // sways more on breath
+            let dx = CGFloat(sin(phase)) * 8 * boost          // ±8 px (× boost)
+            let dy = CGFloat(sin(phase + 1.2)) * 4 * boost    // ±4 px
+            let rot = sin(phase) * 5 * boost                  // ±5°
+
+            ZStack {
+                // The leaf — pointed-tip oval, soft green with vein lines
+                LeafShape()
+                    .fill(LinearGradient(colors: [Self.leafGreen,
+                                                  Color(hex: "#4a7a2e")],
+                                         startPoint: .topLeading, endPoint: .bottomTrailing))
+                    .frame(width: 60, height: 40)
+                    .overlay(LeafVeins().stroke(Color(hex: "#7aa85a").opacity(0.7),
+                                                lineWidth: 0.8)
+                        .frame(width: 60, height: 40))
+                    .shadow(color: .black.opacity(0.18), radius: 4, y: 2)
+                // The emoji, sitting just above the leaf's center
+                symbol
+                    .scaleEffect(0.85 + charge * 0.18)
+                    .offset(y: -8)
+                    .shadow(color: Self.sun.opacity(0.6 + charge * 0.4),
+                            radius: 6 + charge * 14)
+            }
+            .scaleEffect(1.0 + charge * 0.15)
+            .offset(x: dx, y: dy - CGFloat(charge) * 10)
+            .rotationEffect(.degrees(rot))
+            .opacity(lifting ? 0 : 1)
+        }
+    }
+
     // ── Instructions ──────────────────────────────────────────────────────
 
     private var instructions: some View {
         VStack {
             Spacer()
-            if showAimHint {
-                Text("point toward \(personName) first")
-                    .font(.system(size: 12, design: .serif).italic())
-                    .foregroundColor(Color(hex: "#d2691e"))
-                    .transition(.opacity)
-            } else if loadedToken != nil {
+            if loadedToken != nil {
                 Text(instruction)
-                    .font(.system(size: 12, design: .serif).italic())
-                    .foregroundColor(Self.slate.opacity(aligned ? 0.95 : 0.7))
+                    .font(.system(size: 22, weight: .bold, design: .rounded))
+                    .foregroundColor(Color(hex: "#2c4a5e"))
+                    .minimumScaleFactor(0.7)
+                    .lineLimit(1)
+                    .shadow(color: .white.opacity(0.6), radius: 4)
                     .transition(.opacity)
             }
 
@@ -243,18 +284,16 @@ struct WindInstrumentView: View {
             }
         }
         .padding(.bottom, 4)
-        .animation(.easeOut(duration: 0.25), value: showAimHint)
         .animation(.easeOut(duration: 0.3), value: breath.micDenied)
     }
 
     private var instruction: String {
         if usingBreath {
             if charge > 0.1 { return "keep breathing…" }
-            return aligned ? "breathe toward \(personName)"
-                           : "point toward \(personName), then breathe"
+            return "breathe to send to \(personName)"
         } else {
             if charge > 0.05 { return "keep holding…" }
-            return "hold toward \(personName)"
+            return "hold to send to \(personName)"
         }
     }
 
@@ -332,40 +371,34 @@ struct WindInstrumentView: View {
 
     // ── Release paths ─────────────────────────────────────────────────────
 
-    /// Breath path: a detected exhale releases — if aimed.
+    /// [3/7] Breath path: ANY detected exhale releases — no aim needed.
+    /// The leaf lifts off and the magic carries the thought to the person.
     private func exhaleDetected() {
-        guard loadedToken != nil else { return }
-        guard aligned else {
-            showAimHint = true
-            HapticEngine.sendSoft()
-            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
-                withAnimation { showAimHint = false }
-            }
-            return
-        }
-        HapticEngine.send()
+        guard loadedToken != nil, !lifting else { return }
+        HapticEngine.windSend()             // very soft double tap
+        withAnimation(.easeIn(duration: 0.5)) { lifting = true }
         onSend()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { lifting = false }
     }
 
-    /// Fallback path (mic denied): hold steady within 15° for 2 seconds.
+    /// [3/7] Fallback path (mic denied): just hold for ~2 seconds — still no
+    /// direction required.
     private func fallbackHoldTick() {
-        guard loadedToken != nil, breath.micDenied else {
-            if !usingBreath && holdProgress > 0 { holdProgress = 0 }
+        guard loadedToken != nil, breath.micDenied, !lifting else {
+            if !usingBreath && holdProgress > 0 && !lifting { holdProgress = 0 }
             return
         }
-        if aligned {
-            holdProgress = min(1, holdProgress + 0.05 / 2.0)
-            if Date.now.timeIntervalSince(lastPulseHaptic) >= 0.5 {
-                lastPulseHaptic = .now
-                HapticEngine.sendSoft()
-            }
-            if holdProgress >= 1 {
-                holdProgress = 0
-                HapticEngine.send()
-                onSend()
-            }
-        } else if holdProgress > 0 {
-            withAnimation(.easeOut(duration: 0.5)) { holdProgress = 0 }
+        holdProgress = min(1, holdProgress + 0.05 / 2.0)
+        if Date.now.timeIntervalSince(lastPulseHaptic) >= 0.5 {
+            lastPulseHaptic = .now
+            HapticEngine.windBreath()       // whisper
+        }
+        if holdProgress >= 1 {
+            holdProgress = 0
+            HapticEngine.windSend()         // soft double tap
+            withAnimation(.easeIn(duration: 0.5)) { lifting = true }
+            onSend()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { lifting = false }
         }
     }
 }
@@ -382,6 +415,41 @@ struct Cloud: Identifiable {
     let scale: CGFloat
     let period: TimeInterval
     let phase: Double
+}
+
+/// [4/7] A leaf — a pointed-tip oval. Tip at the top, rounded base, drawn
+/// symmetric so it reads cleanly at any rotation.
+struct LeafShape: Shape {
+    func path(in rect: CGRect) -> Path {
+        var p = Path()
+        let w = rect.width, h = rect.height
+        p.move(to: CGPoint(x: w / 2, y: 0))                                  // tip
+        p.addQuadCurve(to: CGPoint(x: w / 2, y: h),
+                       control: CGPoint(x: w * 1.05, y: h * 0.30))           // right belly
+        p.addQuadCurve(to: CGPoint(x: w / 2, y: 0),
+                       control: CGPoint(x: -w * 0.05, y: h * 0.30))          // left belly
+        p.closeSubpath()
+        return p
+    }
+}
+
+/// Central vein + two side veins, for a hint of leaf texture.
+struct LeafVeins: Shape {
+    func path(in rect: CGRect) -> Path {
+        var p = Path()
+        let w = rect.width, h = rect.height
+        // Midrib
+        p.move(to: CGPoint(x: w / 2, y: h * 0.06))
+        p.addLine(to: CGPoint(x: w / 2, y: h * 0.94))
+        // Side veins
+        for s in [0.34, 0.54, 0.74] {
+            p.move(to: CGPoint(x: w / 2, y: h * s))
+            p.addLine(to: CGPoint(x: w * 0.82, y: h * (s - 0.12)))
+            p.move(to: CGPoint(x: w / 2, y: h * s))
+            p.addLine(to: CGPoint(x: w * 0.18, y: h * (s - 0.12)))
+        }
+        return p
+    }
 }
 
 /// A dandelion seed — a tiny central dot with thin filaments radiating, the

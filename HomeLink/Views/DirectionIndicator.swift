@@ -24,6 +24,8 @@ struct DirectionIndicator: View {
     var ringRadius: CGFloat = 180
     /// Bow & wind draw their own richer hints — they pass false.
     var showHint: Bool = true
+    /// [3/5] Optional distance shown beneath the marker ("88 mi").
+    var distanceText: String? = nil
     /// Instruments that aim by something other than the phone bearing (the
     /// bow's finger-spin) pass their own approach error so the marker and arc
     /// brighten as *that* aim closes in, while the marker stays at the
@@ -83,14 +85,24 @@ struct DirectionIndicator: View {
                         radius: 8)
                 .animation(AnimationSystem.easeInOutSine(0.3), value: arcOpacity)
 
-            // ── Person initial marker — a small crosshaired circle bearing
-            // the person's first initial, floating just outside the ring at
-            // their real-world bearing. Brightens as the aim closes in.
-            // (previous bare navigational triangle retired.)
+            // ── [3/5] Direction hint — a small chevron near the center
+            // pointing toward the marker, so the way is obvious at a glance.
+            Image(systemName: "chevron.up")
+                .font(.system(size: 13, weight: .bold))
+                .foregroundColor(Self.lavender.opacity(angleError < 30 ? 0.7 : 0.4))
+                .offset(y: -ringRadius * 0.42)
+                .rotationEffect(.radians(rad))
+                .animation(.easeOut(duration: 0.25), value: bearingDegrees)
+
+            // ── [3/5] Person initial marker — bigger (36 pt), bolder, slowly
+            // pulsing, with the distance beneath. Glows on approach: soft
+            // within 30°, bright pulse within 15°, a confirming flash at 5°.
             PersonInitialMarker(initial: initial, opacity: markerOpacity,
-                                close: angleError < 15, perfect: angleError < 5)
-                .offset(x: CGFloat(sin(rad)) * (ringRadius + 22),
-                        y: -CGFloat(cos(rad)) * (ringRadius + 22))
+                                near: angleError < 30,
+                                close: angleError < 15, perfect: angleError < 5,
+                                pulse: pulse, distanceText: distanceText)
+                .offset(x: CGFloat(sin(rad)) * (ringRadius + 26),
+                        y: -CGFloat(cos(rad)) * (ringRadius + 26))
                 .animation(.easeOut(duration: 0.2), value: bearingDegrees)
                 .animation(.easeOut(duration: 0.25), value: angleError < 15)
 
@@ -116,44 +128,68 @@ struct DirectionIndicator: View {
     }
 }
 
-/// A 28 pt soft-lavender circle holding the person's initial, with four thin
-/// crosshair lines extending 8 pt outward — "aim here." Shared by every
-/// instrument (it replaced the scope button + targeting reticle).
+/// [3/5] A 36 pt soft-lavender disc holding the person's BOLD initial, with
+/// four crosshair ticks and the distance beneath. It pulses gently to draw
+/// the eye, and its glow escalates as the aim closes: soft within 30°, a
+/// bright pulse within 15°, a confirming flash ring at 5°.
 struct PersonInitialMarker: View {
 
     let initial: String
     var opacity: Double = 0.7
+    var near: Bool = false       // within 30°
     var close: Bool = false      // within 15°
     var perfect: Bool = false    // within 5°
+    var pulse: Bool = false      // the slow 2 s attention pulse
+    var distanceText: String? = nil
 
     private static let lavender = Color(hex: "#c4a8d4")
 
     var body: some View {
         ZStack {
-            // Four crosshair ticks extending 8 pt beyond the rim
+            // Confirmation flash ring — appears at 5° as a strong lock cue
+            if perfect {
+                Circle()
+                    .stroke(Self.lavender.opacity(pulse ? 0.0 : 0.8), lineWidth: 2)
+                    .frame(width: pulse ? 58 : 40, height: pulse ? 58 : 40)
+            }
+
+            // Four crosshair ticks extending beyond the rim
             ForEach(0..<4, id: \.self) { i in
                 Capsule()
                     .fill(Self.lavender.opacity(opacity))
-                    .frame(width: 1.4, height: 8)
-                    .offset(y: -22)
+                    .frame(width: 1.6, height: 9)
+                    .offset(y: -28)
                     .rotationEffect(.degrees(Double(i) * 90))
             }
-            // The disc
+
+            // The disc — 36 pt
             Circle()
                 .fill(DesignTokens.Color.background.opacity(0.85))
-                .frame(width: 28, height: 28)
+                .frame(width: 36, height: 36)
                 .overlay(
                     Circle().stroke(Self.lavender.opacity(opacity),
-                                    lineWidth: perfect ? 2 : 1.3)
+                                    lineWidth: perfect ? 2.4 : 1.6)
                 )
-            // The initial
+
+            // The initial — bold
             Text(initial)
-                .font(.system(size: 13, weight: .semibold, design: .rounded))
+                .font(.system(size: 17, weight: .bold, design: .rounded))
                 .foregroundColor(Self.lavender.opacity(min(1, opacity + 0.1)))
+
+            // Distance beneath the marker
+            if let distanceText {
+                Text(distanceText)
+                    .font(.system(size: 9, weight: .medium, design: .rounded))
+                    .foregroundColor(Self.lavender.opacity(min(1, opacity)))
+                    .monospacedDigit()
+                    .fixedSize()
+                    .offset(y: 30)
+            }
         }
-        .scaleEffect(perfect ? 1.18 : (close ? 1.08 : 1.0))
-        .shadow(color: Self.lavender.opacity(close ? 0.7 : 0.25),
-                radius: close ? 8 : 4)
+        // Slow attention pulse (0.95–1.05) plus an approach boost.
+        .scaleEffect((pulse ? 1.05 : 0.95) * (perfect ? 1.14 : (close ? 1.06 : 1.0)))
+        .shadow(color: Self.lavender.opacity(perfect ? 0.9 : (close ? 0.7 : (near ? 0.4 : 0.2))),
+                radius: perfect ? 12 : (close ? 9 : (near ? 6 : 3)))
     }
 }
 
