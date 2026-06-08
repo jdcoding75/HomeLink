@@ -30,9 +30,18 @@ final class PingManager: ObservableObject {
 
     // ── Thought queue ────────────────────────────────────────────────────
     /// Received thoughts waiting to be watched. Max 10; oldest drops off.
-    @Published private(set) var queue: [ReceivedPing] = []
+    @Published private(set) var queue: [ReceivedPing] = [] {
+        didSet {
+            queueCount = queue.count + (nowPlaying == nil ? 0 : 1)
+            persistQueue()
+        }
+    }
     /// The thought currently playing its arrival animation, if any.
-    @Published var nowPlaying: ReceivedPing?
+    @Published var nowPlaying: ReceivedPing? {
+        didSet { queueCount = queue.count + (nowPlaying == nil ? 0 : 1) }
+    }
+    /// Unread thoughts (waiting + the one being caught) — drives the badge.
+    @Published var queueCount: Int = 0
 
     static let maxQueued = 10
 
@@ -64,6 +73,40 @@ final class PingManager: ObservableObject {
     init(networkService: NetworkServiceProtocol, appState: AppStateManager? = nil) {
         self.networkService = networkService
         self.appState = appState
+        restoreQueue()   // waiting thoughts survive an app relaunch
+    }
+
+    // ── Queue persistence — unread thoughts survive relaunches ──────────
+
+    private struct PersistedPing: Codable {
+        let fromName: String
+        let emoji: String
+        let timestamp: Date
+        let remoteID: UUID?
+        let senderStyle: String?
+    }
+
+    private func persistQueue() {
+        let stored = queue.map {
+            PersistedPing(fromName: $0.fromName, emoji: $0.emoji,
+                          timestamp: $0.timestamp, remoteID: $0.remoteID,
+                          senderStyle: $0.senderStyle)
+        }
+        if let data = try? JSONEncoder().encode(stored) {
+            UserDefaults.standard.set(data, forKey: "pendingThoughtQueue")
+        }
+    }
+
+    private func restoreQueue() {
+        guard let data = UserDefaults.standard.data(forKey: "pendingThoughtQueue"),
+              let stored = try? JSONDecoder().decode([PersistedPing].self, from: data),
+              !stored.isEmpty else { return }
+        log.info("queue: restored \(stored.count) waiting thought(s) from last session")
+        queue = stored.map {
+            ReceivedPing(fromName: $0.fromName, emoji: $0.emoji,
+                         timestamp: $0.timestamp, remoteID: $0.remoteID,
+                         senderStyle: $0.senderStyle)
+        }
     }
 
     func sendPing(to person: Person, emoji: String) async {
@@ -196,10 +239,68 @@ final class PingManager: ObservableObject {
     }
 
     /// Ambient presence arrived — their needle is resting on us.
-    func presenceFelt(name: String) {
+    /// `bearing` is THEIR reported absolute bearing (toward us), when the
+    /// event carried one — feeds the mutual-pointing check.
+    func presenceFelt(name: String, bearing: Double? = nil) {
         guard UserDefaults.standard.object(forKey: "notifyPointing") as? Bool ?? true else { return }
         partnerPointingName = name
         partnerPointingAt = .now
+        partnerPointingBearing = bearing
+    }
+
+    // ── Replay, app-wide ─────────────────────────────────────────────────
+    /// Set from any tab; RootView presents the full-screen replay overlay.
+    struct ReplayRequest: Identifiable, Equatable {
+        let id = UUID()
+        let emoji: String
+        let bearingDegrees: Double
+        let styleRaw: String?
+    }
+    @Published var replayRequest: ReplayRequest?
+
+    func requestReplay(emoji: String, bearingDegrees: Double, styleRaw: String?) {
+        log.info("replay: requested — \(emoji, privacy: .public) bearing=\(Int(bearingDegrees), privacy: .public)°")
+        replayRequest = ReplayRequest(emoji: emoji, bearingDegrees: bearingDegrees,
+                                      styleRaw: styleRaw)
+    }
+
+    // ── Felt receipts, live ──────────────────────────────────────────────
+    /// Bumped whenever one of OUR sent pings gets opened — history views
+    /// listening to this refetch and flip their dot to "felt".
+    @Published var lastFeltAt: Date?
+
+    // ── Mutual pointing — the most magical moment ────────────────────────
+    /// Their last reported absolute bearing (toward us), from realtime/push.
+    @Published var partnerPointingBearing: Double?
+    /// Set when BOTH needles rest on each other within 15° — golden moment.
+    @Published var mutualMoment: Date?
+    private var lastMutualMoment: Date = .distantPast
+
+    /// Called with OUR absolute bearing toward them + our alignment error
+    /// whenever either side's pointing state changes. Requires their
+    /// pointing report to be fresh (within 90 s) so the moment is genuinely
+    /// simultaneous. Throttled to once per 5 minutes.
+    func checkMutualPointing(myAbsoluteBearing: Double, myAlignmentError: Double) {
+        guard myAlignmentError <= 15,
+              let theirBearing = partnerPointingBearing,
+              let theirStamp = partnerPointingAt,
+              Date.now.timeIntervalSince(theirStamp) < 90,
+              Date.now.timeIntervalSince(lastMutualMoment) > 300   // once per 5 min
+        else { return }
+        // Their bearing should be (roughly) the reciprocal of ours
+        let reciprocal = (myAbsoluteBearing + 180).truncatingRemainder(dividingBy: 360)
+        let diff = BearingCalculator.alignmentError(relativeBearing: theirBearing - reciprocal)
+        guard diff <= 15 else {
+            log.debug("mutual: not reciprocal (their=\(Int(theirBearing), privacy: .public)° vs expected=\(Int(reciprocal), privacy: .public)°, off \(Int(diff), privacy: .public)°)")
+            return
+        }
+        lastMutualMoment = .now
+        log.info("mutual: ✦ BOTH POINTING — golden moment (off by \(Int(diff), privacy: .public)°)")
+        mutualMoment = .now
+        Task {
+            try? await Task.sleep(nanoseconds: 3_000_000_000)
+            mutualMoment = nil
+        }
     }
 
     /// Called when an arrival animation completes — auto-advances to the

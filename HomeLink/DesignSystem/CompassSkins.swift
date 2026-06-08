@@ -46,13 +46,13 @@ enum CompassSkin: String, CaseIterable, Identifiable {
         }
     }
 
-    /// Free tier ships with Minimal only; the $1.99 unlock opens the rest.
+    /// Unified picker model: ALL THREE compass variants are free —
+    /// the $2.99 unlock buys the Pro instruments, not skins.
     /// Keep in sync with SubscriptionTier.unlockedSkinIDs.
     var requiresUnlock: Bool {
         switch self {
-        case .minimal:                       return false
-        case .classic, .heart, .vintage,
-             .celestial, .aurora:            return true
+        case .minimal, .vintage, .heart:     return false
+        case .classic, .celestial, .aurora:  return true
         }
     }
 

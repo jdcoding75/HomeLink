@@ -100,9 +100,9 @@ struct SettingsView: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("✦ Pro Features")
                         .settingsLabel()
-                    // The current instrument at a glance —
-                    // "🏹 bow & arrow · pro active" / "🧭 compass · free"
-                    Text("\(instrumentStore.selected.icon) \(instrumentStore.selected.displayName) · "
+                    // The current style at a glance —
+                    // "🏹 bow & arrow · pro active" / "🧭 vintage brass · free"
+                    Text("\(InstrumentOption.selected.icon) \(InstrumentOption.selected.displayName) · "
                          + (subscription.tier == .free
                             ? "free"
                             : (proFeatures ? "pro active" : "pro · switched off")))

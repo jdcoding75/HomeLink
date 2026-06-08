@@ -20,7 +20,8 @@ struct InstrumentPreview: View {
     private static let lavender = Color(hex: "#c4a8d4")
     private static let gold     = Color(hex: "#FFD700")
     private static let amber    = Color(hex: "#D4A017")
-    private static let green    = Color(hex: "#90EE90")
+    // wind took the firefly slot — warm lavender-white breath
+    private static let green    = Color(hex: "#d9cce8")
 
     var body: some View {
         switch instrument {
@@ -192,12 +193,13 @@ struct InstrumentPreview: View {
                 let control = CGSize(width: 0, height: -h * 0.40)
 
                 ZStack {
-                    // The fingertip beneath the launch point
+                    // The launch pocket beneath the dot — clean, no finger
                     Circle()
-                        .fill(Color(hex: "#ece4f5").opacity(0.55))
-                        .frame(width: 13, height: 13)
-                        .offset(x: start.width, y: start.height + 10)
-                        .scaleEffect(pressed ? 0.86 : 1.0, anchor: .bottom)
+                        .stroke(InstrumentPreview.lavender.opacity(0.55), lineWidth: 1)
+                        .background(Circle().fill(Color.black.opacity(0.25)))
+                        .frame(width: 14, height: 14)
+                        .offset(x: start.width, y: start.height + 9)
+                        .scaleEffect(pressed ? 0.88 : 1.0)
 
                     // The thought — pressed down, then flicked on a curve
                     Circle()

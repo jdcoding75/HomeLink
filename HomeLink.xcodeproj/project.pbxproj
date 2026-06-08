@@ -93,8 +93,6 @@
 		};
 		7A0000012FD4000000000009 /* HomeLinkTests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-			);
 			path = HomeLinkTests;
 			sourceTree = "<group>";
 		};

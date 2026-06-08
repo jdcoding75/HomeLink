@@ -21,8 +21,8 @@ enum Instrument: String, CaseIterable, Codable, Identifiable {
         switch self {
         case .compass: return "compass"
         case .bow:     return "bow & arrow"
-        case .firefly: return "firefly"
-        case .flick:   return "flick"
+        case .firefly: return "wind"      // 🌬️ wind replaced the firefly
+        case .flick:   return "flick"     //    (case name kept — wire format)
         }
     }
 
@@ -30,7 +30,7 @@ enum Instrument: String, CaseIterable, Codable, Identifiable {
         switch self {
         case .compass: return "classic · always points true"
         case .bow:     return "draw · aim · release"
-        case .firefly: return "hold · guide · release"
+        case .firefly: return "breathe · release"   // wind
         case .flick:   return "load · aim · launch"
         }
     }
@@ -39,7 +39,7 @@ enum Instrument: String, CaseIterable, Codable, Identifiable {
         switch self {
         case .compass: return "🧭"
         case .bow:     return "🏹"
-        case .firefly: return "🫧"
+        case .firefly: return "🌬️"   // wind (was 🫧)
         case .flick:   return "👆"
         }
     }

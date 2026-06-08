@@ -33,9 +33,9 @@ enum SubscriptionTier: String, Codable {
 
     var unlockedSkinIDs: Set<String> {
         switch self {
-        // free had minimal+vintage before the Pro split:
-        // case .free:       return ["minimal", "vintage"]
-        case .free:          return ["minimal"]
+        // Unified picker: the three compass variants are everyone's —
+        // Pro buys the instruments. (previous: ["minimal"])
+        case .free:          return ["minimal", "vintage", "heart"]
         case .pro:      return Set(CompassSkin.allCases.map(\.rawValue))
         case .institutional: return Set(CompassSkin.allCases.map(\.rawValue))
         }

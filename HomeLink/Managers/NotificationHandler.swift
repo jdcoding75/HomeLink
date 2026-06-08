@@ -65,5 +65,7 @@ extension NotificationHandler: UNUserNotificationCenterDelegate {
     ) async {
         log.info("push: user TAPPED notification — opening")
         handlePayload(response.notification.request.content.userInfo)
+        // The catch lives on the compass — make sure it's the visible tab
+        NotificationCenter.default.post(name: .pointwardOpenCompass, object: nil)
     }
 }

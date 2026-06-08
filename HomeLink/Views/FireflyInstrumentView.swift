@@ -1,6 +1,10 @@
 // FireflyInstrumentView.swift
 // Pointward › Views
 //
+// ⛔️ SUPERSEDED — the firefly's hold-to-send was the compass mechanic in
+// different clothes, so the slot became WIND 🌬️ (WindInstrumentView).
+// View kept for reference; nothing routes here anymore.
+//
 // INSTRUMENT 3 — FIREFLY (Pro). A dark atmospheric circle, no rose —
 // just a warm living light drifting toward the person. Load a thought,
 // hold the phone toward them, and over two seconds the light brightens

@@ -335,8 +335,10 @@ struct SenderAnimationView<Symbol: View>: View {
     //   LAND   300 ms   soft fade at the edge, gentle screen pulse
     // Trail lingers 1.2 s — a path of faint green light.
 
-    private static var fireflyGreen: Color { Color(hex: "#90EE90") }
-    private let fireflyFlight = 1.40
+    // 🌬️ WIND took over the firefly slot — warm lavender/white breath,
+    // slow and beautiful (3–4 s total), particles lingering long after.
+    private static var fireflyGreen: Color { Color(hex: "#d9cce8") }   // wind lavender-white
+    private let fireflyFlight = 3.00
 
     @ViewBuilder
     private func fireflySend(end: CGSize) -> some View {
@@ -566,18 +568,39 @@ struct SenderAnimationView<Symbol: View>: View {
     private func fingerFlickSend(end: CGSize) -> some View {
         let control = controlOffset(from: fingerTipOffset, to: end, drama: 70)
 
-        // ── The hand — fills 85 % of the compass circle, aimed at them ──
-        FingerShape()
-            .fill(Self.instrumentTint.opacity(0.85))
-            .frame(width: 120, height: 310)
-            .shadow(color: .black.opacity(0.15), radius: 12)
-            .scaleEffect(y: ffFlick ? 1.08 : (ffCompress ? 0.88 : 1.0), anchor: .bottom)
-            .animation(AnimationSystem.easeInOutSine(0.2), value: ffCompress)
-            .animation(.spring(response: 0.16, dampingFraction: 0.45), value: ffFlick)
-            .rotationEffect(.radians(rad))
-            .opacity(instrumentGone ? 0 : (instrumentShown ? 1 : 0))
-            .animation(.easeIn(duration: 0.3), value: instrumentShown)
-            .animation(.easeOut(duration: 0.3), value: instrumentGone)
+        // ── The launch pad — a clean recessed pocket, no finger anywhere.
+        // Soft lavender border glow; it compresses with the press and
+        // springs on the flick. ──
+        // (previous hand silhouette retired:)
+        // FingerShape()
+        //     .fill(Self.instrumentTint.opacity(0.85))
+        //     .frame(width: 120, height: 310)
+        //     .shadow(color: .black.opacity(0.15), radius: 12)
+        //     .rotationEffect(.radians(rad))
+        ZStack {
+            // Recessed bowl
+            Circle()
+                .fill(Color.black.opacity(0.30))
+                .frame(width: 58, height: 58)
+            Circle()
+                .fill(
+                    RadialGradient(colors: [.clear, Color.black.opacity(0.25)],
+                                   center: .center, startRadius: 10, endRadius: 29)
+                )
+                .frame(width: 58, height: 58)
+            // Soft lavender rim glow
+            Circle()
+                .stroke(Color(hex: "#c4a8d4").opacity(0.6), lineWidth: 1.5)
+                .frame(width: 58, height: 58)
+                .shadow(color: Color(hex: "#c4a8d4").opacity(0.5), radius: 8)
+        }
+        .scaleEffect(ffFlick ? 1.06 : (ffCompress ? 0.92 : 1.0))
+        .animation(AnimationSystem.easeInOutSine(0.2), value: ffCompress)
+        .animation(.spring(response: 0.16, dampingFraction: 0.45), value: ffFlick)
+        .offset(fingerTipOffset)
+        .opacity(instrumentGone ? 0 : (instrumentShown ? 1 : 0))
+        .animation(.easeIn(duration: 0.3), value: instrumentShown)
+        .animation(.easeOut(duration: 0.3), value: instrumentGone)
 
         // ── Spark explosion at the fingertip — 7 particles, white/gold ──
         if ffSparks {
@@ -795,21 +818,21 @@ struct SenderAnimationView<Symbol: View>: View {
                             .repeatForever(autoreverses: true)) {
                 orbPulse = true
             }
-            // DRIFT 1400 ms — wandering home, growing gently
+            // DRIFT 3000 ms — wind: slow, gentle, beautiful wandering
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.30) {
                 progress = 1
                 withAnimation(AnimationSystem.easeInOutSine(fireflyFlight)) {
                     flightScale = 1.3
                 }
             }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1.40) {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 3.00) {
                 faded = true
             }
             // LAND — no flash, just the screen warming and a gentle tap
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1.70) {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 3.30) {
                 impact(flash: false)
             }
-            finish(after: 1.7 + AnimationSystem.Trail.lingerMax + 0.45)
+            finish(after: 3.3 + AnimationSystem.Trail.lingerMax + 0.45)
 
         case .fingerFlick:
             // FULL COMPASS: transform 300 → compress 200 → snap 80 with

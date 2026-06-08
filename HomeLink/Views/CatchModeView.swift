@@ -56,6 +56,7 @@ struct CatchModeView: View {
     // Step 6 — sender info
     @State private var named       = false
     @State private var debugBypass = false
+    @State private var arrivalLine = false   // "A feeling is coming your way…"
 
     /// 10 Hz heartbeat: haptic bands, jitter drift, hold-to-confirm.
     private let tick = Timer.publish(every: 0.1, on: .main, in: .common).autoconnect()
@@ -110,6 +111,20 @@ struct CatchModeView: View {
                     startRadius: 10, endRadius: 420
                 )
                 .ignoresSafeArea()
+
+                // The arrival line — gentle, fades once you start aligning
+                if phase == .seeking {
+                    VStack {
+                        Text("a feeling is coming your way…")
+                            .font(.system(size: 14, design: .serif).italic())
+                            .foregroundColor(Self.lavender.opacity(0.85))
+                            .opacity(arrivalLine ? 1 : 0)
+                            .padding(.top, 92)
+                        Spacer()
+                    }
+                    .allowsHitTesting(false)
+                    .transition(.opacity)
+                }
 
                 // ── Steps 1–4: the orb (or streak, or firefly) ────────────
                 if phase != .revealed {
@@ -303,6 +318,7 @@ struct CatchModeView: View {
     @State private var lastAlignmentLog = Date.distantPast
 
     private func begin() {
+        withAnimation(.easeIn(duration: 1.2).delay(0.4)) { arrivalLine = true }
         Self.log.info("catch: ACTIVATED — from=\(ping.fromName, privacy: .public) emoji=\(ping.emoji, privacy: .public) style=\(style.rawValue, privacy: .public) senderBearing=\(Int(compass.state.bearingDegrees), privacy: .public)° headingAvailable=\(compass.isHeadingAvailable, privacy: .public)")
         // Step 1 — the orb breathes (900 ms easeInOutSine cycle)
         withAnimation(AnimationSystem.easeInOutSine(AnimationSystem.Timing.glowPulseSlow)

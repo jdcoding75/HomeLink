@@ -24,6 +24,8 @@ struct PointwardApp: App {
         ProFeatures.migrateLegacyKey()
         // Carry sender-style users into the instrument architecture
         Instrument.migrateLegacySelection()
+        // Unified picker: derive the one selection from the old two
+        InstrumentOption.migrateLegacySelection()
     }
 
     var body: some Scene {

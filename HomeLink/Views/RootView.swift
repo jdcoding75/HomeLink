@@ -34,6 +34,10 @@ struct RootView: View {
     @State private var pairRequest: PairRequest? = nil   // from universal links
     @AppStorage("postOnboardConnectPromptShown") private var connectPromptShown = false
     @State private var showConnectPrompt = false
+    /// Inviter-side celebration — someone just claimed one of our codes
+    /// (detected over realtime; both phones celebrate together).
+    @State private var celebratePerson: Person? = nil
+    @State private var showInviterCelebration = false
     @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
@@ -105,8 +109,41 @@ struct RootView: View {
             if let url = activity.webpageURL { handleIncomingURL(url) }
         }
         .sheet(item: $pairRequest) { request in
-            PairRequestView(code: request.code) {
+            // The acceptance flow: who wants to connect → add as new person
+            // or link to someone already here → celebration.
+            // (PairRequestView, the old auto-link sheet, is superseded — kept.)
+            PairAcceptView(code: request.code) {
                 pairRequest = nil
+            }
+        }
+        // ── Replay, app-wide — any tab can request one; it plays here ─────
+        .fullScreenCover(item: $pings.replayRequest) { request in
+            ZStack {
+                // Full-screen deep purple under the overlay's own dim
+                DesignTokens.Color.background.ignoresSafeArea()
+                ReplayOverlayView(
+                    emoji: request.emoji,
+                    bearingDegrees: request.bearingDegrees,
+                    style: SenderStyle.from(request.styleRaw)
+                ) {
+                    pings.replayRequest = nil
+                }
+                // "tap to dismiss" — quiet, at the bottom
+                VStack {
+                    Spacer()
+                    Text("tap to dismiss")
+                        .font(.system(size: 11, design: .serif).italic())
+                        .foregroundColor(DesignTokens.Color.textDim)
+                        .padding(.bottom, 28)
+                }
+                .allowsHitTesting(false)
+            }
+            .presentationBackground(.clear)
+        }
+        // ── Inviter-side celebration — their phone learns over realtime ───
+        .fullScreenCover(isPresented: $showInviterCelebration) {
+            PairingCelebrationView(person: celebratePerson) {
+                showInviterCelebration = false
             }
         }
     }
@@ -178,15 +215,40 @@ struct RootView: View {
                         // }?.name ?? "they"
                         // pings.showFelt(name: name)
                         pings.showCaught(emoji: event.emoji)
+                        // History views listening flip their dot to "felt"
+                        pings.lastFeltAt = .now
                     }
                 },
-                onPointed: {
+                onPointed: { bearing in
                     Task { @MainActor in
                         let name = partner.flatMap { p in
                             people.people.first { $0.pairedUserID == p.uuidString }?.name
                         } ?? "someone"
-                        // Ambient presence — the compass edge glows, nothing else
-                        pings.presenceFelt(name: name)
+                        // Ambient presence — the compass edge glows; their
+                        // bearing feeds the mutual-pointing check.
+                        pings.presenceFelt(name: name, bearing: bearing)
+                        // If WE are already resting on them, this may be the
+                        // mutual moment — the compass screen completes the check.
+                        if let raw = compass.rawBearingToTarget {
+                            pings.checkMutualPointing(
+                                myAbsoluteBearing: raw,
+                                myAlignmentError: BearingCalculator.alignmentError(
+                                    relativeBearing: compass.state.bearingDegrees))
+                        }
+                    }
+                },
+                onPaired: { connection in
+                    Task { @MainActor in
+                        rootLog.info("pairing: claim detected over realtime — celebrating ✦")
+                        people.bindConnection(friendID: connection.partnerID,
+                                              toPersonID: connection.myPersonID)
+                        celebratePerson = people.people.first {
+                            $0.pairedUserID == connection.partnerID.uuidString
+                        }
+                        // Don't interrupt a pairing flow already on screen
+                        if pairRequest == nil && !showInviterCelebration {
+                            showInviterCelebration = true
+                        }
                     }
                 }
             )
@@ -508,6 +570,10 @@ struct MainTabView: View {
         // The "✦ Pro" badge on the compass jumps here
         .onReceive(NotificationCenter.default.publisher(for: .pointwardOpenSettings)) { _ in
             selectedTab = 2
+        }
+        // A notification-opened catch needs the compass visible
+        .onReceive(NotificationCenter.default.publisher(for: .pointwardOpenCompass)) { _ in
+            selectedTab = 0
         }
         // (thoughts tab retired — the pill/notification path is gone)
         // .onReceive(NotificationCenter.default.publisher(for: .pointwardOpenThoughts)) { _ in

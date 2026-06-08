@@ -71,6 +71,15 @@ final class PeopleManager: ObservableObject {
         try? save()
     }
 
+    /// Insert a fully-built person coming from an accepted invite —
+    /// connection-initiated, so it bypasses the free-tier person gate.
+    func insertFromInvite(_ person: Person) {
+        modelContext?.insert(person)
+        try? modelContext?.save()
+        fetchAll()
+        if selectedPerson == nil { selectedPerson = person }
+    }
+
     /// Accepting an invite auto-adds the person it came labeled as.
     /// Connection-initiated, so it bypasses the free-tier person gate.
     /// Location starts at the recipient's own position (distance ~0) until

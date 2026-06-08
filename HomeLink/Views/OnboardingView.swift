@@ -13,6 +13,8 @@ import SwiftUI
 import CoreLocation
 import UserNotifications
 import ContactsUI
+import AuthenticationServices
+import CryptoKit
 
 struct OnboardingView: View {
 
@@ -62,11 +64,12 @@ struct OnboardingView: View {
                 VStack(spacing: 0) {
                     TabView(selection: $page) {
                         heroScreen.tag(0)
-                        instrumentsScreen.tag(1)   // (was compassScreen — kept below)
-                        thoughtScreen.tag(2)
-                        proScreen.tag(3)
-                        givingScreen.tag(4)
-                        setupScreen.tag(5)
+                        signInScreen.tag(1)        // sign in before adding anyone
+                        instrumentsScreen.tag(2)   // (was compassScreen — kept below)
+                        thoughtScreen.tag(3)
+                        proScreen.tag(4)
+                        givingScreen.tag(5)
+                        setupScreen.tag(6)
                     }
                     .tabViewStyle(.page(indexDisplayMode: .never))
                     .animation(.easeInOut(duration: 0.4), value: page)
@@ -75,13 +78,14 @@ struct OnboardingView: View {
                         .padding(.bottom, 14)
                 }
 
-                // Skip — screens 2-5 only, straight to setup
-                if (1...4).contains(page) {
+                // Skip — screens 3-6 only, straight to setup (the sign-in
+                // screen carries its own "use offline only" skip)
+                if (2...5).contains(page) {
                     VStack {
                         HStack {
                             Spacer()
                             Button("skip") {
-                                withAnimation(.easeInOut(duration: 0.4)) { page = 5 }
+                                withAnimation(.easeInOut(duration: 0.4)) { page = 6 }
                             }
                             .font(.system(size: 13))
                             .foregroundColor(DesignTokens.Color.textMuted)
@@ -130,7 +134,7 @@ struct OnboardingView: View {
 
     private var pageDots: some View {
         HStack(spacing: 7) {
-            ForEach(0..<6, id: \.self) { i in
+            ForEach(0..<7, id: \.self) { i in
                 Circle()
                     .fill(i == page ? Self.lavender : DesignTokens.Color.borderMid)
                     .frame(width: i == page ? 7 : 5, height: i == page ? 7 : 5)
@@ -224,7 +228,142 @@ struct OnboardingView: View {
         }
     }
 
-    // MARK: - Screen 2 · The four instruments
+    // MARK: - Screen 2 · Sign in with Apple
+
+    @State private var signInBusy   = false
+    @State private var signedIn     = SupabaseService.localUserID != nil
+    @State private var signInError: String?
+    @State private var currentNonce = ""
+
+    private var signInScreen: some View {
+        VStack(spacing: 0) {
+            Spacer()
+
+            if signedIn {
+                // Success moment — soft green check, then onward
+                VStack(spacing: 14) {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: 54))
+                        .foregroundColor(Color(hex: "#5dcaa5").opacity(0.9))
+                        .shadow(color: Color(hex: "#5dcaa5").opacity(0.5), radius: 16)
+                    Text("signed in ✦")
+                        .font(.system(size: 22, weight: .semibold, design: .serif))
+                        .foregroundColor(DesignTokens.Color.textPrimary)
+                }
+                .transition(.scale(scale: 0.8).combined(with: .opacity))
+            } else {
+                Text("sign in to connect")
+                    .font(.system(size: 30, weight: .semibold, design: .serif))
+                    .foregroundColor(DesignTokens.Color.textPrimary)
+
+                Text("needed to send and receive thoughts")
+                    .font(.system(size: 13, design: .serif).italic())
+                    .foregroundColor(Self.lavender.opacity(0.8))
+                    .padding(.top, 8)
+                    .padding(.bottom, 36)
+
+                SignInWithAppleButton(.signIn) { request in
+                    currentNonce = Self.randomNonce()
+                    request.requestedScopes = [.fullName]
+                    request.nonce = Self.sha256(currentNonce)
+                } onCompletion: { result in
+                    handleAppleResult(result)
+                }
+                .signInWithAppleButtonStyle(.white)
+                .frame(height: 50)
+                .cornerRadius(DesignTokens.Radius.button)
+                .padding(.horizontal, 44)
+                .disabled(signInBusy)
+                .opacity(signInBusy ? 0.6 : 1)
+
+                if signInBusy {
+                    ProgressView()
+                        .tint(DesignTokens.Color.accentSoft)
+                        .padding(.top, 18)
+                }
+
+                if let signInError {
+                    Text(signInError)
+                        .font(.system(size: 12))
+                        .foregroundColor(.red)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 40)
+                        .padding(.top, 14)
+                }
+
+                // The escape hatch — the compass works fully offline
+                Button {
+                    withAnimation(.easeInOut(duration: 0.4)) { page = 2 }
+                } label: {
+                    Text("use offline only →")
+                        .font(.system(size: 13))
+                        .foregroundColor(DesignTokens.Color.textMuted)
+                }
+                .padding(.top, 26)
+
+                Text("you can connect later from Settings")
+                    .font(.system(size: 11, design: .serif).italic())
+                    .foregroundColor(DesignTokens.Color.textDim)
+                    .padding(.top, 6)
+            }
+
+            Spacer()
+
+            if signedIn {
+                nextButton
+            }
+        }
+        .animation(.easeOut(duration: 0.4), value: signedIn)
+    }
+
+    private func handleAppleResult(_ result: Result<ASAuthorization, Error>) {
+        switch result {
+        case .failure:
+            // Includes user-cancelled — stay quiet, they can retry or skip
+            signInError = nil
+        case .success(let auth):
+            guard let credential = auth.credential as? ASAuthorizationAppleIDCredential,
+                  let tokenData = credential.identityToken,
+                  let idToken = String(data: tokenData, encoding: .utf8) else {
+                signInError = "Sign in didn't complete — try again."
+                return
+            }
+            signInBusy = true
+            signInError = nil
+            Task {
+                defer { signInBusy = false }
+                do {
+                    try await SupabaseService.shared.signInWithApple(idToken: idToken,
+                                                                     nonce: currentNonce)
+                    try await SupabaseService.shared.ensureUser(appleUserID: credential.user)
+                    // Mint the pairing code in the background so Connect is instant
+                    Task { _ = try? await SupabaseService.shared.myPairingCode() }
+                    withAnimation(.easeOut(duration: 0.4)) { signedIn = true }
+                    HapticEngine.connectionFelt()
+                    // Brief success moment, then onward
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.3) {
+                        if page == 1 {
+                            withAnimation(.easeInOut(duration: 0.4)) { page = 2 }
+                        }
+                    }
+                } catch {
+                    signInError = error.localizedDescription
+                }
+            }
+        }
+    }
+
+    private static func randomNonce(length: Int = 32) -> String {
+        let charset = Array("0123456789ABCDEFabcdef")
+        return String((0..<length).map { _ in charset.randomElement()! })
+    }
+
+    private static func sha256(_ input: String) -> String {
+        let hash = SHA256.hash(data: Data(input.utf8))
+        return hash.map { String(format: "%02x", $0) }.joined()
+    }
+
+    // MARK: - Screen 3 · The four instruments
 
     @State private var carouselIndex = 0
 
@@ -296,7 +435,7 @@ struct OnboardingView: View {
     /// 2-second pause on each instrument, looping while the screen shows.
     private func cycleInstruments() {
         DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
-            guard page == 1, !showCompletion else { return }
+            guard page == 2, !showCompletion else { return }
             withAnimation(.easeInOut(duration: 0.35)) {
                 carouselIndex = (carouselIndex + 1) % Instrument.allCases.count
             }
@@ -443,7 +582,7 @@ struct OnboardingView: View {
             flickProgress = 1
         }
         DispatchQueue.main.asyncAfter(deadline: .now() + 3.2) {
-            if page == 2 && !showCompletion { loopFlick() }
+            if page == 3 && !showCompletion { loopFlick() }
         }
     }
 

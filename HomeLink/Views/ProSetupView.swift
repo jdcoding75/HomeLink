@@ -41,12 +41,10 @@ struct ProSetupView: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 22) {
                         statusSection
-                        instrumentSection
-                        // Skins only dress the compass — the subsection
-                        // shows only while the compass is in hand
-                        if instrumentStore.selected == .compass {
-                            skinSection
-                        }
+                        yourStyleSection
+                        // (instrument + skin selections unified above)
+                        // instrumentSection
+                        // if instrumentStore.selected == .compass { skinSection }
                         // senderStyleSection   // superseded by the instrument selection
                         emojiSetSection
                         customSoundsSection
@@ -152,9 +150,122 @@ struct ProSetupView: View {
         }
     }
 
-    // MARK: - Your instrument (the four-instrument architecture)
+    // MARK: - Your style (instrument + skin, unified)
 
     @EnvironmentObject var instrumentStore: InstrumentStore
+
+    /// ONE selection for everything — three free compass variants on top,
+    /// the Pro instruments below. Same options as the long-press picker.
+    private var yourStyleSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            sectionLabel("your style")
+            Text("choose how you send a feeling")
+                .font(.system(size: 12, design: .serif).italic())
+                .foregroundColor(DesignTokens.Color.textMuted)
+                .padding(.bottom, 2)
+
+            LazyVGrid(columns: [GridItem(.flexible(), spacing: 10),
+                                GridItem(.flexible(), spacing: 10)],
+                      spacing: 10) {
+                ForEach(InstrumentOption.allCases) { option in
+                    styleCard(option)
+                }
+            }
+        }
+    }
+
+    private func styleCard(_ option: InstrumentOption) -> some View {
+        let locked   = option.requiresPro && !isPro
+        let isActive = InstrumentOption.selected == option
+
+        return Button {
+            if option.comingSoon {
+                HapticEngine.personSelected()   // a wink — not selectable yet
+            } else if locked {
+                HapticEngine.paywallReached()
+                showPaywall = true
+            } else {
+                withAnimation(.easeInOut(duration: 0.3)) {
+                    InstrumentOption.apply(option, instrumentStore: instrumentStore,
+                                           skinStore: skinStore)
+                }
+                HapticEngine.skinSelected()
+            }
+        } label: {
+            VStack(spacing: 7) {
+                HStack {
+                    Spacer()
+                    if option.comingSoon {
+                        Text("coming soon")
+                            .font(.system(size: 8, design: .serif).italic())
+                            .foregroundColor(DesignTokens.Color.accentMid)
+                    } else if locked {
+                        HStack(spacing: 3) {
+                            Image(systemName: "lock.fill").font(.system(size: 8))
+                            Text("pro").font(.system(size: 9, design: .serif).italic())
+                        }
+                        .foregroundColor(Self.lavender.opacity(0.85))
+                    } else {
+                        Text(option.requiresPro ? "pro" : "free")
+                            .font(.system(size: 9, design: .serif).italic())
+                            .foregroundColor(option.requiresPro
+                                             ? Self.lavender.opacity(0.85) : Self.green)
+                    }
+                }
+                .frame(height: 12)
+
+                Text(option.icon)
+                    .font(.system(size: 38))
+                    .opacity(locked || option.comingSoon ? 0.5 : 1)
+
+                Text(option.displayName)
+                    .font(.system(size: 13, weight: isActive ? .semibold : .regular,
+                                  design: .serif))
+                    .foregroundColor(DesignTokens.Color.textPrimary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+
+                Text(option.tagline)
+                    .font(.system(size: 9, design: .serif).italic())
+                    .foregroundColor(DesignTokens.Color.textDim)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+
+                // Compass variants show their face; instruments their mechanic
+                ZStack {
+                    RoundedRectangle(cornerRadius: 10)
+                        .fill(DesignTokens.Color.backgroundLift)
+                    if let skin = option.skin {
+                        ZStack {
+                            SkinFaceView(skin: skin, bearing: -22.5, locked: false,
+                                         quietMode: false, pingRingActive: false)
+                            NeedleView(bearing: -22.5, skin: skin, locked: false)
+                        }
+                        .frame(width: 240, height: 240)
+                        .scaleEffect(44.0 / 240.0)
+                        .frame(width: 44, height: 44)
+                    } else {
+                        InstrumentPreview(instrument: option.instrument)
+                            .clipShape(RoundedRectangle(cornerRadius: 10))
+                            .opacity(locked || option.comingSoon ? 0.4 : 1)
+                    }
+                }
+                .frame(height: 50)
+            }
+            .padding(11)
+            .frame(maxWidth: .infinity)
+            .background(DesignTokens.Color.backgroundCard)
+            .cornerRadius(DesignTokens.Radius.card)
+            .overlay(
+                RoundedRectangle(cornerRadius: DesignTokens.Radius.card)
+                    .stroke(isActive ? Self.lavender : DesignTokens.Color.border,
+                            lineWidth: isActive ? 2 : 1)
+            )
+            .shadow(color: isActive ? Self.lavender.opacity(0.5) : .clear, radius: 10)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
 
     private var instrumentSection: some View {
         VStack(alignment: .leading, spacing: 8) {

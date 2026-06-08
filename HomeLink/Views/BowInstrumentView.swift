@@ -7,6 +7,7 @@
 // arrow flies; off-target it bounces home.
 
 import SwiftUI
+import Combine
 
 struct BowInstrumentView: View {
 
@@ -15,6 +16,7 @@ struct BowInstrumentView: View {
     let loadedSymbol: AnyView?
     let bearingDegrees: Double
     let personName: String
+    var personEmoji: String = "💜"
     /// Fires when a valid aligned release happens.
     let onSend: () -> Void
 
@@ -23,17 +25,56 @@ struct BowInstrumentView: View {
     @State private var dragging = false
     @State private var bounceBack = false
     @State private var showMissHint = false
+    @State private var showAimFirstHint = false     // tried to draw off-target
+    @State private var showPerfectAim = false       // "perfect aim ✦", brief
+    @State private var perfectConfirmed = false     // strong haptic, once per entry
+    @State private var aimPulse = false             // within-5° bright pulsing
     @State private var halfDrawHapticFired = false
     @State private var fullDrawHapticFired = false
+
+    /// Aim haptics ride the shared alignment bands (2 s / 1 s / 0.5 s).
+    private let aimTick = Timer.publish(every: 0.25, on: .main, in: .common).autoconnect()
 
     private static let tint   = Color(hex: "#ece4f5")
     private static let gold   = Color(hex: "#D4A017")
     private static let orange = Color(hex: "#e08a3c")
     private static let lavender = Color(hex: "#c4a8d4")
+    private static let slackGrey = Color(hex: "#8a8694")
 
     private var rad: Double { bearingDegrees * .pi / 180 }
     private var alignDiff: Double { BearingCalculator.alignmentError(relativeBearing: bearingDegrees) }
     private var aligned: Bool { BearingCalculator.isSendAligned(bearingDegrees) }
+
+    /// Progressive aim bands: 0 outside 30° · 1 within 30° · 2 within 15° ·
+    /// 3 within 5°. Everything — string, arrow, haptics — keys off this.
+    private var aimBand: Int {
+        switch alignDiff {
+        case ..<5:   return 3
+        case ..<15:  return 2
+        case ..<30:  return 1
+        default:     return 0
+        }
+    }
+
+    /// String: dim and slack → slightly brighter → bright lavender glow.
+    private var stringColor: Color {
+        switch aimBand {
+        case 3:  return Self.lavender.opacity(aimPulse ? 1.0 : 0.85)
+        case 2:  return Self.lavender.opacity(0.9)
+        case 1:  return Self.tint.opacity(0.6)
+        default: return Self.tint.opacity(0.35)
+        }
+    }
+
+    /// Arrow: muted grey → softly glowing → full amber gold.
+    private var arrowColor: Color {
+        switch aimBand {
+        case 3:  return Self.gold.opacity(aimPulse ? 1.0 : 0.85)
+        case 2:  return Self.gold
+        case 1:  return Self.gold.opacity(0.55)
+        default: return Self.slackGrey.opacity(0.6)
+        }
+    }
 
     var body: some View {
         ZStack {
@@ -42,18 +83,32 @@ struct BowInstrumentView: View {
                 .ignoresSafeArea()
                 .allowsHitTesting(false)
 
-            // ── The bow — fills the circle, aimed at them, breathing ──
+            // ── Where they are — marker + alignment arc (hints are ours) ──
+            DirectionIndicator(bearingDegrees: bearingDegrees,
+                               personName: personName,
+                               personEmoji: personEmoji,
+                               ringRadius: 172,
+                               showHint: false)
+
+            // ── The bow — fills the circle, aimed at them, breathing.
+            // Aim feedback: slack and dim off-target, lavender-bright and
+            // glowing at the edges once you're within 15°. ──
             ZStack {
                 BowArchShape(tension: drawAmount * 14)
-                    .stroke(Self.tint.opacity(0.85),
+                    .stroke(aimBand >= 2 ? Self.tint.opacity(0.95) : Self.tint.opacity(0.5),
                             style: StrokeStyle(lineWidth: 4, lineCap: .round))
+                    .shadow(color: Self.lavender.opacity(aimBand >= 2 ? 0.55 : 0),
+                            radius: 10)   // the arc glows at the edges
                 BowStringShape(pull: drawAmount * 84)   // 25 % of the bow width
-                    .stroke(Self.tint.opacity(0.85), lineWidth: 2)
+                    .stroke(stringColor, lineWidth: 2)
+                    .shadow(color: Self.lavender.opacity(aimBand >= 2 ? 0.7 : 0),
+                            radius: 6)
             }
             .frame(width: 333, height: 333)
             .shadow(color: .black.opacity(0.15), radius: 12)
             .rotationEffect(.radians(rad))
             .scaleEffect(breathe ? 1.02 : 0.98)
+            .animation(AnimationSystem.easeInOutSine(0.3), value: aimBand)
 
             // ── Trajectory — dotted arc showing where the arrow goes ──
             if dragging && drawAmount > 0.08 {
@@ -66,37 +121,73 @@ struct BowInstrumentView: View {
                     .transition(.opacity)
             }
 
-            // ── The arrow — nocked at center, drawn back with the string ──
+            // ── The arrow — nocked at center, drawn back with the string.
+            // Muted grey off-target, glowing softly inside 30°, full amber
+            // gold inside 15°, sparkling at the tip inside 5°. ──
             ZStack {
                 ArrowShape()
-                    .fill(Self.gold.opacity(loadedToken == nil ? 0.85 : 0.55))
+                    .fill(arrowColor.opacity(loadedToken == nil ? 1.0 : 0.65))
                     .frame(width: 13, height: 58)
                     .offset(y: 8)
+                    .shadow(color: Self.gold.opacity(aimBand >= 1 ? 0.25 * Double(aimBand) : 0),
+                            radius: 8)
                 if let loadedSymbol {
                     loadedSymbol
                         .scaleEffect(x: 1.0, y: 1.0 + drawAmount * 0.4)   // elongates
                         .shadow(color: Self.gold.opacity(0.5 + Double(drawAmount) * 0.4),
                                 radius: 8 + drawAmount * 8)
                 }
+
+                // Tip sparkles — within 5° only
+                if aimBand == 3 {
+                    ForEach(0..<3, id: \.self) { i in
+                        Circle()
+                            .fill(i == 1 ? Color(hex: "#FFD700") : .white)
+                            .frame(width: i == 1 ? 3 : 2.5, height: i == 1 ? 3 : 2.5)
+                            .offset(x: CGFloat(i - 1) * 7,
+                                    y: -26 - CGFloat((i * 5) % 7))
+                            .opacity(aimPulse ? 0.95 : 0.35)
+                            .transition(.opacity)
+                    }
+                }
             }
             .rotationEffect(.radians(rad))
             .offset(x: CGFloat(sin(rad)) * -drawAmount * 84,
                     y: CGFloat(cos(rad)) * drawAmount * 84)
             .modifier(BounceBackEffect(active: bounceBack))
+            .animation(AnimationSystem.easeInOutSine(0.3), value: aimBand)
 
-            // ── Instructions ──
+            // ── "perfect aim ✦" — brief, inside 5° ──
+            if showPerfectAim {
+                Text("perfect aim ✦")
+                    .font(.system(size: 14, design: .serif).italic())
+                    .foregroundColor(Color(hex: "#FFD700"))
+                    .shadow(color: Color(hex: "#FFD700").opacity(0.7), radius: 8)
+                    .offset(y: -120)
+                    .transition(.scale(scale: 0.8).combined(with: .opacity))
+            }
+
+            // ── Instructions — progressive with aim ──
             VStack {
                 Spacer()
-                if showMissHint {
+                if showAimFirstHint {
+                    Text("aim toward \(personName) first")
+                        .font(.system(size: 12, design: .serif).italic())
+                        .foregroundColor(Self.orange)
+                        .transition(.opacity)
+                } else if showMissHint {
                     Text("aim toward \(personName)")
                         .font(.system(size: 12, design: .serif).italic())
                         .foregroundColor(Self.orange)
                         .transition(.opacity)
                 } else if loadedToken != nil {
                     Text(drawAmount >= 0.97 ? "release to send"
-                         : dragging ? "" : "draw the string back")
+                         : dragging ? ""
+                         : aimBand >= 2 ? "ready · draw to send"
+                         : "aim toward \(personName)")
                         .font(.system(size: 12, design: .serif).italic())
-                        .foregroundColor(Self.lavender.opacity(0.85))
+                        .foregroundColor(aimBand >= 2 ? Self.lavender.opacity(0.95)
+                                                      : Self.lavender.opacity(0.65))
                         .transition(.opacity)
                 }
             }
@@ -111,8 +202,30 @@ struct BowInstrumentView: View {
                             .repeatForever(autoreverses: true)) {
                 breathe = true
             }
+            withAnimation(AnimationSystem.easeInOutSine(0.6)
+                            .repeatForever(autoreverses: true)) {
+                aimPulse = true
+            }
+        }
+        // Aim haptics — pulses quicken as the aim tightens (shared bands:
+        // 2 s very subtle within 30°, 1 s soft within 15°), plus a strong
+        // confirmation + brief "perfect aim ✦" entering 5°.
+        .onReceive(aimTick) { _ in
+            guard loadedToken != nil else { return }
+            HapticEngine.catchAlignment(angleError: alignDiff)
+            if aimBand == 3 && !perfectConfirmed {
+                perfectConfirmed = true
+                HapticEngine.lockOn()
+                withAnimation { showPerfectAim = true }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
+                    withAnimation { showPerfectAim = false }
+                }
+            } else if aimBand < 3 && perfectConfirmed {
+                perfectConfirmed = false
+            }
         }
         .animation(.easeOut(duration: 0.25), value: showMissHint)
+        .animation(.easeOut(duration: 0.25), value: showAimFirstHint)
     }
 
     // ── The draw: drag away from the person to pull the string ──
@@ -126,6 +239,23 @@ struct BowInstrumentView: View {
                 let opposite = CGSize(width: -CGFloat(sin(rad)), height: CGFloat(cos(rad)))
                 let along = value.translation.width * opposite.width
                           + value.translation.height * opposite.height
+
+                // DRAW RESTRICTION — off-target the string is resistant:
+                // it barely budges, and pulling shows the aim-first hint.
+                guard aimBand >= 2 else {
+                    withAnimation(.interactiveSpring()) {
+                        drawAmount = max(0, min(0.04, along / 700))
+                    }
+                    if along > 30 && !showAimFirstHint {
+                        showAimFirstHint = true
+                        HapticEngine.sendSoft()
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                            withAnimation { showAimFirstHint = false }
+                        }
+                    }
+                    return
+                }
+
                 let newAmount = max(0, min(1, along / 120))
                 // Haptic milestones
                 if newAmount >= 0.6 && !halfDrawHapticFired {

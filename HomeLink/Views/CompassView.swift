@@ -145,6 +145,15 @@ struct CompassView: View {
                                 .frame(width: 240, height: 240)
                                 .scaleEffect(370.0 / 240.0)
                                 .frame(width: 370, height: 370)
+                                // Where they are — marker · arc · hint
+                                .overlay(
+                                    DirectionIndicator(
+                                        bearingDegrees: compass.state.bearingDegrees,
+                                        personName: compass.state.personName,
+                                        personEmoji: compass.state.personEmoji,
+                                        ringRadius: 180
+                                    )
+                                )
                                 // Full-compass send styles dim the skin
                                 .opacity(faceDimmedForInstrument ? 0.2 : 1.0)
                                 .animation(faceDimmedForInstrument
@@ -157,22 +166,34 @@ struct CompassView: View {
                                 loadedSymbol: selectedToken.map { AnyView(sendSymbol($0, size: 26)) },
                                 bearingDegrees: compass.state.bearingDegrees,
                                 personName: compass.state.personName,
+                                personEmoji: compass.state.personEmoji,
                                 onSend: { if let token = selectedToken { sendThought(token) } }
                             )
                         case .firefly:
-                            FireflyInstrumentView(
+                            // 🌬️ WIND — replaced the firefly (same mechanic as
+                            // compass made it redundant; view kept in the repo)
+                            WindInstrumentView(
                                 loadedToken: selectedToken,
                                 loadedSymbol: selectedToken.map { AnyView(sendSymbol($0, size: 26)) },
                                 bearingDegrees: compass.state.bearingDegrees,
                                 personName: compass.state.personName,
+                                personEmoji: compass.state.personEmoji,
                                 onSend: { if let token = selectedToken { sendThought(token) } }
                             )
+                            // FireflyInstrumentView(
+                            //     loadedToken: selectedToken,
+                            //     loadedSymbol: selectedToken.map { AnyView(sendSymbol($0, size: 26)) },
+                            //     bearingDegrees: compass.state.bearingDegrees,
+                            //     personName: compass.state.personName,
+                            //     onSend: { if let token = selectedToken { sendThought(token) } }
+                            // )
                         case .flick:
                             FlickInstrumentView(
                                 loadedToken: selectedToken,
                                 loadedSymbol: selectedToken.map { AnyView(sendSymbol($0, size: 26)) },
                                 bearingDegrees: compass.state.bearingDegrees,
                                 personName: compass.state.personName,
+                                personEmoji: compass.state.personEmoji,
                                 onSend: { _ in if let token = selectedToken { sendThought(token) } }
                             )
                         }
@@ -180,6 +201,10 @@ struct CompassView: View {
                     .id(instrumentStore.selected)              // crossfade on switch
                     .transition(.opacity)
                     .animation(.easeInOut(duration: 0.3), value: instrumentStore.selected)
+                    // The catch dims the instrument beneath it, slightly
+                    .opacity(appState.currentState == .catchMode ? 0.55 : 1.0)
+                    .animation(.easeInOut(duration: 0.3),
+                               value: appState.currentState == .catchMode)
                         // STEADY LOCK (5 s+): warm breathing halo behind the face
                         .background(
                             Circle()
@@ -213,11 +238,24 @@ struct CompassView: View {
                     bottomZone
                         .padding(.top, 24)
 
+                    // ── Catch badge — "X thoughts waiting ✦", every tier ──
+                    if pings.queueCount > 0 && pings.nowPlaying == nil {
+                        CatchBadgeView(count: pings.queueCount) {
+                            pings.playNext()
+                        }
+                        .padding(.top, 12)
+                        .transition(.opacity.combined(with: .move(edge: .bottom)))
+                    }
+
                     // The six, always visible — sending lives right here.
                     // The gap above equals one tagline line height (26pt):
                     // the tagline breathes clearly, not crowded, not far.
                     emojiRow
-                        .padding(.top, 26)
+                        .padding(.top, pings.queueCount > 0 && pings.nowPlaying == nil ? 8 : 26)
+                        // The catch owns the screen — the row recedes to 30 %
+                        .opacity(appState.currentState == .catchMode ? 0.3 : 1.0)
+                        .animation(.easeInOut(duration: 0.3),
+                                   value: appState.currentState == .catchMode)
 
                     sendControl
                         .padding(.top, 10)
@@ -333,57 +371,21 @@ struct CompassView: View {
             //     .animation(.easeInOut(duration: 0.4), value: pings.feltNotice)
             // }
 
-            // ── Thought queue badge — pro mode only (core mode
-            // reveals thoughts automatically through the compass itself) ──────
-            if proOn && !pings.queue.isEmpty && pings.nowPlaying == nil {
-                VStack {
-                    Button {
-                        pings.playNext()
-                    } label: {
-                        HStack(spacing: 6) {
-                            Text(pings.queue.count == 1
-                                 ? "a thought for you"
-                                 : "thoughts for you")
-                                .font(.system(size: 13, design: .serif).italic())
-                            Text("✦")
-                                .font(.system(size: 12))
-                        }
-                        .foregroundColor(DesignTokens.Color.accentSoft)
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 9)
-                        .background(
-                            Capsule()
-                                .fill(DesignTokens.Color.backgroundLift.opacity(0.95))
-                                .overlay(Capsule().stroke(DesignTokens.Color.accentMid.opacity(0.5), lineWidth: 1))
-                        )
-                        .shadow(color: Color(hex: "#9b7fc0").opacity(badgePulse ? 0.5 : 0.2), radius: 10)
-                        .scaleEffect(badgePulse ? 1.04 : 1.0)
-                    }
-                    .padding(.top, 52)
-                    Spacer()
-                }
-                .transition(.opacity.combined(with: .move(edge: .top)))
-                .onAppear {
-                    guard !quietMode else { return }
-                    withAnimation(.easeInOut(duration: 1.6).repeatForever(autoreverses: true)) {
-                        badgePulse = true
-                    }
-                }
-            }
+            // (badge moved into the layout above the emoji row — every tier,
+            //  count always shown; old top-floating pro-only version retired)
 
-            // ── Arrival → CATCH MODE ──────────────────────────────────────────
+            // ── Arrival            // ── Arrival → CATCH MODE ──────────────────────────────────────────
             // Only the newest thought triggers the catch; the orb waits at
             // the sender's edge until you physically turn toward them.
             // opened_at is set at the reveal — felt means felt.
             if let playing = pings.nowPlaying {
                 CatchModeView(
                     ping: playing,
-                    // The RECEIVER's instrument shapes the catch — the
-                    // experience matches the instrument in your hand:
-                    // compass → glow orb · bow → arrow stuck at the edge ·
-                    // firefly → wandering orb · flick → bouncing emoji.
-                    // (was: SenderStyle.from(playing.senderStyle))
-                    style: instrumentStore.selected.senderStyle,
+                    // The SENDER's instrument shapes the catch — you receive
+                    // the thought the way they sent it: bow → arrow stuck at
+                    // the edge · flick → embedded emoji · wind → wanderer.
+                    // (was briefly the receiver's: instrumentStore.selected)
+                    style: SenderStyle.from(playing.senderStyle),
                     onRevealed: { pings.markOpened(playing) },
                     onFinished: {
                         pings.finishedPlaying(playing)
@@ -473,9 +475,10 @@ struct CompassView: View {
                 .transition(.opacity)
             }
 
-            // ── Skin picker — long-press the face, switch right here ──────────
+            // ── THE ONE PICKER — long-press any instrument, choose your
+            // style: compass variants (free) + instruments (pro) ──────────────
             if showSkinOverlay {
-                SkinQuickPicker(
+                InstrumentOptionPicker(
                     isPro: subscription.tier != .free,
                     onLockedTap: {
                         showSkinOverlay = false
@@ -488,6 +491,7 @@ struct CompassView: View {
                 .transition(.opacity)
                 .zIndex(5)
             }
+            // (previous skin-only picker retired; SkinQuickPicker kept)
 
             // ── Pointing toast retired — ambient presence glow replaced it ────
             // if let notice = pings.pointingNotice {
@@ -1236,6 +1240,8 @@ extension Notification.Name {
     static let pointwardOpenSettings = Notification.Name("pointwardOpenSettings")
     /// Posted by the send-a-thought pill — MainTabView jumps to Thoughts.
     static let pointwardOpenThoughts = Notification.Name("pointwardOpenThoughts")
+    /// Posted when a notification-opened catch needs the compass on screen.
+    static let pointwardOpenCompass = Notification.Name("pointwardOpenCompass")
 }
 
 // MARK: - SkinQuickPicker

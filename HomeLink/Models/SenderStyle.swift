@@ -57,7 +57,7 @@ enum SenderStyle: String, CaseIterable, Identifiable {
         switch self {
         case .glow:         return 1.20   // charge 200 · launch 100 · flight 700 · impact 200
         case .shootingStar: return 0.90   // charge 150 · streak 500 · impact 250
-        case .firefly:      return 2.00   // gather 300 · drift 1400 · land 300
+        case .firefly:      return 3.60   // wind: gather 300 · drift 3000 · land 300
         case .fingerFlick:  return 1.30   // transform 300 · compress 200 · snap 80 · flight 800
         case .bowArrow:     return 1.55   // transform 300 · draw 400 · hold 150 · flight 700
         }

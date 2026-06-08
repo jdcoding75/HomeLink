@@ -680,14 +680,26 @@ final class SupabaseService: ObservableObject {
         }
     }
 
+    /// Realtime shape of a partner's compass_bearings row.
+    struct PointingEvent: Codable {
+        let userID: UUID
+        let bearing: Double
+        enum CodingKeys: String, CodingKey {
+            case userID = "user_id"
+            case bearing
+        }
+    }
+
     /// Open the single consolidated realtime channel: incoming pings, felt
-    /// receipts on our sent pings, and partner pointing events.
+    /// receipts on our sent pings, partner pointing events, and pairing
+    /// claims on our own invite codes (the inviter-side celebration).
     /// Safe to call repeatedly — tears down any existing channel first.
     func startRealtime(
         partner: UUID?,
         onPing: @escaping (PingEvent) -> Void,
         onFelt: @escaping (PingEvent) -> Void,
-        onPointed: @escaping () -> Void
+        onPointed: @escaping (Double?) -> Void,
+        onPaired: @escaping (DiscoveredConnection) -> Void = { _ in }
     ) async {
         guard let client, let me = await currentUserID else { return }
         await stopListening()
@@ -706,6 +718,10 @@ final class SupabaseService: ObservableObject {
                 AnyAction.self, schema: "public", table: "compass_bearings",
                 filter: "user_id=eq.\(p.uuidString)")
         }
+        // Someone redeemed one of MY codes → friend fills in → celebrate live
+        let connectionClaims = channel.postgresChange(
+            UpdateAction.self, schema: "public", table: "connections",
+            filter: "owner=eq.\(me.uuidString)")
 
         await channel.subscribe()
         log.info("realtime: consolidated channel subscribed (partner: \(partner?.uuidString ?? "none", privacy: .public))")
@@ -739,9 +755,34 @@ final class SupabaseService: ObservableObject {
         }
         if let pointingChanges {
             Task { [log] in
-                for await _ in pointingChanges {
-                    log.info("realtime: partner pointing event")
-                    onPointed()
+                for await change in pointingChanges {
+                    // Carry their reported bearing when we can decode it —
+                    // feeds the mutual-pointing check. nil keeps the glow.
+                    var bearing: Double?
+                    switch change {
+                    case .insert(let action):
+                        bearing = (try? action.decodeRecord(decoder: JSONDecoder()) as PointingEvent)?.bearing
+                    case .update(let action):
+                        bearing = (try? action.decodeRecord(decoder: JSONDecoder()) as PointingEvent)?.bearing
+                    default:
+                        break
+                    }
+                    log.info("realtime: partner pointing event (bearing=\(bearing.map { String(Int($0)) } ?? "?", privacy: .public)°)")
+                    onPointed(bearing)
+                }
+            }
+        }
+        Task { [log] in
+            for await update in connectionClaims {
+                do {
+                    let row: ConnectionRow = try update.decodeRecord(decoder: JSONDecoder())
+                    guard let friend = row.friend else { continue }
+                    log.info("realtime: connection claimed ✦ partner=\(friend.uuidString, privacy: .public)")
+                    Self.connectedFriendID = friend
+                    onPaired(DiscoveredConnection(partnerID: friend,
+                                                  myPersonID: row.ownerPersonID))
+                } catch {
+                    log.error("realtime: connection claim DECODE FAILED: \(error.localizedDescription, privacy: .public)")
                 }
             }
         }

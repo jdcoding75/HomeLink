@@ -14,6 +14,7 @@ struct FlickInstrumentView: View {
     let loadedSymbol: AnyView?
     let bearingDegrees: Double
     let personName: String
+    var personEmoji: String = "💜"
     /// perfect = released within 5°.
     let onSend: (_ perfect: Bool) -> Void
 
@@ -43,17 +44,23 @@ struct FlickInstrumentView: View {
                 .stroke(Color.white.opacity(0.08), lineWidth: 1)
                 .frame(width: 360, height: 360)
 
-            // ── Bearing arc at the top — where they are ──
-            BearingArcShape(rad: rad)
-                .stroke(Self.lavender.opacity(aligned ? 0.85 : 0.4),
-                        style: StrokeStyle(lineWidth: 3, lineCap: .round))
-                .frame(width: 330, height: 330)
-                .shadow(color: Self.lavender.opacity(aligned ? 0.5 : 0), radius: 8)
-            Image(systemName: "location.north.fill")
-                .font(.system(size: 11))
-                .foregroundColor(Self.lavender.opacity(0.8))
-                .offset(x: CGFloat(sin(rad)) * 150, y: -CGFloat(cos(rad)) * 150)
-                .rotationEffect(.radians(rad), anchor: .center)
+            // ── Where they are — shared marker · arc · hint ──
+            // (previous bespoke arc + north icon superseded:)
+            // BearingArcShape(rad: rad)
+            //     .stroke(Self.lavender.opacity(aligned ? 0.85 : 0.4),
+            //             style: StrokeStyle(lineWidth: 3, lineCap: .round))
+            //     .frame(width: 330, height: 330)
+            //     .shadow(color: Self.lavender.opacity(aligned ? 0.5 : 0), radius: 8)
+            // Image(systemName: "location.north.fill")
+            //     .font(.system(size: 11))
+            //     .foregroundColor(Self.lavender.opacity(0.8))
+            //     .offset(x: CGFloat(sin(rad)) * 150, y: -CGFloat(cos(rad)) * 150)
+            //     .rotationEffect(.radians(rad), anchor: .center)
+            DirectionIndicator(bearingDegrees: bearingDegrees,
+                               personName: personName,
+                               personEmoji: personEmoji,
+                               ringRadius: 165,
+                               showHint: loadedToken == nil)   // own hints while loaded
 
             // ── The launch pocket — a soft recessed cup ──
             ZStack {
