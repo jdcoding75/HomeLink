@@ -591,11 +591,25 @@ struct PingHistoryView: View {
             if !loaded {
                 ProgressView().tint(DesignTokens.Color.accentSoft)
             } else if records.isEmpty {
-                Text("the needle is ready · send your first thought")
-                    .font(.system(size: 14, design: .serif).italic())
-                    .foregroundColor(DesignTokens.Color.textMuted)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 40)
+                // [4/4] EMPTY STATE — a gently tilted bucket, warm + quiet
+                VStack(spacing: 18) {
+                    ZStack {
+                        BucketHandleShape()
+                            .stroke(Color(hex: "#888888"), style: StrokeStyle(lineWidth: 3, lineCap: .round))
+                            .frame(width: 70, height: 26).offset(y: -42)
+                        BucketShape()
+                            .fill(LinearGradient(colors: [Color(hex: "#8B4513"), Color(hex: "#6E3A1E")],
+                                                 startPoint: .top, endPoint: .bottom))
+                            .frame(width: 80, height: 72)
+                    }
+                    .rotationEffect(.degrees(-12))
+                    .opacity(0.7)
+                    Text("your thought bucket is empty ✦")
+                        .font(.system(size: 15, design: .serif).italic())
+                        .foregroundColor(DesignTokens.Color.textMuted)
+                        .multilineTextAlignment(.center)
+                }
+                .padding(.horizontal, 40)
             } else {
                 ScrollView {
                     VStack(spacing: 0) {
@@ -647,48 +661,50 @@ struct PingHistoryView: View {
         }
     }
 
+    /// [4/4] A thought bubble card — large emoji, the sender named in bold,
+    /// the time below, a small instrument icon. Tap anywhere to replay.
     private func row(_ record: SupabaseService.PingRecord) -> some View {
         let sent = record.toUser == partnerID
+        let instrumentIcon = SenderStyle.from(record.senderStyle).emoji
         return Button {
             replay(record)
         } label: {
             HStack(spacing: 14) {
-                // The thought, floating quietly on the left
-                Text(record.emoji)
-                    .font(.system(size: 28))
-                    .frame(width: 38)
-                    .scaleEffect(replayingID == record.id ? 1.25 : 1.0)
+                // The thought bubble — large emoji in a hued glow
+                ZStack {
+                    Circle()
+                        .fill(RadialGradient(colors: [EmojiHue.color(for: record.emoji).opacity(0.45),
+                                                      EmojiHue.color(for: record.emoji).opacity(0.12)],
+                                             center: .center, startRadius: 2, endRadius: 30))
+                        .frame(width: 58, height: 58)
+                    Text(record.emoji).font(.system(size: 40))
+                }
+                .scaleEffect(replayingID == record.id ? 1.18 : 1.0)
 
-                // Tiny compass needle — the direction it traveled
-                Image(systemName: "location.north.fill")
-                    .font(.system(size: 8))
-                    .foregroundColor(DesignTokens.Color.textDim.opacity(0.7))
-                    .rotationEffect(.degrees(sent ? bearing : bearing + 180))
-
-                // Felt indicator — soft dots, never a tick
-                //   one grey dot      · sent, waiting
-                //   two lavender dots · felt
-                if sent {
-                    if record.openedAt != nil {
-                        HStack(spacing: 3) {
-                            Circle().fill(Self.lavender).frame(width: 5, height: 5)
-                            Circle().fill(Self.lavender).frame(width: 5, height: 5)
-                        }
-                    } else {
-                        Circle()
-                            .fill(DesignTokens.Color.textDim.opacity(0.5))
-                            .frame(width: 5, height: 5)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(sent ? "to \(personName)" : "from \(personName)")
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundColor(DesignTokens.Color.textPrimary)
+                    Text(PoeticTime.string(for: record.createdAt))
+                        .font(.system(size: 12, design: .serif).italic())
+                        .foregroundColor(DesignTokens.Color.textMuted)
+                    // Felt indicator on sent thoughts
+                    if sent {
+                        Text(record.openedAt != nil ? "felt ✦" : "sent · waiting")
+                            .font(.system(size: 10))
+                            .foregroundColor(record.openedAt != nil
+                                             ? Self.lavender : DesignTokens.Color.textDim)
                     }
                 }
 
                 Spacer()
 
-                // Poetic time, right-aligned — a journal, not a log
-                Text(PoeticTime.string(for: record.createdAt))
-                    .font(.system(size: 12, design: .serif).italic())
-                    .foregroundColor(DesignTokens.Color.textMuted)
+                // Small instrument icon, bottom-right
+                Text(instrumentIcon)
+                    .font(.system(size: 18))
+                    .opacity(0.7)
             }
-            .padding(.vertical, 13)
+            .padding(.vertical, 12)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -711,9 +727,12 @@ struct PingHistoryView: View {
         let emoji = record.emoji
         let style = record.senderStyle
         let storedBearing = bearing
+        // [1/4] received thoughts name the sender during replay; ours don't
+        let replayName = record.toUser == partnerID ? "" : personName
         NotificationCenter.default.post(name: .pointwardCloseSheetsForReplay, object: nil)
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
-            pings.requestReplay(emoji: emoji, bearingDegrees: storedBearing, styleRaw: style)
+            pings.requestReplay(emoji: emoji, bearingDegrees: storedBearing, styleRaw: style,
+                                fromName: replayName)
         }
     }
 }

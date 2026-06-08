@@ -217,7 +217,8 @@ struct RootView: View {
                         }?.name ?? "someone who loves you"
                         pings.receivePing(fromName: fromName, emoji: event.emoji,
                                           remoteID: event.id,
-                                          senderStyle: event.senderStyle)
+                                          senderStyle: event.senderStyle,
+                                          message: event.message)
                     }
                 },
                 onFelt: { event in
@@ -593,7 +594,8 @@ struct MainTabView: View {
                 ReplayOverlayView(
                     emoji: request.emoji,
                     bearingDegrees: request.bearingDegrees,
-                    style: SenderStyle.from(request.styleRaw)
+                    style: SenderStyle.from(request.styleRaw),
+                    fromName: request.fromName
                 ) {
                     pings.replayRequest = nil
                     appState.transition(to: .idle)   // never strand .replay

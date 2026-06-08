@@ -76,6 +76,8 @@ final class PingManager: ObservableObject {
         /// sender_style from the wire — the SENDER's animation personality.
         /// nil (pre-migration rows) falls back to glow at the call site.
         var senderStyle: String? = nil
+        /// [5/5] Optional short message (≤30 chars) the sender attached.
+        var message: String? = nil
     }
 
     init(networkService: NetworkServiceProtocol, appState: AppStateManager? = nil) {
@@ -92,13 +94,14 @@ final class PingManager: ObservableObject {
         let timestamp: Date
         let remoteID: UUID?
         let senderStyle: String?
+        var message: String? = nil
     }
 
     private func persistQueue() {
         let stored = queue.map {
             PersistedPing(fromName: $0.fromName, emoji: $0.emoji,
                           timestamp: $0.timestamp, remoteID: $0.remoteID,
-                          senderStyle: $0.senderStyle)
+                          senderStyle: $0.senderStyle, message: $0.message)
         }
         if let data = try? JSONEncoder().encode(stored) {
             UserDefaults.standard.set(data, forKey: "pendingThoughtQueue")
@@ -113,7 +116,7 @@ final class PingManager: ObservableObject {
         queue = stored.map {
             ReceivedPing(fromName: $0.fromName, emoji: $0.emoji,
                          timestamp: $0.timestamp, remoteID: $0.remoteID,
-                         senderStyle: $0.senderStyle)
+                         senderStyle: $0.senderStyle, message: $0.message)
         }
     }
 
@@ -162,7 +165,8 @@ final class PingManager: ObservableObject {
         for record in missed { rememberSeen(record.id) }
         if let newest = missed.last {
             receivePing(fromName: partnerName, emoji: newest.emoji,
-                        remoteID: newest.id, senderStyle: newest.senderStyle)
+                        remoteID: newest.id, senderStyle: newest.senderStyle,
+                        message: newest.message)
         }
     }
 
@@ -181,11 +185,11 @@ final class PingManager: ObservableObject {
     /// and — critically — surfaces failure instead of swallowing it: the
     /// flight animation plays optimistically, but if the insert never lands
     /// the user is told their thought did not travel.
-    func sendRemote(to userID: UUID, emoji: String, style: SenderStyle) {
-        log.info("sendRemote: → \(userID.uuidString, privacy: .public) emoji=\(emoji, privacy: .public) style=\(style.rawValue, privacy: .public)")
+    func sendRemote(to userID: UUID, emoji: String, style: SenderStyle, message: String? = nil) {
+        log.info("sendRemote: → \(userID.uuidString, privacy: .public) emoji=\(emoji, privacy: .public) style=\(style.rawValue, privacy: .public) msg=\(message != nil, privacy: .public)")
         Task {
             do {
-                try await SupabaseService.shared.sendPing(to: userID, emoji: emoji, style: style)
+                try await SupabaseService.shared.sendPing(to: userID, emoji: emoji, style: style, message: message)
                 log.info("sendRemote: delivered ✓")
             } catch {
                 log.error("sendRemote: FAILED — \(error.localizedDescription, privacy: .public)")
@@ -238,7 +242,7 @@ final class PingManager: ObservableObject {
     /// thought triggers the catch — anything older slips quietly into
     /// History (it's already persisted server-side in the pings table).
     func receivePing(fromName: String, emoji: String, remoteID: UUID? = nil,
-                     senderStyle: String? = nil) {
+                     senderStyle: String? = nil, message: String? = nil) {
         log.info("receivePing: from=\(fromName, privacy: .public) emoji=\(emoji, privacy: .public) remoteID=\(remoteID?.uuidString ?? "nil", privacy: .public) style=\(senderStyle ?? "nil", privacy: .public)")
 
         // DEDUPE: in the foreground the same thought arrives twice — once
@@ -261,7 +265,8 @@ final class PingManager: ObservableObject {
         let isFirstUnread = unreadCount == 0
 
         let ping = ReceivedPing(fromName: fromName, emoji: emoji, timestamp: .now,
-                                remoteID: remoteID, senderStyle: senderStyle)
+                                remoteID: remoteID, senderStyle: senderStyle,
+                                message: message)
         // MULTI-SENDER QUEUE: an active catch is NEVER interrupted, and
         // waiting thoughts are ALL kept — each with its own sender name and
         // style, so every later catch and replay is correctly attributed.
@@ -341,13 +346,15 @@ final class PingManager: ObservableObject {
         let emoji: String
         let bearingDegrees: Double
         let styleRaw: String?
+        var fromName: String = ""
     }
     @Published var replayRequest: ReplayRequest?
 
-    func requestReplay(emoji: String, bearingDegrees: Double, styleRaw: String?) {
+    func requestReplay(emoji: String, bearingDegrees: Double, styleRaw: String?,
+                       fromName: String = "") {
         log.info("replay: requested — \(emoji, privacy: .public) bearing=\(Int(bearingDegrees), privacy: .public)°")
         replayRequest = ReplayRequest(emoji: emoji, bearingDegrees: bearingDegrees,
-                                      styleRaw: styleRaw)
+                                      styleRaw: styleRaw, fromName: fromName)
     }
 
     // ── Felt receipts, live ──────────────────────────────────────────────
