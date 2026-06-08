@@ -58,6 +58,14 @@ final class PeopleManager: ObservableObject {
         selectedPerson = person
     }
 
+    /// Resolve an incoming connection's friend id to the local person card it's
+    /// linked to — `nil` when no card is linked yet. That nil is the gate for
+    /// "a thought arrived but needs setup": a ping from an unlinked sender must
+    /// not pop catch mode until the user links them to a person.
+    func person(forPairedUserID friendID: UUID) -> Person? {
+        people.first { $0.pairedUserID == friendID.uuidString }
+    }
+
     /// Make sure some local person carries the connected friend's Supabase id —
     /// per-person status, pointing reports, and ping naming all key off it.
     /// When the connection knows which card it belongs to (owner_person_id),
