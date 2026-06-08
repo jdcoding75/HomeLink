@@ -73,6 +73,17 @@ struct CompassView: View {
     // Ambient presence — partner's needle resting on us → edge glow
     @State private var presenceGlowVisible = false
 
+    // [1/6] Thought history — lives on the compass now. Bottom-left icon opens
+    // a drawer of recent thoughts; tapping one replays it on the compass while
+    // it points toward that person.
+    @State private var showThoughtsDrawer = false
+    @State private var compassThoughts: [SupabaseService.PingRecord] = []
+    @State private var thoughtsLoaded = false
+    @State private var thoughtsIconPulse = false
+    @State private var replayCaption: String? = nil   // "from X · 2h ago"
+    @State private var pendingReplayCaption: String? = nil
+    private var hasThoughts: Bool { !compassThoughts.isEmpty }
+
     // Needle emotional state — steady lock breathes warmer
     @State private var steadyLock = false
     @State private var breathePulse = false
@@ -567,13 +578,13 @@ struct CompassView: View {
                     .transition(.opacity)
             }
 
-            // ── "✦ Pro" indicator — top right, tap → Settings ──────────
+            // ── "✦ Pro" indicator — top right, tap → Pro tab [6/6] ─────
             if proOn {
                 VStack {
                     HStack {
                         Spacer()
                         Button {
-                            NotificationCenter.default.post(name: .pointwardOpenSettings, object: nil)
+                            NotificationCenter.default.post(name: .pointwardOpenPro, object: nil)
                         } label: {
                             Text("✦ Pro")
                                 .font(.system(size: 10, design: .serif).italic())
@@ -664,17 +675,43 @@ struct CompassView: View {
         // ── Reactions to state changes ────────────────────────────────────────
         .onChange(of: pings.partnerPointingAt) { _, stamp in
             guard stamp != nil else { return }
+            // Mutual: we're locked on them while they rest on us — always honored.
+            if compass.state.isLocked {
+                HapticEngine.connectionFelt()
+            }
+            // [2/6] Ambient presence is ALWAYS ON, but the visible glow is a
+            // once-per-person-per-day surprise — never annoying, always welcome.
+            // Resets at local midnight. (Bearing/timestamp already updated for
+            // the mutual-pointing check regardless.)
+            let key = "lastAmbientGlow_\(pings.partnerPointingName)"
+            let last = UserDefaults.standard.object(forKey: key) as? Date
+            if let last, Calendar.current.isDate(last, inSameDayAs: .now) { return }
+            UserDefaults.standard.set(Date.now, forKey: key)
             withAnimation(.easeIn(duration: 1.2)) { presenceGlowVisible = true }
             // The glow breathes for a while, then drifts away
             DispatchQueue.main.asyncAfter(deadline: .now() + 9.0) {
                 withAnimation(.easeOut(duration: 2.0)) { presenceGlowVisible = false }
             }
-            // Mutual: we're locked on them while they rest on us
-            if compass.state.isLocked {
-                HapticEngine.connectionFelt()
-            }
         }
         .onChange(of: compass.state.isLocked)        { _, locked in handleLock(locked) }
+        // [1/6] Thought history on the compass — icon, drawer, replay caption.
+        .overlay(alignment: .bottomLeading) { thoughtsIcon }
+        .overlay { thoughtsDrawerLayer }
+        .overlay(alignment: .top) { replayCaptionView }
+        .task(id: people.selectedPerson) { await loadCompassThoughts() }
+        .onChange(of: pings.queueCount) { _, _ in
+            Task { await loadCompassThoughts() }   // a new thought just landed
+        }
+        .onChange(of: pings.replayRequest) { _, req in
+            // When the app-wide replay finishes (request clears), fade in the
+            // "from [name] · [time ago]" caption for 2 s, then return to normal.
+            guard req == nil, let caption = pendingReplayCaption else { return }
+            pendingReplayCaption = nil
+            withAnimation(.easeIn(duration: 0.5)) { replayCaption = caption }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                withAnimation(.easeOut(duration: 0.6)) { replayCaption = nil }
+            }
+        }
         .sheet(isPresented: $showSkinPaywall) { PaywallView() }
         // [3/6] Compass send mechanic: hold within 15° for 2 s → auto-send.
         // Built-in, every tier — the tap button is gone.
@@ -1399,6 +1436,168 @@ struct CompassView: View {
         }
     }
 
+    // MARK: - [1/6] Thought history on the compass
+
+    /// Bottom-left icon — a soft lavender sparkle cluster. Pulses gently when
+    /// thoughts exist, dims to 20 % when none, carries an unread badge.
+    private var thoughtsIcon: some View {
+        Button {
+            guard thoughtsLoaded else { return }
+            HapticEngine.personSelected()
+            withAnimation(AnimationSystem.easeOutCubic(0.4)) { showThoughtsDrawer = true }
+        } label: {
+            ZStack(alignment: .topTrailing) {
+                Image(systemName: "sparkles")
+                    .font(.system(size: 22))
+                    .foregroundColor(Color(hex: "#c4a8d4"))
+                    .frame(width: 44, height: 44)           // 44pt tap target
+                    .opacity(hasThoughts ? 1.0 : 0.2)       // dim when empty
+                    .scaleEffect(hasThoughts && thoughtsIconPulse ? 1.05 : 0.95)
+                if pings.unreadCount > 0 {                  // unread badge
+                    Text("\(pings.unreadCount)")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(Capsule().fill(Color(hex: "#c4a8d4")))
+                        .offset(x: 8, y: -4)
+                }
+            }
+        }
+        .buttonStyle(.plain)
+        .padding(.leading, 22)
+        .padding(.bottom, 30)
+        .onAppear {
+            withAnimation(AnimationSystem.easeInOutSine(3.0).repeatForever(autoreverses: true)) {
+                thoughtsIconPulse = true
+            }
+        }
+    }
+
+    /// Scrim + the upward-sliding drawer.
+    @ViewBuilder private var thoughtsDrawerLayer: some View {
+        if showThoughtsDrawer {
+            ZStack(alignment: .bottom) {
+                Color.black.opacity(0.45)
+                    .ignoresSafeArea()
+                    .onTapGesture {
+                        withAnimation(AnimationSystem.easeOutCubic(0.3)) { showThoughtsDrawer = false }
+                    }
+                thoughtsDrawer
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+        }
+    }
+
+    private var thoughtsDrawer: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text("your thoughts ✦")
+                .font(.system(size: 15, design: .serif).italic())
+                .foregroundColor(Color(hex: "#c4a8d4"))
+                .padding(.leading, 4)
+            if compassThoughts.isEmpty {
+                Text(thoughtsLoaded ? "no thoughts yet" : "loading…")
+                    .font(.system(size: 12, design: .serif).italic())
+                    .foregroundColor(DesignTokens.Color.textMuted)
+                    .padding(.vertical, 12)
+            } else {
+                // Max 6 fit; more scroll horizontally. Most recent first.
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 18) {
+                        ForEach(Array(compassThoughts.prefix(12)), id: \.id) { rec in
+                            thoughtBubble(rec)
+                        }
+                    }
+                    .padding(.horizontal, 4)
+                    .padding(.vertical, 6)
+                }
+            }
+        }
+        .padding(20)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(DesignTokens.Color.backgroundCard)
+        .clipShape(RoundedRectangle(cornerRadius: 24))
+        .overlay(RoundedRectangle(cornerRadius: 24)
+            .stroke(DesignTokens.Color.borderMid, lineWidth: 1))
+        .padding(.horizontal, 12)
+        .padding(.bottom, 10)
+    }
+
+    private func thoughtBubble(_ rec: SupabaseService.PingRecord) -> some View {
+        let hue = EmojiHue.color(for: rec.emoji)
+        return Button {
+            replayThought(rec)
+        } label: {
+            VStack(spacing: 6) {
+                Text(rec.emoji)
+                    .font(.system(size: 32))
+                    .shadow(color: hue.opacity(0.7), radius: 8)
+                // Sender initial (the person this compass points at)
+                Text(String(compass.state.personName.prefix(1)))
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundColor(DesignTokens.Color.textMuted)
+                    .frame(width: 18, height: 18)
+                    .background(Circle().fill(hue.opacity(0.25)))
+                // Instrument-style indicator
+                Text(SenderStyle.from(rec.senderStyle).emoji)
+                    .font(.system(size: 9))
+                    .opacity(0.7)
+            }
+            .frame(width: 56)
+        }
+        .buttonStyle(.plain)
+        .transition(.scale(scale: 0.8).combined(with: .opacity))
+    }
+
+    /// "from [name] · [time ago]" — fades in after a replay finishes.
+    @ViewBuilder private var replayCaptionView: some View {
+        if let replayCaption {
+            Text(replayCaption)
+                .font(.system(size: 14, design: .serif).italic())
+                .foregroundColor(Color(hex: "#c4a8d4"))
+                .padding(.top, 74)
+                .transition(.opacity)
+                .allowsHitTesting(false)
+        }
+    }
+
+    /// Dismiss the drawer, then replay the memory ON the compass — in the
+    /// original sender's instrument style, while the compass points toward
+    /// that person. The most emotional moment in the app.
+    private func replayThought(_ rec: SupabaseService.PingRecord) {
+        withAnimation(AnimationSystem.easeOutCubic(0.3)) { showThoughtsDrawer = false }
+        pendingReplayCaption = "from \(compass.state.personName) · \(Self.timeAgo(rec.createdAt))"
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+            pings.requestReplay(emoji: rec.emoji,
+                                bearingDegrees: compass.state.bearingDegrees,
+                                styleRaw: rec.senderStyle)
+        }
+    }
+
+    /// Recent RECEIVED thoughts from the currently-tracked person, newest first.
+    private func loadCompassThoughts() async {
+        guard let person = people.selectedPerson,
+              let pid = person.pairedUserID.flatMap(UUID.init) else {
+            compassThoughts = []
+            thoughtsLoaded = true
+            return
+        }
+        let me = SupabaseService.localUserID
+        let records = await SupabaseService.shared.fetchPings(with: pid)
+        compassThoughts = records
+            .filter { $0.toUser.uuidString == me?.uuidString }   // addressed to me
+            .sorted { $0.createdAt > $1.createdAt }
+        thoughtsLoaded = true
+    }
+
+    private static func timeAgo(_ date: Date) -> String {
+        let s = Int(Date.now.timeIntervalSince(date))
+        if s < 60 { return "just now" }
+        if s < 3_600 { return "\(s / 60)m ago" }
+        if s < 86_400 { return "\(s / 3_600)h ago" }
+        return "\(s / 86_400)d ago"
+    }
+
     // MARK: - Share card
 
     /// Renders the shareable compass moment as an image.
@@ -1435,6 +1634,8 @@ struct CompassView: View {
 // MARK: - Notifications
 
 extension Notification.Name {
+    /// [6/6] Posted by the "✦ Pro" badge — MainTabView jumps to the Pro tab.
+    static let pointwardOpenPro = Notification.Name("pointwardOpenPro")
     /// Posted by the "✦ Pro" badge — MainTabView jumps to Settings.
     static let pointwardOpenSettings = Notification.Name("pointwardOpenSettings")
     /// Posted by the send-a-thought pill — MainTabView jumps to Thoughts.

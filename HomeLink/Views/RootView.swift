@@ -562,29 +562,25 @@ struct MainTabView: View {
                 }
                 .tag(0)
 
-            // Thoughts tab retired — sending lives ON the compass now
-            // PingView()
-            //     .tabItem {
-            //         Label("thoughts", systemImage: "paperplane")
-            //     }
+            // [6/6] Pro is its own tab now — the home for everything Pro.
+            // Free users see it locked (each 🔒 → paywall); Pro users see it all.
+            ProSetupView(isTab: true)
+                .tabItem {
+                    Label("pro", systemImage: "sparkles")
+                }
+                .tag(1)
 
             PeopleListView(geocodingService: geocodingService)
                 .tabItem {
                     Label("people", systemImage: "person.2")
                 }
-                .tag(1)
-
-            // Skin selection lives in Settings → compass only
-            // SkinPickerView()
-            //     .tabItem {
-            //         Label("skins", systemImage: "paintpalette")
-            //     }
+                .tag(2)
 
             SettingsView()
                 .tabItem {
                     Label("settings", systemImage: "gearshape")
                 }
-                .tag(2)
+                .tag(3)
         }
         .tint(DesignTokens.Color.accentSoft)
         .preferredColorScheme(.dark)
@@ -612,9 +608,12 @@ struct MainTabView: View {
                 .allowsHitTesting(false)
             }
         }
-        // The "✦ Pro" badge on the compass jumps here
+        // [6/6] The "✦ Pro" badge on the compass jumps to the Pro tab now.
+        .onReceive(NotificationCenter.default.publisher(for: .pointwardOpenPro)) { _ in
+            selectedTab = 1
+        }
         .onReceive(NotificationCenter.default.publisher(for: .pointwardOpenSettings)) { _ in
-            selectedTab = 2
+            selectedTab = 3
         }
         // A notification-opened catch needs the compass visible
         .onReceive(NotificationCenter.default.publisher(for: .pointwardOpenCompass)) { _ in
@@ -622,7 +621,7 @@ struct MainTabView: View {
         }
         // The post-onboarding prompt leads here — connecting lives on cards
         .onReceive(NotificationCenter.default.publisher(for: .pointwardOpenPeople)) { _ in
-            selectedTab = 1
+            selectedTab = 2
         }
         // (thoughts tab retired — the pill/notification path is gone)
         // .onReceive(NotificationCenter.default.publisher(for: .pointwardOpenThoughts)) { _ in

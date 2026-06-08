@@ -39,8 +39,9 @@ struct SettingsView: View {
                     // sectionHeader("feel")
                     // feelSection
 
-                    sectionHeader("pro")
-                    proSection
+                    // [6/6] Pro moved to its own tab — no Pro section in Settings.
+                    // sectionHeader("pro")
+                    // proSection
 
                     // Final clean: expression toggles + skin row moved
                     // into ProSetupView. (kept below for reference)
@@ -49,11 +50,16 @@ struct SettingsView: View {
                     // sectionHeader("compass")
                     // skinSection
 
-                    sectionHeader("notifications")
-                    notificationsSection
+                    // [2/6] Ambient presence is always-on now — the toggle was
+                    // the only notification pref, so the section is gone.
+                    // sectionHeader("notifications")
+                    // notificationsSection
 
                     sectionHeader("account")
                     accountSection
+
+                    sectionHeader("about")
+                    aboutSection
 
                     // ── Stripped in the emotional-core pass (kept, not lost) ──
                     // sectionHeader("about")
@@ -680,6 +686,22 @@ struct SettingsView: View {
                 Text(appVersion)
                     .font(DesignTokens.Font.caption)
                     .foregroundColor(DesignTokens.Color.textMuted)
+            }
+
+            Divider().background(DesignTokens.Color.border).padding(.leading, 44)
+
+            // [6/6] Privacy policy link
+            Link(destination: URL(string: "https://pointward.app/privacy")!) {
+                settingsRow {
+                    Image(systemName: "lock.shield")
+                        .settingsIcon()
+                    Text("privacy policy")
+                        .settingsLabel()
+                    Spacer()
+                    Image(systemName: "arrow.up.right")
+                        .font(.system(size: 11))
+                        .foregroundColor(DesignTokens.Color.textDim)
+                }
             }
 
             Divider().background(DesignTokens.Color.border).padding(.leading, 44)

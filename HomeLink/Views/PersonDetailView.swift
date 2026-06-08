@@ -80,39 +80,13 @@ struct PersonDetailView: View {
                             .padding(.horizontal, 24)
                             .padding(.bottom, 16)
 
-                        // ── Thought history — expandable memory trail ─────
+                        // [5/6] Thoughts are minimal here now — just a count.
+                        // The compass is the stage; tapping replays there. The
+                        // old expandable trail (thoughtsSection / trailRow /
+                        // PingHistoryView) is kept defined below but unused.
                         if isConnected, partnerID != nil {
-                            thoughtsSection
+                            thoughtsCountRow
                                 .padding(.horizontal, 24)
-                        }
-
-                        // (push-style history retired for inline expand; kept)
-                        if false, isConnected, let partnerID {
-                            NavigationLink {
-                                PingHistoryView(personName: person.name, partnerID: partnerID,
-                                                bearing: compass.state.bearingDegrees)
-                            } label: {
-                                HStack {
-                                    Image(systemName: "clock.arrow.circlepath")
-                                        .font(.system(size: 15))
-                                        .foregroundColor(DesignTokens.Color.accentSoft)
-                                    Text("thought history")
-                                        .font(DesignTokens.Font.label)
-                                        .foregroundColor(DesignTokens.Color.textPrimary)
-                                    Spacer()
-                                    Image(systemName: "chevron.right")
-                                        .font(.system(size: 12))
-                                        .foregroundColor(DesignTokens.Color.textDim)
-                                }
-                                .padding(DesignTokens.Spacing.md)
-                                .background(DesignTokens.Color.backgroundCard)
-                                .cornerRadius(DesignTokens.Radius.card)
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: DesignTokens.Radius.card)
-                                        .stroke(DesignTokens.Color.border, lineWidth: 1)
-                                )
-                            }
-                            .padding(.horizontal, 24)
                         }
 
                         Spacer(minLength: 40)
@@ -127,6 +101,12 @@ struct PersonDetailView: View {
             }
         }
         .onAppear { fetchPresence() }
+        // [5/6] Load the thought count for the minimal row (replay lives on the compass).
+        .task {
+            guard let partnerID else { return }
+            historyRecords = await SupabaseService.shared.fetchPings(with: partnerID)
+            historyLoaded = true
+        }
         // iMessage composer for the personal invite (primary share path)
         .sheet(isPresented: $showMessageComposer) {
             MessageComposerView(body: personInvite ?? "")
@@ -394,6 +374,41 @@ struct PersonDetailView: View {
     @State private var historyRecords: [SupabaseService.PingRecord] = []
     @State private var historyLoaded = false
     @State private var replayingID: UUID?
+
+    /// [5/6] Minimal People-tab thoughts: just a count. Tapping selects this
+    /// person and jumps to the compass, where replay now happens.
+    private var thoughtsCountRow: some View {
+        Button {
+            people.select(person)
+            compass.start(tracking: person)
+            HapticEngine.personSelected()
+            dismiss()
+            NotificationCenter.default.post(name: .pointwardOpenCompass, object: nil)
+        } label: {
+            HStack(spacing: 10) {
+                Image(systemName: "sparkles")
+                    .font(.system(size: 14))
+                    .foregroundColor(DesignTokens.Color.accentSoft)
+                Text(historyLoaded
+                     ? "\(historyRecords.count) thought\(historyRecords.count == 1 ? "" : "s")"
+                     : "thoughts")
+                    .font(DesignTokens.Font.label)
+                    .foregroundColor(DesignTokens.Color.textPrimary)
+                Spacer()
+                Text("on the compass →")
+                    .font(.system(size: 11, design: .serif).italic())
+                    .foregroundColor(DesignTokens.Color.textDim)
+            }
+            .padding(DesignTokens.Spacing.md)
+            .background(DesignTokens.Color.backgroundCard)
+            .cornerRadius(DesignTokens.Radius.card)
+            .overlay(
+                RoundedRectangle(cornerRadius: DesignTokens.Radius.card)
+                    .stroke(DesignTokens.Color.border, lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
+    }
 
     private var thoughtsSection: some View {
         VStack(spacing: 0) {

@@ -9,6 +9,10 @@ import SwiftUI
 
 struct ProSetupView: View {
 
+    /// True when hosted as a root tab (vs. presented as a sheet) — lets the
+    /// view drop the sheet-only "done" button. Defaults false for sheet use.
+    var isTab: Bool = false
+
     @EnvironmentObject var subscription: SubscriptionManager
     @EnvironmentObject var skinStore: SkinStore
     @Environment(\.dismiss) private var dismiss
@@ -59,9 +63,11 @@ struct ProSetupView: View {
             .navigationTitle("Pointward Pro")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("done") { dismiss() }
-                        .foregroundColor(DesignTokens.Color.accentSoft)
+                if !isTab {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button("done") { dismiss() }
+                            .foregroundColor(DesignTokens.Color.accentSoft)
+                    }
                 }
             }
         }
