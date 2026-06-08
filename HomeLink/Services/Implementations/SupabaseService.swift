@@ -353,7 +353,23 @@ final class SupabaseService: ObservableObject {
     ///   network drop   → networkProblem/timedOut after a retry, at any step;
     ///                    re-entering the same code later is idempotent —
     ///                    a row already claimed by ME counts as success.
-    @discardableResult
+    /// The pure decision at the heart of `redeem`: given a connection row's
+    /// owner and current friend, and who *we* are, what should claiming do?
+    /// Extracted so the self-pair / already-claimed / idempotent / both-sides
+    /// rules are testable without a live backend. [8/8]
+    enum PairOutcome: Equatable {
+        case pairWithSelf     // the code is our own → refuse
+        case alreadyClaimed   // someone else holds it → refuse
+        case alreadyOurs      // we already claimed it → idempotent success
+        case proceed          // unclaimed → claim it; both sides link
+    }
+
+    static func claimOutcome(owner: UUID, friend: UUID?, me: UUID) -> PairOutcome {
+        if owner == me { return .pairWithSelf }
+        if let friend { return friend == me ? .alreadyOurs : .alreadyClaimed }
+        return .proceed
+    }
+
     func redeem(_ rawCode: String, friendPersonID: UUID? = nil) async throws -> RedeemResult {
         guard let client else { throw SupabaseServiceError.notConfigured }
         guard let me = await currentUserID else { throw SupabaseServiceError.notSignedIn }
@@ -373,20 +389,21 @@ final class SupabaseService: ObservableObject {
         }
         log.info("redeem: lookup matched \(rows.count) row(s)")
         guard let row = rows.first else { throw SupabaseServiceError.codeNotFound }
-        guard row.owner != me else { throw SupabaseServiceError.cannotPairWithSelf }
-
-        if let friend = row.friend, friend != me {
+        switch Self.claimOutcome(owner: row.owner, friend: row.friend, me: me) {
+        case .pairWithSelf:
+            throw SupabaseServiceError.cannotPairWithSelf
+        case .alreadyClaimed:
             log.warning("redeem: code already claimed by another user")
             throw SupabaseServiceError.codeAlreadyClaimed
-        }
-
-        // Already mine (a retry after a network drop mid-pair) → done.
-        if row.friend == me {
+        case .alreadyOurs:
+            // A retry after a network drop mid-pair → idempotent success.
             log.info("redeem: already claimed by me — idempotent success")
             Self.connectedFriendID = row.owner
             return RedeemResult(ownerID: row.owner,
                                 personName: row.personName,
                                 personEmoji: row.personEmoji)
+        case .proceed:
+            break   // unclaimed — fall through to the atomic claim below
         }
 
         // Atomic claim: only an UNCLAIMED row matches — two phones racing on

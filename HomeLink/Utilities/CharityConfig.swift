@@ -30,9 +30,12 @@ enum CharityConfig {
         ),
     ]
 
-    /// The partner featured right now, if any window is active.
-    static var current: CharityPartner? {
-        let now = Date()
-        return partners.first { now >= $0.startDate && now <= $0.endDate }
+    /// The partner whose window contains `date`, if any. Pure and date-injectable
+    /// so the "no active charity" case is testable without time travel.
+    static func partner(at date: Date) -> CharityPartner? {
+        partners.first { date >= $0.startDate && date <= $0.endDate }
     }
+
+    /// The partner featured right now, if any window is active.
+    static var current: CharityPartner? { partner(at: Date()) }
 }

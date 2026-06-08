@@ -122,6 +122,15 @@ struct RootView: View {
                 break
             }
         }
+        // [7/8] LAUNCH PERFORMANCE — warm the programmatic sound cache off the
+        // main thread once at launch. Building ~40 audio buffers is the one
+        // heavy bit of work on the send path; doing it in the background here
+        // keeps the compass instant to open and the first send stutter-free.
+        .task(priority: .background) {
+            await Task.detached(priority: .background) {
+                _ = SoundEngine.shared
+            }.value
+        }
         // Universal links: pointward.app/pair/POINT-XXXX (and /join/ fallback).
         // SwiftUI delivers them via user activity; onOpenURL covers scheme opens.
         .onOpenURL { handleIncomingURL($0) }

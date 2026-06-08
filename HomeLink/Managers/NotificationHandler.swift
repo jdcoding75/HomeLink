@@ -50,6 +50,13 @@ final class NotificationHandler: NSObject, ObservableObject {
     }
 }
 
+extension NotificationHandler {
+    /// Foreground presentation policy: suppress the banner/sound entirely.
+    /// Realtime (and the in-app catch) already deliver the thought, so the OS
+    /// banner would be a duplicate. Pure + static so the rule is testable.
+    static func foregroundPresentationOptions() -> UNNotificationPresentationOptions { [] }
+}
+
 extension NotificationHandler: UNUserNotificationCenterDelegate {
     func userNotificationCenter(
         _ center: UNUserNotificationCenter,
@@ -57,7 +64,7 @@ extension NotificationHandler: UNUserNotificationCenterDelegate {
     ) async -> UNNotificationPresentationOptions {
         log.info("push: arrived while app in FOREGROUND (realtime should deliver too — deduped)")
         handlePayload(notification.request.content.userInfo)
-        return []
+        return Self.foregroundPresentationOptions()
     }
     func userNotificationCenter(
         _ center: UNUserNotificationCenter,
