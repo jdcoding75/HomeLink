@@ -114,6 +114,8 @@ struct CompassView: View {
     @AppStorage("holdToSendEnabled") private var holdToSendEnabled = false
     @State private var personalSixRow: [String] = PersonalSet.load()
     @State private var selectedToken: String? = nil
+    @State private var messageText: String = ""             // [5/5] optional note (≤30)
+    @FocusState private var messageFocused: Bool
     @State private var loadFlightToken: String? = nil       // [1/5] load flight
     @State private var loadFlightProgress: CGFloat = 0
     @State private var flightToken: String? = nil
@@ -425,6 +427,14 @@ struct CompassView: View {
                         .opacity(appState.currentState == .catchMode ? 0.3 : 1.0)
                         .animation(.easeInOut(duration: 0.3),
                                    value: appState.currentState == .catchMode)
+
+                    // [5/5] Optional short message — appears once a thought is
+                    // chosen, ≤30 chars, easy to skip.
+                    if selectedToken != nil && appState.currentState != .catchMode {
+                        messageField
+                            .padding(.top, 8)
+                            .transition(.opacity.combined(with: .move(edge: .bottom)))
+                    }
 
                     sendControl
                         .padding(.top, 10)
@@ -1002,6 +1012,36 @@ struct CompassView: View {
     }
 
     /// The six, always visible in soft cards. Selection glows and stays.
+    /// [5/5] The optional note field — "add a message (optional)", ≤30 chars.
+    private var messageField: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "text.bubble")
+                .font(.system(size: 12))
+                .foregroundColor(DesignTokens.Color.textMuted)
+            TextField("add a message (optional)", text: $messageText)
+                .font(.system(size: 14, design: .serif))
+                .foregroundColor(DesignTokens.Color.textPrimary)
+                .focused($messageFocused)
+                .submitLabel(.done)
+                .onChange(of: messageText) { _, newValue in
+                    if newValue.count > 30 { messageText = String(newValue.prefix(30)) }
+                }
+            if !messageText.isEmpty {
+                Text("\(messageText.count)/30")
+                    .font(.system(size: 10))
+                    .foregroundColor(DesignTokens.Color.textDim)
+                    .monospacedDigit()
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 9)
+        .background(
+            Capsule().fill(DesignTokens.Color.backgroundCard.opacity(0.85))
+                .overlay(Capsule().stroke(DesignTokens.Color.border, lineWidth: 1))
+        )
+        .padding(.horizontal, 40)
+    }
+
     private var emojiRow: some View {
         HStack(spacing: 10) {
             ForEach(rowTokens, id: \.self) { token in
@@ -1159,7 +1199,11 @@ struct CompassView: View {
             CompassView.log.warning("send: blocked by app state \(appState.currentState.rawValue, privacy: .public) — try again when free")
             return
         }
+        // [5/5] Capture the note before clearing the field, so it rides along.
+        let outgoingMessage = messageText.trimmingCharacters(in: .whitespacesAndNewlines)
         withAnimation(.easeOut(duration: 0.25)) { selectedToken = nil }
+        messageFocused = false
+        messageText = ""
         flightToken = token
         flightFly = true   // legacy flag (the style view drives its own motion)
 
@@ -1194,7 +1238,8 @@ struct CompassView: View {
             CompassView.log.info("send: \(token, privacy: .public) → \(recipient.uuidString, privacy: .public) as \(style.rawValue, privacy: .public)")
             pings.sendRemote(to: recipient,
                              emoji: sendRemoteEmoji(for: token),
-                             style: style)
+                             style: style,
+                             message: outgoingMessage.isEmpty ? nil : outgoingMessage)
         } else {
             CompassView.log.info("send: local only — no paired recipient")
         }

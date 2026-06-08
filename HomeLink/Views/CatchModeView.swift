@@ -312,7 +312,7 @@ struct CatchModeView: View {
                                 .animation(.easeOut(duration: 0.1), value: revealFlash)
                         }
 
-                        VStack(spacing: 18) {
+                        VStack(spacing: 14) {
                             // [4/5] The emoji stays LARGE — 72 pt, the peak.
                             Text(ping.emoji)
                                 .font(.system(size: 72))
@@ -323,9 +323,20 @@ struct CatchModeView: View {
                                 .animation(AnimationSystem.easeOutBack(
                                     AnimationSystem.Timing.catchReveal), value: bloomed)
 
-                            // [5/5] Aftermath — "from [name]" rests beneath it.
-                            Text("from \(ping.fromName)")
-                                .font(.system(size: 19, design: .serif).italic())
+                            // [5/5] The attached message — prominent, 20 pt serif.
+                            if let message = ping.message, !message.isEmpty {
+                                Text("“\(message)”")
+                                    .font(.system(size: 20, design: .serif).italic())
+                                    .foregroundColor(DesignTokens.Color.textPrimary)
+                                    .multilineTextAlignment(.center)
+                                    .padding(.horizontal, 32)
+                                    .opacity(bloomed ? 1 : 0)
+                                    .animation(.easeIn(duration: 0.5).delay(0.2), value: bloomed)
+                            }
+
+                            // [5/5] Aftermath — "from [name] ✦" rests beneath it.
+                            Text("from \(ping.fromName) ✦")
+                                .font(.system(size: 16, design: .serif).italic())
                                 .foregroundColor(Self.lavender)
                                 .opacity(named ? 1 : 0)
                                 .animation(.easeIn(duration: 0.5), value: named)

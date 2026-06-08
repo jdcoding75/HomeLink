@@ -656,12 +656,14 @@ final class SupabaseService: ObservableObject {
         let toUser: UUID
         let emoji: String
         var senderStyle: String? = nil
+        var message: String? = nil          // [5/5] optional ≤30-char note
 
         enum CodingKeys: String, CodingKey {
             case fromUser    = "from_user"
             case toUser      = "to_user"
             case emoji
             case senderStyle = "sender_style"
+            case message
         }
     }
 
@@ -674,6 +676,7 @@ final class SupabaseService: ObservableObject {
         let openedAt: String?
         /// glow | shootingStar | firefly — nil on rows from before the migration.
         let senderStyle: String?
+        let message: String?          // [5/5] optional note
 
         enum CodingKeys: String, CodingKey {
             case id
@@ -682,6 +685,7 @@ final class SupabaseService: ObservableObject {
             case emoji
             case openedAt    = "opened_at"
             case senderStyle = "sender_style"
+            case message
         }
     }
 
@@ -695,6 +699,7 @@ final class SupabaseService: ObservableObject {
         let openedAt: Date?
         /// glow | shootingStar | firefly — nil on rows from before the migration.
         let senderStyle: String?
+        let message: String?          // [5/5] optional note
 
         enum CodingKeys: String, CodingKey {
             case id
@@ -704,6 +709,7 @@ final class SupabaseService: ObservableObject {
             case createdAt   = "created_at"
             case openedAt    = "opened_at"
             case senderStyle = "sender_style"
+            case message
         }
     }
 
@@ -713,7 +719,8 @@ final class SupabaseService: ObservableObject {
     /// styled insert fails — retry once with the legacy payload so a
     /// schema lag never blocks a thought. Network errors are retried and
     /// then THROWN: the caller must surface them, never swallow them.
-    func sendPing(to userID: UUID, emoji: String, style: SenderStyle? = nil) async throws {
+    func sendPing(to userID: UUID, emoji: String, style: SenderStyle? = nil,
+                  message: String? = nil) async throws {
         guard let client else { throw SupabaseServiceError.notConfigured }
         guard let me = await currentUserID else { throw SupabaseServiceError.notSignedIn }
         // One selection defines everything: the wire style follows the
@@ -736,7 +743,8 @@ final class SupabaseService: ObservableObject {
                 try await client
                     .from("pings")
                     .insert(PingPayload(fromUser: me, toUser: userID, emoji: emoji,
-                                        senderStyle: styleRaw))
+                                        senderStyle: styleRaw,
+                                        message: message?.isEmpty == true ? nil : message))
                     .execute()
             }
             log.info("pings: sendPing ✓ insert accepted")

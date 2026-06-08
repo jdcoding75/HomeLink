@@ -110,6 +110,7 @@ struct SenderAnimationView<Symbol: View>: View {
     @State private var flashVisible = false         // impact flash at the edge
     @State private var goldRing    = false          // compass: expanding gold ring
     @State private var windSky     = false          // wind: full-screen sky takeover
+    @State private var windFloating = false         // [4/5] wind: float-phase wander
     @State private var streakIn    = false          // flick: full-screen light streak
     @State private var wandWhiteFlash = false       // wand: full-screen white flash
     @State private var wandExplode    = false       // wand: implosion → explosion scatter
@@ -388,7 +389,7 @@ struct SenderAnimationView<Symbol: View>: View {
     // 🌬️ WIND took over the firefly slot — warm lavender/white breath,
     // slow and beautiful (3–4 s total), particles lingering long after.
     private static var fireflyGreen: Color { Color(hex: "#d9cce8") }   // wind lavender-white
-    private let fireflyFlight = 3.00
+    private let fireflyFlight = 2.20    // [4/5] phase-3 send leg (float+gather precede it)
 
     @ViewBuilder
     private func fireflySend(end: CGSize) -> some View {
@@ -422,8 +423,14 @@ struct SenderAnimationView<Symbol: View>: View {
             symbol
                 .scaleEffect(1.4)   // emoji riding the leaf, ~48 pt
         }
-        .rotationEffect(.degrees(orbPulse ? 8 : -8))            // ±8° sway
-        .offset(x: orbPulse ? 15 : -15, y: orbPulse ? -8 : 8)   // ±15 px / ±8 px alive
+        // [4/5] Bigger wander during the FLOAT phase (±40/±20/±10°), settling
+        // to the alive sway (±15/±8/±8°) once it gathers to fly.
+        .rotationEffect(.degrees(orbPulse ? (windFloating ? 10 : 8)
+                                          : (windFloating ? -10 : -8)))
+        .offset(x: orbPulse ? (windFloating ? 40 : 15) : (windFloating ? -40 : -15),
+                y: orbPulse ? (windFloating ? -20 : -8) : (windFloating ? 20 : 8))
+        .animation(AnimationSystem.easeInOutSine(windFloating ? 1.5 : 0.6)
+                    .repeatForever(autoreverses: true), value: orbPulse)
         .scaleEffect(flightScale)
         .shadow(color: .white.opacity(0.7), radius: 12)
         .shadow(color: Color(hex: "#FFF3A3").opacity(0.5), radius: 18)   // sunlight
@@ -1055,34 +1062,40 @@ struct SenderAnimationView<Symbol: View>: View {
             finish(after: 0.7 + 0.9 + 0.55)
 
         case .firefly:
-            // GATHER 300 ms — the sky takes over the screen, the pulse begins
-            HapticEngine.sendSoft()                          // soft, slightly delayed
-            SoundEngine.shared.play(for: "style.chime")      // soft, gentle, airy
+            // [4/5] THREE PHASES — the most beautiful send, worth the wait.
+            // PHASE 1 · FLOAT (3 s)  the leaf lifts and wanders the sky, in no
+            //                        hurry — ±40 px / ±20 px / ±10°.
+            // PHASE 2 · GATHER (1 s) the wander settles, the wind picks a way.
+            // PHASE 3 · SEND (2.5 s) the leaf accelerates toward them and fades.
+            HapticEngine.sendSoft()
+            SoundEngine.shared.play(for: "style.chime")
             chargeGlow = true
             windSky = true                                   // full-screen sky in
-            withAnimation(AnimationSystem.easeInOutSine(0.6)
+            windFloating = true                              // big, idle wander
+            withAnimation(AnimationSystem.easeInOutSine(1.5)
                             .repeatForever(autoreverses: true)) {
                 orbPulse = true
             }
-            // The sky recedes near the end, returning to the instrument
-            DispatchQueue.main.asyncAfter(deadline: .now() + 3.4) {
-                windSky = false
+            // PHASE 2 — GATHER at 3.0 s: the wander shrinks, the leaf orients.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
+                withAnimation(.easeInOut(duration: 1.0)) { windFloating = false }
             }
-            // DRIFT 3000 ms — wind: slow, gentle, beautiful wandering
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.30) {
+            // PHASE 3 — SEND at 4.0 s: accelerate to the screen edge.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 4.0) {
                 progress = 1
                 withAnimation(AnimationSystem.easeInOutSine(fireflyFlight)) {
                     flightScale = 1.3
                 }
             }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 3.00) {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 6.2) {
                 faded = true
             }
-            // LAND — no flash, just the screen warming and a gentle tap
-            DispatchQueue.main.asyncAfter(deadline: .now() + 3.30) {
+            // The sky recedes as the leaf leaves; gentle landing tap.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 6.4) {
+                windSky = false
                 impact(flash: false)
             }
-            finish(after: 3.3 + AnimationSystem.Trail.lingerMax + 0.45)
+            finish(after: 6.4 + AnimationSystem.Trail.lingerMax + 0.45)
 
         case .fingerFlick:
             // SLINGSHOT LAUNCH — blazing 600 ms. The thought explodes from the

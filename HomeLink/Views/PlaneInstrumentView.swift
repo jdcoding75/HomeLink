@@ -230,10 +230,11 @@ struct PlaneInstrumentView: View {
         }
     }
 
-    /// "load · wind · let fly" with the current step emphasized.
+    /// "wind · let fly" — the plane auto-aims, so there is NO aim step.
     private var stepText: String {
         if loadedToken == nil { return "load · wind · let fly" }
-        return "wind the propeller · \(winds)/\(Self.maxWinds)"
+        if maxed { return "let fly ✦" }
+        return "wind · let fly · \(winds)/\(Self.maxWinds)"
     }
 
     // ── [6/7] Tap-to-spin mechanic ───────────────────────────────────────────

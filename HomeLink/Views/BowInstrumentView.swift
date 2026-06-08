@@ -62,14 +62,19 @@ struct BowInstrumentView: View {
     private static let lavender = Color(hex: "#c4a8d4")
     private static let slackGrey = Color(hex: "#8a8694")
 
-    /// The bow now faces the FINGER-SPUN angle, not the phone bearing.
+    /// The bow faces the FINGER-SPUN angle ONLY — never the phone heading.
     private var rad: Double { spinAngle * .pi / 180 }
-    /// How far the bow's facing is from the person's bearing (handles wrap).
+    /// [1/5] The aim target is FROZEN the moment a thought is nocked, so
+    /// turning the phone afterwards never moves it — the bow is aimed purely
+    /// by finger-spin. While nothing is loaded it tracks the live bearing so
+    /// the marker shows where the person currently is.
+    @State private var aimTarget: Double = 0
+    /// How far the bow's facing is from the (frozen) aim target — wrap-safe.
     private var alignDiff: Double {
-        BearingCalculator.alignmentError(relativeBearing: spinAngle - bearingDegrees)
+        BearingCalculator.alignmentError(relativeBearing: spinAngle - aimTarget)
     }
     private var aligned: Bool {
-        BearingCalculator.isSendAligned(spinAngle - bearingDegrees)
+        BearingCalculator.isSendAligned(spinAngle - aimTarget)
     }
 
     /// Progressive aim bands: 0 outside 30° · 1 within 30° · 2 within 15° ·
@@ -116,7 +121,7 @@ struct BowInstrumentView: View {
             // ── Where they are — the person-initial marker rides the ring at
             // their bearing; it brightens as the FINGER-SPIN aim closes in
             // (approachError = the bow-vs-person angle, not the phone). ──
-            DirectionIndicator(bearingDegrees: bearingDegrees,
+            DirectionIndicator(bearingDegrees: aimTarget,
                                personName: personName,
                                personEmoji: personEmoji,
                                ringRadius: 172,
@@ -285,7 +290,16 @@ struct BowInstrumentView: View {
         // the center to draw the string. No phone movement, no two-finger
         // twist — a single finger does everything.
         .gesture(bowGesture)
+        // [1/5] Keep the aim target tracking the live bearing UNTIL a thought
+        // is nocked; once armed it freezes, so the phone heading can't move it.
+        .onChange(of: bearingDegrees) { _, newValue in
+            if loadedToken == nil { aimTarget = newValue }
+        }
+        .onChange(of: loadedToken) { _, token in
+            if token == nil { aimTarget = bearingDegrees }   // re-arm: re-sync
+        }
         .onAppear {
+            aimTarget = bearingDegrees
             withAnimation(AnimationSystem.easeInOutSine(3.0)
                             .repeatForever(autoreverses: true)) {
                 breathe = true

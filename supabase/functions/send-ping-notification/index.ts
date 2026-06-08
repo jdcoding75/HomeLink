@@ -221,6 +221,7 @@ Deno.serve(async (req) => {
       pingId: record.id ?? null,
       senderStyle: record.sender_style ?? null,
       fromUserId: record.from_user ?? null,
+      message: record.message ?? null,        // [5/5] optional note
     };
 
     // QUEUE NOTIFICATION RULE: only the FIRST unread announces itself.

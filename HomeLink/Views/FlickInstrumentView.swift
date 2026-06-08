@@ -132,13 +132,27 @@ struct FlickInstrumentView: View {
     private var paperScroll: some View {
         ZStack {
             PaperNoteShape()
-                .fill(LinearGradient(colors: [Color(hex: "#F5F0E0"), Color(hex: "#E8E0C8")],
+                // [3/5] Classic yellow post-it — material yellow, a touch
+                // deeper toward the bottom.
+                .fill(LinearGradient(colors: [Color(hex: "#FFEB3B"), Color(hex: "#FFD600")],
                                      startPoint: .topLeading, endPoint: .bottomTrailing))
                 .frame(width: 52, height: 58)
                 .overlay(
-                    // Folded corner at the top-right
+                    // Faint ruled lines, darker yellow — reads as a post-it
+                    VStack(spacing: 9) {
+                        ForEach(0..<3, id: \.self) { _ in
+                            Capsule().fill(Color(hex: "#F0C800").opacity(0.55))
+                                .frame(height: 1)
+                        }
+                    }
+                    .padding(.horizontal, 9)
+                    .padding(.top, 22)
+                    .frame(width: 52, height: 58, alignment: .top)
+                )
+                .overlay(
+                    // Folded corner at the top-right — darker yellow
                     PaperFoldShape()
-                        .fill(Color(hex: "#D8CFB0"))
+                        .fill(Color(hex: "#F0C800"))
                         .frame(width: 52, height: 58)
                 )
                 .overlay {

@@ -39,14 +39,16 @@ final class NotificationHandler: NSObject, ObservableObject {
         // sender's real animation (older payloads lack them — both optional).
         let remoteID    = (userInfo["pingId"] as? String).flatMap(UUID.init)
         let senderStyle = userInfo["senderStyle"] as? String
+        let message     = userInfo["message"] as? String
 
-        log.info("push: thought — emoji=\(emoji, privacy: .public) from=\(fromName, privacy: .public) pingId=\(remoteID?.uuidString ?? "nil", privacy: .public) style=\(senderStyle ?? "nil", privacy: .public)")
+        log.info("push: thought — emoji=\(emoji, privacy: .public) from=\(fromName, privacy: .public) pingId=\(remoteID?.uuidString ?? "nil", privacy: .public) style=\(senderStyle ?? "nil", privacy: .public) msg=\(message != nil, privacy: .public)")
 
         AppGroupStore.pendingPingEmoji     = emoji
         AppGroupStore.pendingPingFromName  = fromName
         AppGroupStore.pendingPingTimestamp = .now
         pingManager.receivePing(fromName: fromName, emoji: emoji,
-                                remoteID: remoteID, senderStyle: senderStyle)
+                                remoteID: remoteID, senderStyle: senderStyle,
+                                message: message)
     }
 }
 
