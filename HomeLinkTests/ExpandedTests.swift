@@ -149,9 +149,10 @@ final class InstrumentOptionTests: XCTestCase {
         else { UserDefaults.standard.removeObject(forKey: k) }
     }
 
-    func testTwoFreeOptionsRestArePro() {
+    func testOnlyVintageCompassIsFree() {
+        // [2/5] minimal retired — vintage brass is the lone free option.
         let free = InstrumentOption.allCases.filter { !$0.requiresPro }
-        XCTAssertEqual(Set(free), [.compassMinimal, .compassVintage])
+        XCTAssertEqual(Set(free), [.compassVintage])
         for opt in InstrumentOption.allCases where !free.contains(opt) {
             XCTAssertTrue(opt.requiresPro, "\(opt) should be Pro")
         }
@@ -169,7 +170,6 @@ final class InstrumentOptionTests: XCTestCase {
     }
 
     func testOptionRoutesToUnderlyingInstrument() {
-        XCTAssertEqual(InstrumentOption.compassMinimal.instrument, .compass)
         XCTAssertEqual(InstrumentOption.compassVintage.instrument, .compass)
         XCTAssertEqual(InstrumentOption.bow.instrument,    .bow)
         XCTAssertEqual(InstrumentOption.flick.instrument,  .flick)
@@ -179,7 +179,6 @@ final class InstrumentOptionTests: XCTestCase {
     }
 
     func testOnlyCompassOptionsCarryASkin() {
-        XCTAssertEqual(InstrumentOption.compassMinimal.skin, .minimal)
         XCTAssertEqual(InstrumentOption.compassVintage.skin, .vintage)
         for opt in [InstrumentOption.bow, .flick, .wind, .rocket, .wand] {
             XCTAssertNil(opt.skin, "\(opt) is not a compass — no skin")
@@ -193,9 +192,9 @@ final class InstrumentOptionTests: XCTestCase {
         XCTAssertEqual(InstrumentOption.selected, .bow)
         XCTAssertEqual(inst.selected, .bow)
 
-        InstrumentOption.apply(.compassMinimal, instrumentStore: inst, skinStore: skin)
+        InstrumentOption.apply(.compassVintage, instrumentStore: inst, skinStore: skin)
         XCTAssertEqual(inst.selected, .compass)
-        XCTAssertEqual(skin.activeSkin, .minimal)
+        XCTAssertEqual(skin.activeSkin, .vintage)
     }
 
     func testOnlyPlaneIsComingSoon() {
@@ -211,7 +210,7 @@ final class InstrumentOptionTests: XCTestCase {
         // apply() must refuse a coming-soon option (the guard holds).
         let inst = InstrumentStore()
         let skin = SkinStore()
-        InstrumentOption.apply(.compassMinimal, instrumentStore: inst, skinStore: skin)
+        InstrumentOption.apply(.compassVintage, instrumentStore: inst, skinStore: skin)
         InstrumentOption.apply(.plane, instrumentStore: inst, skinStore: skin)
         // Selection unchanged — plane was blocked.
         XCTAssertNotEqual(InstrumentOption.selected, .plane)
@@ -229,8 +228,9 @@ final class InstrumentOptionTests: XCTestCase {
         UserDefaults.standard.set(Instrument.compass.rawValue, forKey: instKey)
         UserDefaults.standard.set("minimal", forKey: skinKey)
         InstrumentOption.migrateLegacySelection()
+        // minimal retired → legacy minimal users land on vintage brass.
         XCTAssertEqual(UserDefaults.standard.string(forKey: optionKey),
-                       InstrumentOption.compassMinimal.rawValue)
+                       InstrumentOption.compassVintage.rawValue)
     }
 
     func testMigrationNoOpWhenAlreadySelected() {

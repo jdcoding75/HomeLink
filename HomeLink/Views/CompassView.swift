@@ -548,12 +548,11 @@ struct CompassView: View {
             // the sender's edge until you physically turn toward them.
             // opened_at is set at the reveal — felt means felt.
             if let playing = pings.nowPlaying {
-                CatchModeView(
+                // [1/5] THE BUCKET — the universal catch screen, the same warm
+                // experience for every instrument. (CatchModeView retired but
+                // kept in the repo for reference.)
+                BucketCatchView(
                     ping: playing,
-                    // The SENDER's instrument shapes the catch — you receive
-                    // the thought the way they sent it: bow → arrow stuck at
-                    // the edge · flick → embedded emoji · wind → wanderer.
-                    // (was briefly the receiver's: instrumentStore.selected)
                     style: SenderStyle.from(playing.senderStyle),
                     onRevealed: { pings.markOpened(playing) },
                     onFinished: {

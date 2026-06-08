@@ -276,16 +276,25 @@ final class PingManager: ObservableObject {
         AppGroupStore.pendingPingEmoji     = emoji
         AppGroupStore.pendingPingFromName  = fromName
         AppGroupStore.pendingPingTimestamp = .now
-        if isFirstUnread {
+        if isFirstUnread && appState?.currentState != .sending {
             HapticEngine.thoughtArrived()   // soft directional pull, not an alert
         } else {
-            log.info("receivePing: arrived while \(self.unreadCount) unread — silent (badge only)")
+            log.info("receivePing: arrived silently (badge only) — first unread already waiting, or a send is in progress")
         }
 
         // A catch already on screen finishes its moment; anything else
         // waits on the badge and plays when the user taps for it.
         if nowPlaying == nil && queue.count == 1 {
-            playNext()
+            // [2/5] SIMULTANEOUS SEND/RECEIVE — never let an arriving thought
+            // interrupt a send in progress. While sending, it sits in the
+            // queue (badge only); the catch fires the instant the send
+            // completes (the screen returns to idle and the queue drains).
+            if appState?.currentState == .sending {
+                log.info("receivePing: send in progress — queued, catch will play when the send completes")
+                appState?.queueAnimation { [weak self] in self?.playNext() }
+            } else {
+                playNext()
+            }
         }
     }
 

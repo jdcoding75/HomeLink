@@ -29,9 +29,17 @@ async function apnsJWT(): Promise<string> {
   if (cachedJWT && now - cachedJWT.createdAt < 50 * 60 * 1000) {
     return cachedJWT.token;
   }
-  const keyPem = Deno.env.get("APNS_KEY_P8")!;
-  const keyId = Deno.env.get("APNS_KEY_ID")!;
-  const teamId = Deno.env.get("APNS_TEAM_ID")!;
+  // [1/5] Fail loudly if a secret is missing — the #1 cause of "push stopped
+  // working" is an unset/rotated APNS_KEY_P8 after a redeploy.
+  const keyPem = Deno.env.get("APNS_KEY_P8");
+  const keyId = Deno.env.get("APNS_KEY_ID");
+  const teamId = Deno.env.get("APNS_TEAM_ID");
+  console.log(`push chain ④ APNs JWT: keyP8=${keyPem ? "set" : "MISSING"} ` +
+    `keyId=${keyId ?? "MISSING"} teamId=${teamId ?? "MISSING"} ` +
+    `topic=${Deno.env.get("APNS_TOPIC") ?? "MISSING"}`);
+  if (!keyPem || !keyId || !teamId) {
+    throw new Error("APNs secrets missing — run `supabase secrets set APNS_KEY_P8/APNS_KEY_ID/APNS_TEAM_ID`");
+  }
 
   const pkcs8 = keyPem
     .replace("-----BEGIN PRIVATE KEY-----", "")
@@ -89,7 +97,9 @@ async function sendPush(toUser: string, aps: Record<string, unknown>): Promise<R
     .select("token")
     .eq("user_id", toUser);
   if (error) throw error;
+  console.log(`push chain ③ tokens: ${tokens?.length ?? 0} device(s) for user ${toUser.slice(0, 8)}`);
   if (!tokens || tokens.length === 0) {
+    console.log("push chain ③ tokens: NONE — recipient never registered a device token");
     return new Response("no devices", { status: 200 });
   }
 
@@ -112,7 +122,13 @@ async function sendPush(toUser: string, aps: Record<string, unknown>): Promise<R
       return { token: t.token.slice(0, 8), first };
     }),
   );
-  console.log("push results:", JSON.stringify(results));
+  console.log("push chain ⑤ APNs:", JSON.stringify(results));
+  // Surface any non-200 APNs status (400/410 BadDeviceToken, 403 bad cert…).
+  const failures = results.filter((r) =>
+    (r.second ?? r.first) !== 200);
+  if (failures.length > 0) {
+    console.error(`push chain ⑤ APNs: ${failures.length} device(s) FAILED — ${JSON.stringify(failures)}`);
+  }
   return new Response(JSON.stringify({ sent: results }), { status: 200 });
 }
 

@@ -36,17 +36,29 @@ struct RocketInstrumentView: View {
     @State private var launched = false
     @State private var twinkle = false
 
-    /// Drives the auto-launch check + idle flame flicker.
-    private let tick = Timer.publish(every: 0.5, on: .main, in: .common).autoconnect()
+    // [3/5] SPIN-TO-AIM + LOCK-FIRST (like the bow). Aim by spinning the rocket
+    // with a finger on the rim; lock onto the person at 5° before you can fuel.
+    @State private var spinAngle: Double = 0      // rocket facing (degrees, 0 = up)
+    @State private var lockedAim = false          // locked on → can't rotate, can fuel
+    @State private var lockHapticFired = false
+    @State private var lastFingerAngle: Double = 0
+    private let spinRingInner: CGFloat = 118
+
+    /// Drives the auto-launch check + idle flame flicker + lock detection.
+    private let tick = Timer.publish(every: 0.1, on: .main, in: .common).autoconnect()
 
     private static let steel    = Color(hex: "#8a8a8a")
     private static let amber    = Color(hex: "#e08a3c")
     private static let orange   = Color(hex: "#e0622c")
     private static let lavender = Color(hex: "#c4a8d4")
 
-    private var rad: Double { bearingDegrees * .pi / 180 }
-    private var alignDiff: Double { BearingCalculator.alignmentError(relativeBearing: bearingDegrees) }
-    private var aligned: Bool { BearingCalculator.isSendAligned(bearingDegrees) }   // ≤15°
+    /// The rocket faces the FINGER-SPUN angle now, not the phone bearing.
+    private var rad: Double { spinAngle * .pi / 180 }
+    private var alignDiff: Double {
+        BearingCalculator.alignmentError(relativeBearing: spinAngle - bearingDegrees)
+    }
+    private var aligned: Bool { alignDiff <= 15 }
+    private var onTarget: Bool { alignDiff <= 5 }     // lock threshold
     private var fueled: Bool { fuelSegments >= 5 }
 
     /// Steady stars, frozen at first appearance so they don't reroll.
@@ -77,18 +89,40 @@ struct RocketInstrumentView: View {
             }
             .frame(width: 360, height: 360)
 
-            // ── Where they are — marker on the rim (own hints below) ──
+            // ── Where they are — marker brightens as the SPIN aim closes in ──
             DirectionIndicator(bearingDegrees: bearingDegrees,
                                personName: personName,
                                personEmoji: personEmoji,
                                ringRadius: 168,
-                               showHint: false)
+                               showHint: false,
+                               approachError: alignDiff)
+
+            // ── [3/5] SPIN RING — drag the rim to aim (hidden once locked) ──
+            if loadedToken != nil && !lockedAim {
+                ZStack {
+                    Circle()
+                        .stroke(Self.lavender.opacity(0.18),
+                                style: StrokeStyle(lineWidth: 1.5, dash: [3, 6]))
+                        .frame(width: 316, height: 316)
+                    ZStack {
+                        Circle().fill(Self.lavender.opacity(aligned ? 0.95 : 0.7))
+                            .frame(width: 16, height: 16)
+                        Image(systemName: "arrow.clockwise")
+                            .font(.system(size: 9, weight: .bold))
+                            .foregroundColor(Color(hex: "#0b0910"))
+                    }
+                    .shadow(color: Self.lavender.opacity(0.6), radius: 5)
+                    .offset(x: CGFloat(sin(rad)) * 158, y: -CGFloat(cos(rad)) * 158)
+                }
+                .allowsHitTesting(false)
+                .transition(.opacity)
+            }
 
             // ── The fuel gauge — vertical, five segments, left side ──
             fuelGauge
                 .offset(x: -150, y: 0)
 
-            // ── Launch pad + rocket — rotated to face the bearing ──
+            // ── Launch pad + rocket — rotated to the SPUN aim direction ──
             ZStack {
                 launchPad
                 rocket
@@ -104,8 +138,11 @@ struct RocketInstrumentView: View {
             .allowsHitTesting(false)
         }
         .frame(width: 370, height: 370)
+        .contentShape(Circle())
+        .gesture(spinGesture)            // [3/5] drag the rim to aim
         .animation(.easeOut(duration: 0.25), value: showMissHint)
         .animation(.easeOut(duration: 0.25), value: showLaunchPrompt)
+        .animation(.easeOut(duration: 0.3), value: lockedAim)
         .onAppear {
             withAnimation(AnimationSystem.easeInOutSine(1.5)
                             .repeatForever(autoreverses: true)) {
@@ -119,9 +156,12 @@ struct RocketInstrumentView: View {
             refreshFuelHint()
         }
         .onChange(of: loadedToken) { _, _ in
-            // Emoji changed (or cleared) → reset the tank, re-show the hint
+            // Emoji changed (or cleared) → reset the tank + aim, re-show hint
             if !launched {
-                withAnimation(.easeOut(duration: 0.3)) { fuelSegments = 0 }
+                withAnimation(.easeOut(duration: 0.3)) {
+                    fuelSegments = 0
+                    lockedAim = false
+                }
                 showLaunchPrompt = false
             }
             refreshFuelHint()
@@ -302,29 +342,36 @@ struct RocketInstrumentView: View {
 
     @ViewBuilder
     private var instruction: some View {
-        if showMissHint {
-            Text("aim toward \(personName) first")
-                .font(.system(size: 12, design: .serif).italic())
-                .foregroundColor(Self.amber)
-                .transition(.opacity)
-        } else if showLaunchPrompt {
+        if showLaunchPrompt {
             Text("LAUNCH")
-                .font(.system(size: 15, weight: .bold, design: .rounded))
+                .font(.system(size: 24, weight: .heavy, design: .rounded))
                 .tracking(3)
                 .foregroundColor(Color(hex: "#FFD27a"))
                 .shadow(color: Self.orange.opacity(0.8), radius: 8)
                 .transition(.scale(scale: 0.7).combined(with: .opacity))
-        } else if showFuelHint {
-            Text("fuel the rocket")
-                .font(.system(size: 12, design: .serif).italic())
-                .foregroundColor(Self.lavender.opacity(0.85))
+        } else if showMissHint {
+            Text("lock onto \(personName) first")
+                .font(.system(size: 22, weight: .bold, design: .rounded))
+                .foregroundColor(Self.amber)
+                .minimumScaleFactor(0.7).lineLimit(1)
                 .transition(.opacity)
         } else if loadedToken != nil {
-            Text("tap to fuel · \(fuelSegments)/5")
-                .font(.system(size: 12, design: .serif).italic())
-                .foregroundColor(Self.lavender.opacity(0.7))
+            // [3/5] step-by-step: spin to aim · lock · fuel · blast off
+            Text(rocketStep)
+                .font(.system(size: 22, weight: .bold, design: .rounded))
+                .foregroundColor(lockedAim ? Color(hex: "#FFD27a") : Self.lavender.opacity(0.9))
+                .minimumScaleFactor(0.7).lineLimit(1)
+                .shadow(color: Self.lavender.opacity(0.4), radius: 5)
                 .transition(.opacity)
         }
+    }
+
+    private var rocketStep: String {
+        if !lockedAim {
+            return aligned ? "almost — keep spinning to lock"
+                           : "spin to aim at \(personName)"
+        }
+        return "locked ✦ tap to fuel · \(fuelSegments)/5"
     }
 
     // ── Mechanic ────────────────────────────────────────────────────────────
@@ -335,12 +382,60 @@ struct RocketInstrumentView: View {
         }
     }
 
+    // ── [3/5] Spin to aim ────────────────────────────────────────────────────
+
+    /// Finger angle around the center (0° = up, clockwise). Frame is 370².
+    private func angleFromCenter(_ p: CGPoint) -> Double {
+        atan2(Double(p.x - 185), -Double(p.y - 185)) * 180 / .pi
+    }
+
+    /// Drag on the rim to rotate the rocket. Disabled once locked.
+    private var spinGesture: some Gesture {
+        DragGesture(minimumDistance: 1)
+            .onChanged { value in
+                guard loadedToken != nil, !lockedAim, !launched else { return }
+                let r = hypot(value.startLocation.x - 185, value.startLocation.y - 185)
+                guard r > spinRingInner else { return }
+                if lastFingerAngle == 0 { lastFingerAngle = angleFromCenter(value.startLocation) }
+                let cur = angleFromCenter(value.location)
+                var d = cur - lastFingerAngle
+                while d >  180 { d -= 360 }
+                while d < -180 { d += 360 }
+                lastFingerAngle = cur
+                spinAngle += d
+                checkLock()
+            }
+            .onEnded { _ in lastFingerAngle = 0 }
+    }
+
+    /// Lock onto the person at 5° — a strong snap; the rocket can't rotate
+    /// after this, and fueling becomes available.
+    private func checkLock() {
+        guard loadedToken != nil, !lockedAim, !launched else { return }
+        if onTarget {
+            lockedAim = true
+            lockHapticFired = true
+            HapticEngine.lockOn()
+            SoundEngine.shared.play(for: "catch.lock")
+            withAnimation(.easeOut(duration: 0.3)) { showFuelHint = false }
+        }
+    }
+
     /// One tap pumps a fuel segment. Each tap: flame burst, smoke puff, body
     /// shudder, mechanical click, and a haptic that strengthens with level.
     private func fuelTap() {
         guard loadedToken != nil else {
             // Nothing loaded — a gentle nudge toward choosing a feeling
             HapticEngine.personSelected()
+            return
+        }
+        // [3/5] LOCK FIRST — can't fuel until aimed and locked onto them.
+        guard lockedAim else {
+            HapticEngine.sendSoft()
+            withAnimation { showMissHint = true }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2.2) {
+                withAnimation { showMissHint = false }
+            }
             return
         }
         guard !fueled, !launched else { return }
@@ -366,17 +461,9 @@ struct RocketInstrumentView: View {
         if fueled { attemptLaunch() }
     }
 
-    /// Full tank → check alignment. Aligned: prompt + auto-launch in 1 s.
-    /// Off-target: keep the fuel, show the aim hint, wait for the turn.
+    /// Full tank → arm immediately (we're already locked on the person).
     private func attemptLaunch() {
-        if aligned {
-            armLaunch()
-        } else {
-            withAnimation { showMissHint = true }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 2.6) {
-                withAnimation { showMissHint = false }
-            }
-        }
+        armLaunch()
     }
 
     private func armLaunch() {
@@ -385,20 +472,17 @@ struct RocketInstrumentView: View {
         HapticEngine.rocketReady()
         // Auto-launch after a held beat
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-            guard fueled, aligned, !launched else { return }
+            guard fueled, lockedAim, !launched else { return }
             launch()
         }
     }
 
-    /// Re-checks alignment on the heartbeat — a rocket that filled while
-    /// off-target launches the moment the user turns toward the person.
+    /// Heartbeat — detect lock (in case the aim is already on target without a
+    /// drag) and arm once the tank is full.
     private func autoLaunchCheck() {
-        guard fueled, !launched else { return }
-        if aligned && !showLaunchPrompt {
-            armLaunch()
-        } else if !aligned && showLaunchPrompt {
-            withAnimation { showLaunchPrompt = false }
-        }
+        if !lockedAim { checkLock() }
+        guard fueled, lockedAim, !launched, !showLaunchPrompt else { return }
+        armLaunch()
     }
 
     private func launch() {

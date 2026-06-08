@@ -159,7 +159,7 @@ struct WandInstrumentView: View {
         if pointing { return "releasing toward \(personName) ✦" }
         if full { return "magic ready ✦" }
         if charge > 0 { return "keep shaking…" }
-        return "shake · release toward \(personName)"
+        return "load · shake · release"          // [4/5] canonical wand phrase
     }
 
     // ── The wand ──────────────────────────────────────────────────────────
