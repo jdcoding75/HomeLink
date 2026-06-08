@@ -382,27 +382,34 @@ struct PairingCelebrationView: View {
             VStack(spacing: 0) {
                 Spacer()
 
-                // Two compass faces meeting in the middle
+                // Two instruments float in from opposite edges, meet at
+                // center with a soft collision, merge into one warm glow
                 GeometryReader { geo in
                     ZStack {
-                        compassFace
-                            .offset(x: met ? -34 : -geo.size.width / 2 - 80)
-                        compassFace
-                            .offset(x: met ?  34 :  geo.size.width / 2 + 80)
+                        // The merged warm glow blooms as they touch
+                        Circle()
+                            .fill(purpleGlow.opacity(met ? 0.34 : 0))
+                            .frame(width: 130, height: 130)
+                            .blur(radius: 26)
+                            .animation(.easeIn(duration: 0.7).delay(0.9), value: met)
+                        instrumentFace(myInstrumentIcon)
+                            .offset(x: met ? -30 : -geo.size.width / 2 - 80)
+                        instrumentFace("🧭")
+                            .offset(x: met ?  30 :  geo.size.width / 2 + 80)
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
                 .frame(height: 120)
                 .padding(.bottom, 36)
 
-                Text("connected")
+                Text("connected ✦")
                     .font(.system(size: 32, weight: .semibold, design: .serif))
                     .foregroundColor(DesignTokens.Color.textPrimary)
                     .opacity(showTitle ? 1 : 0)
                     .offset(y: showTitle ? 0 : 8)
                     .padding(.bottom, 6)
 
-                Text("your compasses are now linked")
+                Text("your instruments are now linked")
                     .font(DesignTokens.Font.compassDistance)
                     .foregroundColor(DesignTokens.Color.textMuted)
                     .opacity(showSubtitle ? 1 : 0)
@@ -449,8 +456,15 @@ struct PairingCelebrationView: View {
         .onAppear { runCelebration() }
     }
 
-    /// One small compass face — ring, soft glow, 🧭 at heart.
-    private var compassFace: some View {
+    /// OUR instrument's icon — the celebration shows the two instruments
+    /// meeting (theirs is unknown; the compass stands in for them).
+    private var myInstrumentIcon: String {
+        let saved = UserDefaults.standard.string(forKey: InstrumentStore.storageKey) ?? ""
+        return (Instrument(rawValue: saved) ?? .compass).icon
+    }
+
+    /// One small instrument face — ring, soft glow, the icon at heart.
+    private func instrumentFace(_ icon: String) -> some View {
         ZStack {
             Circle()
                 .fill(purpleGlow.opacity(glowBloom ? 0.30 : 0.10))
@@ -462,19 +476,22 @@ struct PairingCelebrationView: View {
             Circle()
                 .stroke(lavender.opacity(0.2), lineWidth: 1)
                 .frame(width: 98, height: 98)
-            Text("🧭")
+            Text(icon)
                 .font(.system(size: 36))
         }
     }
 
+    // (previous: two identical compass faces — superseded, kept)
+    // private var compassFace: some View { instrumentFace("🧭") }
+
     private func runCelebration() {
         // Glow blooms as the screen opens
         withAnimation(.easeInOut(duration: 1.2)) { glowBloom = true }
-        // The two compasses drift in and meet
+        // The two instruments drift in, meet with a soft collision
         withAnimation(.spring(response: 1.0, dampingFraction: 0.75).delay(0.3)) {
             met = true
         }
-        // Soft warm double pulse the moment they meet
+        // Soft warm double pulse the moment they merge
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
             HapticEngine.pingReceived()
         }

@@ -257,6 +257,21 @@ struct ConnectView: View {
         .sheet(isPresented: $showMessageComposer) {
             MessageComposerView(body: inviteText)
         }
+        // Entered code → the full acceptance flow (who → choose → celebrate)
+        .sheet(isPresented: Binding(
+            get: { acceptingCode != nil },
+            set: { if !$0 { acceptingCode = nil } }
+        )) {
+            if let acceptingCode {
+                PairAcceptView(code: acceptingCode) {
+                    self.acceptingCode = nil
+                    codeInput = ""
+                    withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
+                        connected = SupabaseService.connectedFriendID != nil
+                    }
+                }
+            }
+        }
         .onAppear {
             // Make sure a code exists (signed-in users only)
             if code == nil { fetchMyCode() }

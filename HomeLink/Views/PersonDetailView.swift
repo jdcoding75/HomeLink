@@ -12,6 +12,7 @@ struct PersonDetailView: View {
     let person: Person
     @EnvironmentObject var people: PeopleManager
     @EnvironmentObject var compass: CompassManager
+    @EnvironmentObject var pings: PingManager
     @Environment(\.dismiss) private var dismiss
 
     @State private var codeInput = ""
@@ -122,6 +123,36 @@ struct PersonDetailView: View {
             }
         }
         .onAppear { fetchPresence() }
+        // A felt receipt just landed (realtime UPDATE on our sent ping) —
+        // refresh so the grey dot turns into the lavender pair live.
+        .onChange(of: pings.lastFeltAt) { _, _ in
+            guard let partnerID else { return }
+            Task {
+                historyRecords = await SupabaseService.shared.fetchPings(with: partnerID)
+            }
+        }
+        // Replay overlay — this sheet is the visible presentation context,
+        // so the full-screen replay presents from here while it's open.
+        .fullScreenCover(item: $pings.replayRequest) { request in
+            ZStack {
+                DesignTokens.Color.background.ignoresSafeArea()
+                ReplayOverlayView(
+                    emoji: request.emoji,
+                    bearingDegrees: request.bearingDegrees,
+                    style: SenderStyle.from(request.styleRaw)
+                ) {
+                    pings.replayRequest = nil
+                }
+                VStack {
+                    Spacer()
+                    Text("tap to dismiss")
+                        .font(.system(size: 11, design: .serif).italic())
+                        .foregroundColor(DesignTokens.Color.textDim)
+                        .padding(.bottom, 28)
+                }
+                .allowsHitTesting(false)
+            }
+        }
     }
 
     // MARK: - Connection card
@@ -136,8 +167,8 @@ struct PersonDetailView: View {
                         .font(.system(size: 15, weight: .semibold))
                         .foregroundColor(Color(hex: "#5dcaa5"))
                 }
-                if let lastSeen {
-                    Text(Self.presenceText(for: lastSeen))
+                if let lastSeen, let presence = Self.presenceText(for: lastSeen) {
+                    Text(presence)
                         .font(.system(size: 12))
                         .foregroundColor(DesignTokens.Color.textMuted)
                 }
@@ -341,16 +372,25 @@ struct PersonDetailView: View {
         }
     }
 
-    /// Memory trail row: emoji · felt dot · poetic time. Tap to feel again.
+    /// Memory trail row: emoji · felt dots · poetic time. Tap for the FULL
+    /// replay — the thought re-enters from its original direction (the
+    /// overlay presents app-wide through PingManager.replayRequest).
     private func trailRow(_ record: SupabaseService.PingRecord) -> some View {
         let sent = record.toUser == partnerID
         return Button {
-            SoundEngine.shared.play(for: record.emoji)
             HapticEngine.thoughtArrived()
             withAnimation(.easeOut(duration: 0.35)) { replayingID = record.id }
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) {
                 withAnimation(.easeIn(duration: 0.4)) { replayingID = nil }
             }
+            // Sent thoughts replay outward; received ones come back in
+            // from the sender's side.
+            pings.requestReplay(
+                emoji: record.emoji,
+                bearingDegrees: sent ? compass.state.bearingDegrees
+                                     : compass.state.bearingDegrees + 180,
+                styleRaw: record.senderStyle
+            )
         } label: {
             HStack(spacing: 14) {
                 Text(record.emoji)
@@ -358,11 +398,7 @@ struct PersonDetailView: View {
                     .frame(width: 38)
                     .scaleEffect(replayingID == record.id ? 1.25 : 1.0)
                 if sent {
-                    Circle()
-                        .fill(record.openedAt != nil
-                              ? Color(hex: "#c4a8d4")
-                              : DesignTokens.Color.textDim.opacity(0.5))
-                        .frame(width: 5, height: 5)
+                    feltDots(felt: record.openedAt != nil)
                 }
                 Spacer()
                 Text(PoeticTime.string(for: record.createdAt))
@@ -376,6 +412,23 @@ struct PersonDetailView: View {
         .buttonStyle(.plain)
     }
 
+    /// Read receipt, quiet as a journal margin:
+    ///   one grey dot      · sent, not yet felt
+    ///   two lavender dots · felt
+    @ViewBuilder
+    private func feltDots(felt: Bool) -> some View {
+        if felt {
+            HStack(spacing: 3) {
+                Circle().fill(Color(hex: "#c4a8d4")).frame(width: 5, height: 5)
+                Circle().fill(Color(hex: "#c4a8d4")).frame(width: 5, height: 5)
+            }
+        } else {
+            Circle()
+                .fill(DesignTokens.Color.textDim.opacity(0.5))
+                .frame(width: 5, height: 5)
+        }
+    }
+
     private func fetchPresence() {
         guard isConnected, let partnerID else { return }
         Task {
@@ -383,12 +436,29 @@ struct PersonDetailView: View {
         }
     }
 
-    /// "active recently" within the hour, else "last seen 2 hours ago".
-    static func presenceText(for date: Date) -> String {
+    /// Presence in poetic buckets — nothing shown beyond a week:
+    ///   < 1 hour        "active recently"
+    ///   today           "last seen this morning/afternoon/evening"
+    ///   yesterday       "last seen yesterday"
+    ///   this week       "last seen Tuesday"
+    ///   older           nil (the card stays quiet)
+    static func presenceText(for date: Date) -> String? {
+        let calendar = Calendar.current
         if Date.now.timeIntervalSince(date) < 3600 { return "active recently" }
-        let formatter = RelativeDateTimeFormatter()
-        formatter.unitsStyle = .full
-        return "last seen \(formatter.localizedString(for: date, relativeTo: .now))"
+        if calendar.isDateInToday(date) {
+            switch calendar.component(.hour, from: date) {
+            case ..<12:  return "last seen this morning"
+            case ..<18:  return "last seen this afternoon"
+            default:     return "last seen this evening"
+            }
+        }
+        if calendar.isDateInYesterday(date) { return "last seen yesterday" }
+        if Date.now.timeIntervalSince(date) < 7 * 86400 {
+            let formatter = DateFormatter()
+            formatter.dateFormat = "EEEE"
+            return "last seen \(formatter.string(from: date))"
+        }
+        return nil
     }
 }
 
@@ -412,6 +482,7 @@ struct PingHistoryView: View {
 
     @EnvironmentObject var appState: AppStateManager
     @EnvironmentObject var subscription: SubscriptionManager
+    @EnvironmentObject var pings: PingManager
 
     private static let lavender = Color(red: 196/255, green: 168/255, blue: 212/255)
 
@@ -468,6 +539,12 @@ struct PingHistoryView: View {
             records = await SupabaseService.shared.fetchPings(with: partnerID)
             loaded = true
         }
+        // Felt receipt landed while we're looking — dots update live
+        .onChange(of: pings.lastFeltAt) { _, _ in
+            Task {
+                records = await SupabaseService.shared.fetchPings(with: partnerID)
+            }
+        }
     }
 
     private func row(_ record: SupabaseService.PingRecord) -> some View {
@@ -488,15 +565,20 @@ struct PingHistoryView: View {
                     .foregroundColor(DesignTokens.Color.textDim.opacity(0.7))
                     .rotationEffect(.degrees(sent ? bearing : bearing + 180))
 
-                // Felt indicator — a soft dot, never a tick
-                //   grey   · sent, waiting
-                //   lavender · received (felt)
+                // Felt indicator — soft dots, never a tick
+                //   one grey dot      · sent, waiting
+                //   two lavender dots · felt
                 if sent {
-                    Circle()
-                        .fill(record.openedAt != nil
-                              ? Self.lavender
-                              : DesignTokens.Color.textDim.opacity(0.5))
-                        .frame(width: 5, height: 5)
+                    if record.openedAt != nil {
+                        HStack(spacing: 3) {
+                            Circle().fill(Self.lavender).frame(width: 5, height: 5)
+                            Circle().fill(Self.lavender).frame(width: 5, height: 5)
+                        }
+                    } else {
+                        Circle()
+                            .fill(DesignTokens.Color.textDim.opacity(0.5))
+                            .frame(width: 5, height: 5)
+                    }
                 }
 
                 Spacer()
