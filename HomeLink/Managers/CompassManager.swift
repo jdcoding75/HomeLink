@@ -129,6 +129,25 @@ final class CompassManager: NSObject, ObservableObject {
         locationManager.stopUpdatingHeading()
     }
 
+    #if DEBUG
+    // [2/4] Mock heading — slowly rotate the heading so alignment can be tested
+    // without physically turning the phone. DEBUG only.
+    private var mockHeadingTimer: Timer?
+    func setMockHeading(_ on: Bool) {
+        mockHeadingTimer?.invalidate()
+        mockHeadingTimer = nil
+        guard on else { return }
+        isHeadingAvailable = true
+        mockHeadingTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                self.currentHeading = (self.currentHeading + 2).truncatingRemainder(dividingBy: 360)
+                self.updateCompassState()
+            }
+        }
+    }
+    #endif
+
     // ── Battery: foreground-only sensors ─────────────────────────────────
     // The magnetometer (heading) and GPS are the compass's biggest battery
     // draw. There is nothing to point at while backgrounded, so we stop both

@@ -27,6 +27,16 @@ struct PointwardApp: App {
         // Unified picker: derive the one selection from the old two
         InstrumentOption.migrateLegacySelection()
 
+        #if DEBUG
+        // [1/4] -skipOnboarding launch arg → straight to the compass with mock
+        // data (no onboarding, no Apple Sign In). Consumed by RootView, which
+        // has the configured model context. DEBUG only — never ships.
+        if DevTools.wantsSkipOnboarding {
+            UserDefaults.standard.set(true, forKey: "hasCompletedOnboarding")
+            UserDefaults.standard.set(true, forKey: DevTools.injectFlagKey)
+        }
+        #endif
+
         // Backend housekeeping — prune our own stale presence/token rows on a
         // background task so it never blocks launch or touches the main thread. [3/8]
         Task.detached(priority: .background) {

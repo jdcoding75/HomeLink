@@ -79,6 +79,14 @@ struct RootView: View {
         }
         .onAppear {
             people.configure(with: modelContext)
+            #if DEBUG
+            // [1/4] Consume the -skipOnboarding inject flag once: mock Sarah +
+            // connection + a little history, so the compass works immediately.
+            if UserDefaults.standard.bool(forKey: DevTools.injectFlagKey) {
+                UserDefaults.standard.removeObject(forKey: DevTools.injectFlagKey)
+                DevTools.injectMockData(people: people, pings: pings, withHistory: true)
+            }
+            #endif
             startCompassIfNeeded()
             startRealtimePings()
             skinStore.enforceTier(subscription.tier)   // free = Minimal, always

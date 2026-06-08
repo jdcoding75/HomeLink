@@ -11,6 +11,11 @@ struct SettingsView: View {
     @EnvironmentObject var subscription: SubscriptionManager
     @EnvironmentObject var skinStore:    SkinStore
     @EnvironmentObject var instrumentStore: InstrumentStore
+    #if DEBUG
+    @EnvironmentObject var devPeople:  PeopleManager
+    @EnvironmentObject var devPings:   PingManager
+    @EnvironmentObject var devCompass: CompassManager
+    #endif
 
     @AppStorage("quietMode")      private var quietMode      = false
     @AppStorage("hapticsEnabled") private var hapticsEnabled = true
@@ -33,6 +38,10 @@ struct SettingsView: View {
     @State private var showClearAllConfirm = false
     @State private var showClearConnConfirm = false
     @State private var devBusy = false
+    @State private var showTestSheet = false
+    @State private var mockHeadingOn = false
+    @State private var farAwayOn = false
+    @State private var nearbyOn = false
     #endif
 
     var body: some View {
@@ -117,6 +126,9 @@ struct SettingsView: View {
         } message: {
             Text("Removes your pairing only — your thought history is kept. Good for testing pairing again.")
         }
+        .sheet(isPresented: $showTestSheet) {
+            TestMessageSheet().environmentObject(devPings)
+        }
         #endif
     }
 
@@ -160,6 +172,91 @@ struct SettingsView: View {
             }
             .buttonStyle(.plain)
             .disabled(devBusy)
+
+            // [3/4] Send yourself a test thought — full receipt, no 2nd phone.
+            Button { showTestSheet = true } label: {
+                settingsRow {
+                    Image(systemName: "paperplane.fill")
+                        .settingsIcon()
+                        .foregroundColor(Color(hex: "#c4a8d4"))
+                    Text("Send myself a test thought").settingsLabel()
+                    Spacer()
+                    Image(systemName: "chevron.right").font(.system(size: 12))
+                        .foregroundColor(DesignTokens.Color.textDim)
+                }
+            }
+            .buttonStyle(.plain)
+
+            // [2/4] Skip straight to the compass with mock Sarah + connection.
+            Button {
+                DevTools.injectMockData(people: devPeople, pings: devPings, withHistory: true)
+                if let s = devPeople.selectedPerson { devCompass.start(tracking: s) }
+                NotificationCenter.default.post(name: .pointwardOpenCompass, object: nil)
+            } label: {
+                settingsRow {
+                    Image(systemName: "wand.and.stars").settingsIcon()
+                    Text("Skip to compass (mock data)").settingsLabel()
+                    Spacer()
+                }
+            }
+            .buttonStyle(.plain)
+
+            Button { DevTools.resetToOnboarding(people: devPeople) } label: {
+                settingsRow {
+                    Image(systemName: "arrow.counterclockwise").settingsIcon()
+                    Text("Reset to onboarding").settingsLabel()
+                    Spacer()
+                }
+            }
+            .buttonStyle(.plain)
+
+            Button { DevTools.clearOnboardingFlagOnly() } label: {
+                settingsRow {
+                    Image(systemName: "flag.slash").settingsIcon()
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Clear onboarding flag only").settingsLabel()
+                        Text("re-see onboarding · keep data")
+                            .font(.system(size: 11)).foregroundColor(DesignTokens.Color.textMuted)
+                    }
+                    Spacer()
+                }
+            }
+            .buttonStyle(.plain)
+
+            Toggle(isOn: $mockHeadingOn) {
+                settingsRow {
+                    Image(systemName: "gyroscope").settingsIcon()
+                    Text("Mock compass heading").settingsLabel()
+                    Spacer()
+                }
+            }
+            .onChange(of: mockHeadingOn) { _, on in devCompass.setMockHeading(on) }
+
+            Toggle(isOn: $farAwayOn) {
+                settingsRow {
+                    Image(systemName: "airplane").settingsIcon()
+                    Text("Simulate far away (5000 km)").settingsLabel()
+                    Spacer()
+                }
+            }
+            .onChange(of: farAwayOn) { _, on in
+                guard on else { return }
+                nearbyOn = false
+                DevTools.setMockDistance(farAway: true, people: devPeople, compass: devCompass)
+            }
+
+            Toggle(isOn: $nearbyOn) {
+                settingsRow {
+                    Image(systemName: "figure.walk").settingsIcon()
+                    Text("Simulate nearby (0.5 km)").settingsLabel()
+                    Spacer()
+                }
+            }
+            .onChange(of: nearbyOn) { _, on in
+                guard on else { return }
+                farAwayOn = false
+                DevTools.setMockDistance(farAway: false, people: devPeople, compass: devCompass)
+            }
         }
     }
 
