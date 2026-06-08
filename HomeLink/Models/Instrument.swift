@@ -70,15 +70,22 @@ enum Instrument: String, CaseIterable, Codable, Identifiable {
         }
     }
 
-    /// Whether SENDING requires aiming at the person (compass aligned within
-    /// the send threshold). Wind releases on a breath and the wand on a shake
-    /// — "magic finds them" — so neither needs the phone pointed; every other
-    /// instrument fires only while aimed at the recipient. Encodes the rule the
-    /// instrument views implement structurally, as testable data.
+    /// Whether SENDING requires aiming at the person. Compass aligns by phone
+    /// rotation; bow/flick/rocket by finger GESTURE. Wind (breath), wand
+    /// (shake), and plane (auto-aim, tap-only) need no aiming action at all —
+    /// "magic finds them" / the plane points itself. Testable data mirroring
+    /// what the instrument views implement structurally.
     var requiresAlignment: Bool {
         switch self {
-        case .compass, .bow, .flick, .rocket, .plane: return true
-        case .firefly, .wand:                         return false   // wind · wand: no aim
+        case .compass, .bow, .flick, .rocket: return true
+        case .firefly, .wand, .plane:         return false   // breath · shake · auto-aim
         }
     }
+
+    /// [AUDIT] The single rule: ONLY the compass aligns by ROTATING THE PHONE
+    /// (device heading). Every other instrument that aims does so by finger
+    /// gesture — bow spin · flick swipe · rocket spin — never by phone rotation.
+    /// Wind/wand/plane don't aim at all. This is the invariant the alignment
+    /// audit enforces and the alignment tests pin.
+    var alignsByPhoneRotation: Bool { self == .compass }
 }
