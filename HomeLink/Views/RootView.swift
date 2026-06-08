@@ -608,6 +608,28 @@ struct MainTabView: View {
                 .allowsHitTesting(false)
             }
         }
+        // ── THE RECEIPT — a dedicated full-screen receive experience over the
+        // TabView (tab bar hidden, no compass). Replaces the inline catch. ──
+        .fullScreenCover(item: $pings.nowPlaying) { playing in
+            ReceiptView(
+                ping: playing,
+                style: SenderStyle.from(playing.senderStyle),
+                onRevealed: { pings.markOpened(playing) },
+                onFinished: {
+                    pings.finishedPlaying(playing)
+                    appState.transition(to: .idle)
+                }
+            )
+            .onAppear {
+                appState.transition(to: .catchMode)
+                // Swing the needle to the sender so the alignment is real.
+                if let sender = people.people.first(where: { $0.name == playing.fromName }),
+                   people.selectedPerson?.id != sender.id {
+                    people.select(sender)
+                    compass.start(tracking: sender)
+                }
+            }
+        }
         // [6/6] The "✦ Pro" badge on the compass jumps to the Pro tab now.
         .onReceive(NotificationCenter.default.publisher(for: .pointwardOpenPro)) { _ in
             selectedTab = 1

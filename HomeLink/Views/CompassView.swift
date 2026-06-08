@@ -547,32 +547,17 @@ struct CompassView: View {
             // Only the newest thought triggers the catch; the orb waits at
             // the sender's edge until you physically turn toward them.
             // opened_at is set at the reveal — felt means felt.
-            if let playing = pings.nowPlaying {
-                // [1/5] THE BUCKET — the universal catch screen, the same warm
-                // experience for every instrument. (CatchModeView retired but
-                // kept in the repo for reference.)
-                BucketCatchView(
-                    ping: playing,
-                    style: SenderStyle.from(playing.senderStyle),
-                    onRevealed: { pings.markOpened(playing) },
-                    onFinished: {
-                        pings.finishedPlaying(playing)
-                        appState.transition(to: .idle)
-                    }
-                )
-                .transition(.opacity)
-                .zIndex(7)
-                .onAppear {
-                    appState.transition(to: .catchMode)
-                    // Swing the needle to the sender so the catch direction
-                    // is real, not whoever was selected before
-                    if let sender = people.people.first(where: { $0.name == playing.fromName }),
-                       people.selectedPerson?.id != sender.id {
-                        people.select(sender)
-                        compass.start(tracking: sender)
-                    }
-                }
-            }
+            // THE RECEIPT is now a dedicated full-screen cover over the TabView
+            // (see MainTabView) — the inline BucketCatchView is retired so the
+            // tab bar hides and the compass isn't visible during a receipt.
+            // (kept for reference:)
+            // if let playing = pings.nowPlaying {
+            //     BucketCatchView(ping: playing,
+            //         style: SenderStyle.from(playing.senderStyle),
+            //         onRevealed: { pings.markOpened(playing) },
+            //         onFinished: { pings.finishedPlaying(playing); appState.transition(to: .idle) })
+            //         .transition(.opacity).zIndex(7)
+            // }
             // (previous arrival flows retired — views kept for reference:
             //  proOn → ThoughtArrivalView, core → DirectionalArrivalView)
 

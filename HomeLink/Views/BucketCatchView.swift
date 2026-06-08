@@ -88,13 +88,13 @@ struct BucketCatchView: View {
                                  y: geo.size.height / 2 + bucketYOffset)
 
             ZStack {
-                // ── Background: deep purple + warm candlelight behind bucket ──
-                DesignTokens.Color.background.opacity(0.55 + (dimOthers ? 0.25 : 0))
+                // ── [2/4] THEMED CATCH WORLD — each instrument arrives into
+                // its own animated world (sky · space · cork · target · magic). ──
+                CatchWorldBackground(style: style)
+                    .ignoresSafeArea()
+                Color.black.opacity(dimOthers ? 0.25 : 0)
                     .ignoresSafeArea()
                     .animation(.easeInOut(duration: 0.4), value: dimOthers)
-                RadialGradient(colors: [Color(hex: "#3a2418").opacity(0.5), .clear],
-                               center: .center, startRadius: 20, endRadius: 260)
-                    .ignoresSafeArea()
 
                 // ── Arrival lavender wash ──
                 Self.lavender.opacity(arrivalPulse ? 0.2 : 0)
