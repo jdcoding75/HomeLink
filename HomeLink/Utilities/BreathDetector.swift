@@ -34,19 +34,22 @@ final class BreathDetector: ObservableObject {
 
     private let engine = AVAudioEngine()
     private var sustainedSeconds: Double = 0
-    private var previousLevel: Float = 0
+    private var previousDb: Float = -120
     /// Rolling window of the last RMS readings → a steady level (spec: 10).
     private var levelWindow: [Float] = []
     private let windowSize = 10
 
-    // Tuning — breath against a quiet room
-    private let levelThreshold: Float  = 0.022   // above ambient hiss
-    private let spikeJump: Float       = 0.10    // sharp = speech, reject
-    private let requiredSeconds        = 1.6     // within the 1.5–2 s window
-    // Live-arc normalization: breath sits roughly in this RMS band. We map
-    // it to 0…1 so the arc reaches full glow on a strong steady exhale.
-    private let levelFloor: Float      = 0.012   // below → silent (dim)
-    private let levelCeiling: Float    = 0.090   // at/above → full glow
+    // Tuning — all in dB (spec). A breath is a long soft hill between
+    // ambient silence and the volume of speech.
+    private let silenceDb: Float  = -50   // below this → silence
+    private let breathLowDb: Float = -45  // breath band floor
+    private let breathHighDb: Float = -25 // breath band ceiling
+    private let speechDb: Float   = -20   // above this → speech/noise, ignore
+    private let spikeJumpDb: Float = 12    // a sharp jump = tap/speech onset
+    private let requiredSeconds   = 1.6    // within the 1.5–2 s window
+    // Live-arc normalization: map silence → full breath onto 0…1.
+    private let arcFloorDb: Float   = -50  // very dim lavender
+    private let arcCeilingDb: Float = -25  // full glow
 
     func start() {
         guard !isListening else { return }
@@ -122,21 +125,26 @@ final class BreathDetector: ObservableObject {
     }
 
     private func evaluate(level rms: Float, dt: Double) {
-        defer { previousLevel = rms }
-
-        // Rolling average (10 samples) → a steady live level for the arc.
+        // Rolling average (10 samples) → a steady level, then to dB.
         levelWindow.append(rms)
         if levelWindow.count > windowSize { levelWindow.removeFirst() }
         let smoothed = levelWindow.reduce(0, +) / Float(levelWindow.count)
-        let normalized = Double((smoothed - levelFloor) / (levelCeiling - levelFloor))
+        let db = 20 * log10(max(smoothed, 1e-7))   // -inf guard
+
+        defer { previousDb = db }
+
+        // Live arc — map silence…full breath onto 0…1, eased so it glides.
+        let normalized = Double((db - arcFloorDb) / (arcCeilingDb - arcFloorDb))
         let target = min(1, max(0, normalized))
-        // Ease toward the target so the arc glides rather than jitters.
         level += (target - level) * 0.35
 
-        // A sharp jump is speech or a bump — breath rises gently
-        let jumped = abs(rms - previousLevel) > spikeJump
+        // A sharp jump is a tap or speech onset — a breath rises gradually.
+        let jumped = abs(db - previousDb) > spikeJumpDb
+        // In the breath band, below speech, with a gentle onset.
+        let inBreathBand = db >= breathLowDb && db <= breathHighDb
+        let isSpeech     = db > speechDb
 
-        if rms > levelThreshold && !jumped {
+        if inBreathBand && !isSpeech && !jumped {
             sustainedSeconds += dt
             exhaleProgress = min(1, sustainedSeconds / requiredSeconds)
             if sustainedSeconds >= requiredSeconds {
@@ -145,7 +153,8 @@ final class BreathDetector: ObservableObject {
                 onExhale?()
             }
         } else {
-            // The breath broke — ease back rather than hard reset
+            // Silence, speech, or a spike — the breath broke. Ease back
+            // rather than hard reset so a brief wobble doesn't punish.
             sustainedSeconds = max(0, sustainedSeconds - dt * 2)
             exhaleProgress = min(1, sustainedSeconds / requiredSeconds)
         }

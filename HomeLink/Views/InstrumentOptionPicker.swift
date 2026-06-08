@@ -50,8 +50,12 @@ struct InstrumentOptionPicker: View {
                     .frame(height: 1)
                     .padding(.horizontal, 6)
 
-                // ── Pro — the instruments ──
-                HStack(spacing: 10) {
+                // ── Pro — the instruments. A 3-wide grid wraps the growing
+                // lineup (bow · flick · rocket · wind · wand) without
+                // overflowing the card. ──
+                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10),
+                                         count: 3),
+                          spacing: 12) {
                     ForEach(proOptions) { option in
                         optionCard(option)
                     }

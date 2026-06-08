@@ -1248,12 +1248,19 @@ struct ReplayOverlayView: View {
     @State private var progress: CGFloat = 0   // edge → center
     @State private var bloomed  = false
     @State private var fadingOut = false
+    @State private var wandBurst = false       // 🪄 crystal burst at the start
 
     private var hue: Color { EmojiHue.color(for: emoji) }
     private var rad: Double { bearingDegrees * .pi / 180 }
 
-    /// 70–80 % of the original send duration.
-    private var travelDuration: Double { style.sendDuration * 0.75 }
+    private static let wandGold = Color(hex: "#D4AF37")
+    private static let wandPurple = Color(hex: "#9b7fc0")
+    private var isWand: Bool { style == .wand }
+
+    /// 70–80 % of the original send duration (wand: a tight 70 %).
+    private var travelDuration: Double {
+        style.sendDuration * (isWand ? 0.70 : 0.75)
+    }
 
     var body: some View {
         GeometryReader { geo in
@@ -1269,11 +1276,46 @@ struct ReplayOverlayView: View {
                     .ignoresSafeArea()
                     .animation(AnimationSystem.easeInOutQuad(0.2), value: dimmed)
 
+                // 🪄 WAND — a memory of the cast: the crystal is already
+                // glowing (no shake), it bursts at the start, and a sparkle
+                // trail follows the thought home at 70 % duration.
+                if isWand {
+                    // BURST — sparkles scattering from the crystal at the edge
+                    ForEach(0..<18, id: \.self) { i in
+                        let a = Double(i) / 18 * 2 * .pi
+                        let dist: CGFloat = wandBurst ? 55 + CGFloat(i % 5) * 7 : 0
+                        Circle()
+                            .fill(i % 2 == 0 ? Self.wandGold : Self.wandPurple)
+                            .frame(width: i % 3 == 0 ? 4 : 3, height: i % 3 == 0 ? 4 : 3)
+                            .blur(radius: 0.5)
+                            .offset(x: edge.width + CGFloat(cos(a)) * dist,
+                                    y: edge.height + CGFloat(sin(a)) * dist)
+                            .opacity(wandBurst ? 0 : (dimmed ? 0.95 : 0))
+                            .animation(.easeOut(duration: 0.55), value: wandBurst)
+                            .position(x: geo.size.width / 2, y: geo.size.height / 2)
+                    }
+                    // TRAIL — gold/purple sparkles following the thought home
+                    ForEach(0..<10, id: \.self) { i in
+                        Circle()
+                            .fill((i % 2 == 0 ? Self.wandGold : Self.wandPurple).opacity(0.7))
+                            .frame(width: 5, height: 5)
+                            .blur(radius: 1.5)
+                            .opacity(fadingOut ? 0 : (dimmed ? 1 : 0))
+                            .modifier(CurvedFlightEffect(progress: progress,
+                                                         start: edge, control: control,
+                                                         end: .zero))
+                            .animation(AnimationSystem.easeInOutQuad(travelDuration)
+                                        .delay(0.02 * Double(i + 1)), value: progress)
+                            .animation(.easeOut(duration: 0.3), value: fadingOut)
+                            .position(x: geo.size.width / 2, y: geo.size.height / 2)
+                    }
+                }
+
                 // 2–4 · Edge → center in the original direction, then bloom
                 Text(emoji)
                     .font(.system(size: 54))
                     .scaleEffect(bloomed ? 1.0 : 0.55)
-                    .shadow(color: hue.opacity(AnimationSystem.Glow.opacity),
+                    .shadow(color: (isWand ? Self.wandPurple : hue).opacity(AnimationSystem.Glow.opacity),
                             radius: AnimationSystem.Glow.radius)
                     .opacity(fadingOut ? 0 : (dimmed ? 1 : 0))
                     .modifier(CurvedFlightEffect(progress: progress,
@@ -1292,6 +1334,11 @@ struct ReplayOverlayView: View {
 
     private func play() {
         dimmed = true
+        // 🪄 The crystal is already glowing — burst straight into release.
+        if isWand {
+            SoundEngine.shared.play(for: "style.shimmer")
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { wandBurst = true }
+        }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
             progress = 1
         }
