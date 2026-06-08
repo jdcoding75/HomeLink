@@ -18,7 +18,35 @@ final class NotificationHandler: NSObject, ObservableObject {
         UNUserNotificationCenter.current().delegate = self
     }
 
-    private func handlePayload(_ userInfo: [AnyHashable: Any]) {
+    /// A parsed "thought" push payload. (Pointing-presence pushes parse to nil.)
+    struct ParsedPush: Equatable {
+        let emoji: String
+        let fromName: String
+        let remoteID: UUID?
+        let senderStyle: String?
+        let message: String?
+    }
+
+    /// Pure parser for an APNs payload — extracts the thought's fields, or nil
+    /// for a "pointing" presence push or a malformed payload. Testable.
+    static func parsePush(_ userInfo: [AnyHashable: Any]) -> ParsedPush? {
+        if userInfo["type"] as? String == "pointing" { return nil }
+        guard
+            let emoji    = userInfo["pingEmoji"] as? String,
+            let fromName = userInfo["fromName"]  as? String
+        else { return nil }
+        return ParsedPush(
+            emoji: emoji,
+            fromName: fromName,
+            remoteID: (userInfo["pingId"] as? String).flatMap(UUID.init),
+            senderStyle: userInfo["senderStyle"] as? String,
+            message: userInfo["message"] as? String
+        )
+    }
+
+    /// Route a raw payload into the app. Internal so the foreground/catch
+    /// behaviour is testable without constructing a UNNotification.
+    func handlePayload(_ userInfo: [AnyHashable: Any]) {
         log.info("push: payload received — keys: \(userInfo.keys.map { "\($0)" }.joined(separator: ","), privacy: .public)")
 
         // "Pointing" pushes become ambient presence — the compass edge glow
@@ -27,28 +55,18 @@ final class NotificationHandler: NSObject, ObservableObject {
             pingManager.presenceFelt(name: userInfo["fromName"] as? String ?? "someone")
             return
         }
-        guard
-            let emoji    = userInfo["pingEmoji"] as? String,
-            let fromName = userInfo["fromName"]  as? String
-        else {
+        guard let parsed = Self.parsePush(userInfo) else {
             log.warning("push: payload missing pingEmoji/fromName — ignored")
             return
         }
-        // The Edge Function includes the ping's id + sender style so a
-        // push-delivered catch can record its felt receipt and play the
-        // sender's real animation (older payloads lack them — both optional).
-        let remoteID    = (userInfo["pingId"] as? String).flatMap(UUID.init)
-        let senderStyle = userInfo["senderStyle"] as? String
-        let message     = userInfo["message"] as? String
+        log.info("push: thought — emoji=\(parsed.emoji, privacy: .public) from=\(parsed.fromName, privacy: .public) pingId=\(parsed.remoteID?.uuidString ?? "nil", privacy: .public) style=\(parsed.senderStyle ?? "nil", privacy: .public) msg=\(parsed.message != nil, privacy: .public)")
 
-        log.info("push: thought — emoji=\(emoji, privacy: .public) from=\(fromName, privacy: .public) pingId=\(remoteID?.uuidString ?? "nil", privacy: .public) style=\(senderStyle ?? "nil", privacy: .public) msg=\(message != nil, privacy: .public)")
-
-        AppGroupStore.pendingPingEmoji     = emoji
-        AppGroupStore.pendingPingFromName  = fromName
+        AppGroupStore.pendingPingEmoji     = parsed.emoji
+        AppGroupStore.pendingPingFromName  = parsed.fromName
         AppGroupStore.pendingPingTimestamp = .now
-        pingManager.receivePing(fromName: fromName, emoji: emoji,
-                                remoteID: remoteID, senderStyle: senderStyle,
-                                message: message)
+        pingManager.receivePing(fromName: parsed.fromName, emoji: parsed.emoji,
+                                remoteID: parsed.remoteID, senderStyle: parsed.senderStyle,
+                                message: parsed.message)
     }
 }
 

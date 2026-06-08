@@ -286,17 +286,20 @@ final class PingQueueTests: XCTestCase {
         XCTAssertEqual(pm.queueCount, 2)
     }
 
-    func testQueueCapsAtTenOldestDrops() {
+    func testQueueCapsAtMaxOldestDrops() {
         let pm = makeManager()
-        // 12 distinct thoughts; one becomes nowPlaying, queue holds at most 10.
-        for i in 0..<12 {
-            pm.receivePing(fromName: "P\(i)", emoji: "\(i)", remoteID: UUID())
+        // maxQueued + 2 distinct thoughts: one becomes nowPlaying, the queue
+        // holds at most `maxQueued`, and the oldest WAITING one ages out.
+        let total = PingManager.maxQueued + 2
+        for i in 0..<total {
+            pm.receivePing(fromName: "P\(i)", emoji: "e\(i)", remoteID: UUID())
         }
         XCTAssertEqual(pm.queue.count, PingManager.maxQueued)
-        // The very first ("0") should have been dropped from the waiting list.
-        XCTAssertFalse(pm.queue.contains { $0.emoji == "0" },
-                       "oldest waiting thought should have aged out at 10")
-        XCTAssertTrue(pm.queue.contains { $0.emoji == "11" }, "newest must survive")
+        // "e0" played (nowPlaying); "e1" was the oldest waiting and aged out.
+        XCTAssertFalse(pm.queue.contains { $0.emoji == "e1" },
+                       "oldest waiting thought should have aged out at the cap")
+        XCTAssertTrue(pm.queue.contains { $0.emoji == "e\(total - 1)" },
+                      "newest must survive")
     }
 
     func testDuplicateByRemoteIDIgnored() {

@@ -107,12 +107,15 @@ final class CatchModeHardeningTests: XCTestCase {
         XCTAssertEqual(orb(270).x, -184, accuracy: 0.001) // west  → left
     }
 
-    func testQueueMaxTenEnforced() {
+    func testQueueMaxEnforced() {
         let pm = makeManager()
-        for i in 0..<12 { pm.receivePing(fromName: "P\(i)", emoji: "\(i)", remoteID: UUID()) }
+        // maxQueued + 2 distinct thoughts: one plays, the queue holds at most
+        // `maxQueued`, and the oldest waiting one ages out.
+        let total = PingManager.maxQueued + 2
+        for i in 0..<total { pm.receivePing(fromName: "P\(i)", emoji: "e\(i)", remoteID: UUID()) }
         XCTAssertEqual(pm.queue.count, PingManager.maxQueued)
-        XCTAssertFalse(pm.queue.contains { $0.emoji == "0" }, "oldest waiting thought ages out at 10")
-        XCTAssertTrue(pm.queue.contains { $0.emoji == "11" }, "the newest survives")
+        XCTAssertFalse(pm.queue.contains { $0.emoji == "e1" }, "oldest waiting thought ages out at the cap")
+        XCTAssertTrue(pm.queue.contains { $0.emoji == "e\(total - 1)" }, "the newest survives")
     }
 
     func testNewestOnlyTriggersCatch() {

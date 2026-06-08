@@ -1024,7 +1024,8 @@ struct CompassView: View {
                 .focused($messageFocused)
                 .submitLabel(.done)
                 .onChange(of: messageText) { _, newValue in
-                    if newValue.count > 30 { messageText = String(newValue.prefix(30)) }
+                    let clamped = MessageRules.clamped(newValue)
+                    if clamped != newValue { messageText = clamped }
                 }
             if !messageText.isEmpty {
                 Text("\(messageText.count)/30")

@@ -51,7 +51,7 @@ final class PingManager: ObservableObject {
     /// to 0 automatically when the user catches up (queue drains).
     @Published private(set) var unreadCount: Int = 0
 
-    static let maxQueued = 10
+    static let maxQueued = 50
 
     private let networkService: NetworkServiceProtocol
 
@@ -419,5 +419,25 @@ final class PingManager: ObservableObject {
     func clearPendingPing() {
         pendingPing = nil
         AppGroupStore.clearPendingPing()
+    }
+}
+
+// ── Message rules — the optional ≤30-char note that rides a thought ───────
+// Pure + testable, so the same clamping/normalizing runs in the compose UI
+// (CompassView) and the send path (SupabaseService.sendPing).
+enum MessageRules {
+    static let maxLength = 30
+
+    /// Trim a message to the maximum length (the compose field uses this).
+    static func clamped(_ message: String) -> String {
+        String(message.prefix(maxLength))
+    }
+
+    /// Normalize for sending: an empty/whitespace-only message becomes nil so
+    /// it's omitted from the payload entirely; otherwise it's clamped.
+    static func normalized(_ message: String?) -> String? {
+        guard let message else { return nil }
+        let trimmed = message.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : clamped(trimmed)
     }
 }
