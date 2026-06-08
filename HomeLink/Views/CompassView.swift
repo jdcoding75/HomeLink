@@ -284,6 +284,18 @@ struct CompassView: View {
                                 personEmoji: compass.state.personEmoji,
                                 onSend: { if let token = selectedToken { sendThought(token) } }
                             )
+                        case .plane:
+                            // ✈️ PLANE — wind the propeller (8 winds), let fly.
+                            // Owns its winding mechanic, then fires the send pipeline. [3/5]
+                            PlaneInstrumentView(
+                                loadedToken: selectedToken,
+                                loadedSymbol: selectedToken.map { AnyView(sendSymbol($0, size: 22)) },
+                                loadedEmoji: selectedToken.map { sendRemoteEmoji(for: $0) },
+                                bearingDegrees: compass.state.bearingDegrees,
+                                personName: compass.state.personName,
+                                personEmoji: compass.state.personEmoji,
+                                onLaunch: { if let token = selectedToken { sendThought(token) } }
+                            )
                         }
                     }
                     .id(instrumentStore.selected)              // crossfade on switch
@@ -695,7 +707,8 @@ struct CompassView: View {
         }
         .onChange(of: compass.state.isLocked)        { _, locked in handleLock(locked) }
         // [1/6] Thought history on the compass — icon, drawer, replay caption.
-        .overlay(alignment: .bottomLeading) { thoughtsIcon }
+        // [3/5] Moved top-left (below the nav bar), clear of the send controls.
+        .overlay(alignment: .topLeading) { thoughtsIcon }
         .overlay { thoughtsDrawerLayer }
         .overlay(alignment: .top) { replayCaptionView }
         .task(id: people.selectedPerson) { await loadCompassThoughts() }
@@ -1082,6 +1095,7 @@ struct CompassView: View {
         case .flick:   return "loaded ✓ · flick toward \(name)"
         case .rocket:  return "loaded ✓ · tap to fuel · blast off"
         case .wand:    return "loaded ✓ · shake · release"
+        case .plane:   return "loaded ✓ · wind it up · let fly"
         }
     }
 
@@ -1096,6 +1110,7 @@ struct CompassView: View {
         case .flick:   return "flick toward \(name) to send"
         case .rocket:  return "fuel the rocket toward \(name)"
         case .wand:    return "shake · release toward \(name)"
+        case .plane:   return "wind it up, then let fly toward \(name)"
         }
     }
 
@@ -1438,8 +1453,8 @@ struct CompassView: View {
 
     // MARK: - [1/6] Thought history on the compass
 
-    /// Bottom-left icon — a soft lavender sparkle cluster. Pulses gently when
-    /// thoughts exist, dims to 20 % when none, carries an unread badge.
+    /// [3/5] Top-left icon — a soft lavender sparkle cluster. Pulses gently
+    /// when thoughts exist, dims to 20 % when none, carries an unread badge.
     private var thoughtsIcon: some View {
         Button {
             guard thoughtsLoaded else { return }
@@ -1465,8 +1480,8 @@ struct CompassView: View {
             }
         }
         .buttonStyle(.plain)
-        .padding(.leading, 22)
-        .padding(.bottom, 30)
+        .padding(.leading, 16)
+        .padding(.top, 8)            // [3/5] just below the navigation bar
         .onAppear {
             withAnimation(AnimationSystem.easeInOutSine(3.0).repeatForever(autoreverses: true)) {
                 thoughtsIconPulse = true

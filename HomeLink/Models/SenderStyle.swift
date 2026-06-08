@@ -15,6 +15,7 @@ enum SenderStyle: String, CaseIterable, Identifiable {
     case bowArrow      = "bowArrow"        // pro
     case rocket        = "rocket"          // pro — fuel · aim · blast off
     case wand          = "wand"            // pro — load · shake · release
+    case plane         = "plane"           // pro — wind · let fly · glide
 
     var id: String { rawValue }
 
@@ -31,6 +32,7 @@ enum SenderStyle: String, CaseIterable, Identifiable {
         case .bowArrow:     return "bow & arrow"
         case .rocket:       return "rocket"
         case .wand:         return "wand"
+        case .plane:        return "paper plane"
         }
     }
 
@@ -43,6 +45,7 @@ enum SenderStyle: String, CaseIterable, Identifiable {
         case .bowArrow:     return "🏹"
         case .rocket:       return "🚀"
         case .wand:         return "🪄"
+        case .plane:        return "✈️"
         }
     }
 
@@ -56,6 +59,7 @@ enum SenderStyle: String, CaseIterable, Identifiable {
         case .bowArrow:     return "drawn and released"
         case .rocket:       return "fueled and launched"
         case .wand:         return "charged and cast"
+        case .plane:        return "wound and let fly"
         }
     }
 
@@ -70,6 +74,7 @@ enum SenderStyle: String, CaseIterable, Identifiable {
         case .bowArrow:     return 1.55   // transform 300 · draw 400 · hold 150 · flight 700
         case .rocket:       return 4.00   // countdown 1500 · ignition 200 · flight 1500 · exit 800
         case .wand:         return 2.00   // charge held · burst 200 · flight 1000 · trail 800
+        case .plane:        return 3.50   // wind · banking flight 2500 · glide out 1000
         }
     }
 
@@ -83,6 +88,7 @@ enum SenderStyle: String, CaseIterable, Identifiable {
         case .bowArrow:     return 0.50   // pulled out, flies home
         case .rocket:       return 0.80   // descends to landing pad with beeps
         case .wand:         return 0.45   // sparkle trail rushes to center
+        case .plane:        return 0.70   // glides in, banks, drops into the bucket
         }
     }
 

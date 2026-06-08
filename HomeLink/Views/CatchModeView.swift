@@ -409,9 +409,9 @@ struct CatchModeView: View {
     @ViewBuilder
     private var orbView: some View {
         switch style {
-        case .glow:
+        case .glow, .plane:
             // 40 px circle, warm glow matching the emoji hue,
-            // 60 % opacity breathing 0.8–1.0, 900 ms cycle
+            // 60 % opacity breathing 0.8–1.0, 900 ms cycle (plane shares it)
             Circle()
                 .fill(RadialGradient(colors: [hue.opacity(0.9), hue.opacity(0.3), .clear],
                                      center: .center, startRadius: 4, endRadius: 22))

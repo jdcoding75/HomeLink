@@ -31,6 +31,7 @@ struct InstrumentPreview: View {
         case .flick:   FlickLaunchPreview()
         case .rocket:  RocketLaunchPreview()
         case .wand:    WandChargePreview()
+        case .plane:   PlaneLaunchPreview()
         }
     }
 
@@ -419,6 +420,7 @@ extension Instrument {
         case .bowArrow:            instrument = .bow
         case .rocket:              instrument = .rocket
         case .wand:                instrument = .wand
+        case .plane:               instrument = .plane
         }
         defaults.set(instrument.rawValue, forKey: InstrumentStore.storageKey)
     }

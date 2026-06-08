@@ -727,6 +727,7 @@ struct SenderStylePreview: View {
         case .bowArrow:     return 1.0
         case .rocket:       return 1.1
         case .wand:         return 1.0
+        case .plane:        return 1.4
         }
     }
 
@@ -739,6 +740,7 @@ struct SenderStylePreview: View {
         case .bowArrow:     return AnimationSystem.easeOutCubic(duration)
         case .rocket:       return .easeIn(duration: duration)
         case .wand:         return AnimationSystem.easeOutCubic(duration)
+        case .plane:        return AnimationSystem.easeInOutSine(duration)
         }
     }
 
@@ -829,6 +831,12 @@ struct SenderStylePreview: View {
                     .frame(width: 6, height: 6)
             }
             .shadow(color: Color(hex: "#D4AF37").opacity(0.7), radius: 5)
+        case .plane:
+            // A little plane gliding along on a banked path ✈️
+            Text("✈️")
+                .font(.system(size: 16))
+                .rotationEffect(.degrees(-18))
+                .shadow(color: Color(hex: "#c4a8d4").opacity(0.6), radius: 4)
         }
     }
 

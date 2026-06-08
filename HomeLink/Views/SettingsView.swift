@@ -29,6 +29,11 @@ struct SettingsView: View {
     @State private var showAbout      = false
     @State private var showUnlock     = false
     @State private var showAccount    = false
+    #if DEBUG
+    @State private var showClearAllConfirm = false
+    @State private var showClearConnConfirm = false
+    @State private var devBusy = false
+    #endif
 
     var body: some View {
         ZStack {
@@ -61,6 +66,11 @@ struct SettingsView: View {
                     sectionHeader("about")
                     aboutSection
 
+                    #if DEBUG
+                    sectionHeader("developer")
+                    developerSection
+                    #endif
+
                     // ── Stripped in the emotional-core pass (kept, not lost) ──
                     // sectionHeader("about")
                     // aboutSection              // story · version · offline
@@ -92,7 +102,88 @@ struct SettingsView: View {
         .sheet(isPresented: $showAccount) {
             AccountView()
         }
+        #if DEBUG
+        .confirmationDialog("Clear all my data",
+                            isPresented: $showClearAllConfirm, titleVisibility: .visible) {
+            Button("Delete everything", role: .destructive) { runClearAll() }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This will delete all your Pointward data from the server. Are you sure?")
+        }
+        .confirmationDialog("Clear partner connection",
+                            isPresented: $showClearConnConfirm, titleVisibility: .visible) {
+            Button("Remove connection", role: .destructive) { runClearConnections() }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Removes your pairing only — your thought history is kept. Good for testing pairing again.")
+        }
+        #endif
     }
+
+    #if DEBUG
+    // MARK: - [5/5] Developer (DEBUG only — never ships)
+
+    private var developerSection: some View {
+        settingsGroup {
+            Button { showClearAllConfirm = true } label: {
+                settingsRow {
+                    Image(systemName: "trash")
+                        .settingsIcon()
+                        .foregroundColor(.red)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Clear all my data")
+                            .settingsLabel()
+                            .foregroundColor(.red)
+                        Text("wipe everything server-side · sign out")
+                            .font(.system(size: 11))
+                            .foregroundColor(DesignTokens.Color.textMuted)
+                    }
+                    Spacer()
+                }
+            }
+            .buttonStyle(.plain)
+            .disabled(devBusy)
+
+            Button { showClearConnConfirm = true } label: {
+                settingsRow {
+                    Image(systemName: "person.crop.circle.badge.xmark")
+                        .settingsIcon()
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Clear partner connection only")
+                            .settingsLabel()
+                        Text("keeps history · re-test pairing")
+                            .font(.system(size: 11))
+                            .foregroundColor(DesignTokens.Color.textMuted)
+                    }
+                    Spacer()
+                }
+            }
+            .buttonStyle(.plain)
+            .disabled(devBusy)
+        }
+    }
+
+    private func runClearAll() {
+        devBusy = true
+        Task {
+            try? await SupabaseService.shared.clearAllMyData()
+            await MainActor.run {
+                devBusy = false
+                // Sign-out flips the app back to onboarding via RootView's
+                // auth observer; nudge the compass tab so it lands cleanly.
+                NotificationCenter.default.post(name: .pointwardOpenCompass, object: nil)
+            }
+        }
+    }
+
+    private func runClearConnections() {
+        devBusy = true
+        Task {
+            try? await SupabaseService.shared.clearConnectionsOnly()
+            await MainActor.run { devBusy = false }
+        }
+    }
+    #endif
 
     // MARK: - Pro
 

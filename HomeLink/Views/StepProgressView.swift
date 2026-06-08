@@ -29,6 +29,7 @@ struct StepProgressView: View {
         case .wand:    return ["load", "shake", "release"]
         case .firefly: return ["load", "breathe"]        // wind
         case .rocket:  return ["load", "fuel", "aim", "launch"]
+        case .plane:   return ["load", "wind", "let fly"]
         }
     }
 

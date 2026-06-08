@@ -1,7 +1,7 @@
 // Instrument.swift
 // Pointward › Models
 //
-// THE FOUR INSTRUMENTS — one selection defines everything: the main-screen
+// THE INSTRUMENTS — one selection defines everything: the main-screen
 // visual, the send mechanic, the flight, and the catch on the other side.
 // This replaces the old compass + sender-style two-selection system.
 
@@ -14,6 +14,7 @@ enum Instrument: String, CaseIterable, Codable, Identifiable {
     case flick    = "flick"     // pro
     case rocket   = "rocket"    // pro — fuel · aim · blast off
     case wand     = "wand"      // pro — load · shake · release
+    case plane    = "plane"     // pro — wind · let fly · glide
 
     var id: String { rawValue }
 
@@ -27,6 +28,7 @@ enum Instrument: String, CaseIterable, Codable, Identifiable {
         case .flick:   return "flick"     //    (case name kept — wire format)
         case .rocket:  return "rocket"
         case .wand:    return "wand"
+        case .plane:   return "plane"
         }
     }
 
@@ -38,6 +40,7 @@ enum Instrument: String, CaseIterable, Codable, Identifiable {
         case .flick:   return "load · aim · launch"
         case .rocket:  return "fuel · aim · blast off"
         case .wand:    return "load · shake · release"
+        case .plane:   return "wind · let fly"
         }
     }
 
@@ -49,6 +52,7 @@ enum Instrument: String, CaseIterable, Codable, Identifiable {
         case .flick:   return "👆"
         case .rocket:  return "🚀"
         case .wand:    return "🪄"
+        case .plane:   return "✈️"
         }
     }
 
@@ -62,6 +66,7 @@ enum Instrument: String, CaseIterable, Codable, Identifiable {
         case .flick:   return .fingerFlick
         case .rocket:  return .rocket
         case .wand:    return .wand
+        case .plane:   return .plane
         }
     }
 
@@ -72,8 +77,8 @@ enum Instrument: String, CaseIterable, Codable, Identifiable {
     /// instrument views implement structurally, as testable data.
     var requiresAlignment: Bool {
         switch self {
-        case .compass, .bow, .flick, .rocket: return true
-        case .firefly, .wand:                 return false   // wind · wand: no aim
+        case .compass, .bow, .flick, .rocket, .plane: return true
+        case .firefly, .wand:                         return false   // wind · wand: no aim
         }
     }
 }

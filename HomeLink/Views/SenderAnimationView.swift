@@ -192,6 +192,7 @@ struct SenderAnimationView<Symbol: View>: View {
         case .bowArrow:     return Self.amber2
         case .rocket:       return Self.rocketOrange
         case .wand:         return Self.wandGold
+        case .plane:        return Self.gold   // ✈️ placeholder flight tint [3/5]
         }
     }
 
@@ -228,6 +229,7 @@ struct SenderAnimationView<Symbol: View>: View {
                     case .bowArrow:     bowArrowSend(end: end)
                     case .rocket:       rocketSend(end: end)
                     case .wand:         wandSend(end: end)
+                    case .plane:        glowSend(end: end)   // ✈️ placeholder cross-screen flight [3/5]
                     }
 
                     // IMPACT — brief flash where the thought leaves the screen
@@ -988,7 +990,7 @@ struct SenderAnimationView<Symbol: View>: View {
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.20) { impact() }
             finish(after: 1.2 + AnimationSystem.Trail.linger + 0.4)
 
-        case .glow:
+        case .glow, .plane:   // ✈️ plane rides the glow launch as a placeholder [3/5]
             // [6/6] CHARGE 200 ms — the whole compass face expands and glows,
             // the needle locks, the golden ring blooms from center.
             chargeScale = 1.2
