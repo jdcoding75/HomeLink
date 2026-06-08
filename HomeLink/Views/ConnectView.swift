@@ -24,6 +24,8 @@ struct ConnectView: View {
     @State private var isBusy = false
     @State private var connected = false
     @State private var errorMessage: String?
+    /// Entered code → the acceptance flow (who → choose person → celebrate)
+    @State private var acceptingCode: String?
 
     private static let lavender = Color(hex: "#c4a8d4")
     private static let green    = Color(hex: "#5dcaa5")
@@ -282,40 +284,44 @@ struct ConnectView: View {
         }
     }
 
+    /// Entering a code opens the SAME acceptance flow as tapping a link:
+    /// who wants to connect → add as new person or link to someone you
+    /// know → celebration. (The previous instant-redeem path auto-linked
+    /// to the wrong card; superseded, kept below.)
     private func connect() {
         guard SupabaseService.localUserID != nil else {
             errorMessage = "Sign in first (Settings → account)."
             return
         }
-        isBusy = true
         errorMessage = nil
-        Self.log.info("connect: redeeming entered code POINT-\(codeInput, privacy: .public)")
-        Task {
-            defer { isBusy = false }
-            do {
-                let result = try await SupabaseService.shared.redeem("POINT-\(codeInput)")
-                // The invite may carry who it's from — bind (or auto-add)
-                // the RIGHT person card instead of blindly grabbing the
-                // selected/first one.
-                if let name = result.personName {
-                    people.addFromInvite(name: name,
-                                         emoji: result.personEmoji ?? "💜",
-                                         friendID: result.ownerID,
-                                         near: nil)
-                } else {
-                    people.bindConnection(friendID: result.ownerID)
-                }
-                Self.log.info("connect: paired ✓ with \(result.ownerID.uuidString, privacy: .public)")
-                HapticEngine.connectionFelt()
-                withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
-                    connected = true
-                }
-            } catch {
-                Self.log.error("connect: redeem failed — \(error.localizedDescription, privacy: .public)")
-                errorMessage = error.localizedDescription
-            }
-        }
+        Self.log.info("connect: opening acceptance flow for POINT-\(codeInput, privacy: .public)")
+        acceptingCode = SupabaseService.normalizePairingCode("POINT-\(codeInput)")
     }
+
+    // private func connectLegacy() {   // superseded by PairAcceptView — kept
+    //     isBusy = true
+    //     errorMessage = nil
+    //     Task {
+    //         defer { isBusy = false }
+    //         do {
+    //             let result = try await SupabaseService.shared.redeem("POINT-\(codeInput)")
+    //             if let name = result.personName {
+    //                 people.addFromInvite(name: name,
+    //                                      emoji: result.personEmoji ?? "💜",
+    //                                      friendID: result.ownerID,
+    //                                      near: nil)
+    //             } else {
+    //                 people.bindConnection(friendID: result.ownerID)
+    //             }
+    //             HapticEngine.connectionFelt()
+    //             withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
+    //                 connected = true
+    //             }
+    //         } catch {
+    //             errorMessage = error.localizedDescription
+    //         }
+    //     }
+    // }
 }
 
 // MARK: - iMessage composer wrapper

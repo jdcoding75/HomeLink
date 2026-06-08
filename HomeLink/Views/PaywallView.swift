@@ -1,7 +1,7 @@
 // PaywallView.swift
 // Pointward › Views
 //
-// One-time $1.99 unlock — NOT a subscription. No recurring charges,
+// One-time $2.99 unlock — NOT a subscription. No recurring charges,
 // no subscription language anywhere. Buy once, yours forever.
 
 import SwiftUI
@@ -15,7 +15,7 @@ struct PaywallView: View {
 
     private let features: [(emoji: String, text: String)] = [
         ("🏹", "bow & arrow — draw and release"),
-        ("🫧", "firefly — hold and guide"),
+        ("🌬️", "wind — breathe and release"),
         ("👆", "flick — load aim launch"),
         ("😤", "pro emojis and custom sounds"),
         ("📏", "funny distances"),
@@ -60,7 +60,7 @@ struct PaywallView: View {
                             .foregroundColor(DesignTokens.Color.textPrimary)
                             .padding(.bottom, 6)
 
-                        Text("the full experience · $1.99")
+                        Text("the full experience · $2.99")
                             .font(DesignTokens.Font.compassDistance)
                             .foregroundColor(DesignTokens.Color.textMuted)
                             .padding(.bottom, 3)
@@ -155,7 +155,7 @@ struct PaywallView: View {
                                         .tint(DesignTokens.Color.textPrimary)
                                         .scaleEffect(0.8)
                                 }
-                                Text(isPurchasing ? "unlocking…" : "unlock pro · $1.99")
+                                Text(isPurchasing ? "unlocking…" : "unlock pro · $2.99")
                             }
                             .font(DesignTokens.Font.label)
                             .foregroundColor(DesignTokens.Color.textPrimary)

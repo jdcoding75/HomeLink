@@ -66,7 +66,7 @@ struct SkinPickerView: View {
                     )
                     .onTapGesture {
                         if locked {
-                            // One-time $1.99 unlock opens all six skins
+                            // One-time $2.99 unlock opens all six skins
                             HapticEngine.paywallReached()
                             showUnlock = true
                         } else {

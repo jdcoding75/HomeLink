@@ -143,11 +143,17 @@ final class CompassManager: NSObject, ObservableObject {
         )
     }
 
+    /// ABSOLUTE bearing toward the tracked person (0° = true north) —
+    /// the mutual-pointing check compares this against the partner's
+    /// reported bearing. nil until a location fix exists.
+    @Published private(set) var rawBearingToTarget: Double?
+
     private func updateCompassState() {
         guard let userLocation, let target = targetPerson else { return }
         let userCoord   = userLocation.coordinate
         let targetCoord = target.coordinate
         let rawBearing  = BearingCalculator.bearing(from: userCoord, to: targetCoord)
+        rawBearingToTarget = rawBearing
         let distance    = BearingCalculator.distanceKm(from: userCoord, to: targetCoord)
         let relativeBearing = (rawBearing - currentHeading + 360)
             .truncatingRemainder(dividingBy: 360)

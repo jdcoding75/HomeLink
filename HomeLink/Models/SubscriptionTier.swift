@@ -3,12 +3,12 @@
 
 import Foundation
 
-/// Phase 1 model: free to download, one-time $1.99 purchase unlocks everything.
+/// Phase 1 model: free to download, one-time $2.99 purchase unlocks everything.
 /// No subscription — `.pro` is permanent once purchased.
 enum SubscriptionTier: String, Codable {
     case free
     // case unlocked     // renamed to .pro (rawValue kept for persistence)
-    case pro = "unlocked"   // one-time $1.99 purchase
+    case pro = "unlocked"   // one-time $2.99 purchase
     case institutional   // reserved for School Edition
 
     var maxPeople: Int {

@@ -14,12 +14,12 @@ final class SubscriptionManager: ObservableObject {
 
     init(skinStore: SkinStore? = nil) {
         self.skinStore = skinStore
-        // Free to download — the $1.99 one-time unlock persists across launches.
+        // Free to download — the $2.99 one-time unlock persists across launches.
         let saved = UserDefaults.standard.string(forKey: "subscriptionTier") ?? ""
         tier = SubscriptionTier(rawValue: saved) ?? .free
     }
 
-    /// One-time $1.99 unlock. Phase 1 simulates the purchase locally;
+    /// One-time $2.99 unlock. Phase 1 simulates the purchase locally;
     /// StoreKit wiring lands with App Store setup.
     func upgrade() async {
         tier = .pro

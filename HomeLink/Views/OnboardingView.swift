@@ -619,7 +619,7 @@ struct OnboardingView: View {
                 .foregroundColor(DesignTokens.Color.textPrimary)
                 .padding(.top, 26)
 
-            Text("$1.99 · one time · yours forever")
+            Text("$2.99 · one time · yours forever")
                 .font(.system(size: 14, design: .serif).italic())
                 .foregroundColor(Self.lavender.opacity(0.85))
                 .padding(.top, 8)

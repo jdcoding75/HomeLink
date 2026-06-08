@@ -12,8 +12,10 @@ final class LocalNotificationService: NotificationServiceProtocol {
 
     func scheduleLocalPingNotification(fromName: String, emoji: String) async throws {
         let content      = UNMutableNotificationContent()
-        content.title    = "\(fromName) is thinking of you"
-        content.body     = emoji
+        // The mystery is the gift — no emoji, no name, just the pull.
+        // (previous: title "[name] is thinking of you", body = the emoji)
+        content.title    = "Pointward"
+        content.body     = "A feeling is coming your way…"
         content.sound    = .default
         content.userInfo = ["pingEmoji": emoji, "fromName": fromName]
         let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 0.1, repeats: false)

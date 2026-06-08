@@ -124,14 +124,14 @@ struct ProSetupView: View {
             }
         } else {
             VStack(spacing: 12) {
-                Text("unlock Pointward Pro · $1.99")
+                Text("unlock Pointward Pro · $2.99")
                     .font(.system(size: 17, weight: .semibold, design: .serif))
                     .foregroundColor(DesignTokens.Color.textPrimary)
                 Button {
                     HapticEngine.paywallReached()
                     showPaywall = true
                 } label: {
-                    Text("unlock pro · $1.99")
+                    Text("unlock pro · $2.99")
                         .font(DesignTokens.Font.label)
                         .foregroundColor(DesignTokens.Color.textPrimary)
                         .frame(maxWidth: .infinity)

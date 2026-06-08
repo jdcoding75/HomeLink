@@ -11,6 +11,7 @@
 
 import Foundation
 import AVFoundation
+import AudioToolbox
 import Combine
 
 // MARK: - Custom thoughts
@@ -19,12 +20,47 @@ struct CustomThought: Codable, Equatable, Identifiable {
     enum SoundKind: Codable, Equatable {
         case recording          // audio file named custom-<id>.m4a
         case preset(String)     // a SoundEngine emoji token, e.g. "💜"
+        case system(UInt32)     // an Apple system sound id (curated list)
     }
 
     var id    = UUID()
     var emoji: String
     var name:  String?
     var sound: SoundKind
+}
+
+// MARK: - Apple system sounds (curated)
+
+/// The warm, pleasant corner of Apple's system sound library — notification
+/// tones, gentle alerts, soft UI sounds. No alarms, nothing harsh.
+enum SystemSoundLibrary {
+    struct Entry: Identifiable {
+        let id: UInt32          // SystemSoundID
+        let name: String
+        let category: String
+    }
+
+    static let curated: [Entry] = [
+        // Notification tones — the classic gentle ones
+        Entry(id: 1003, name: "tri-tone",  category: "notification"),
+        Entry(id: 1321, name: "bloom",     category: "notification"),
+        Entry(id: 1322, name: "calypso",   category: "notification"),
+        Entry(id: 1331, name: "spell",     category: "notification"),
+        // Alert tones — warm and melodic
+        Entry(id: 1325, name: "fanfare",   category: "alert"),
+        Entry(id: 1326, name: "ladder",    category: "alert"),
+        Entry(id: 1327, name: "minuet",    category: "alert"),
+        Entry(id: 1330, name: "sherwood",  category: "alert"),
+        Entry(id: 1334, name: "tiptoes",   category: "alert"),
+        Entry(id: 1336, name: "update",    category: "alert"),
+        // UI sounds — small and soft
+        Entry(id: 1001, name: "swoosh",    category: "ui"),
+        Entry(id: 1016, name: "tweet",     category: "ui"),
+    ]
+
+    static func play(_ id: UInt32) {
+        AudioServicesPlaySystemSound(SystemSoundID(id))
+    }
 }
 
 /// Up to five user-created thoughts, persisted as JSON in the documents
@@ -76,11 +112,14 @@ final class CustomThoughtStore: ObservableObject {
         persist()
     }
 
-    /// Play a thought's sound — the user's recording, or its preset voice.
+    /// Play a thought's sound — the user's recording, its preset voice,
+    /// or its Apple system sound.
     func play(_ thought: CustomThought) {
         switch thought.sound {
         case .preset(let token):
             SoundEngine.shared.play(for: token)
+        case .system(let soundID):
+            SystemSoundLibrary.play(soundID)
         case .recording:
             player = try? AVAudioPlayer(contentsOf: Self.soundURL(for: thought.id))
             player?.volume = 1.0   // quiet mode retired

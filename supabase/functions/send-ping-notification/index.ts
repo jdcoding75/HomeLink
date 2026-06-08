@@ -168,7 +168,7 @@ Deno.serve(async (req) => {
         aps: {
           alert: {
             title: `${pointerName ?? "someone"} is pointing toward you 🧭`,
-            body: "they're thinking of you",
+            body: "A feeling is coming your way…",
           },
           sound: "default",
         },
@@ -189,9 +189,11 @@ Deno.serve(async (req) => {
       .is("opened_at", null);
     const unread = count ?? 1;
 
+    // The mystery is the gift — no emoji, no name, just the pull.
+    // (previous: title = the emoji, body "someone sent you a thought")
     const alert = unread > 1
-      ? { title: "Pointward", body: `you have ${unread} thoughts waiting ✦` }
-      : { title: record.emoji ?? "💜", body: "someone sent you a thought" };
+      ? { title: "Pointward", body: `${unread} feelings are coming your way…` }
+      : { title: "Pointward", body: "A feeling is coming your way…" };
 
     // Resolve who it's from so the catch screen can say their name
     const senderName = record.from_user

@@ -52,12 +52,30 @@ struct RootView: View {
                 }
             }
 
+            // ── The mutual moment — both needles resting on each other.
+            // Golden glow over whatever is on screen, 3 s, then gone. ──────
+            if pings.mutualMoment != nil {
+                MutualMomentView(partnerName: pings.partnerPointingName)
+                    .transition(.opacity)
+                    .zIndex(9)
+            }
+
             // Branded launch moment — 1.5s, then fades into the app
             if showSplash {
                 SplashView()
                     .transition(.opacity)
                     .zIndex(10)
             }
+        }
+        .animation(.easeOut(duration: 0.8), value: pings.mutualMoment != nil)
+        // Our own lock edge can complete the mutual moment too — their
+        // pointing report may have arrived seconds before we settled.
+        .onChange(of: compass.state.isLocked) { _, locked in
+            guard locked, let raw = compass.rawBearingToTarget else { return }
+            pings.checkMutualPointing(
+                myAbsoluteBearing: raw,
+                myAlignmentError: BearingCalculator.alignmentError(
+                    relativeBearing: compass.state.bearingDegrees))
         }
         .onAppear {
             people.configure(with: modelContext)

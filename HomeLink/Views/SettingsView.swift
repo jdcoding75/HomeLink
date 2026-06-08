@@ -275,7 +275,7 @@ struct SettingsView: View {
                 Image(systemName: "sparkles")
                     .settingsIcon()
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Unlock Pointward — $1.99")
+                    Text("Unlock Pointward — $2.99")
                         .settingsLabel()
                     Text("unlimited people · all skins · widget — one-time purchase")
                         .font(.system(size: 11))
