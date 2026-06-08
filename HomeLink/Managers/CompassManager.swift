@@ -131,11 +131,12 @@ final class CompassManager: NSObject, ObservableObject {
 
     #if DEBUG
     // [2/4] Mock heading — slowly rotate the heading so alignment can be tested
-    // without physically turning the phone. DEBUG only.
+    // WITHOUT a real magnetometer (the Simulator). DEBUG only, and a REAL
+    // heading reading always disables it (see didUpdateHeading) so a stale
+    // toggle can never spin the compass on a real device outdoors.
     private var mockHeadingTimer: Timer?
     func setMockHeading(_ on: Bool) {
-        mockHeadingTimer?.invalidate()
-        mockHeadingTimer = nil
+        stopMockHeadingTimer()
         guard on else { return }
         isHeadingAvailable = true
         mockHeadingTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in
@@ -145,6 +146,10 @@ final class CompassManager: NSObject, ObservableObject {
                 self.updateCompassState()
             }
         }
+    }
+    private func stopMockHeadingTimer() {
+        mockHeadingTimer?.invalidate()
+        mockHeadingTimer = nil
     }
     #endif
 
@@ -160,6 +165,9 @@ final class CompassManager: NSObject, ObservableObject {
         locationManager.stopUpdatingHeading()
         locationManager.stopUpdatingLocation()
         stopPresenceTimer()
+        #if DEBUG
+        stopMockHeadingTimer()   // never let a test toggle spin in the background
+        #endif
         locationManager.desiredAccuracy = kCLLocationAccuracyKilometer
     }
 
@@ -248,6 +256,13 @@ extension CompassManager: CLLocationManagerDelegate {
         updateCompassState()
     }
     func locationManager(_ manager: CLLocationManager, didUpdateHeading newHeading: CLHeading) {
+        #if DEBUG
+        // A real heading reading is authoritative — it disables any stale
+        // mock-heading test toggle so the marker can never spin on its own on
+        // a real device. (Mock heading survives only in the Simulator, where
+        // these real readings never arrive.)
+        stopMockHeadingTimer()
+        #endif
         // Throttle: ignore sub-degree magnetometer jitter — this gates both
         // the math and the SwiftUI redraws to meaningful changes only.
         let heading = newHeading.magneticHeading
