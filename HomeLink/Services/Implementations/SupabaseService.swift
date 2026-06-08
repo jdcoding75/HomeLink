@@ -390,14 +390,34 @@ final class SupabaseService: ObservableObject {
         }
 
         // Atomic claim: only an UNCLAIMED row matches — two phones racing on
-        // the same code can't both win.
-        try await withRetry(label: "redeem.claim") {
-            try await client
-                .from("connections")
-                .update(["friend": me.uuidString])
-                .eq("code", value: code)
-                .is("friend", value: nil)
-                .execute()
+        // the same code can't both win. friend_person_id records WHICH of
+        // the recipient's cards is the sender, so both sides stay linked to
+        // the right person. (Falls back to friend-only if the column is
+        // missing — pre-migration databases.)
+        var claim = ["friend": me.uuidString]
+        if let friendPersonID { claim["friend_person_id"] = friendPersonID.uuidString }
+        do {
+            let payload = claim
+            try await withRetry(label: "redeem.claim") {
+                try await client
+                    .from("connections")
+                    .update(payload)
+                    .eq("code", value: code)
+                    .is("friend", value: nil)
+                    .execute()
+            }
+        } catch let error as SupabaseServiceError {
+            throw error
+        } catch {
+            log.warning("redeem: claim with friend_person_id failed (pre-migration schema?) — retrying friend-only")
+            try await withRetry(label: "redeem.claim.legacy") {
+                try await client
+                    .from("connections")
+                    .update(["friend": me.uuidString])
+                    .eq("code", value: code)
+                    .is("friend", value: nil)
+                    .execute()
+            }
         }
 
         // Verify the claim landed — RLS (or losing the race) can match zero

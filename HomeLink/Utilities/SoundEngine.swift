@@ -21,12 +21,16 @@ final class SoundEngine {
 
     /// Token → ready-to-play buffer + lane volume. Built once at startup.
     private var cache: [String: (buffer: AVAudioPCMBuffer, volume: Float)] = [:]
+    /// PRO: the same voices, pre-rendered through proEnhanced() — layered,
+    /// warmer, richer. Built once; play(for:) picks by tier at tap time.
+    private var proCache: [String: (buffer: AVAudioPCMBuffer, volume: Float)] = [:]
 
     private init() {
         format = AVAudioFormat(standardFormatWithSampleRate: 44_100, channels: 1)!
         // Ambient: respects the silent switch, mixes with the user's music.
         try? AVAudioSession.sharedInstance().setCategory(.ambient, options: [.mixWithOthers])
         buildCache()
+        buildProCache()
     }
 
     // Quiet Mode retired — full emotional intensity, always.
@@ -97,9 +101,72 @@ final class SoundEngine {
     }
 
     /// Instant playback from cache — safe to call on the tap path.
+    /// Free: single clean voice. Pro: the layered enhanced version of the
+    /// same voice (catch reveals, send completions, confirmations — all of
+    /// them route through here).
     func play(for token: String) {
+        if isProTier, let rich = proCache[token] {
+            play(rich.buffer, volume: rich.volume)
+            return
+        }
         guard let entry = cache[token] else { return }
         play(entry.buffer, volume: entry.volume)
+    }
+
+    /// Read the tier straight from UserDefaults — SoundEngine has no view
+    /// model, and the check must be instant on the tap path.
+    private var isProTier: Bool {
+        let raw = UserDefaults.standard.string(forKey: "subscriptionTier") ?? ""
+        return (SubscriptionTier(rawValue: raw) ?? .free) != .free
+    }
+
+    // MARK: - Pro enhancement (layered warmth)
+
+    /// Every cached voice gets a pre-rendered enhanced sibling.
+    private func buildProCache() {
+        for (token, entry) in cache {
+            if let rich = proEnhanced(entry.buffer) {
+                proCache[token] = (rich, entry.volume)
+            }
+        }
+    }
+
+    /// PRO ENHANCED — the same voice, three times, barely apart:
+    ///   layer 1 · the original                      · 100 %
+    ///   layer 2 · +7 ms, pitch +2 % (resampled)     ·  60 %
+    ///   layer 3 · +14 ms, 85 % of its own volume    ·  40 %
+    /// The micro-offsets and detune read as warmth and body — one voice
+    /// becoming a small chorus. Normalized back into headroom.
+    private func proEnhanced(_ base: AVAudioPCMBuffer) -> AVAudioPCMBuffer? {
+        let baseFrames = Int(base.frameLength)
+        guard baseFrames > 0, let src = base.floatChannelData?[0] else { return nil }
+        let offset2 = Int(0.007 * sampleRate)   //  +7 ms
+        let offset3 = Int(0.014 * sampleRate)   // +14 ms
+        let pitch2  = 1.02                      //  +2 % — slight detune
+        let total   = baseFrames + offset3
+        guard let (buf, data, n) = makeBuffer(duration: Double(total) / sampleRate) else {
+            return nil
+        }
+        for i in 0..<n {
+            var s = 0.0
+            // Layer 1 — the voice itself
+            if i < baseFrames { s += Double(src[i]) }
+            // Layer 2 — 7 ms behind, 2 % sharp (linear-interp resample)
+            if i >= offset2 {
+                let pos = Double(i - offset2) * pitch2
+                let j = Int(pos)
+                if j + 1 < baseFrames {
+                    let frac = pos - Double(j)
+                    s += (Double(src[j]) * (1 - frac) + Double(src[j + 1]) * frac) * 0.60
+                }
+            }
+            // Layer 3 — 14 ms behind, slightly quieter copy
+            let k = i - offset3
+            if k >= 0 && k < baseFrames { s += Double(src[k]) * 0.85 * 0.40 }
+            // Blend back into headroom (sum of gains ≈ 1.94)
+            data[i] = Float(max(-1, min(1, s / 1.4)))
+        }
+        return buf
     }
 
     // MARK: - Core signatures (Pro Mode OFF)

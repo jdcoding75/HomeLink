@@ -27,6 +27,11 @@ create table if not exists public.connections (
 alter table public.connections add column if not exists person_name text;
 alter table public.connections add column if not exists person_emoji text;
 alter table public.connections add column if not exists owner_person_id uuid;
+alter table public.connections add column if not exists friend_person_id uuid;
+
+-- Realtime: the inviter's phone watches its own rows for the claim —
+-- both phones celebrate the moment the friend column fills in.
+alter publication supabase_realtime add table public.connections;
 alter table public.connections enable row level security;
 create policy "connections read"       on public.connections for select using (true);
 create policy "connections insert own" on public.connections for insert with check (auth.uid() = owner);

@@ -1,14 +1,11 @@
 {
   "permissions": {
     "allow": [
-      "bash(*)",
-      "edit(*)",
-      "write(*)",
-      "read(*)",
-      "computer(*)",
-      "mcp(*)"
+      "Bash",
+      "Edit",
+      "Write",
+      "Read"
     ],
-    "defaultMode": "allowAll",
-    "autoApprove": true
+    "defaultMode": "bypassPermissions"
   }
 }

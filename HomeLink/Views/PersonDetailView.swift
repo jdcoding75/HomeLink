@@ -366,7 +366,10 @@ struct PersonDetailView: View {
         Task {
             defer { isBusy = false }
             do {
-                let result = try await SupabaseService.shared.redeem(codeInput)
+                // Entering a code on THIS card is an explicit choice — the
+                // claim carries this card's id as friend_person_id.
+                let result = try await SupabaseService.shared.redeem(codeInput,
+                                                                     friendPersonID: person.id)
                 person.pairedUserID = result.ownerID.uuidString   // bind to this person
                 try? people.save()
                 connectedNow = true

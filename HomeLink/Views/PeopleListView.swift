@@ -169,6 +169,13 @@ struct PeopleListView: View {
 
 }
 
+// MARK: - Notifications
+
+extension Notification.Name {
+    /// Posted by the post-onboarding connect prompt — MainTabView jumps to People.
+    static let pointwardOpenPeople = Notification.Name("pointwardOpenPeople")
+}
+
 // MARK: - PersonCard
 
 // A relationship, not a contact-list row: large glowing avatar, bold name,

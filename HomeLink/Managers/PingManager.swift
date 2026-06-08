@@ -117,6 +117,55 @@ final class PingManager: ObservableObject {
         }
     }
 
+    // ── Offline catch queue — thoughts that arrived while we were away ──
+    //
+    // Realtime and pushes both miss when the app is offline; the pings are
+    // safe in Supabase. On every foreground/reconnect we sweep for unread
+    // ones we've never SEEN: the newest becomes the catch, the rest stay in
+    // History (they're already there server-side). No error states — quiet
+    // either way.
+
+    /// Ping ids that ever entered the local queue — so offline sweeps never
+    /// re-trigger a catch for something already offered. Capped at 100.
+    private var seenPingIDs: [String] {
+        get { UserDefaults.standard.stringArray(forKey: "seenPingIDs") ?? [] }
+        set { UserDefaults.standard.set(Array(newValue.suffix(100)), forKey: "seenPingIDs") }
+    }
+
+    private func rememberSeen(_ id: UUID?) {
+        guard let id else { return }
+        var seen = seenPingIDs
+        guard !seen.contains(id.uuidString) else { return }
+        seen.append(id.uuidString)
+        seenPingIDs = seen
+    }
+
+    /// Sweep one partner's pings for unread thoughts that never reached
+    /// this device. `resolveName` maps the partner id to their card name.
+    func syncMissedThoughts(partnerID: UUID, partnerName: String) async {
+        let records = await SupabaseService.shared.fetchPings(with: partnerID)
+        let me = SupabaseService.localUserID
+        let seen = Set(seenPingIDs)
+        // Unread, addressed to me, never seen here — oldest…newest
+        let missed = records
+            .filter { record in
+                record.openedAt == nil
+                    && record.toUser.uuidString == me?.uuidString
+                    && !seen.contains(record.id.uuidString)
+            }
+            .sorted { $0.createdAt < $1.createdAt }
+        guard !missed.isEmpty else { return }
+        log.info("offline-sync: \(missed.count) missed thought(s) from \(partnerName, privacy: .public)")
+
+        // All are remembered as seen; only the NEWEST goes through the
+        // queue → catch. Older ones rest in History (already server-side).
+        for record in missed { rememberSeen(record.id) }
+        if let newest = missed.last {
+            receivePing(fromName: partnerName, emoji: newest.emoji,
+                        remoteID: newest.id, senderStyle: newest.senderStyle)
+        }
+    }
+
     func sendPing(to person: Person, emoji: String) async {
         isSending = true
         defer { isSending = false }
@@ -213,9 +262,17 @@ final class PingManager: ObservableObject {
 
         let ping = ReceivedPing(fromName: fromName, emoji: emoji, timestamp: .now,
                                 remoteID: remoteID, senderStyle: senderStyle)
-        // The queue holds at most the newest un-caught thought — an older
-        // waiting one is superseded (→ History, never lost).
-        queue = [ping]
+        // MULTI-SENDER QUEUE: an active catch is NEVER interrupted, and
+        // waiting thoughts are ALL kept — each with its own sender name and
+        // style, so every later catch and replay is correctly attributed.
+        // Oldest drops past 10 (it lives in History server-side anyway).
+        var updated = queue
+        updated.append(ping)
+        if updated.count > Self.maxQueued {
+            updated.removeFirst(updated.count - Self.maxQueued)
+        }
+        queue = updated
+        rememberSeen(remoteID)
         AppGroupStore.pendingPingEmoji     = emoji
         AppGroupStore.pendingPingFromName  = fromName
         AppGroupStore.pendingPingTimestamp = .now
@@ -225,9 +282,9 @@ final class PingManager: ObservableObject {
             log.info("receivePing: arrived while \(self.unreadCount) unread — silent (badge only)")
         }
 
-        // A catch already on screen finishes its moment; the newest waits
-        // its turn and starts the instant the screen frees up.
-        if nowPlaying == nil {
+        // A catch already on screen finishes its moment; anything else
+        // waits on the badge and plays when the user taps for it.
+        if nowPlaying == nil && queue.count == 1 {
             playNext()
         }
     }
@@ -320,17 +377,21 @@ final class PingManager: ObservableObject {
         }
     }
 
-    /// Called when an arrival animation completes — auto-advances to the
-    /// next thought after 2 seconds (tap skips ahead immediately).
+    /// Called when an arrival animation completes. Waiting thoughts do NOT
+    /// auto-play — the badge shows the count and the user taps to catch the
+    /// next when ready. (previous: auto-advance after 2 s — retired)
     func finishedPlaying(_ ping: ReceivedPing) {
         guard nowPlaying?.id == ping.id else { return }
         nowPlaying = nil
         AppGroupStore.clearPendingPing()
-        guard !queue.isEmpty else { return }
-        Task {
-            try? await Task.sleep(nanoseconds: 2_000_000_000)
-            if nowPlaying == nil { playNext() }
+        if !queue.isEmpty {
+            log.info("queue: \(self.queue.count) thought(s) waiting — badge shows, user taps to catch")
         }
+        // guard !queue.isEmpty else { return }            // (auto-advance retired)
+        // Task {
+        //     try? await Task.sleep(nanoseconds: 2_000_000_000)
+        //     if nowPlaying == nil { playNext() }
+        // }
     }
 
     /// Tap-to-skip: jump straight to the next thought, no 2-second gap.

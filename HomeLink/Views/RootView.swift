@@ -189,6 +189,14 @@ struct RootView: View {
                 rootLog.error("realtime: connection discovery failed: \(error.localizedDescription, privacy: .public)")
             }
 
+            // OFFLINE CATCH-UP: sweep every paired person for thoughts that
+            // arrived while we were away — newest becomes the catch, the
+            // rest are already resting in History. Quiet on failure.
+            for person in people.people {
+                guard let pid = person.pairedUserID.flatMap(UUID.init) else { continue }
+                await pings.syncMissedThoughts(partnerID: pid, partnerName: person.name)
+            }
+
             await SupabaseService.shared.startRealtime(
                 partner: partner,
                 onPing: { event in
@@ -271,7 +279,9 @@ struct PostOnboardConnectPrompt: View {
         ZStack {
             DesignTokens.Color.background.ignoresSafeArea()
 
-            if showFullConnect {
+            // (ConnectView unrouted — the prompt now leads to the person's
+            //  own card in People, where connecting lives)
+            if false, showFullConnect {
                 ConnectView()
             } else {
                 VStack(spacing: 14) {
@@ -281,14 +291,16 @@ struct PostOnboardConnectPrompt: View {
                     Text("want to connect with someone?")
                         .font(.system(size: 20, weight: .semibold, design: .serif))
                         .foregroundColor(DesignTokens.Color.textPrimary)
-                    Text("paired compasses feel each other's thoughts")
+                    Text("open their card in People and tap\n“connect with them”")
                         .font(.system(size: 13, design: .serif).italic())
                         .foregroundColor(DesignTokens.Color.textMuted)
+                        .multilineTextAlignment(.center)
 
                     Button {
-                        withAnimation(.easeOut(duration: 0.3)) { showFullConnect = true }
+                        dismiss()
+                        NotificationCenter.default.post(name: .pointwardOpenPeople, object: nil)
                     } label: {
-                        Text("connect now →")
+                        Text("take me there →")
                             .font(DesignTokens.Font.label)
                             .foregroundColor(DesignTokens.Color.textPrimary)
                             .frame(maxWidth: .infinity)
@@ -596,6 +608,10 @@ struct MainTabView: View {
         // A notification-opened catch needs the compass visible
         .onReceive(NotificationCenter.default.publisher(for: .pointwardOpenCompass)) { _ in
             selectedTab = 0
+        }
+        // The post-onboarding prompt leads here — connecting lives on cards
+        .onReceive(NotificationCenter.default.publisher(for: .pointwardOpenPeople)) { _ in
+            selectedTab = 1
         }
         // (thoughts tab retired — the pill/notification path is gone)
         // .onReceive(NotificationCenter.default.publisher(for: .pointwardOpenThoughts)) { _ in

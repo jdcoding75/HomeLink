@@ -476,13 +476,17 @@ struct PairAcceptView: View {
 
     /// Shared guard + redeem. Returns the partner id, or nil after showing
     /// the error.
-    private func redeemFirst() async -> UUID? {
+    /// Shared guard + redeem. The chosen card's id rides along as
+    /// friend_person_id so BOTH sides of the connection know which person
+    /// the link belongs to. Returns the partner id, or nil after showing
+    /// the error.
+    private func redeemFirst(cardID: UUID) async -> UUID? {
         guard SupabaseService.localUserID != nil else {
             errorMessage = "Sign in first — Settings → account — then try again."
             return nil
         }
         do {
-            let result = try await SupabaseService.shared.redeem(code)
+            let result = try await SupabaseService.shared.redeem(code, friendPersonID: cardID)
             return result.ownerID
         } catch {
             Self.log.error("accept: redeem failed — \(error.localizedDescription, privacy: .public)")
@@ -496,23 +500,24 @@ struct PairAcceptView: View {
         errorMessage = nil
         Task {
             defer { isBusy = false }
-            guard let partnerID = await redeemFirst() else { return }
-            // Build the card exactly as completed — geocoded when an
-            // address was found, otherwise near the recipient (editable later)
+            // Build the card FIRST so its id can travel with the claim —
+            // geocoded when an address was found, otherwise near the
+            // recipient (editable later). Inserted only after redeem lands.
             let person: Person
             if let geocoded = geocodedLocation {
                 person = Person(name: newName.trimmingCharacters(in: .whitespaces),
                                 emoji: newEmoji, geocoded: geocoded)
-                person.pairedUserID = partnerID.uuidString
-                people.insertFromInvite(person)
             } else {
-                person = people.addFromInvite(
-                    name: newName.trimmingCharacters(in: .whitespaces),
-                    emoji: newEmoji,
-                    friendID: partnerID,
-                    near: compass.userLocation?.coordinate
-                ) ?? Person(name: newName, emoji: newEmoji, latitude: 0, longitude: 0)
+                let coordinate = compass.userLocation?.coordinate
+                person = Person(name: newName.trimmingCharacters(in: .whitespaces),
+                                emoji: newEmoji,
+                                latitude: coordinate?.latitude ?? 0,
+                                longitude: coordinate?.longitude ?? 0,
+                                locationDisplayName: newName)
             }
+            guard let partnerID = await redeemFirst(cardID: person.id) else { return }
+            person.pairedUserID = partnerID.uuidString
+            people.insertFromInvite(person)
             Self.log.info("accept: paired ✓ as NEW person \(person.name, privacy: .public)")
             celebrate(with: person)
         }
@@ -523,7 +528,7 @@ struct PairAcceptView: View {
         errorMessage = nil
         Task {
             defer { isBusy = false }
-            guard let partnerID = await redeemFirst() else { return }
+            guard let partnerID = await redeemFirst(cardID: person.id) else { return }
             person.pairedUserID = partnerID.uuidString
             try? people.save()
             Self.log.info("accept: paired ✓ linked to EXISTING person \(person.name, privacy: .public)")
