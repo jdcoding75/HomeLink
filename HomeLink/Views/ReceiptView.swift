@@ -29,7 +29,7 @@ struct ReceiptView: View {
     @EnvironmentObject var compass: CompassManager
     @EnvironmentObject var pings:   PingManager
 
-    private enum Phase { case arriving, seeking, locked, dropping, caught, revealed }
+    private enum Phase { case arriving, seeking, locked, landing, dropping, caught, revealed }
     @State private var phase: Phase = .arriving
 
     @State private var arrivalPulse = false
@@ -116,7 +116,11 @@ struct ReceiptView: View {
 
     private func middleZone(geo: GeometryProxy) -> some View {
         ZStack {
-            if phase == .revealed {
+            if phase == .landing {
+                // The dramatic per-instrument landing plays over the world.
+                InstrumentLandingView(style: style, emoji: ping.emoji,
+                                      onComplete: { revealAfterLanding() })
+            } else if phase == .revealed {
                 VStack(spacing: 18) {
                     ZStack {
                         Circle().fill(hue.opacity(0.22)).frame(width: 220, height: 220).blur(radius: 44)
@@ -359,10 +363,23 @@ struct ReceiptView: View {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
             withAnimation(.easeOut(duration: 0.12)) { lockFlash = false }
         }
-        withAnimation(.easeOut(duration: 0.3)) { dimWorld = true }
-        phase = .dropping
-        withAnimation(.easeIn(duration: 0.5)) { approach = 1 }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { caught() }
+        // The thought is locked — the dramatic per-instrument LANDING plays.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+            withAnimation(.easeInOut(duration: 0.3)) { phase = .landing }
+        }
+    }
+
+    /// The landing animation finished (emoji emerged) → settle into the reveal.
+    private func revealAfterLanding() {
+        guard phase == .landing else { return }
+        phase = .revealed
+        onRevealed()
+        bloomed = true
+        named = true
+        withAnimation(.easeOut(duration: 0.2)) { revealFlood = true }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+            withAnimation(.easeIn(duration: 0.2)) { revealFlood = false }
+        }
     }
 
     private func caught() {
