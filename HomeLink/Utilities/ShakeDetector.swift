@@ -30,9 +30,12 @@ final class ShakeDetector: ObservableObject {
     /// Fires the instant the charge first reaches full.
     var onFull: (() -> Void)?
 
-    static let shakesToFull = 5
-    private let shakeThreshold: Double = 2.5    // g — a deliberate shake
-    private let resetThreshold: Double = 1.3    // must fall below before next
+    // [2/6] Magical and responsive — a gentle shake counts, and only THREE
+    // fill the crystal (≈34 % each). Was 2.5 g / 5 shakes, which felt like a
+    // workout.
+    static let shakesToFull = 3
+    private let shakeThreshold: Double = 1.5    // g — a gentle, deliberate shake
+    private let resetThreshold: Double = 1.2    // must fall below before next
     private let minInterval: Double    = 0.12   // seconds between counted shakes
 
     #if canImport(CoreMotion)

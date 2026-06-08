@@ -115,6 +115,8 @@ struct CatchModeView: View {
     /// that updates as the user turns toward the sender: cardinal direction
     /// far out → "keep turning right" closer → "hold steady" on lock.
     private var catchInstruction: String {
+        // [3/6] WIND finds you — no aiming, just receive it.
+        if style == .firefly { return "breathe it in — it finds you ✦" }
         // [1/3] Spin the bucket — no phone turning.
         if phase == .locked { return "locked ✦" }
         switch angleError {
@@ -431,6 +433,10 @@ struct CatchModeView: View {
                 // After the moment lands a tap moves on; before that the
                 // catch is physical, not tappable.
                 if phase == .revealed { onFinished() }
+                // [3/6] WIND — tap to catch it now (no aiming). Wind is magic.
+                else if style == .firefly && (phase == .seeking || phase == .locked) {
+                    beginCatch()
+                }
             }
         }
         .onAppear { begin() }
@@ -714,6 +720,14 @@ struct CatchModeView: View {
         // 🪄 WAND — a full-screen sparkle storm bursts everywhere, then the
         // sparks converge to the sender's edge and form the catch orb.
         if style == .wand { beginWandStorm() }
+
+        // 🌬️ WIND — no aiming to receive. The leaf simply floats in: it
+        // auto-catches after 3 s, or a tap catches it now. Wind finds you.
+        if style == .firefly {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
+                if phase == .seeking { beginCatch() }
+            }
+        }
     }
 
     /// 50+ gold/purple sparks scatter across the whole screen for ~2 s, then
@@ -761,6 +775,10 @@ struct CatchModeView: View {
                                 height: .random(in: -amplitude...amplitude))
             }
         }
+
+        // [3/6] WIND needs NO aiming to catch — it auto-catches (or tap). Skip
+        // the bucket lock-on entirely; the leaf just floats in.
+        guard style != .firefly else { return }
 
         // [3/5] LOCK-ON inside 5° — the most satisfying click in the app.
         // Everything happens at once: a strong snap, the orb freezes, a white
@@ -817,6 +835,8 @@ struct CatchModeView: View {
     /// strain outward 10 px, pop loose, fly home with one mid-flight
     /// bounce, land with an easeOutBack pop.
     private func beginCatch() {
+        // [3/6] Guard against a double trigger (wind's tap + auto-catch timer).
+        guard phase == .seeking || phase == .locked else { return }
         Self.log.info("catch: CAUGHT — flying home (style=\(style.rawValue, privacy: .public))")
         phase = .flying
         jitter = .zero

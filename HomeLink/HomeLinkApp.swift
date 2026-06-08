@@ -34,6 +34,10 @@ struct PointwardApp: App {
         if DevTools.wantsSkipOnboarding {
             UserDefaults.standard.set(true, forKey: "hasCompletedOnboarding")
             UserDefaults.standard.set(true, forKey: DevTools.injectFlagKey)
+            // [4/6] Drop any queue persisted from an earlier mock-history run so
+            // a stale catch can't bury the compass on launch — skip-onboarding
+            // lands on a clean compass pointing at Sarah.
+            UserDefaults.standard.removeObject(forKey: "pendingThoughtQueue")
         }
         #endif
 

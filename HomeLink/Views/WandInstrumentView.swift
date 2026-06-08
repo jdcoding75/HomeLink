@@ -335,8 +335,9 @@ struct WandInstrumentView: View {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.18) {
             crystalSwing = .zero
         }
-        // [5/5] Each shake — a rhythmic light tap (the explosion is onFull).
-        if shakes < 5 { HapticEngine.wandShake() }
+        // [5/5] Each shake — a rhythmic light tap (the final one's explosion
+        // haptic is onFull). [2/6] keyed off shakesToFull, not a literal 5.
+        if shakes < ShakeDetector.shakesToFull { HapticEngine.wandShake() }
     }
 
     /// 10 Hz: spin both orbital rings (faster as charge climbs) and run the
