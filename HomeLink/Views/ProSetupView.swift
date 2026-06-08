@@ -14,7 +14,7 @@ struct ProSetupView: View {
     @Environment(\.dismiss) private var dismiss
 
     @AppStorage(ProFeatures.storageKey) private var proOn = false
-    @AppStorage("holdToSendEnabled")    private var holdToSend = false
+    // @AppStorage("holdToSendEnabled") private var holdToSend = false   // retired
     @AppStorage("funnyUnitLocked")      private var funnyUnitLocked = -1
     @AppStorage(SenderStyle.storageKey) private var senderStyleRaw = SenderStyle.glow.rawValue
 
@@ -618,26 +618,26 @@ struct ProSetupView: View {
         }
     }
 
-    // MARK: - Hold to send
-
-    private var holdToSendSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            sectionLabel("hold to send")
-            lockable {
-                HStack {
-                    Text("hold your phone toward them for 2 seconds to send instead of tapping")
-                        .font(.system(size: 12))
-                        .foregroundColor(DesignTokens.Color.textPrimary)
-                        .fixedSize(horizontal: false, vertical: true)
-                    Spacer()
-                    Toggle("", isOn: $holdToSend)
-                        .tint(Self.green)
-                        .labelsHidden()
-                }
-                .padding(14)
-            }
-        }
-    }
+    // MARK: - Hold to send (retired — the instruments ARE the mechanic)
+    //
+    // private var holdToSendSection: some View {
+    //     VStack(alignment: .leading, spacing: 8) {
+    //         sectionLabel("hold to send")
+    //         lockable {
+    //             HStack {
+    //                 Text("hold your phone toward them for 2 seconds to send instead of tapping")
+    //                     .font(.system(size: 12))
+    //                     .foregroundColor(DesignTokens.Color.textPrimary)
+    //                     .fixedSize(horizontal: false, vertical: true)
+    //                 Spacer()
+    //                 Toggle("", isOn: $holdToSend)
+    //                     .tint(Self.green)
+    //                     .labelsHidden()
+    //             }
+    //             .padding(14)
+    //         }
+    //     }
+    // }
 
     // MARK: - Building blocks
 

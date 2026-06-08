@@ -210,12 +210,14 @@ final class SupabaseService: ObservableObject {
         var personName: String?      // who the owner says this connection is
         var personEmoji: String?
         var ownerPersonID: UUID?     // the owner's local Person.id, to re-link
+        var friendPersonID: UUID?    // the FRIEND's local Person.id (set on claim)
 
         enum CodingKeys: String, CodingKey {
             case code, owner, friend
-            case personName    = "person_name"
-            case personEmoji   = "person_emoji"
-            case ownerPersonID = "owner_person_id"
+            case personName     = "person_name"
+            case personEmoji    = "person_emoji"
+            case ownerPersonID  = "owner_person_id"
+            case friendPersonID = "friend_person_id"
         }
     }
 
@@ -352,7 +354,7 @@ final class SupabaseService: ObservableObject {
     ///                    re-entering the same code later is idempotent —
     ///                    a row already claimed by ME counts as success.
     @discardableResult
-    func redeem(_ rawCode: String) async throws -> RedeemResult {
+    func redeem(_ rawCode: String, friendPersonID: UUID? = nil) async throws -> RedeemResult {
         guard let client else { throw SupabaseServiceError.notConfigured }
         guard let me = await currentUserID else { throw SupabaseServiceError.notSignedIn }
 

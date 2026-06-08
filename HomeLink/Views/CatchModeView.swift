@@ -137,7 +137,11 @@ struct CatchModeView: View {
                         .modifier(CurvedFlightEffect(progress: flightProgress,
                                                      start: edge, control: control,
                                                      end: .zero))
-                        .animation(AnimationSystem.easeInOutCubic(style.catchTravelDuration),
+                        // The flick stages its own flight (pull free →
+                        // bounce → land), so it animates explicitly
+                        .animation(style == .fingerFlick
+                                   ? nil
+                                   : AnimationSystem.easeInOutCubic(style.catchTravelDuration),
                                    value: flightProgress)
                         .position(x: geo.size.width / 2, y: geo.size.height / 2)
                 }
@@ -279,18 +283,45 @@ struct CatchModeView: View {
                         radius: AnimationSystem.Glow.radiusMax)
 
         case .fingerFlick:
-            // A bouncing orb — the bounce is the personality. It quickens
-            // with alignment (the shared pulse does), steadies inside 5°.
-            Circle()
-                .fill(RadialGradient(colors: [hue.opacity(0.95), hue.opacity(0.35), .clear],
-                                     center: .center, startRadius: 4, endRadius: 20))
-                .frame(width: 36, height: 36)
-                .blur(radius: 1.5)
-                .offset(y: angleError < 5 ? 0 : (orbPulse ? -4 : 4))
-                .scaleEffect(angleError < 5 ? 1.0 : (orbPulse ? 1.05 : 0.95))
-                .opacity(orbBrightness)
-                .shadow(color: hue.opacity(AnimationSystem.Glow.opacityMax),
-                        radius: AnimationSystem.Glow.radiusMax)
+            // EMBEDDED — the thought arrived so fast it's stuck in the wall
+            // at the sender's edge. It loosens as you align, strains and
+            // vibrates inside 5°, and the catch PULLS it free.
+            // (previous bouncing orb retired)
+            ZStack {
+                // The embedding point — a dark recess, glowing from within
+                Circle()
+                    .fill(Color.black.opacity(0.45))
+                    .frame(width: 44, height: 44)
+                Circle()
+                    .stroke(hue.opacity(0.3 + orbBrightness * 0.5), lineWidth: 1.5)
+                    .frame(width: 44, height: 44)
+                    .shadow(color: hue.opacity(orbBrightness * 0.8),
+                            radius: AnimationSystem.Glow.radiusMin)
+
+                // Loose dust — small particles shake free as the grip loosens
+                if angleError < 15 {
+                    ForEach(0..<5, id: \.self) { i in
+                        Circle()
+                            .fill(hue.opacity(0.55))
+                            .frame(width: 3, height: 3)
+                            .offset(x: CGFloat(i - 2) * 9 + (orbPulse ? 2 : -2),
+                                    y: CGFloat((i * 7) % 11) - 5 + (orbPulse ? -3 : 1))
+                            .opacity(orbPulse ? 0.9 : 0.4)
+                            .transition(.opacity)
+                    }
+                }
+
+                // The thought — recessed, half-swallowed, straining
+                Text(ping.emoji)
+                    .font(.system(size: 26))
+                    .scaleEffect(0.9)
+                    .opacity(0.55 + orbBrightness * 0.45)
+                    // STRAIN — visible vibration inside 5°, dying to be free
+                    .offset(x: angleError < 5 ? (orbPulse ? 1.5 : -1.5) : 0,
+                            y: angleError < 5 ? (orbPulse ? -1.0 : 1.0) : 0)
+                    .shadow(color: hue.opacity(orbBrightness),
+                            radius: AnimationSystem.Glow.radius)
+            }
 
         case .bowArrow:
             // An arrow stuck in the compass face — shaft showing more as
@@ -375,13 +406,16 @@ struct CatchModeView: View {
 
     /// Step 4 — the orb flies home on a curved arc, shrinking slightly.
     /// Bow & arrow first gets PULLED OUT — a 5 px outward slide — before
-    /// it releases and flies home.
+    /// it releases and flies home. The flick gets the full PULL-FREE:
+    /// strain outward 10 px, pop loose, fly home with one mid-flight
+    /// bounce, land with an easeOutBack pop.
     private func beginCatch() {
         Self.log.info("catch: CAUGHT — flying home (style=\(style.rawValue, privacy: .public))")
         phase = .flying
         jitter = .zero
+        let rad = compass.state.bearingDegrees * .pi / 180
+
         if style == .bowArrow {
-            let rad = compass.state.bearingDegrees * .pi / 180
             withAnimation(.easeOut(duration: 0.12)) {
                 jitter = CGSize(width: CGFloat(sin(rad)) * 5,
                                 height: -CGFloat(cos(rad)) * 5)
@@ -395,6 +429,37 @@ struct CatchModeView: View {
             }
             return
         }
+
+        if style == .fingerFlick {
+            // PULL FREE — strains 10 px outward…
+            withAnimation(.easeOut(duration: 0.16)) {
+                jitter = CGSize(width: CGFloat(sin(rad)) * 10,
+                                height: -CGFloat(cos(rad)) * 10)
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.20) {
+                // …then POPS loose
+                HapticEngine.sendImpact()                 // the satisfying pop
+                jitter = .zero
+                withAnimation(AnimationSystem.easeOutCubic(0.22)) {
+                    flightProgress = 0.55                 // first leg, fast
+                }
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.44) {
+                withAnimation(.spring(response: 0.18, dampingFraction: 0.5)) {
+                    flightProgress = 0.47                 // one bounce mid-flight
+                }
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.64) {
+                withAnimation(AnimationSystem.easeInOutCubic(0.26)) {
+                    flightProgress = 1                    // lands at center
+                }
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.94) {
+                reveal()                                  // easeOutBack pop bloom
+            }
+            return
+        }
+
         flightProgress = 1
         DispatchQueue.main.asyncAfter(deadline: .now() + style.catchTravelDuration) {
             reveal()

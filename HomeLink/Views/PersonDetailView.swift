@@ -6,6 +6,7 @@
 // history of thoughts between you.
 
 import SwiftUI
+import MessageUI
 
 struct PersonDetailView: View {
 
@@ -21,7 +22,10 @@ struct PersonDetailView: View {
     @State private var lastSeen: Date?
     @State private var showConnectOptions = false
     @State private var connectedNow = false   // refresh after in-sheet pairing
-    @State private var personInvite: String?  // deep-link invite tied to THIS person
+    @State private var personInvite: String?  // full message tied to THIS person
+    @State private var personInviteLink: String?  // just the pair URL (copy)
+    @State private var showMessageComposer = false
+    @State private var linkCopied = false
 
     private var isConnected: Bool {
         if connectedNow { return true }
@@ -123,6 +127,10 @@ struct PersonDetailView: View {
             }
         }
         .onAppear { fetchPresence() }
+        // iMessage composer for the personal invite (primary share path)
+        .sheet(isPresented: $showMessageComposer) {
+            MessageComposerView(body: personInvite ?? "")
+        }
         // A felt receipt just landed (realtime UPDATE on our sent ping) —
         // refresh so the grey dot turns into the lavender pair live.
         .onChange(of: pings.lastFeltAt) { _, _ in
@@ -197,21 +205,33 @@ struct PersonDetailView: View {
                         withAnimation(.easeOut(duration: 0.25)) { showConnectOptions = true }
                         prepareInvite()
                     } label: {
-                        Text("Connect with \(person.name)")
+                        Text("connect with \(person.name)")
                             .font(DesignTokens.Font.label)
                             .foregroundColor(DesignTokens.Color.textPrimary)
                             .frame(maxWidth: .infinity)
                             .padding(DesignTokens.Spacing.md)
                             .background(DesignTokens.Color.accentStrong)
                             .cornerRadius(DesignTokens.Radius.button)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: DesignTokens.Radius.button)
+                                    .stroke(Color(hex: "#c4a8d4").opacity(0.5), lineWidth: 1)
+                            )
+                            .shadow(color: Color(hex: "#c4a8d4").opacity(0.3), radius: 8)
                     }
                 } else {
-                    // PRIMARY: a deep-link invite tied to THIS person — the
-                    // recipient sees "[name] wants to connect" and one tap pairs
-                    ShareLink(item: personInvite ?? AppLinks.inviteMessage(pairingCode: SupabaseService.localPairingCode)) {
+                    // The invite is tied to THIS person — the code is stored
+                    // with owner_person_id + name + emoji, so accepting links
+                    // the right card on both sides.
+
+                    // PRIMARY: iMessage
+                    Button {
+                        if MFMessageComposeViewController.canSendText(), personInvite != nil {
+                            showMessageComposer = true
+                        }
+                    } label: {
                         HStack(spacing: 8) {
-                            Image(systemName: "square.and.arrow.up")
-                            Text("send invite")
+                            Text("📱")
+                            Text("send via iMessage")
                         }
                         .font(DesignTokens.Font.label)
                         .foregroundColor(DesignTokens.Color.textPrimary)
@@ -220,7 +240,50 @@ struct PersonDetailView: View {
                         .background(DesignTokens.Color.accentStrong)
                         .cornerRadius(DesignTokens.Radius.button)
                     }
-                    .disabled(personInvite == nil && isBusy)
+                    .disabled(personInvite == nil || !MFMessageComposeViewController.canSendText())
+                    .opacity((personInvite == nil || !MFMessageComposeViewController.canSendText()) ? 0.45 : 1)
+
+                    // SECONDARY: anywhere else
+                    ShareLink(item: personInvite ?? "") {
+                        HStack(spacing: 8) {
+                            Text("📤")
+                            Text("share another way")
+                        }
+                        .font(DesignTokens.Font.label)
+                        .foregroundColor(DesignTokens.Color.textSecondary)
+                        .frame(maxWidth: .infinity)
+                        .padding(DesignTokens.Spacing.md)
+                        .background(DesignTokens.Color.backgroundLift)
+                        .cornerRadius(DesignTokens.Radius.button)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: DesignTokens.Radius.button)
+                                .stroke(DesignTokens.Color.borderMid, lineWidth: 1)
+                        )
+                    }
+                    .disabled(personInvite == nil)
+                    .opacity(personInvite == nil ? 0.45 : 1)
+
+                    // Copy just the link
+                    Button {
+                        if let link = personInviteLink {
+                            UIPasteboard.general.string = link
+                            HapticEngine.personSelected()
+                            withAnimation(.easeOut(duration: 0.25)) { linkCopied = true }
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                                withAnimation { linkCopied = false }
+                            }
+                        }
+                    } label: {
+                        HStack(spacing: 6) {
+                            Image(systemName: linkCopied ? "checkmark" : "link")
+                                .font(.system(size: 11))
+                            Text(linkCopied ? "copied ✓" : "copy link")
+                                .font(DesignTokens.Font.caption)
+                        }
+                        .foregroundColor(linkCopied ? Color(hex: "#5dcaa5")
+                                                    : DesignTokens.Color.accentSoft)
+                    }
+                    .disabled(personInviteLink == nil)
 
                     // FALLBACK: manual code entry
                     VStack(alignment: .leading, spacing: 6) {
@@ -275,11 +338,20 @@ struct PersonDetailView: View {
             return
         }
         isBusy = true
+        errorMessage = nil
         Task {
             defer { isBusy = false }
-            if let code = try? await SupabaseService.shared.createInvite(
-                personName: person.name, personEmoji: person.emoji, personID: person.id) {
-                personInvite = AppLinks.inviteMessage(pairingCode: code)
+            do {
+                // Stored server-side as: owner=me, owner_person_id=this card,
+                // person_name + person_emoji — acceptance links the right
+                // person on both phones.
+                let code = try await SupabaseService.shared.createInvite(
+                    personName: person.name, personEmoji: person.emoji, personID: person.id)
+                personInvite = AppLinks.personInviteMessage(personName: person.name,
+                                                            code: code)
+                personInviteLink = AppLinks.pairLink(code: code)
+            } catch {
+                errorMessage = error.localizedDescription
             }
         }
     }

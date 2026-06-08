@@ -32,16 +32,24 @@ final class PingManager: ObservableObject {
     /// Received thoughts waiting to be watched. Max 10; oldest drops off.
     @Published private(set) var queue: [ReceivedPing] = [] {
         didSet {
-            queueCount = queue.count + (nowPlaying == nil ? 0 : 1)
+            queueCount  = queue.count + (nowPlaying == nil ? 0 : 1)
+            unreadCount = queueCount
             persistQueue()
         }
     }
     /// The thought currently playing its arrival animation, if any.
     @Published var nowPlaying: ReceivedPing? {
-        didSet { queueCount = queue.count + (nowPlaying == nil ? 0 : 1) }
+        didSet {
+            queueCount  = queue.count + (nowPlaying == nil ? 0 : 1)
+            unreadCount = queueCount
+        }
     }
     /// Unread thoughts (waiting + the one being caught) — drives the badge.
     @Published var queueCount: Int = 0
+    /// QUEUE NOTIFICATION RULE: only the FIRST unread announces itself —
+    /// arrivals while this is > 0 slip in silently (badge only). Resets
+    /// to 0 automatically when the user catches up (queue drains).
+    @Published private(set) var unreadCount: Int = 0
 
     static let maxQueued = 10
 
@@ -198,6 +206,11 @@ final class PingManager: ObservableObject {
             return
         }
 
+        // QUEUE NOTIFICATION RULE: only the FIRST unread thought announces
+        // itself. While one is already waiting, newcomers slip in silently —
+        // no haptic, no fanfare; the badge count is the only change.
+        let isFirstUnread = unreadCount == 0
+
         let ping = ReceivedPing(fromName: fromName, emoji: emoji, timestamp: .now,
                                 remoteID: remoteID, senderStyle: senderStyle)
         // The queue holds at most the newest un-caught thought — an older
@@ -206,7 +219,11 @@ final class PingManager: ObservableObject {
         AppGroupStore.pendingPingEmoji     = emoji
         AppGroupStore.pendingPingFromName  = fromName
         AppGroupStore.pendingPingTimestamp = .now
-        HapticEngine.thoughtArrived()   // soft directional pull, not an alert
+        if isFirstUnread {
+            HapticEngine.thoughtArrived()   // soft directional pull, not an alert
+        } else {
+            log.info("receivePing: arrived while \(self.unreadCount) unread — silent (badge only)")
+        }
 
         // A catch already on screen finishes its moment; the newest waits
         // its turn and starts the instant the screen frees up.

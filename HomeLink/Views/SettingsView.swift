@@ -21,7 +21,7 @@ struct SettingsView: View {
     @AppStorage("funnyUnitLocked")      private var funnyUnitLocked      = -1
     @AppStorage("thoughtTaglineLocked") private var thoughtTaglineLocked = -1
     @AppStorage(ProFeatures.storageKey) private var proFeatures = false
-    @AppStorage("holdToSendEnabled") private var holdToSend = false
+    // @AppStorage("holdToSendEnabled") private var holdToSend = false   // retired with the row
 
     @State private var showCopied     = false
     @State private var showConnect    = false

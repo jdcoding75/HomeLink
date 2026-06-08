@@ -189,12 +189,6 @@ Deno.serve(async (req) => {
       .is("opened_at", null);
     const unread = count ?? 1;
 
-    // The mystery is the gift — no emoji, no name, just the pull.
-    // (previous: title = the emoji, body "someone sent you a thought")
-    const alert = unread > 1
-      ? { title: "Pointward", body: `${unread} feelings are coming your way…` }
-      : { title: "Pointward", body: "A feeling is coming your way…" };
-
     // Resolve who it's from so the catch screen can say their name
     const senderName = record.from_user
       ? await nameOfSender(record.from_user, record.to_user)
@@ -203,15 +197,34 @@ Deno.serve(async (req) => {
     console.log(`ping: ${record.from_user} → ${record.to_user} ` +
       `emoji=${record.emoji} style=${record.sender_style} id=${record.id} unread=${unread}`);
 
-    return await sendPush(record.to_user, {
-      aps: { alert, sound: "default", badge: unread },
+    // The payload the app needs either way — felt receipts (opened_at)
+    // and the SENDER's catch animation when the push is the only path.
+    const payload = {
       pingEmoji: record.emoji ?? "💜",
       fromName: senderName ?? "someone who loves you",
-      // The app needs these to record the felt receipt (opened_at) and to
-      // play the SENDER's catch animation when the push is the only path.
       pingId: record.id ?? null,
       senderStyle: record.sender_style ?? null,
       fromUserId: record.from_user ?? null,
+    };
+
+    // QUEUE NOTIFICATION RULE: only the FIRST unread announces itself.
+    // A backlog updates the badge silently — no banner, no sound.
+    if (unread > 1) {
+      console.log(`ping: ${unread} unread — badge-only update`);
+      return await sendPush(record.to_user, {
+        aps: { badge: unread },
+        ...payload,
+      });
+    }
+
+    // The mystery is the gift — no emoji, no name, just the pull.
+    return await sendPush(record.to_user, {
+      aps: {
+        alert: { title: "Pointward", body: "A feeling is coming your way…" },
+        sound: "default",
+        badge: unread,
+      },
+      ...payload,
     });
   } catch (e) {
     console.error(`handler error: ${e}`);
