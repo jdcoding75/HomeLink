@@ -28,6 +28,7 @@ struct EmojiPickerView: View {
     @State private var showCreateSheet = false
     @State private var editMode = false             // long-press → wiggle + ✕
     @State private var fillAnimSlot: Int? = nil     // the slot currently popping in
+    @State private var dropTargetSlot: Int? = nil   // [3/3] slot a drag is hovering over
     @State private var wiggle = false
 
     private var isPaid: Bool { subscription.tier != .free }
@@ -134,14 +135,38 @@ struct EmojiPickerView: View {
         .rotationEffect(.degrees(editMode && token != nil && wiggle ? 2.2 : (editMode && token != nil ? -2.2 : 0)))
         .animation(editMode ? .easeInOut(duration: 0.14).repeatForever(autoreverses: true) : .default,
                    value: wiggle)
-        // Drag a filled slot onto another to reorder (swap).
+        // [3/3] Drag a filled slot onto another → swap. Library emoji can also
+        // be dropped here. Hovering highlights the target; dropping bounces in.
+        .scaleEffect(dropTargetSlot == i ? 1.05 : 1.0)
+        .overlay {
+            if dropTargetSlot == i {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 15)
+                        .stroke(Self.lavender, lineWidth: 2.5)
+                        .shadow(color: Self.lavender.opacity(0.9), radius: 8)
+                    VStack {
+                        Spacer()
+                        Text("release to set")
+                            .font(.system(size: 7, design: .serif).italic())
+                            .foregroundColor(Self.lavender)
+                    }
+                    .padding(2)
+                }
+                .allowsHitTesting(false)
+            }
+        }
+        .animation(.easeOut(duration: 0.15), value: dropTargetSlot)
         .ifLet(token) { view, tok in
             view.draggable(tok)
         }
         .dropDestination(for: String.self) { items, _ in
+            dropTargetSlot = nil
             guard let dropped = items.first else { return false }
             swapToken(dropped, into: i)
             return true
+        } isTargeted: { hovering in
+            if hovering { dropTargetSlot = i }
+            else if dropTargetSlot == i { dropTargetSlot = nil }
         }
         .contextMenu { EmptyView() }   // suppress default; we use long-press below
         .onLongPressGesture(minimumDuration: 0.45) {
@@ -271,13 +296,23 @@ struct EmojiPickerView: View {
         if filledCount == 0 { withAnimation { editMode = false; wiggle = false } }
     }
 
-    /// Reorder: swap the dragged token into slot `dest`.
+    /// Reorder: swap the dragged token into slot `dest` (both animate to their
+    /// new positions); the destination bounces to confirm the drop. [3/3]
     private func swapToken(_ token: String, into dest: Int) {
         guard let src = slots.firstIndex(where: { $0 == token }), src != dest else { return }
         withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
             slots.swapAt(src, dest)
         }
         HapticEngine.sendSoft()
+        bounceSlot(dest)
+    }
+
+    /// The satisfying scale 0.8 → 1.1 → 1.0 pop, shared by set + drop. [3/3]
+    private func bounceSlot(_ idx: Int) {
+        fillAnimSlot = idx
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) {
+            if fillAnimSlot == idx { fillAnimSlot = nil }
+        }
     }
 
     // ── Token rendering ───────────────────────────────────────────────────

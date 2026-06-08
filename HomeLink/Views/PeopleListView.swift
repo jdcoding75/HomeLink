@@ -44,6 +44,7 @@ struct PeopleListView: View {
                                 isSelected: people.selectedPerson?.id == person.id,
                                 distanceText: distanceText(for: person),
                                 isConnected: isConnected(person),
+                                isPending: isPending(person),
                                 lastSeenText: lastSeenText(for: person)
                             ) {
                                 // Tap card → select + open the detail view
@@ -133,6 +134,13 @@ struct PeopleListView: View {
         return person.pairedUserID == friend.uuidString
     }
 
+    /// [1/3] Scenario 4 — one-sided pairing: we recorded a partner id for this
+    /// card, but the live connection doesn't confirm it (partner deleted the
+    /// app / never reciprocated). Shown dim as "connection pending".
+    private func isPending(_ person: Person) -> Bool {
+        person.pairedUserID != nil && !isConnected(person)
+    }
+
     private func lastSeenText(for person: Person) -> String? {
         guard isConnected(person), let date = friendLastSeen else { return nil }
         return PersonDetailView.presenceText(for: date)
@@ -185,6 +193,7 @@ struct PersonCard: View {
     let isSelected: Bool
     let distanceText: String?
     let isConnected: Bool
+    var isPending: Bool = false   // [1/3] one-sided pairing — dim, "pending"
     let lastSeenText: String?
     let onTap: () -> Void
     let onEdit: () -> Void
@@ -230,22 +239,27 @@ struct PersonCard: View {
                     .foregroundColor(DesignTokens.Color.textMuted)
                     .lineLimit(1)
 
-                // Connection status — green when their compasses are linked
+                // Connection status — green linked · amber pending · grey unlinked
                 HStack(spacing: 5) {
                     Circle()
                         .fill(isConnected ? Color(hex: "#5dcaa5")
-                                          : DesignTokens.Color.textDim.opacity(0.6))
+                              : (isPending ? Color(hex: "#D4A017")
+                                           : DesignTokens.Color.textDim.opacity(0.6)))
                         .frame(width: 6, height: 6)
                     Text(isConnected
                          ? (lastSeenText.map { "connected ✓ · \($0)" } ?? "connected ✓")
-                         : "not yet linked")
+                         : (isPending ? "connection pending · waiting for \(person.name) to reconnect"
+                                      : "not yet linked"))
                         .font(.system(size: 10))
                         .foregroundColor(isConnected ? Color(hex: "#5dcaa5")
-                                                     : DesignTokens.Color.textDim)
+                                         : (isPending ? Color(hex: "#D4A017")
+                                                      : DesignTokens.Color.textDim))
                         .lineLimit(1)
                 }
                 .padding(.top, 1)
             }
+            // [1/3] Scenario 4 — a pending (one-sided) connection reads dim.
+            .opacity(isPending ? 0.55 : 1.0)
 
             Spacer()
 

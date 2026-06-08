@@ -398,8 +398,9 @@ struct SenderAnimationView<Symbol: View>: View {
         let c2 = CGSize(width: start.width + (end.width - start.width) * 0.70 + wander2.width,
                         height: start.height + (end.height - start.height) * 0.70 + wander2.height)
 
-        // A STREAM of dandelion seeds following the thought on the breeze
-        ForEach(0..<12, id: \.self) { i in
+        // [2/3] A COMET of dandelion seeds streaming behind the leaf — 24,
+        // lingering ~2 s after it passes.
+        ForEach(0..<24, id: \.self) { i in
             DandelionSeed(size: 8 + CGFloat(i % 3) * 2, opacity: 0.75)
                 .opacity(trailFaded ? 0 : 1)
                 .modifier(WanderingFlightEffect(progress: progress, start: start,
@@ -410,18 +411,27 @@ struct SenderAnimationView<Symbol: View>: View {
                             .delay(0.05 * Double(i)), value: trailFaded)
         }
 
-        // The thought itself — floating in the sky, growing as it drifts away
-        symbol
-            .scaleEffect(orbPulse ? 1.03 : 0.97)
-            .scaleEffect(flightScale)
-            .rotationEffect(.degrees(orbPulse ? 3 : -3))
-            .shadow(color: .white.opacity(0.85), radius: 10)
-            .shadow(color: Color(hex: "#FFF3A3").opacity(0.6), radius: 16)   // sunlight
-            .opacity(faded ? 0 : 1)
-            .modifier(WanderingFlightEffect(progress: progress, start: start,
-                                            control1: c1, control2: c2, end: end))
-            .animation(AnimationSystem.easeInOutSine(fireflyFlight), value: progress)
-            .animation(.easeOut(duration: 0.3), value: faded)
+        // [2/3] The thought rides a BIG leaf (120×80) across the sky — emoji
+        // ~48 pt, swaying as it drifts: ±15 px lateral, ±8 px bounce, ±8° roll.
+        ZStack {
+            LeafShape()
+                .fill(LinearGradient(colors: [Color(hex: "#a8d672"), Color(hex: "#6fae3e")],
+                                     startPoint: .topLeading, endPoint: .bottomTrailing))
+                .frame(width: 120, height: 80)
+                .shadow(color: Color(hex: "#3d6b22").opacity(0.45), radius: 10)
+            symbol
+                .scaleEffect(1.4)   // emoji riding the leaf, ~48 pt
+        }
+        .rotationEffect(.degrees(orbPulse ? 8 : -8))            // ±8° sway
+        .offset(x: orbPulse ? 15 : -15, y: orbPulse ? -8 : 8)   // ±15 px / ±8 px alive
+        .scaleEffect(flightScale)
+        .shadow(color: .white.opacity(0.7), radius: 12)
+        .shadow(color: Color(hex: "#FFF3A3").opacity(0.5), radius: 18)   // sunlight
+        .opacity(faded ? 0 : 1)
+        .modifier(WanderingFlightEffect(progress: progress, start: start,
+                                        control1: c1, control2: c2, end: end))
+        .animation(AnimationSystem.easeInOutSine(fireflyFlight), value: progress)
+        .animation(.easeOut(duration: 0.3), value: faded)
     }
 
     // ── WIND full-screen sky takeover ─────────────────────────────────────
