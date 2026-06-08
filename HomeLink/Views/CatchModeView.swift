@@ -126,23 +126,10 @@ struct CatchModeView: View {
         }
     }
 
-    /// Which way to rotate the phone: the sender clockwise of straight-ahead
-    /// (relative bearing 0…180) means turn right.
-    private var turnRight: Bool {
-        var b = compass.state.bearingDegrees.truncatingRemainder(dividingBy: 360)
-        if b < 0 { b += 360 }
-        return b < 180
-    }
-
-    /// A friendly full-word compass direction ("Northeast").
-    private static func fullCardinal(_ degrees: Double) -> String {
-        let words = ["North", "North-Northeast", "Northeast", "East-Northeast",
-                     "East", "East-Southeast", "Southeast", "South-Southeast",
-                     "South", "South-Southwest", "Southwest", "West-Southwest",
-                     "West", "West-Northwest", "Northwest", "North-Northwest"]
-        let i = ((Int((degrees / 22.5).rounded()) % 16) + 16) % 16
-        return words[i]
-    }
+    // [5/6] turnRight / fullCardinal removed — they were the last heading
+    // (compass.state.bearingDegrees) references in the catch. The catch aims
+    // by FINGER SPIN (bucketAngle) against the thought's FIXED placement
+    // (thoughtAngle), so no phone rotation / magnetometer is involved.
 
     /// Step 2 — visual feedback as the angle decreases.
     private var orbBrightness: Double {
@@ -467,7 +454,7 @@ struct CatchModeView: View {
                                      startPoint: .leading, endPoint: .trailing))
                 .frame(width: 46, height: 10)
                 .blur(radius: 1.5)
-                .rotationEffect(.radians(compass.state.bearingDegrees * .pi / 180 - .pi / 2))
+                .rotationEffect(.radians(thoughtAngle * .pi / 180 - .pi / 2))
                 .opacity(orbBrightness * (orbPulse ? 1.0 : 0.75))
                 .shadow(color: Color(hex: "#FFD700").opacity(0.4),
                         radius: AnimationSystem.Glow.radiusMax)
@@ -545,7 +532,7 @@ struct CatchModeView: View {
                     .rotationEffect(.degrees(90))
             }
             // Embedded pointing inward, toward the center
-            .rotationEffect(.radians(compass.state.bearingDegrees * .pi / 180 + .pi / 2))
+            .rotationEffect(.radians(thoughtAngle * .pi / 180 + .pi / 2))
             .opacity(orbBrightness * (orbPulse ? 1.0 : 0.7))
             .shadow(color: Color(hex: "#FFD700").opacity(angleError < 5 ? 0.7 : 0.3),
                     radius: AnimationSystem.Glow.radiusMax)
@@ -564,7 +551,7 @@ struct CatchModeView: View {
                     .blur(radius: 1)
                     .opacity(orbPulse ? 1.0 : 0.6)
             }
-            .rotationEffect(.radians(compass.state.bearingDegrees * .pi / 180))
+            .rotationEffect(.radians(thoughtAngle * .pi / 180))
             .opacity(orbBrightness * (orbPulse ? 1.0 : 0.7))
             .shadow(color: Color(hex: "#FFD700").opacity(angleError < 5 ? 0.7 : 0.3),
                     radius: AnimationSystem.Glow.radiusMax)
@@ -672,7 +659,7 @@ struct CatchModeView: View {
     }
 
     private func begin() {
-        Self.log.info("catch: ACTIVATED — from=\(ping.fromName, privacy: .public) emoji=\(ping.emoji, privacy: .public) style=\(style.rawValue, privacy: .public) senderBearing=\(Int(compass.state.bearingDegrees), privacy: .public)° headingAvailable=\(compass.isHeadingAvailable, privacy: .public)")
+        Self.log.info("catch: ACTIVATED — from=\(ping.fromName, privacy: .public) emoji=\(ping.emoji, privacy: .public) style=\(style.rawValue, privacy: .public) (finger-spin catch — no phone heading)")
 
         // [1/5] ARRIVAL — strong double haptic + a warm welcoming chime fire
         // immediately, the whole screen washes lavender, and "something is
@@ -759,7 +746,7 @@ struct CatchModeView: View {
         // Real-time alignment trace, throttled to 1 Hz
         if Date.now.timeIntervalSince(lastAlignmentLog) >= 1.0 {
             lastAlignmentLog = .now
-            Self.log.debug("catch: aligning — bearing=\(Int(compass.state.bearingDegrees), privacy: .public)° error=\(Int(angleError), privacy: .public)° phase=\(String(describing: phase), privacy: .public)")
+            Self.log.debug("catch: aligning — bucket=\(Int(bucketAngle), privacy: .public)° thought=\(Int(thoughtAngle), privacy: .public)° error=\(Int(angleError), privacy: .public)° phase=\(String(describing: phase), privacy: .public)")
         }
 
         // Step 2 — haptic pulses quicken as the angle error shrinks
@@ -840,7 +827,9 @@ struct CatchModeView: View {
         Self.log.info("catch: CAUGHT — flying home (style=\(style.rawValue, privacy: .public))")
         phase = .flying
         jitter = .zero
-        let rad = compass.state.bearingDegrees * .pi / 180
+        // [5/6] The thought flies home from its FIXED placement direction —
+        // never the live phone heading (the catch works on a desk).
+        let rad = thoughtAngle * .pi / 180
 
         if style == .bowArrow {
             withAnimation(.easeOut(duration: 0.12)) {
