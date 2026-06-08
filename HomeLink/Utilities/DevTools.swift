@@ -40,6 +40,8 @@ enum DevTools {
         if SupabaseService.localUserID == nil { SupabaseService.localUserID = mockMeID }
 
         if let existing = people.person(forPairedUserID: mockFriendID) {
+            // Sarah already exists (a prior launch) — just re-select her and the
+            // connection; do NOT re-seed history, or thoughts pile up every launch.
             people.select(existing)
         } else {
             let sarah = Person(
@@ -49,8 +51,9 @@ enum DevTools {
                 pairedUserID: mockFriendID.uuidString, tagline: mockTagline)
             people.insertFromInvite(sarah)
             people.select(sarah)
+            // Seed history once, only when Sarah is first created.
+            if withHistory, let pings { injectMockHistory(pings: pings) }
         }
-        if withHistory, let pings { injectMockHistory(pings: pings) }
     }
 
     /// Five mixed-instrument thoughts to partially fill the bucket — good for
