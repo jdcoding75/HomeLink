@@ -64,4 +64,16 @@ enum Instrument: String, CaseIterable, Codable, Identifiable {
         case .wand:    return .wand
         }
     }
+
+    /// Whether SENDING requires aiming at the person (compass aligned within
+    /// the send threshold). Wind releases on a breath and the wand on a shake
+    /// — "magic finds them" — so neither needs the phone pointed; every other
+    /// instrument fires only while aimed at the recipient. Encodes the rule the
+    /// instrument views implement structurally, as testable data.
+    var requiresAlignment: Bool {
+        switch self {
+        case .compass, .bow, .flick, .rocket: return true
+        case .firefly, .wand:                 return false   // wind · wand: no aim
+        }
+    }
 }

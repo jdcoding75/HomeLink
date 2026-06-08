@@ -885,11 +885,18 @@ final class SupabaseService: ObservableObject {
     /// so the push Edge Function can respect it even when the app is closed.
     func setNotifyPointing(_ enabled: Bool) async {
         guard let client, let me = await currentUserID else { return }
-        _ = try? await client
-            .from("users")
-            .update(["notify_pointing": enabled])
-            .eq("id", value: me.uuidString)
-            .execute()
+        do {
+            try await client
+                .from("users")
+                .update(["notify_pointing": enabled])
+                .eq("id", value: me.uuidString)
+                .execute()
+            log.info("users: notify_pointing set to \(enabled, privacy: .public) ✓")
+        } catch {
+            // Was a silent try? — the local toggle and the server could diverge
+            // with no trace. Surface the failure so it's visible in Console. [7/8]
+            log.error("users: setNotifyPointing FAILED — local toggle and server may diverge: \(error.localizedDescription, privacy: .public)")
+        }
     }
 
     // MARK: - Presence (last seen)
@@ -937,5 +944,45 @@ final class SupabaseService: ObservableObject {
             .limit(1)
             .execute().value
         return rows?.first?.totalDonatedCents
+    }
+
+    // MARK: - Stale data cleanup
+
+    /// Launch-time housekeeping so the backend doesn't accumulate dead presence
+    /// and token rows. RLS scopes every delete to `auth.uid()`, so this only
+    /// ever prunes OUR OWN rows — global pruning of every user's stale data is a
+    /// server-side scheduled job (Postgres `cleanup_stale_data`), not something
+    /// a client can or should do. Best-effort and silent on failure: launch must
+    /// never be blocked by housekeeping. Call from a background task. [3/8]
+    ///
+    /// - compass_bearings: our presence bearing older than 1 hour (a stale
+    ///   "pointing at you" glow should not linger after we've moved on).
+    /// - device_tokens: tokens not refreshed in 60 days — the device re-registers
+    ///   a fresh token every launch, so anything this old is a dead device.
+    /// Connections are deliberately untouched: they are the social graph (never
+    /// auto-deleted), and there is no per-connection activity column to drive a
+    /// "30 days inactive" sweep — that would need a schema change + a server job.
+    func cleanupStaleData() async {
+        guard let client, let me = await currentUserID else { return }
+        let iso = ISO8601DateFormatter()
+        let oneHourAgo   = iso.string(from: Date().addingTimeInterval(-3_600))
+        let sixtyDaysAgo = iso.string(from: Date().addingTimeInterval(-60 * 24 * 3_600))
+        do {
+            try await client
+                .from("compass_bearings")
+                .delete()
+                .eq("user_id", value: me.uuidString)
+                .lt("updated_at", value: oneHourAgo)
+                .execute()
+            try await client
+                .from("device_tokens")
+                .delete()
+                .eq("user_id", value: me.uuidString)
+                .lt("updated_at", value: sixtyDaysAgo)
+                .execute()
+            log.info("cleanup: pruned our own stale bearings/tokens ✓")
+        } catch {
+            log.error("cleanup: stale-data prune failed (non-fatal): \(error.localizedDescription, privacy: .public)")
+        }
     }
 }

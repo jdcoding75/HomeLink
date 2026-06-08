@@ -371,7 +371,14 @@ struct PersonDetailView: View {
                 let result = try await SupabaseService.shared.redeem(codeInput,
                                                                      friendPersonID: person.id)
                 person.pairedUserID = result.ownerID.uuidString   // bind to this person
-                try? people.save()
+                // The pair succeeded server-side — persisting the local binding
+                // must NOT fail silently, or the card forgets its partner on the
+                // next launch while the server thinks they're linked. [7/8]
+                do {
+                    try people.save()
+                } catch {
+                    errorMessage = "Connected, but saving locally failed — reopen the app if it doesn't stick."
+                }
                 connectedNow = true
                 HapticEngine.connectionFelt()
                 fetchPresence()

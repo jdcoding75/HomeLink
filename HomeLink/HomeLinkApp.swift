@@ -26,6 +26,12 @@ struct PointwardApp: App {
         Instrument.migrateLegacySelection()
         // Unified picker: derive the one selection from the old two
         InstrumentOption.migrateLegacySelection()
+
+        // Backend housekeeping — prune our own stale presence/token rows on a
+        // background task so it never blocks launch or touches the main thread. [3/8]
+        Task.detached(priority: .background) {
+            await SupabaseService.shared.cleanupStaleData()
+        }
     }
 
     var body: some Scene {

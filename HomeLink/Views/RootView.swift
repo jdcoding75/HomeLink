@@ -108,6 +108,7 @@ struct RootView: View {
             switch phase {
             case .active:
                 startRealtimePings()
+                compass.resumeFromForeground()   // battery: sensors back on [5/8]
                 // The badge counts unread thoughts server-side; opening the
                 // app is the moment to clear it.
                 UNUserNotificationCenter.current().setBadgeCount(0)
@@ -115,6 +116,7 @@ struct RootView: View {
                 // to upload — keeps push delivery alive across sign-ins.
                 Task { await SupabaseService.shared.registerCachedDeviceTokenIfNeeded() }
             case .background:
+                compass.pauseForBackground()     // battery: stop heading/GPS [5/8]
                 Task { await SupabaseService.shared.stopListening() }
             default:
                 break

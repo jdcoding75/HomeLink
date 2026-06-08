@@ -129,6 +129,31 @@ final class CompassManager: NSObject, ObservableObject {
         locationManager.stopUpdatingHeading()
     }
 
+    // ── Battery: foreground-only sensors ─────────────────────────────────
+    // The magnetometer (heading) and GPS are the compass's biggest battery
+    // draw. There is nothing to point at while backgrounded, so we stop both
+    // on the way out and resume on return — wired from RootView's scenePhase. [5/8]
+
+    /// App backgrounded — stop heading/location updates and drop to the
+    /// coarsest accuracy so any residual system use is cheap.
+    func pauseForBackground() {
+        guard targetPerson != nil else { return }
+        locationManager.stopUpdatingHeading()
+        locationManager.stopUpdatingLocation()
+        stopPresenceTimer()
+        locationManager.desiredAccuracy = kCLLocationAccuracyKilometer
+    }
+
+    /// App foregrounded — restore full accuracy and resume updates for the
+    /// person we were already tracking.
+    func resumeFromForeground() {
+        guard targetPerson != nil else { return }
+        locationManager.desiredAccuracy = kCLLocationAccuracyHundredMeters
+        locationManager.startUpdatingLocation()
+        locationManager.startUpdatingHeading()
+        updateCompassState()   // correct the face immediately on return
+    }
+
     func setPendingPing(emoji: String?) {
         state = CompassState(
             bearingDegrees:   state.bearingDegrees,

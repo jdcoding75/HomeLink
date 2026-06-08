@@ -387,11 +387,6 @@ final class PingManager: ObservableObject {
         if !queue.isEmpty {
             log.info("queue: \(self.queue.count) thought(s) waiting — badge shows, user taps to catch")
         }
-        // guard !queue.isEmpty else { return }            // (auto-advance retired)
-        // Task {
-        //     try? await Task.sleep(nanoseconds: 2_000_000_000)
-        //     if nowPlaying == nil { playNext() }
-        // }
     }
 
     /// Tap-to-skip: jump straight to the next thought, no 2-second gap.
