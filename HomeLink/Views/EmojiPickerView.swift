@@ -228,12 +228,16 @@ struct EmojiPickerView: View {
     // ── Status line ───────────────────────────────────────────────────────
 
     private var statusLine: some View {
+        // [4/6] Three clear states — always helpful, never confusing.
         Group {
-            if filledCount == PersonalSet.slotCount {
-                Text("all 6 filled ✦")
+            if filledCount == 0 {
+                Text("tap any slot to add a feeling")
+                    .foregroundColor(DesignTokens.Color.textMuted)
+            } else if filledCount == PersonalSet.slotCount {
+                Text("all slots filled · tap any to remove")
                     .foregroundColor(Self.lavender)
             } else {
-                Text("\(filledCount) of 6 · tap empty slots to add")
+                Text("\(filledCount) of \(PersonalSet.slotCount) · tap empty slots to add")
                     .foregroundColor(DesignTokens.Color.textMuted)
             }
         }

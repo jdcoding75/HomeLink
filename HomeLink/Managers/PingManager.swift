@@ -126,10 +126,10 @@ final class PingManager: ObservableObject {
     // either way.
 
     /// Ping ids that ever entered the local queue — so offline sweeps never
-    /// re-trigger a catch for something already offered. Capped at 100.
+    /// re-trigger a catch for something already offered. Capped at 50. [3/6]
     private var seenPingIDs: [String] {
         get { UserDefaults.standard.stringArray(forKey: "seenPingIDs") ?? [] }
-        set { UserDefaults.standard.set(Array(newValue.suffix(100)), forKey: "seenPingIDs") }
+        set { UserDefaults.standard.set(Array(newValue.suffix(50)), forKey: "seenPingIDs") }
     }
 
     private func rememberSeen(_ id: UUID?) {
@@ -225,7 +225,7 @@ final class PingManager: ObservableObject {
 
     /// Gentle "they're pointing at you" moment — soft double haptic, 4s toast.
     func showPointing(name: String) {
-        guard UserDefaults.standard.object(forKey: "notifyPointing") as? Bool ?? true else { return }
+        // [2/6] Ambient presence is always on now — no setting gate.
         pointingNotice = "\(name) is pointing toward you"
         HapticEngine.pingReceived()
         Task {
@@ -316,7 +316,10 @@ final class PingManager: ObservableObject {
     /// `bearing` is THEIR reported absolute bearing (toward us), when the
     /// event carried one — feeds the mutual-pointing check.
     func presenceFelt(name: String, bearing: Double? = nil) {
-        guard UserDefaults.standard.object(forKey: "notifyPointing") as? Bool ?? true else { return }
+        // [2/6] Ambient presence is ALWAYS ON now (the Settings toggle is gone).
+        // We always update state here so the mutual-pointing check keeps a fresh
+        // bearing + timestamp; the once-per-person-per-day throttle on the
+        // VISIBLE glow lives at the glow-activation site in CompassView.
         partnerPointingName = name
         partnerPointingAt = .now
         partnerPointingBearing = bearing

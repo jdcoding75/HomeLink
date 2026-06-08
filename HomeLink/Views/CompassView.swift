@@ -1003,37 +1003,62 @@ struct CompassView: View {
     /// [1/6] LAYER 1 + [4/6]: one clear line below the instrument —
     /// alignment guidance until aligned, then the instrument's own action.
     /// (The tap-send button is GONE — compass sends by holding aligned.)
+    /// [7/7] UNIVERSAL INSTRUCTION — big (22 pt), bold, bright, and step-by-step
+    /// for every instrument. When nothing is loaded it tells you to pick a
+    /// feeling; once loaded it shows the per-instrument steps with the "loaded"
+    /// step already checked off.
     @ViewBuilder
     private var sendControl: some View {
-        if selectedToken == nil && pings.nowPlaying == nil {
-            Text("choose a feeling below")
-                .font(.system(size: 13, design: .serif).italic())
-                .foregroundColor(DesignTokens.Color.textMuted)
-                .frame(height: 22)
+        if pings.nowPlaying != nil {
+            EmptyView()
+        } else if selectedToken == nil {
+            Text("tap a feeling below to load")
+                .font(.system(size: 22, weight: .bold, design: .rounded))
+                .foregroundColor(.white.opacity(0.92))
+                .minimumScaleFactor(0.6)
+                .lineLimit(1)
+                .shadow(color: Color(hex: "#c4a8d4").opacity(0.6), radius: 6)
+                .frame(height: 30)
+                .padding(.horizontal, 14)
         } else {
-            Text(alignmentInstruction)
-                .font(.system(size: 14, design: .serif).italic())
-                .foregroundColor(sendAlignDiff <= 15
-                                 ? Color(hex: "#e0ccee")
-                                 : Color(hex: "#c4a8d4"))
-                .frame(height: 22)
+            Text(universalInstruction)
+                .font(.system(size: 22, weight: .bold, design: .rounded))
+                .foregroundColor(Color(hex: "#e0ccee"))
+                .minimumScaleFactor(0.6)
+                .lineLimit(1)
+                .shadow(color: Color(hex: "#9b7fc0").opacity(0.7), radius: 6)
+                .frame(height: 30)
+                .padding(.horizontal, 14)
                 .contentTransition(.opacity)
-                .animation(.easeInOut(duration: 0.25), value: alignmentInstruction)
+                .animation(.easeInOut(duration: 0.25), value: universalInstruction)
         }
-        // (the old tap "send →" button + mini hold ring are retired —
-        //  the hold progress now rings the compass itself)
     }
 
-    /// The instrument's own action verb, used once locked.
+    /// Per-instrument step guide, shown once a feeling is loaded. The "loaded"
+    /// step is checked; the rest are the steps to send.
+    private var universalInstruction: String {
+        let name = compass.state.personName
+        switch instrumentStore.selected {
+        case .compass: return "loaded ✓ · orient · point · hold"
+        case .bow:     return "loaded ✓ · spin to aim · pull · release"
+        case .firefly: return "loaded ✓ · breathe to send"          // wind
+        case .flick:   return "loaded ✓ · flick toward \(name)"
+        case .rocket:  return "loaded ✓ · tap to fuel · blast off"
+        case .wand:    return "loaded ✓ · shake · release"
+        }
+    }
+
+    /// The instrument's own action verb, used once locked. (Kept for the
+    /// compass hold flow + any heading-guidance callers.)
     private var instrumentAction: String {
         let name = compass.state.personName
         switch instrumentStore.selected {
         case .compass: return "hold toward \(name) to send"
-        case .bow:     return "draw the string toward \(name)"
-        case .firefly: return "breathe toward \(name) to send"   // wind
+        case .bow:     return "spin to aim, then draw toward \(name)"
+        case .firefly: return "breathe to send to \(name)"   // wind
         case .flick:   return "flick toward \(name) to send"
         case .rocket:  return "fuel the rocket toward \(name)"
-        case .wand:    return "shake to charge, then aim at \(name)"
+        case .wand:    return "shake · release toward \(name)"
         }
     }
 

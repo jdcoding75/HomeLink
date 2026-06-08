@@ -30,9 +30,8 @@ struct PlaneInstrumentView: View {
 
     // ── Winding state ──────────────────────────────────────────────────────
     @State private var winds: Int = 0            // 0…8 tension
-    @State private var windAngle: Double = 0     // accumulated spin (degrees)
-    @State private var windBase: Double = 0
     @State private var propSpin: Double = 0      // propeller rotation
+    @State private var propBoost: Double = 0     // transient whir on each tap
     @State private var shudder: CGFloat = 0      // ±px at high tension
     @State private var launching = false
     @State private var liftoff: CGFloat = 0      // 0…1 launch travel
@@ -41,8 +40,13 @@ struct PlaneInstrumentView: View {
 
     private let tick = Timer.publish(every: 1.0 / 30.0, on: .main, in: .common).autoconnect()
 
-    private static let balsa     = Color(hex: "#DEB887")
-    private static let balsaDark = Color(hex: "#C19A6B")
+    // [6/7] Bright toy palette — cheerful, chunky, kid-friendly.
+    private static let bodyRed   = Color(hex: "#CC2200")
+    private static let bodyHi    = Color(hex: "#FF5533")
+    private static let wingYellow = Color(hex: "#FFD700")
+    private static let wingHi     = Color(hex: "#FFE869")
+    private static let propGrey   = Color(hex: "#4a4a4a")
+    private static let propHi     = Color(hex: "#7a7a7a")
     private static let rubber    = Color(hex: "#3a1a0a")
     private static let lavender  = Color(hex: "#c4a8d4")
 
@@ -54,11 +58,11 @@ struct PlaneInstrumentView: View {
 
     var body: some View {
         ZStack {
-            // ── Dark sky circle ──
+            // ── Bright cheerful sky circle ──
             Circle()
-                .fill(RadialGradient(colors: [Color(hex: "#14161f"), Color(hex: "#0b0d12")],
+                .fill(RadialGradient(colors: [Color(hex: "#aee0ff"), Color(hex: "#7cc0ec")],
                                      center: .center, startRadius: 30, endRadius: 185))
-                .overlay(Circle().stroke(Color.white.opacity(0.06), lineWidth: 1))
+                .overlay(Circle().stroke(Color.white.opacity(0.5), lineWidth: 1.5))
                 .frame(width: 360, height: 360)
 
             // ── Where they are — person-initial marker on the ring ──
@@ -71,7 +75,7 @@ struct PlaneInstrumentView: View {
             // ── Tension gauge — twist indicator on the left ──
             tensionGauge.offset(x: -150, y: 0)
 
-            // ── The plane — banks slightly as it climbs on launch ──
+            // ── The toy plane — banks slightly as it climbs on launch ──
             plane
                 .rotationEffect(.radians(rad))               // nose toward person
                 .rotationEffect(.degrees(launching ? sin(bankPhase) * 8 : 0))
@@ -89,157 +93,160 @@ struct PlaneInstrumentView: View {
             .allowsHitTesting(false)
         }
         .frame(width: 370, height: 370)
+        // [6/7] TAP to spin the propeller — tap anywhere; the propeller whirs,
+        // the rubber band twists, the wind counter climbs. Far more intuitive
+        // than a rotation gesture (kids and adults both just tap).
         .contentShape(Circle())
-        .gesture(windGesture)
+        .onTapGesture { tapWind() }
         .onReceive(tick) { _ in heartbeat() }
     }
 
-    // ── The plane drawing ───────────────────────────────────────────────────
+    // ── The toy plane drawing ───────────────────────────────────────────────
 
     private var plane: some View {
         ZStack {
             // Rubber band under the belly — twists tighter with tension
             RubberBandShape(twist: tension)
-                .stroke(Self.rubber, style: StrokeStyle(lineWidth: 2, lineCap: .round))
-                .frame(width: 14, height: 96)
-                .offset(x: 6)
+                .stroke(Self.rubber, style: StrokeStyle(lineWidth: 2.5, lineCap: .round))
+                .frame(width: 16, height: 86)
+                .offset(x: 7, y: 6)
 
-            // Horizontal stabilizer (tail)
-            TailHStabShape()
-                .fill(Self.balsaDark)
-                .frame(width: 38, height: 16)
-                .offset(y: 64)
-            // Vertical stabilizer
+            // Tail — bright yellow fin + stubby stabilizer
             TailVStabShape()
-                .fill(Self.balsa)
-                .frame(width: 16, height: 24)
-                .offset(y: 58)
-
-            // Wings — swept back, darker tips
-            WingShape(mirrored: false)
-                .fill(LinearGradient(colors: [Self.balsa, Self.balsaDark],
-                                     startPoint: .leading, endPoint: .trailing))
-                .frame(width: 78, height: 26)
-                .offset(x: -2, y: -4)
-
-            // Fuselage — elongated oval body with grain
-            FuselageShape()
-                .fill(LinearGradient(colors: [Self.balsa, Self.balsaDark],
+                .fill(Self.wingYellow)
+                .frame(width: 20, height: 26)
+                .offset(y: 56)
+            TailHStabShape()
+                .fill(LinearGradient(colors: [Self.wingHi, Self.wingYellow],
                                      startPoint: .top, endPoint: .bottom))
-                .frame(width: 22, height: 150)
-                .overlay(
-                    VStack(spacing: 7) {
-                        ForEach(0..<6, id: \.self) { _ in
-                            Capsule().fill(Self.balsaDark.opacity(0.4))
-                                .frame(width: 12, height: 0.8)
-                        }
-                    }
-                )
-                // The loaded thought rides in a little window
-                .overlay {
-                    if let loadedSymbol {
-                        loadedSymbol.scaleEffect(0.5).offset(y: -6)
-                    }
-                }
+                .frame(width: 44, height: 16)
+                .offset(y: 62)
 
-            // Propeller at the nose — two blades, blurs at high speed
-            propeller
-                .offset(y: -80)
+            // Stubby wings — short, wide, bright yellow, rounded
+            Capsule()
+                .fill(LinearGradient(colors: [Self.wingHi, Self.wingYellow],
+                                     startPoint: .leading, endPoint: .trailing))
+                .frame(width: 104, height: 20)
+                .overlay(Capsule().stroke(.white.opacity(0.35), lineWidth: 1))
+                .offset(y: 2)
+                .shadow(color: .black.opacity(0.15), radius: 3, y: 2)
+
+            // Chubby fuselage — fat red capsule
+            Capsule()
+                .fill(LinearGradient(colors: [Self.bodyHi, Self.bodyRed],
+                                     startPoint: .leading, endPoint: .trailing))
+                .frame(width: 40, height: 124)
+                .overlay(
+                    // Cockpit window with the emoji
+                    Circle()
+                        .fill(Color(hex: "#bfe8ff"))
+                        .frame(width: 26, height: 26)
+                        .overlay(Circle().stroke(.white.opacity(0.7), lineWidth: 1.5))
+                        .overlay {
+                            if let loadedSymbol { loadedSymbol.scaleEffect(0.55) }
+                        }
+                        .offset(y: -16)
+                )
+                .shadow(color: .black.opacity(0.2), radius: 5, y: 3)
+
+            // Big round nose — a chunky red ball with a highlight
+            Circle()
+                .fill(RadialGradient(colors: [Self.bodyHi, Self.bodyRed],
+                                     center: UnitPoint(x: 0.35, y: 0.3),
+                                     startRadius: 2, endRadius: 26))
+                .frame(width: 38, height: 38)
+                .offset(y: -58)
+
+            // Big propeller at the nose
+            propeller.offset(y: -64)
         }
-        .frame(width: 110, height: 200)
+        .frame(width: 120, height: 190)
     }
 
+    /// A BIG two-blade propeller, dark grey, that whirs faster as it's wound.
     private var propeller: some View {
         ZStack {
-            // Hub
-            Circle().fill(Self.rubber).frame(width: 6, height: 6)
-            // Two blades
             ForEach(0..<2, id: \.self) { i in
                 Capsule()
-                    .fill(LinearGradient(colors: [Self.balsaDark, Self.balsa],
+                    .fill(LinearGradient(colors: [Self.propHi, Self.propGrey],
                                          startPoint: .top, endPoint: .bottom))
-                    .frame(width: 4, height: 34)
+                    .frame(width: 7, height: 52)
                     .rotationEffect(.degrees(Double(i) * 90))
             }
+            Circle().fill(Self.propGrey).frame(width: 10, height: 10)   // hub
         }
         .rotationEffect(.degrees(propSpin))
-        // The faster it spins the more it blurs into a disc
-        .blur(radius: maxed ? 2.0 : (winds >= 6 ? 1.0 : 0))
+        .blur(radius: maxed ? 2.5 : (winds >= 6 ? 1.2 : 0))
         .overlay(
-            Circle()
-                .stroke(Self.balsa.opacity(maxed ? 0.25 : 0), lineWidth: 1)
-                .frame(width: 36, height: 36)
+            Circle().stroke(Self.propGrey.opacity(maxed ? 0.3 : 0), lineWidth: 1.5)
+                .frame(width: 54, height: 54)
         )
     }
 
-    // ── Tension gauge ────────────────────────────────────────────────────────
+    // ── Wind gauge ─────────────────────────────────────────────────────────
 
     private var tensionGauge: some View {
         VStack(spacing: 6) {
             Text("WIND")
-                .font(.system(size: 8, weight: .semibold, design: .rounded))
+                .font(.system(size: 9, weight: .bold, design: .rounded))
                 .tracking(1.5)
-                .foregroundColor(DesignTokens.Color.textMuted)
+                .foregroundColor(Color(hex: "#2c4a5e"))
             VStack(spacing: 3) {
                 ForEach((0..<Self.maxWinds).reversed(), id: \.self) { i in
                     let filled = winds > i
                     RoundedRectangle(cornerRadius: 2)
                         .fill(filled
-                              ? AnyShapeStyle(LinearGradient(colors: [Self.balsa, Self.balsaDark],
+                              ? AnyShapeStyle(LinearGradient(colors: [Self.wingHi, Self.wingYellow],
                                                              startPoint: .top, endPoint: .bottom))
-                              : AnyShapeStyle(Color(hex: "#1a1622")))
-                        .frame(width: 10, height: 9)
+                              : AnyShapeStyle(Color.white.opacity(0.35)))
+                        .frame(width: 11, height: 9)
                         .overlay(RoundedRectangle(cornerRadius: 2)
-                            .stroke(filled ? Self.balsa.opacity(0.8) : Color.white.opacity(0.1),
+                            .stroke(filled ? Self.bodyRed.opacity(0.6) : Color.white.opacity(0.5),
                                     lineWidth: 1))
                         .animation(.easeOut(duration: 0.18), value: filled)
                 }
             }
             .padding(5)
-            .background(RoundedRectangle(cornerRadius: 5).fill(Color.black.opacity(0.3)))
+            .background(RoundedRectangle(cornerRadius: 5).fill(Color.white.opacity(0.25)))
         }
     }
 
     @ViewBuilder
     private var instruction: some View {
+        // [7/7] bold, large, step-by-step.
         if showRelease {
-            Text("RELEASE")
-                .font(.system(size: 15, weight: .bold, design: .rounded))
-                .tracking(3)
-                .foregroundColor(Self.balsa)
-                .shadow(color: Self.balsa.opacity(0.7), radius: 8)
+            Text("LET FLY ✈️")
+                .font(.system(size: 24, weight: .heavy, design: .rounded))
+                .tracking(2)
+                .foregroundColor(Self.bodyRed)
+                .shadow(color: .white.opacity(0.7), radius: 8)
                 .transition(.scale(scale: 0.7).combined(with: .opacity))
-        } else if loadedToken != nil {
-            Text("wind the propeller · \(winds)/\(Self.maxWinds)")
-                .font(.system(size: 12, design: .serif).italic())
-                .foregroundColor(Self.lavender.opacity(0.8))
         } else {
-            Text("a thought, then wind it up ✈️")
-                .font(.system(size: 12, design: .serif).italic())
-                .foregroundColor(Self.lavender.opacity(0.7))
+            Text(stepText)
+                .font(.system(size: 22, weight: .bold, design: .rounded))
+                .foregroundColor(Color(hex: "#2c4a5e"))
+                .minimumScaleFactor(0.7).lineLimit(1)
+                .shadow(color: .white.opacity(0.6), radius: 4)
         }
     }
 
-    // ── Winding mechanic ─────────────────────────────────────────────────────
+    /// "load · wind · let fly" with the current step emphasized.
+    private var stepText: String {
+        if loadedToken == nil { return "load · wind · let fly" }
+        return "wind the propeller · \(winds)/\(Self.maxWinds)"
+    }
 
-    /// Spin the propeller area to wind. Each full turn adds a wind (to 8).
-    private var windGesture: some Gesture {
-        RotationGesture()
-            .onChanged { angle in
-                guard !launching else { return }
-                let total = windBase + angle.degrees
-                let newWinds = min(Self.maxWinds, max(0, Int(total / 360)))
-                if newWinds != winds {
-                    winds = newWinds
-                    SoundEngine.shared.play(for: "plane.wind")
-                    HapticEngine.rocketFuel(segment: winds)   // click strengthens
-                }
-                windAngle = total
-            }
-            .onEnded { _ in
-                windBase = Double(winds) * 360   // snap the base to the wind count
-                if maxed { armLaunch() }
-            }
+    // ── [6/7] Tap-to-spin mechanic ───────────────────────────────────────────
+
+    /// Each tap winds the propeller half a turn (a whir) and twists the band.
+    private func tapWind() {
+        guard loadedToken != nil else { HapticEngine.personSelected(); return }
+        guard !launching, !maxed else { return }
+        withAnimation(.easeOut(duration: 0.2)) { winds += 1 }
+        propBoost = 34                                   // a visible whir burst
+        HapticEngine.send()                              // light click each tap
+        SoundEngine.shared.play(for: "plane.wind")
+        if maxed { armLaunch() }
     }
 
     private func armLaunch() {
@@ -260,21 +267,23 @@ struct PlaneInstrumentView: View {
         onLaunch()
         // Reset for the next wind once the takeover clears.
         DispatchQueue.main.asyncAfter(deadline: .now() + 2.2) {
-            winds = 0; windBase = 0; windAngle = 0
+            winds = 0
             launching = false; liftoff = 0; shudder = 0
         }
     }
 
-    /// 30 Hz: spin the prop at a speed set by tension, shudder near max.
+    /// 30 Hz: spin the prop (idle slow → fast when wound, plus tap whirs),
+    /// shudder near max.
     private func heartbeat() {
-        let speed = launching ? 60.0 : (2.0 + Double(winds) * 5.0)   // idle → fast
+        let idle = 4.0 + Double(winds) * 2.0             // ~3 s/rev idle → faster
+        let speed = launching ? 60.0 : (idle + propBoost)
         propSpin += speed
+        propBoost *= 0.85                                 // whir decays
         bankPhase += 0.15
 
         guard !launching else { return }
-        // Shudder ±2 px at max tension
         if maxed {
-            shudder = CGFloat.random(in: -2...2)
+            shudder = CGFloat.random(in: -2...2)          // shudder at max tension
         } else if shudder != 0 {
             shudder = 0
         }
@@ -377,32 +386,37 @@ struct PlaneLaunchPreview: View {
     @State private var winding = false
     @State private var fly: CGFloat = 0
 
-    private static let balsa     = Color(hex: "#DEB887")
-    private static let balsaDark = Color(hex: "#C19A6B")
+    private static let bodyRed    = Color(hex: "#CC2200")
+    private static let wingYellow = Color(hex: "#FFD700")
+    private static let propGrey   = Color(hex: "#4a4a4a")
 
     var body: some View {
         GeometryReader { geo in
             let w = geo.size.width, h = geo.size.height
             ZStack {
-                // Fuselage
-                Capsule().fill(Self.balsa)
-                    .frame(width: w * 0.10, height: h * 0.42)
-                // Wings
-                Capsule().fill(Self.balsaDark)
-                    .frame(width: w * 0.42, height: h * 0.07)
-                    .offset(y: -h * 0.02)
-                // Tail
-                Capsule().fill(Self.balsaDark)
-                    .frame(width: w * 0.16, height: h * 0.05)
-                    .offset(y: h * 0.17)
-                // Propeller
+                // Chubby red fuselage
+                Capsule().fill(Self.bodyRed)
+                    .frame(width: w * 0.14, height: h * 0.44)
+                // Stubby yellow wings
+                Capsule().fill(Self.wingYellow)
+                    .frame(width: w * 0.46, height: h * 0.09)
+                    .offset(y: -h * 0.01)
+                // Yellow tail
+                Capsule().fill(Self.wingYellow)
+                    .frame(width: w * 0.18, height: h * 0.06)
+                    .offset(y: h * 0.18)
+                // Big round nose
+                Circle().fill(Self.bodyRed)
+                    .frame(width: w * 0.16, height: w * 0.16)
+                    .offset(y: -h * 0.20)
+                // Big grey propeller
                 ForEach(0..<2, id: \.self) { i in
-                    Capsule().fill(Self.balsa)
-                        .frame(width: w * 0.02, height: h * 0.16)
+                    Capsule().fill(Self.propGrey)
+                        .frame(width: w * 0.03, height: h * 0.20)
                         .rotationEffect(.degrees(Double(i) * 90 + propSpin))
                 }
-                .offset(y: -h * 0.22)
-                .blur(radius: winding ? 1 : 0)
+                .offset(y: -h * 0.24)
+                .blur(radius: winding ? 1.2 : 0)
             }
             .rotationEffect(.degrees(-35))   // climbing pose
             .offset(x: fly * w * 0.5, y: -fly * h * 0.5)
