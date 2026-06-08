@@ -1066,22 +1066,32 @@ struct SenderAnimationView<Symbol: View>: View {
         .frame(width: 60, height: 130)
     }
 
-    @ViewBuilder
     private func rocketSend(end: CGSize) -> some View {
-        let start   = CGSize.zero
         let control = controlOffset(for: end, drama: 30)
+        return ZStack {
+            rocketWashes
+            rocketCountdownView
+            rocketSmokeView
+            rocketTrailView(control: control, end: end)
+            rocketFlightView(control: control, end: end)
+            rocketExitView(end: end)
+        }
+    }
 
-        // Instrument fades to ~10 % beneath a dark takeover
+    /// Dark takeover + the orange ignition wash.
+    @ViewBuilder
+    private var rocketWashes: some View {
         Color.black.opacity(rkDarken ? 0.9 : 0)
             .ignoresSafeArea()
             .animation(.easeIn(duration: 0.4), value: rkDarken)
-
-        // Warm orange ignition wash, 0 → 0.22 → 0
         Self.rocketOrange.opacity(rkIgnFlash ? 0.22 : 0)
             .ignoresSafeArea()
             .animation(.easeInOut(duration: 0.1), value: rkIgnFlash)
+    }
 
-        // COUNTDOWN — each number large, then fades
+    /// The 3 · 2 · 1 number, large then fading.
+    @ViewBuilder
+    private var rocketCountdownView: some View {
         if let n = rkCount {
             Text("\(n)")
                 .font(.system(size: 130, weight: .heavy, design: .rounded))
@@ -1092,52 +1102,62 @@ struct SenderAnimationView<Symbol: View>: View {
                 .id(n)
                 .animation(.easeOut(duration: 0.3), value: rkCountShown)
         }
+    }
 
-        // IGNITION smoke — soft circles billowing from the base
+    /// Ignition smoke billowing from the base.
+    @ViewBuilder
+    private var rocketSmokeView: some View {
         if rkSmoke {
             ForEach(0..<12, id: \.self) { i in
+                let dx = CGFloat((i * 53) % 80 - 40)
+                let dy = 56 + CGFloat((i * 31) % 44)
                 Circle()
                     .fill(Color.white.opacity(0.16))
                     .frame(width: 30, height: 30)
                     .blur(radius: 6)
                     .scaleEffect(rkSmoke ? 3.4 : 0.4)
-                    .offset(x: CGFloat((i * 53) % 80 - 40),
-                            y: 56 + CGFloat((i * 31) % 44))
+                    .offset(x: dx, y: dy)
                     .opacity(rkSmoke ? 0 : 0.85)
                     .animation(.easeOut(duration: 1.1).delay(Double(i) * 0.02), value: rkSmoke)
             }
         }
+    }
 
-        // TRAIL — the most dramatic in the app: 34 orange/red/white particles
-        // lingering ~2 s along the climb
-        ForEach(0..<34, id: \.self) { i in
-            let palette: [Color] = [Self.rocketOrange, Self.rocketRed, Color.white, Self.rocketGold]
-            let trailColor: Color = palette[i % palette.count].opacity(0.7)
-            let trailSize: CGFloat = 6 + CGFloat(i % 5) * 2.0
+    /// The most dramatic trail in the app — 34 orange/red/white particles.
+    private func rocketTrailView(control: CGSize, end: CGSize) -> some View {
+        let palette: [Color] = [Self.rocketOrange, Self.rocketRed, .white, Self.rocketGold]
+        return ForEach(0..<34, id: \.self) { i in
+            let size: CGFloat = 6 + CGFloat(i % 5) * 2
+            let color: Color = palette[i % palette.count]
             Circle()
-                .fill(trailColor)
-                .frame(width: trailSize, height: trailSize)
+                .fill(color.opacity(0.7))
+                .frame(width: size, height: size)
                 .blur(radius: 2)
                 .opacity(rkTrailFaded ? 0 : 1)
-                .modifier(CurvedFlightEffect(progress: rkProgress, start: start,
+                .modifier(CurvedFlightEffect(progress: rkProgress, start: .zero,
                                              control: control, end: end))
                 .animation(.easeIn(duration: 1.5).delay(0.012 * Double(i)), value: rkProgress)
                 .animation(.easeOut(duration: 2.0).delay(0.03 * Double(i % 12)), value: rkTrailFaded)
         }
+    }
 
-        // THE ROCKET — climbs toward the bearing, rotating to face it,
-        // growing dramatically then receding (perspective)
+    /// The rocket itself — climbs toward the bearing, rotating to face it,
+    /// growing dramatically then receding (perspective).
+    private func rocketFlightView(control: CGSize, end: CGSize) -> some View {
         rocketGlyph
             .scaleEffect(rkScale)
             .rotationEffect(.radians(rad))
             .opacity(rkFaded ? 0 : 1)
             .shadow(color: Self.rocketOrange.opacity(0.7), radius: 16)
-            .modifier(CurvedFlightEffect(progress: rkProgress, start: start,
+            .modifier(CurvedFlightEffect(progress: rkProgress, start: .zero,
                                          control: control, end: end))
             .animation(.easeIn(duration: 1.5), value: rkProgress)
             .animation(.easeOut(duration: 0.3), value: rkFaded)
+    }
 
-        // EXIT — bright flash at the exit point, a small ember lingering
+    /// Bright exit flash + a small lingering ember at the exit point.
+    @ViewBuilder
+    private func rocketExitView(end: CGSize) -> some View {
         Circle()
             .fill(RadialGradient(colors: [.white, Self.rocketOrange.opacity(0.5), .clear],
                                  center: .center, startRadius: 2, endRadius: 72))
