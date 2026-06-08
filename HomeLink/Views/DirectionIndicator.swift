@@ -62,14 +62,19 @@ struct DirectionIndicator: View {
                         radius: 8)
                 .animation(AnimationSystem.easeInOutSine(0.3), value: arcOpacity)
 
-            // ── Person marker — 20 pt, floating just outside the ring ──
-            Text(personEmoji)
-                .font(.system(size: 20))
-                .shadow(color: Self.lavender.opacity(angleError < 15 ? 0.7 : 0.25),
+            // ── Direction marker — a small needle, purely navigational.
+            // (emoji marker retired: Text(personEmoji) — kept in the param)
+            Triangle()
+                .fill(Self.lavender)
+                .frame(width: 8, height: 20)
+                .scaleEffect(angleError < 5 ? 1.3 : (angleError < 15 ? 1.15 : 1.0))
+                .shadow(color: Self.lavender.opacity(angleError < 15 ? 0.8 : 0.4),
                         radius: 6)
                 .offset(x: CGFloat(sin(rad)) * (ringRadius + 16),
                         y: -CGFloat(cos(rad)) * (ringRadius + 16))
+                .rotationEffect(.radians(rad), anchor: .center)
                 .animation(.easeOut(duration: 0.2), value: bearingDegrees)
+                .animation(.easeOut(duration: 0.25), value: angleError < 15)
 
             // ── Hint — small italic muted lavender, below the instrument ──
             if showHint {

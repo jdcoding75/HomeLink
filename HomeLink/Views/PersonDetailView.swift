@@ -604,9 +604,16 @@ struct PingHistoryView: View {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) {
             withAnimation(.easeIn(duration: 0.4)) { replayingID = nil }
         }
-        replayRecord = record
-        // (sound now plays at the overlay's bloom moment)
-        // SoundEngine.shared.play(for: record.emoji)
-        // HapticEngine.thoughtArrived()
+        // App-wide replay: the local sheet-bound overlay never showed over
+        // the People tab. Close the whole detail sheet (notification — this
+        // view is nav-pushed inside it), then play full screen above all.
+        // replayRecord = record   // (local presentation retired)
+        let emoji = record.emoji
+        let style = record.senderStyle
+        let storedBearing = bearing
+        NotificationCenter.default.post(name: .pointwardCloseSheetsForReplay, object: nil)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+            pings.requestReplay(emoji: emoji, bearingDegrees: storedBearing, styleRaw: style)
+        }
     }
 }

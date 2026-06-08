@@ -49,7 +49,7 @@ struct ProSetupView: View {
                         emojiSetSection
                         customSoundsSection
                         funnyDistanceSection
-                        holdToSendSection
+                        // holdToSendSection   // [6/6] built into the compass instrument now
                         Spacer(minLength: 30)
                     }
                     .padding(.horizontal, 20)

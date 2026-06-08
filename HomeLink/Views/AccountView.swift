@@ -148,72 +148,36 @@ struct AccountView: View {
         pairingCode.replacingOccurrences(of: "-", with: " · ")
     }
 
+    /// Entered code → the full acceptance flow (who → choose → celebrate)
+    @State private var acceptingCode: String?
+
     private var pairingSection: some View {
         VStack(spacing: 22) {
-            // Your code — a large styled monospace block; tap anywhere to copy
-            Button {
-                guard !pairingCode.isEmpty else { return }
-                UIPasteboard.general.string = pairingCode
-                HapticEngine.personSelected()
-                withAnimation(.easeOut(duration: 0.25)) { showCopied = true }
-                DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
-                    withAnimation(.easeOut(duration: 0.4)) { showCopied = false }
-                }
-            } label: {
-                VStack(spacing: 10) {
-                    Text("YOUR CODE")
-                        .font(.system(size: 11, weight: .medium))
-                        .kerning(2.5)
-                        .foregroundColor(DesignTokens.Color.textMuted)
-                    Text(pairingCode.isEmpty ? "· · · · ·" : displayCode)
-                        .font(.system(size: 34, weight: .semibold, design: .monospaced))
-                        .kerning(1)
-                        .foregroundColor(DesignTokens.Color.accentSoft)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.7)
-                    Text(showCopied ? "copied! ✓" : "tap to copy")
-                        .font(.system(size: 11))
-                        .foregroundColor(showCopied ? Color(hex: "#5dcaa5")
-                                                    : DesignTokens.Color.textDim)
-                        .contentTransition(.opacity)
-                }
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 24)
-                .background(
-                    LinearGradient(
-                        colors: [Color(hex: "#241b33"), Color(hex: "#171120")],
-                        startPoint: .topLeading, endPoint: .bottomTrailing
-                    )
-                )
-                .cornerRadius(DesignTokens.Radius.card)
-                .overlay(
-                    RoundedRectangle(cornerRadius: DesignTokens.Radius.card)
-                        .stroke(DesignTokens.Color.accentMid.opacity(0.5), lineWidth: 1)
-                )
+            // ── Generic "YOUR CODE" block + "invite to pair" RETIRED —
+            // invites are personal now: People → tap a person → connect.
+            // The account screen keeps identity + a code-entry fallback. ──
+            VStack(spacing: 8) {
+                Image(systemName: "checkmark.seal")
+                    .font(.system(size: 22))
+                    .foregroundColor(Color(hex: "#5dcaa5").opacity(0.85))
+                Text("signed in with Apple")
+                    .font(DesignTokens.Font.label)
+                    .foregroundColor(DesignTokens.Color.textPrimary)
+                Text("to connect, open a person's card in People\nand tap “connect with them”")
+                    .font(.system(size: 12, design: .serif).italic())
+                    .foregroundColor(DesignTokens.Color.textMuted)
+                    .multilineTextAlignment(.center)
             }
-            .buttonStyle(.plain)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 22)
+            .background(DesignTokens.Color.backgroundCard)
+            .cornerRadius(DesignTokens.Radius.card)
+            .overlay(
+                RoundedRectangle(cornerRadius: DesignTokens.Radius.card)
+                    .stroke(DesignTokens.Color.border, lineWidth: 1)
+            )
 
-            // One tap to send them everything they need: link + your code
-            ShareLink(item: AppLinks.friendInvite(code: pairingCode)) {
-                HStack(spacing: 8) {
-                    Image(systemName: "square.and.arrow.up")
-                    Text("invite to pair")
-                }
-                .font(DesignTokens.Font.label)
-                .foregroundColor(DesignTokens.Color.textPrimary)
-                .frame(maxWidth: .infinity)
-                .padding(DesignTokens.Spacing.md)
-                .background(DesignTokens.Color.accentStrong)
-                .cornerRadius(DesignTokens.Radius.button)
-                .overlay(
-                    RoundedRectangle(cornerRadius: DesignTokens.Radius.button)
-                        .stroke(DesignTokens.Color.accentMid, lineWidth: 1)
-                )
-            }
-            .disabled(pairingCode.isEmpty)
-            .opacity(pairingCode.isEmpty ? 0.4 : 1)
-
-            // Connection state / redeem
+            // Connection state / code-entry fallback
             if friendID != nil {
                 HStack(spacing: 8) {
                     Image(systemName: "link")
@@ -222,15 +186,16 @@ struct AccountView: View {
                 .font(DesignTokens.Font.label)
                 .foregroundColor(Color(hex: "#5dcaa5"))
             } else if !showManualEntry {
-                // The link does everything — manual entry is the fallback
-                Button("enter a code manually") {
+                // Received a code but the link didn't open? Enter it here —
+                // it runs the SAME acceptance flow (who → choose → celebrate).
+                Button("received a code? enter it manually") {
                     withAnimation(.easeOut(duration: 0.25)) { showManualEntry = true }
                 }
                 .font(DesignTokens.Font.caption)
                 .foregroundColor(DesignTokens.Color.textMuted)
             } else {
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("enter a friend's code")
+                    Text("enter their code")
                         .font(DesignTokens.Font.overline)
                         .foregroundColor(DesignTokens.Color.textMuted)
                     HStack(spacing: 10) {
@@ -240,7 +205,8 @@ struct AccountView: View {
                             .autocorrectionDisabled()
                             .formInput()
                         Button {
-                            redeem()
+                            // The acceptance flow owns redeeming now
+                            acceptingCode = SupabaseService.normalizePairingCode(codeInput)
                         } label: {
                             Text("connect")
                                 .font(DesignTokens.Font.label)
@@ -262,6 +228,18 @@ struct AccountView: View {
             .font(DesignTokens.Font.caption)
             .foregroundColor(DesignTokens.Color.textMuted)
             .padding(.top, 8)
+        }
+        .sheet(isPresented: Binding(
+            get: { acceptingCode != nil },
+            set: { if !$0 { acceptingCode = nil } }
+        )) {
+            if let acceptingCode {
+                PairAcceptView(code: acceptingCode) {
+                    self.acceptingCode = nil
+                    codeInput = ""
+                    friendID = SupabaseService.connectedFriendID
+                }
+            }
         }
     }
 

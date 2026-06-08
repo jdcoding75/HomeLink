@@ -19,7 +19,8 @@ struct PaywallView: View {
         ("👆", "flick — load aim launch"),
         ("😤", "pro emojis and custom sounds"),
         ("📏", "funny distances"),
-        ("🎨", "vintage brass and heart compass skins"),
+        ("🚀", "rocket — coming soon"),
+        // ("🎨", "vintage brass and heart compass skins"),   // skins are free now; heart retired
         ("👥", "up to 5 people"),
         ("🦎", "the gecko · obviously"),
     ]

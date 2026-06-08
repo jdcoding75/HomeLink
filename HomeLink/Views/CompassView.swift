@@ -197,6 +197,7 @@ struct CompassView: View {
                             FlickInstrumentView(
                                 loadedToken: selectedToken,
                                 loadedSymbol: selectedToken.map { AnyView(sendSymbol($0, size: 26)) },
+                                loadedEmoji: selectedToken.map { sendRemoteEmoji(for: $0) },
                                 bearingDegrees: compass.state.bearingDegrees,
                                 personName: compass.state.personName,
                                 personEmoji: compass.state.personEmoji,
@@ -1302,6 +1303,8 @@ extension Notification.Name {
     static let pointwardOpenThoughts = Notification.Name("pointwardOpenThoughts")
     /// Posted when a notification-opened catch needs the compass on screen.
     static let pointwardOpenCompass = Notification.Name("pointwardOpenCompass")
+    /// Posted before an app-wide replay so presenting sheets close first.
+    static let pointwardCloseSheetsForReplay = Notification.Name("pointwardCloseSheetsForReplay")
 }
 
 // MARK: - SkinQuickPicker

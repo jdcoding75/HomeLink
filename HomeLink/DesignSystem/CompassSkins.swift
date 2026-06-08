@@ -46,13 +46,15 @@ enum CompassSkin: String, CaseIterable, Identifiable {
         }
     }
 
-    /// Unified picker model: ALL THREE compass variants are free —
+    /// Unified picker model: the TWO compass variants are free —
     /// the $2.99 unlock buys the Pro instruments, not skins.
+    /// (Heart retired from the lineup — the bow took its slot.)
     /// Keep in sync with SubscriptionTier.unlockedSkinIDs.
     var requiresUnlock: Bool {
         switch self {
-        case .minimal, .vintage, .heart:     return false
-        case .classic, .celestial, .aurora:  return true
+        case .minimal, .vintage:             return false
+        case .classic, .heart,
+             .celestial, .aurora:            return true
         }
     }
 

@@ -134,30 +134,8 @@ struct RootView: View {
                 pairRequest = nil
             }
         }
-        // ── Replay, app-wide — any tab can request one; it plays here ─────
-        .fullScreenCover(item: $pings.replayRequest) { request in
-            ZStack {
-                // Full-screen deep purple under the overlay's own dim
-                DesignTokens.Color.background.ignoresSafeArea()
-                ReplayOverlayView(
-                    emoji: request.emoji,
-                    bearingDegrees: request.bearingDegrees,
-                    style: SenderStyle.from(request.styleRaw)
-                ) {
-                    pings.replayRequest = nil
-                }
-                // "tap to dismiss" — quiet, at the bottom
-                VStack {
-                    Spacer()
-                    Text("tap to dismiss")
-                        .font(.system(size: 11, design: .serif).italic())
-                        .foregroundColor(DesignTokens.Color.textDim)
-                        .padding(.bottom, 28)
-                }
-                .allowsHitTesting(false)
-            }
-            .presentationBackground(.clear)
-        }
+        // ([5/6] replay cover moved onto the TabView in MainTabView —
+        //  presenting from here failed while a child sheet was up)
         // ── Inviter-side celebration — their phone learns over realtime ───
         .fullScreenCover(isPresented: $showInviterCelebration) {
             PairingCelebrationView(person: celebratePerson) {
@@ -548,6 +526,8 @@ struct MainTabView: View {
     @EnvironmentObject var people:       PeopleManager
     @EnvironmentObject var subscription: SubscriptionManager
     @EnvironmentObject var skinStore:    SkinStore
+    @EnvironmentObject var pings:        PingManager
+    @EnvironmentObject var appState:     AppStateManager
 
     @State private var selectedTab = 0
 
@@ -585,6 +565,30 @@ struct MainTabView: View {
         }
         .tint(DesignTokens.Color.accentSoft)
         .preferredColorScheme(.dark)
+        // ── [5/6] Replay, app-wide — ON the TabView so it covers every
+        // tab and survives child sheets. Tap anywhere dismisses; returns
+        // to the original tab (selection untouched). ──
+        .fullScreenCover(item: $pings.replayRequest) { request in
+            ZStack {
+                DesignTokens.Color.background.ignoresSafeArea()
+                ReplayOverlayView(
+                    emoji: request.emoji,
+                    bearingDegrees: request.bearingDegrees,
+                    style: SenderStyle.from(request.styleRaw)
+                ) {
+                    pings.replayRequest = nil
+                    appState.transition(to: .idle)   // never strand .replay
+                }
+                VStack {
+                    Spacer()
+                    Text("tap to dismiss")
+                        .font(.system(size: 11, design: .serif).italic())
+                        .foregroundColor(DesignTokens.Color.textDim)
+                        .padding(.bottom, 28)
+                }
+                .allowsHitTesting(false)
+            }
+        }
         // The "✦ Pro" badge on the compass jumps here
         .onReceive(NotificationCenter.default.publisher(for: .pointwardOpenSettings)) { _ in
             selectedTab = 2

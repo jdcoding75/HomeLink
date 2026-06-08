@@ -386,9 +386,10 @@ struct SettingsView: View {
                 .labelsHidden()
             }
 
-            Divider().background(DesignTokens.Color.border).padding(.leading, 44)
+            // [6/6] Hold to Send retired as a setting — it IS the compass
+            // instrument's send mechanic now. (row kept below)
+            /* Divider().background(DesignTokens.Color.border).padding(.leading, 44)
 
-            // Hold to Send — the purely physical send (paid)
             settingsRow {
                 Image(systemName: "timer")
                     .settingsIcon()
@@ -420,7 +421,7 @@ struct SettingsView: View {
                 ))
                 .tint(Self.toggleOn)
                 .labelsHidden()
-            }
+            } */
 
             // Lock a favourite funny unit (or keep the per-launch surprise)
             if proFeatures && subscription.tier != .free {

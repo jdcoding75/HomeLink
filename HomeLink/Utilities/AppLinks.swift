@@ -36,6 +36,17 @@ enum AppLinks {
         inviteMessage(pairingCode: code)
     }
 
+    /// The PERSONAL invite — tied to one person card, so accepting links
+    /// the right person on both sides.
+    static func personInviteMessage(personName: String, code: String) -> String {
+        """
+        Join me on Pointward 🧭
+        \(personName) wants to connect with you.
+        Tap to connect instantly:
+        \(pairLink(code: code))
+        """
+    }
+
     /// Post-thought invite: "I just sent you a thought…"
     static func thoughtInvite(code: String?) -> String {
         var message = "I just sent you a thought on Pointward 🧭\nDownload here: \(website)"

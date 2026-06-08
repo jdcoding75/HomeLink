@@ -108,6 +108,13 @@ struct PeopleListView: View {
         //     ConnectView()
         // }
         .onAppear { fetchFriendPresence() }
+        // A replay is about to present app-wide — get our sheets out of the way
+        .onReceive(NotificationCenter.default.publisher(for: .pointwardCloseSheetsForReplay)) { _ in
+            detailPerson = nil
+            editPerson = nil
+            showAdd = false
+            showConnect = false
+        }
     }
 
     // MARK: - Helpers

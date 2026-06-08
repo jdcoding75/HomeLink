@@ -2,21 +2,23 @@
 // Pointward › Models
 //
 // ONE PICKER FOR EVERYTHING — instrument and skin unified into a single
-// selection. The three compass variants are the free tier; the Pro
+// selection. The two compass variants are the free tier; the Pro
 // instruments live below them. Selecting an option drives BOTH stores
 // (InstrumentStore for routing, SkinStore for the compass face) so all
 // existing plumbing keeps working untouched.
 //
-//   FREE   🧭 minimal · 🧭 vintage brass (default) · 🧭 heart
+//   FREE   🧭 minimal · 🧭 vintage brass (default)
 //   PRO    🏹 bow & arrow · 👆 flick · 🚀 rocket (coming soon) · 🌬️ wind
+//
+// (Heart compass retired — its slot in the lineup belongs to the bow.)
 
 import Foundation
 
 enum InstrumentOption: String, CaseIterable, Identifiable {
-    // Free — the compass, three ways
+    // Free — the compass, two ways
     case compassMinimal = "compassMinimal"
     case compassVintage = "compassVintage"
-    case compassHeart   = "compassHeart"
+    // case compassHeart = "compassHeart"   // retired — bow took the slot
     // Pro — the instruments
     case bow    = "bow"
     case flick  = "flick"
@@ -27,8 +29,8 @@ enum InstrumentOption: String, CaseIterable, Identifiable {
 
     var requiresPro: Bool {
         switch self {
-        case .compassMinimal, .compassVintage, .compassHeart: return false
-        case .bow, .flick, .rocket, .wind:                    return true
+        case .compassMinimal, .compassVintage: return false
+        case .bow, .flick, .rocket, .wind:     return true
         }
     }
 
@@ -38,7 +40,7 @@ enum InstrumentOption: String, CaseIterable, Identifiable {
         switch self {
         case .compassMinimal: return "minimal"
         case .compassVintage: return "vintage brass"
-        case .compassHeart:   return "heart"
+        // case .compassHeart: return "heart"
         case .bow:            return "bow & arrow"
         case .flick:          return "flick"
         case .rocket:         return "rocket"
@@ -48,7 +50,7 @@ enum InstrumentOption: String, CaseIterable, Identifiable {
 
     var icon: String {
         switch self {
-        case .compassMinimal, .compassVintage, .compassHeart: return "🧭"
+        case .compassMinimal, .compassVintage: return "🧭"
         case .bow:    return "🏹"
         case .flick:  return "👆"
         case .rocket: return "🚀"
@@ -60,7 +62,7 @@ enum InstrumentOption: String, CaseIterable, Identifiable {
         switch self {
         case .compassMinimal: return "clean · modern"
         case .compassVintage: return "antique pocket watch"
-        case .compassHeart:   return "love finds its direction"
+        // case .compassHeart: return "love finds its direction"
         case .bow:            return "draw · aim · release"
         case .flick:          return "load · aim · launch"
         case .rocket:         return "coming soon"
@@ -73,7 +75,7 @@ enum InstrumentOption: String, CaseIterable, Identifiable {
     ///  Rocket is a teaser: routes to the compass until it ships.)
     var instrument: Instrument {
         switch self {
-        case .compassMinimal, .compassVintage, .compassHeart: return .compass
+        case .compassMinimal, .compassVintage: return .compass
         case .bow:    return .bow
         case .flick:  return .flick
         case .wind:   return .firefly
@@ -86,7 +88,7 @@ enum InstrumentOption: String, CaseIterable, Identifiable {
         switch self {
         case .compassMinimal: return .minimal
         case .compassVintage: return .vintage
-        case .compassHeart:   return .heart
+        // case .compassHeart: return .heart
         default:              return nil
         }
     }
@@ -98,6 +100,7 @@ enum InstrumentOption: String, CaseIterable, Identifiable {
     static var selected: InstrumentOption {
         get {
             let raw = UserDefaults.standard.string(forKey: storageKey) ?? ""
+            // A persisted heart selection (pre-retirement) lands on vintage
             return InstrumentOption(rawValue: raw) ?? .compassVintage
         }
         set {
@@ -134,7 +137,7 @@ enum InstrumentOption: String, CaseIterable, Identifiable {
         case .compass:
             switch CompassSkin(rawValue: skinRaw) ?? .vintage {
             case .minimal: derived = .compassMinimal
-            case .heart:   derived = .compassHeart
+            // heart retired — its users land on vintage brass
             default:       derived = .compassVintage
             }
         }

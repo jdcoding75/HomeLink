@@ -22,6 +22,7 @@ struct FlickInstrumentView: View {
 
     @State private var dragOffset: CGSize = .zero
     @State private var dragging = false
+    @State private var padPulse = false      // 0.97–1.03 breath, 2 s cycle
     @State private var missWobble = false
     @State private var showMissHint = false
     @State private var showPerfect = false
@@ -100,11 +101,27 @@ struct FlickInstrumentView: View {
                     .allowsHitTesting(false)
             }
 
-            // ── The loaded thought — in the pocket, rubber-banded ──
+            // ── Drag trail — soft dots remembering the pull-back path ──
+            if dragging, dragDistance > 16 {
+                ForEach(1..<4, id: \.self) { i in
+                    Circle()
+                        .fill(Self.lavender.opacity(0.25 - Double(i) * 0.06))
+                        .frame(width: 7, height: 7)
+                        .blur(radius: 1.5)
+                        .offset(CGSize(
+                            width: pocketOffset.width + rubberBanded.width * (1 - CGFloat(i) * 0.25),
+                            height: pocketOffset.height + rubberBanded.height * (1 - CGFloat(i) * 0.25)))
+                }
+            }
+
+            // ── The loaded thought — centered on the pad, glowing in its
+            // own hue, breathing 0.97–1.03, ready to launch ──
             if let loadedSymbol {
                 loadedSymbol
-                    .shadow(color: Self.lavender.opacity(dragging ? 0.8 : 0.5),
-                            radius: dragging ? 12 : 8)
+                    .scaleEffect(dragging ? 1.0 : (padPulse ? 1.03 : 0.97))
+                    .shadow(color: EmojiHue.color(for: loadedEmoji ?? "💜")
+                                .opacity(dragging ? 0.6 : 0.2),
+                            radius: dragging ? 12 : 9)
                     .offset(CGSize(width: pocketOffset.width + rubberBanded.width,
                                    height: pocketOffset.height + rubberBanded.height))
                     .rotationEffect(.degrees(missWobble ? 9 : 0))
@@ -143,6 +160,12 @@ struct FlickInstrumentView: View {
         .frame(width: 370, height: 370)
         .animation(.easeOut(duration: 0.25), value: showMissHint)
         .animation(.easeOut(duration: 0.3), value: showPerfect)
+        .onAppear {
+            withAnimation(AnimationSystem.easeInOutSine(2.0)
+                            .repeatForever(autoreverses: true)) {
+                padPulse = true
+            }
+        }
     }
 
     private var dragDistance: CGFloat {
