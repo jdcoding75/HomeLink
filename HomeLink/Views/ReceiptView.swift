@@ -43,6 +43,10 @@ struct ReceiptView: View {
     @State private var named = false
     @State private var debugBypass = false
     @State private var pulse = false
+    // [1/3] SPIN-TO-CATCH — finger spin on the bucket, NO phone rotation.
+    @State private var thoughtAngle: Double = 120   // fixed sender direction (deg)
+    @State private var bucketAngle: Double = 0        // finger-spun opening direction
+    @State private var lastFingerAngle: Double? = nil
 
     private let tick = Timer.publish(every: 0.1, on: .main, in: .common).autoconnect()
 
@@ -51,14 +55,26 @@ struct ReceiptView: View {
     private static let warmWhite = Color(hex: "#f3ecdf")
 
     private var angleError: Double {
-        guard compass.isHeadingAvailable else { return 0 }
         if debugBypass { return 0 }
-        return BearingCalculator.alignmentError(relativeBearing: compass.state.bearingDegrees)
+        // [2/3] Spin alignment ONLY — the angle between the bucket opening and
+        // the fixed thought direction. No CLHeading / magnetometer / phone turn.
+        return BearingCalculator.alignmentError(relativeBearing: thoughtAngle - bucketAngle)
     }
-    private var turnRight: Bool {
-        var b = compass.state.bearingDegrees.truncatingRemainder(dividingBy: 360)
-        if b < 0 { b += 360 }
-        return b < 180
+
+    /// SPIN — track the finger's angle around the bucket centre (the 240×260
+    /// drag frame's centre is 120,130) and rotate by the wrap-safe DELTA.
+    private var spinGesture: some Gesture {
+        DragGesture(minimumDistance: 0)
+            .onChanged { v in
+                let a = atan2(v.location.y - 130, v.location.x - 120) * 180 / .pi
+                if let last = lastFingerAngle {
+                    var d = a - last
+                    if d > 180 { d -= 360 } else if d < -180 { d += 360 }
+                    bucketAngle += d
+                }
+                lastFingerAngle = a
+            }
+            .onEnded { _ in lastFingerAngle = nil }
     }
     private var caughtEmojis: [String] {
         var list = pings.queue.map(\.emoji)
@@ -198,7 +214,7 @@ struct ReceiptView: View {
                         .minimumScaleFactor(0.7).lineLimit(2)
                         .shadow(color: Self.lavender.opacity(angleError < 5 ? 0.8 : 0.4), radius: 8)
                         .animation(.easeInOut(duration: 0.2), value: guidanceLine)
-                    Text("turn your phone toward them")
+                    Text("spin the bucket with your finger")
                         .font(.system(size: 13))
                         .foregroundColor(DesignTokens.Color.textMuted)
                     #if DEBUG
@@ -213,16 +229,12 @@ struct ReceiptView: View {
     }
 
     private var guidanceLine: String {
+        // [1/3] Spin the bucket — no phone turning.
         if phase == .locked || phase == .dropping || phase == .caught { return "locked ✦" }
         switch angleError {
         case ..<5:  return "locked ✦"
         case ..<15: return "almost there ✦"
-        case ..<45: return "turn \(turnRight ? "right" : "left") to align"
-        default:
-            if let abs = compass.rawBearingToTarget {
-                return "\(ping.fromName) is to your \(Self.fullCardinal(abs))"
-            }
-            return "turn \(turnRight ? "right" : "left") to align"
+        default:    return "spin the bucket toward \(ping.fromName)"
         }
     }
 
@@ -240,8 +252,20 @@ struct ReceiptView: View {
                 .frame(width: 180, height: 160)
                 .overlay(bucketBubbles.clipShape(BucketShape()))
                 .shadow(color: .black.opacity(0.4), radius: 10, y: 6)
+            // [1/3] Rim arrow — marks which way the opening faces as it spins.
+            Triangle()
+                .fill(angleError < 5 ? Self.lavender : Self.lavender.opacity(0.85))
+                .frame(width: 16, height: 14)
+                .offset(y: -86)
         }
         .padding(.bottom, 8)
+        // [1/3] The whole bucket spins with your finger (no phone turning). The
+        // rotation is on the art; the gesture sits on the unrotated 240×260
+        // frame so spinning never feeds back on itself.
+        .rotationEffect(.degrees(bucketAngle))
+        .frame(width: 240, height: 260)
+        .contentShape(Rectangle())
+        .gesture(spinGesture)
     }
 
     private var bucketBubbles: some View {
@@ -335,6 +359,11 @@ struct ReceiptView: View {
     private func enterSeeking() {
         guard phase == .arriving else { return }
         phase = .seeking
+        // [1/3] Fix the thought at the sender's bearing (or a stable angle when
+        // no location) — it never moves; the user spins the bucket to it.
+        thoughtAngle = compass.rawBearingToTarget ?? 120
+        bucketAngle = 0
+        lastFingerAngle = nil
         SoundEngine.shared.play(for: "catch.lock")
         withAnimation(AnimationSystem.easeOutBack(0.5)) { orbEntered = true }
         withAnimation(AnimationSystem.easeInOutSine(0.9).repeatForever(autoreverses: true)) {

@@ -16,6 +16,11 @@ final class CompassManager: NSObject, ObservableObject {
     // Published so list views can show live distances per person
     @Published private(set) var userLocation: CLLocation?
     private var currentHeading: Double = 0
+    /// [1/6] Low-pass-filtered heading — heavy smoothing (0.2 new · 0.8 old)
+    /// removes magnetometer jitter so the marker is dead still when the phone
+    /// is. Published `currentHeading` only moves when this smoothed value
+    /// crosses the 3° gate.
+    private var smoothedHeading: Double = 0
     private var targetPerson: Person?
     private var wasLocked = false
     private var lockedSince: Date = .distantFuture        // steady-gaze tracking
@@ -263,14 +268,32 @@ extension CompassManager: CLLocationManagerDelegate {
         // these real readings never arrive.)
         stopMockHeadingTimer()
         #endif
-        // Throttle: ignore sub-degree magnetometer jitter — this gates both
-        // the math and the SwiftUI redraws to meaningful changes only.
-        let heading = newHeading.magneticHeading
-        let delta = abs(heading - currentHeading)
-        let wrapped = min(delta, 360 - delta)
-        guard wrapped >= 1.0 || !isHeadingAvailable else { return }
+        let raw = newHeading.magneticHeading
 
-        currentHeading     = heading
+        // [1/6] LOW-PASS FILTER — fold each raw reading in at 20 %, taking the
+        // shortest arc so it wraps cleanly across 0°/360°. This alone kills the
+        // magnetometer jitter that made the marker spin/wander while still.
+        if !isHeadingAvailable {
+            smoothedHeading = raw
+        } else {
+            var diff = raw - smoothedHeading
+            if diff > 180 { diff -= 360 }
+            if diff < -180 { diff += 360 }
+            smoothedHeading = (smoothedHeading + diff * 0.2)
+                .truncatingRemainder(dividingBy: 360)
+            if smoothedHeading < 0 { smoothedHeading += 360 }
+        }
+
+        // 3° gate on the SMOOTHED heading vs what's published — the marker only
+        // moves on a meaningful turn, and is dead still when the phone is.
+        let delta = abs(smoothedHeading - currentHeading)
+        let wrapped = min(delta, 360 - delta)
+        guard wrapped >= 3.0 || !isHeadingAvailable else {
+            isHeadingAvailable = true
+            return
+        }
+
+        currentHeading     = smoothedHeading   // smoothedHeading used everywhere
         isHeadingAvailable = true
         updateCompassState()
     }

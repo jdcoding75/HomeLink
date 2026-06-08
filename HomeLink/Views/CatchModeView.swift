@@ -60,6 +60,12 @@ struct CatchModeView: View {
     @State private var dimOthers   = false     // [3/5] everything but the orb → 60 %
     @State private var energyBuild = false     // [3/5] orb charges while held
     @State private var holdProgress: Double = 0
+    // [1/3] SPIN-TO-CATCH — no phone rotation. The thought sits FIXED at the
+    // sender's direction on the screen edge; the user SPINS THE BUCKET (finger
+    // drag) so its opening faces the thought. Works indoors, on a desk, in bed.
+    @State private var thoughtAngle: Double = 90    // fixed sender direction (deg, 0 = up)
+    @State private var bucketAngle: Double = 0       // finger-spun opening direction
+    @State private var lastFingerAngle: Double? = nil
     // Step 4 — catch flight
     @State private var flightProgress: CGFloat = 0
     // Step 5 — reveal
@@ -98,26 +104,23 @@ struct CatchModeView: View {
     // ── Alignment ─────────────────────────────────────────────────────────
 
     private var angleError: Double {
-        // Indoors / Simulator: no heading means the catch can never happen —
-        // treat as aligned rather than trapping the thought.
-        guard compass.isHeadingAvailable else { return 0 }
         if debugBypass { return 0 }
-        return BearingCalculator.alignmentError(relativeBearing: compass.state.bearingDegrees)
+        // [2/3] The catch alignment is the angle between the BUCKET's opening
+        // and the fixed thought direction — finger spin ONLY. No CLHeading, no
+        // magnetometer, no phone turning. Works perfectly indoors.
+        return BearingCalculator.alignmentError(relativeBearing: thoughtAngle - bucketAngle)
     }
 
     /// [2/5] The big bold catch instruction — encouraging directional guidance
     /// that updates as the user turns toward the sender: cardinal direction
     /// far out → "keep turning right" closer → "hold steady" on lock.
     private var catchInstruction: String {
-        if phase == .locked { return "hold steady ✦" }
+        // [1/3] Spin the bucket — no phone turning.
+        if phase == .locked { return "locked ✦" }
         switch angleError {
-        case ..<15: return "nearly locked — hold steady"
-        case ..<45: return "almost there — keep turning \(turnRight ? "right" : "left")"
-        default:
-            if let absolute = compass.rawBearingToTarget {
-                return "\(ping.fromName) is to your \(Self.fullCardinal(absolute))"
-            }
-            return "turn \(turnRight ? "right" : "left") to find \(ping.fromName)"
+        case ..<5:  return "locked ✦"
+        case ..<15: return "almost there ✦"
+        default:    return "spin the bucket toward \(ping.fromName)"
         }
     }
 
@@ -168,7 +171,7 @@ struct CatchModeView: View {
 
     var body: some View {
         GeometryReader { geo in
-            let rad   = compass.state.bearingDegrees * .pi / 180
+            let rad   = thoughtAngle * .pi / 180   // [1/3] FIXED thought direction — no heading
             let reach = min(geo.size.width, geo.size.height) * 0.46
             let edge  = CGSize(width: CGFloat(sin(rad)) * reach,
                                height: -CGFloat(cos(rad)) * reach)
@@ -246,6 +249,14 @@ struct CatchModeView: View {
                                    value: flightProgress)
                         // CurvedFlightEffect already places the orb at the edge
                         // (start) and flies it to center (end) via progress.
+                        .position(x: geo.size.width / 2, y: geo.size.height / 2)
+                }
+
+                // [1/3] THE BUCKET — SPIN IT with your finger so its opening
+                // faces the thought. No phone turning, ever. The thought flies
+                // into the opening on lock.
+                if phase == .seeking || phase == .locked || phase == .flying {
+                    bucketView
                         .position(x: geo.size.width / 2, y: geo.size.height / 2)
                 }
 
@@ -592,6 +603,68 @@ struct CatchModeView: View {
     /// 1 Hz alignment trace (the 10 Hz heartbeat is too chatty for Console).
     @State private var lastAlignmentLog = Date.distantPast
 
+    // ── [1/3] The spinnable bucket ───────────────────────────────────────
+
+    /// The bucket: a non-rotating 200×240 drag surface wrapping the rotating
+    /// art. The gesture lives on the stable outer frame so spinning never feeds
+    /// back on itself.
+    private var bucketView: some View {
+        bucketArt
+            .rotationEffect(.degrees(bucketAngle))
+            .frame(width: 200, height: 240)
+            .contentShape(Rectangle())
+            .gesture(spinGesture)
+    }
+
+    private var bucketArt: some View {
+        ZStack {
+            // Handle arc above the opening
+            BucketHandleShape()
+                .stroke(Self.lavender.opacity(0.8),
+                        style: StrokeStyle(lineWidth: 4, lineCap: .round))
+                .frame(width: 84, height: 46)
+                .offset(y: -66)
+            // Body — trapezoid, wide at the opening (top), narrow at the base
+            BucketShape()
+                .fill(LinearGradient(colors: [Color(hex: "#3a3550"), Color(hex: "#221e2d")],
+                                     startPoint: .top, endPoint: .bottom))
+                .overlay(BucketShape().stroke(Self.lavender.opacity(0.5), lineWidth: 1.5))
+                .frame(width: 112, height: 96)
+                .offset(y: 10)
+            // The opening (mouth) — a dark ellipse that brightens as you align
+            Ellipse()
+                .fill(Color.black.opacity(0.55))
+                .overlay(Ellipse().stroke(
+                    Self.lavender.opacity(angleError < 15 ? 0.95 : 0.5),
+                    lineWidth: angleError < 5 ? 3 : 2))
+                .frame(width: 104, height: 30)
+                .offset(y: -38)
+                .shadow(color: hue.opacity(angleError < 15 ? 0.5 : 0), radius: 10)
+            // Rim arrow — points OUT of the opening, marking which way it faces
+            Triangle()
+                .fill(angleError < 5 ? Self.lavender : Self.lavender.opacity(0.85))
+                .frame(width: 16, height: 14)
+                .offset(y: -64)
+        }
+    }
+
+    /// SPIN gesture — track the finger's angle around the bucket centre and
+    /// rotate by the DELTA (wrap-safe), exactly like the bow's spin. The local
+    /// centre of the stable 200×240 frame is (100, 120).
+    private var spinGesture: some Gesture {
+        DragGesture(minimumDistance: 0)
+            .onChanged { v in
+                let a = atan2(v.location.y - 120, v.location.x - 100) * 180 / .pi
+                if let last = lastFingerAngle {
+                    var d = a - last
+                    if d > 180 { d -= 360 } else if d < -180 { d += 360 }
+                    bucketAngle += d
+                }
+                lastFingerAngle = a
+            }
+            .onEnded { _ in lastFingerAngle = nil }
+    }
+
     private func begin() {
         Self.log.info("catch: ACTIVATED — from=\(ping.fromName, privacy: .public) emoji=\(ping.emoji, privacy: .public) style=\(style.rawValue, privacy: .public) senderBearing=\(Int(compass.state.bearingDegrees), privacy: .public)° headingAvailable=\(compass.isHeadingAvailable, privacy: .public)")
 
@@ -621,6 +694,12 @@ struct CatchModeView: View {
     private func enterSeeking() {
         guard phase == .arriving else { return }
         phase = .seeking
+        // [1/3] Fix the thought at the sender's absolute bearing (or a stable
+        // angle when no location) — it NEVER moves; the user spins the bucket
+        // to face it. Bucket starts at 0 (opening up).
+        thoughtAngle = compass.rawBearingToTarget ?? 90
+        bucketAngle = 0
+        lastFingerAngle = nil
         withAnimation(.easeInOut(duration: 0.4)) { arrivalDim = false }
         // The orb breathes (900 ms easeInOutSine cycle)
         withAnimation(AnimationSystem.easeInOutSine(AnimationSystem.Timing.glowPulseSlow)
@@ -693,6 +772,11 @@ struct CatchModeView: View {
                 lockHeldSince = .now
                 holdProgress = 0
                 lockSnap = true                       // easeOutBack snap
+                // [1/3] The bucket opening SNAPS to face the thought (shortest
+                // path, easeOutBack overshoot) — the satisfying lock.
+                let raw = (thoughtAngle - bucketAngle).truncatingRemainder(dividingBy: 360)
+                let shortest = raw > 180 ? raw - 360 : (raw < -180 ? raw + 360 : raw)
+                withAnimation(AnimationSystem.easeOutBack(0.3)) { bucketAngle += shortest }
                 Self.log.info("catch: LOCKED ON (error=\(Int(angleError), privacy: .public)°) — holding 0.5 s")
                 HapticEngine.catchLock()              // the satisfying snap
                 SoundEngine.shared.play(for: "catch.lock")
