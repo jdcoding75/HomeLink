@@ -1408,6 +1408,7 @@ struct ReplayOverlayView: View {
     @State private var bloomed  = false
     @State private var fadingOut = false
     @State private var wandBurst = false       // 🪄 crystal burst at the start
+    @State private var landingDone = false     // the full landing finished
 
     private var hue: Color { EmojiHue.color(for: emoji) }
     private var rad: Double { bearingDegrees * .pi / 180 }
@@ -1500,6 +1501,37 @@ struct ReplayOverlayView: View {
                                value: bloomed)
                     .animation(.easeOut(duration: 0.3), value: fadingOut)
                     .position(x: geo.size.width / 2, y: geo.size.height / 2)
+
+                // ── THE REPLAY IS THE LANDING — the full per-instrument
+                // landing drama plays over the themed world, then lingers on
+                // the reveal. (Reliving the original moment completely.) ──
+                CatchWorldBackground(style: style)
+                    .ignoresSafeArea()
+                    .opacity(dimmed ? 1 : 0)
+                    .animation(.easeIn(duration: 0.3), value: dimmed)
+                if dimmed && !landingDone {
+                    InstrumentLandingView(style: style, emoji: emoji,
+                                          onComplete: { landingComplete() })
+                }
+                if landingDone {
+                    Text(emoji).font(.system(size: 72))
+                        .shadow(color: hue.opacity(0.6), radius: 24)
+                        .opacity(fadingOut ? 0 : 1)
+                        .position(x: geo.size.width / 2, y: geo.size.height / 2)
+                }
+                // Sender name — always visible at the top, 28pt serif lavender
+                if !fromName.isEmpty {
+                    VStack {
+                        Text("from \(fromName) ✦")
+                            .font(.system(size: 28, design: .serif))
+                            .foregroundColor(Color(hex: "#c4a8d4"))
+                            .shadow(color: .black.opacity(0.6), radius: 8)
+                            .opacity(dimmed ? 1 : 0)
+                            .padding(.top, 70)
+                        Spacer()
+                    }
+                    .allowsHitTesting(false)
+                }
             }
         }
         .onAppear { play() }
@@ -1507,23 +1539,16 @@ struct ReplayOverlayView: View {
     }
 
     private func play() {
-        dimmed = true
-        // 🪄 The crystal is already glowing — burst straight into release.
-        if isWand {
-            SoundEngine.shared.play(for: "style.shimmer")
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { wandBurst = true }
-        }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-            progress = 1
-        }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2 + travelDuration) {
-            bloomed = true
-            SoundEngine.shared.play(for: emoji)
-        }
-        // 5 · stays 1.5 s · 6 · fades 300 ms · 7 · background returns 200 ms
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2 + travelDuration + 1.5) {
-            finish()
-        }
+        withAnimation(.easeIn(duration: 0.3)) { dimmed = true }
+        // The themed world appears, then the full landing plays (driven by
+        // InstrumentLandingView). The old abbreviated flight is hidden behind
+        // the opaque world.
+    }
+
+    /// The landing finished — linger on the reveal, then dismiss.
+    private func landingComplete() {
+        landingDone = true
+        DispatchQueue.main.asyncAfter(deadline: .now() + 4.0) { finish() }
     }
 
     private func finish() {
