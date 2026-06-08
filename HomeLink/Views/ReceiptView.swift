@@ -131,6 +131,16 @@ struct ReceiptView: View {
                         .foregroundColor(Self.warmWhite)
                         .opacity(named ? 1 : 0)
                         .animation(.easeIn(duration: 0.5), value: named)
+                    // [ReceiptView] optional short message, if the sender added one
+                    if let message = ping.message, !message.isEmpty {
+                        Text(message)
+                            .font(.system(size: 18, design: .serif).italic())
+                            .foregroundColor(Self.lavender.opacity(0.9))
+                            .multilineTextAlignment(.center)
+                            .opacity(named ? 1 : 0)
+                            .animation(.easeIn(duration: 0.6), value: named)
+                            .padding(.horizontal, 30)
+                    }
                 }
             } else {
                 // The bucket near the bottom of the middle zone
