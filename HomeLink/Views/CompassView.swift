@@ -203,6 +203,32 @@ struct CompassView: View {
                                 personEmoji: compass.state.personEmoji,
                                 onSend: { _ in if let token = selectedToken { sendThought(token) } }
                             )
+                        case .rocket:
+                            // 🚀 ROCKET — tap-to-fuel, then blast off. The
+                            // mechanic owns emoji loading + alignment, then
+                            // calls back to fire the shared send pipeline.
+                            RocketInstrumentView(
+                                loadedToken: selectedToken,
+                                loadedSymbol: selectedToken.map { AnyView(sendSymbol($0, size: 24)) },
+                                loadedEmoji: selectedToken.map { sendRemoteEmoji(for: $0) },
+                                bearingDegrees: compass.state.bearingDegrees,
+                                personName: compass.state.personName,
+                                personEmoji: compass.state.personEmoji,
+                                onLaunch: { if let token = selectedToken { sendThought(token) } }
+                            )
+                        case .wand:
+                            // 🪄 WAND — load into the crystal, shake to charge,
+                            // release at full charge within 15°. Owns its own
+                            // mechanic, then fires the shared send pipeline.
+                            WandInstrumentView(
+                                loadedToken: selectedToken,
+                                loadedSymbol: selectedToken.map { AnyView(sendSymbol($0, size: 22)) },
+                                loadedEmoji: selectedToken.map { sendRemoteEmoji(for: $0) },
+                                bearingDegrees: compass.state.bearingDegrees,
+                                personName: compass.state.personName,
+                                personEmoji: compass.state.personEmoji,
+                                onSend: { if let token = selectedToken { sendThought(token) } }
+                            )
                         }
                     }
                     .id(instrumentStore.selected)              // crossfade on switch
@@ -937,6 +963,8 @@ struct CompassView: View {
         case .bow:     return "draw the string toward \(name)"
         case .firefly: return "breathe toward \(name) to send"   // wind
         case .flick:   return "flick toward \(name) to send"
+        case .rocket:  return "fuel the rocket toward \(name)"
+        case .wand:    return "shake to charge, then aim at \(name)"
         }
     }
 
@@ -1009,9 +1037,11 @@ struct CompassView: View {
         // the chosen instrument (compass→glow, bow→bowArrow, firefly→firefly,
         // flick→fingerFlick). Free users hold the compass, so glow.
         let style = instrumentStore.selected.senderStyle
-        if style == .fingerFlick || style == .bowArrow {
+        if style == .fingerFlick || style == .bowArrow || style == .rocket {
             faceDimmedForInstrument = true
-            let restoreDelay = style == .bowArrow ? 1.5 : 1.2
+            // The rocket's blast-off owns the whole screen for ~3.4 s
+            let restoreDelay: Double = style == .rocket ? 3.4
+                                     : style == .bowArrow ? 1.5 : 1.2
             DispatchQueue.main.asyncAfter(deadline: .now() + restoreDelay) {
                 faceDimmedForInstrument = false
             }

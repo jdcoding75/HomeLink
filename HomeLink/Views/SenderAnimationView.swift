@@ -128,6 +128,20 @@ struct SenderAnimationView<Symbol: View>: View {
     @State private var baDimmed    = false   // 5 % tension overlay
     @State private var baEdgeFlash = false   // arrival flash + bloom
 
+    // Rocket blast-off phases
+    @State private var rkCount: Int?   = nil   // countdown 3 · 2 · 1
+    @State private var rkCountShown    = false // current number large + fading
+    @State private var rkDarken        = false // instrument fades to ~10 %
+    @State private var rkIgnFlash      = false // warm orange ignition wash
+    @State private var rkSmoke         = false // ignition smoke billow
+    @State private var rkProgress: CGFloat = 0 // pad → screen edge
+    @State private var rkScale: CGFloat = 1.0  // grows then recedes (perspective)
+    @State private var rkFaded         = false // rocket fades at the edge
+    @State private var rkTrailFaded    = false // 2 s lingering trail fade
+    @State private var rkExitFlash     = false // bright flash at the exit point
+    @State private var rkEmber         = false // small ember glow lingers
+    @State private var rkShake: CGFloat = 0     // engine rumble shake pre-launch
+
     // Wander offsets are frozen once per flight so the drift doesn't reroll
     @State private var wander1 = CGSize(width: .random(in: -70...70),
                                         height: .random(in: -70...10))
@@ -170,6 +184,8 @@ struct SenderAnimationView<Symbol: View>: View {
         case .firefly:      return Self.fireflyGreen
         case .fingerFlick:  return Self.flickGold2
         case .bowArrow:     return Self.amber2
+        case .rocket:       return Self.rocketOrange
+        case .wand:         return Self.wandGold
         }
     }
 
@@ -198,11 +214,14 @@ struct SenderAnimationView<Symbol: View>: View {
                     case .firefly:      fireflySend(end: end)
                     case .fingerFlick:  fingerFlickSend(end: end)
                     case .bowArrow:     bowArrowSend(end: end)
+                    case .rocket:       rocketSend(end: end)
+                    case .wand:         wandSend(end: end)
                     }
 
                     // IMPACT — brief flash where the thought leaves the screen
-                    // (the firefly lands softly instead)
-                    if style != .firefly {
+                    // (the firefly lands softly instead; the rocket owns its
+                    //  own exit flash + ember)
+                    if style != .firefly && style != .rocket {
                         Circle()
                             .fill(RadialGradient(
                                 colors: [.white.opacity(0.9),
@@ -735,6 +754,63 @@ struct SenderAnimationView<Symbol: View>: View {
         .animation(.easeOut(duration: 0.35), value: baEdgeFlash)
     }
 
+    // ── WAND SEND (pro) — 🪄 charge built on the instrument, released here ──
+    // BURST 200 ms   crystal flash + 24 sparkles scatter from the launch point
+    // FLIGHT 1000 ms curved arc, grows 1.0 → 1.6, gold/purple sparkle trail
+    // IMPACT         purple/gold screen wash, medium haptic
+
+    private static var wandGold: Color { Color(hex: "#D4AF37") }
+    private static var wandPurple: Color { Color(hex: "#9b7fc0") }
+    private let wandFlight = 1.00
+
+    @ViewBuilder
+    private func wandSend(end: CGSize) -> some View {
+        let start   = ringStart
+        let control = controlOffset(from: start, to: end, drama: 80)
+
+        // BURST — sparkles scattering from the crystal as it releases
+        ForEach(0..<24, id: \.self) { i in
+            let a = Double(i) / 24 * 2 * .pi
+            let dist: CGFloat = squashed ? 60 + CGFloat(i % 5) * 8 : 0
+            Circle()
+                .fill(i % 2 == 0 ? Self.wandGold : Self.wandPurple)
+                .frame(width: i % 3 == 0 ? 4 : 3, height: i % 3 == 0 ? 4 : 3)
+                .blur(radius: 0.5)
+                .offset(x: start.width + CGFloat(cos(a)) * dist,
+                        y: start.height + CGFloat(sin(a)) * dist)
+                .opacity(squashed ? 0 : (chargeGlow ? 0.95 : 0))
+                .animation(.easeOut(duration: 0.5), value: squashed)
+        }
+
+        // TRAIL — gold/purple sparkles following the thought, fading 1.5 s
+        ForEach(0..<12, id: \.self) { i in
+            Circle()
+                .fill((i % 2 == 0 ? Self.wandGold : Self.wandPurple).opacity(0.7))
+                .frame(width: 6, height: 6)
+                .blur(radius: 1.5)
+                .opacity(trailFaded ? 0 : 1)
+                .modifier(CurvedFlightEffect(progress: progress, start: start,
+                                             control: control, end: end))
+                .animation(AnimationSystem.easeOutCubic(wandFlight)
+                            .delay(0.02 * Double(i + 1)), value: progress)
+                .animation(.easeOut(duration: 1.5).delay(0.05 * Double(i)),
+                           value: trailFaded)
+        }
+
+        // The thought — launches from the crystal tip, grows mid-flight
+        symbol
+            .scaleEffect(flightScale)
+            .rotationEffect(.degrees(progress > 0 ? 10 * (sin(rad) >= 0 ? 1 : -1) : 0))
+            .shadow(color: Self.wandPurple.opacity(chargeGlow ? 0.7 : 0.2),
+                    radius: chargeGlow ? 18 : 8)
+            .opacity(faded ? 0 : 1)
+            .modifier(CurvedFlightEffect(progress: progress, start: start,
+                                         control: control, end: end))
+            .animation(AnimationSystem.easeOutCubic(wandFlight), value: progress)
+            .animation(.easeOut(duration: 0.35), value: flightScale)
+            .animation(.easeOut(duration: 0.25), value: faded)
+    }
+
     // ── Launch sequencing ─────────────────────────────────────────────────
 
     /// IMPACT — shared by every style except the firefly's soft landing:
@@ -760,6 +836,34 @@ struct SenderAnimationView<Symbol: View>: View {
 
     private func launch() {
         switch style {
+
+        case .rocket:
+            launchRocket()
+
+        case .wand:
+            // RELEASE — the charge was built on the wand; here the crystal
+            // bursts and the thought streaks away on a sparkle trail.
+            // BURST 200 ms — bright flash, scatter, strong haptic
+            chargeGlow = true
+            HapticEngine.send()
+            SoundEngine.shared.play(for: "style.shimmer")
+            withAnimation(.easeOut(duration: 0.1)) { squashed = true }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
+                withAnimation(.easeOut(duration: 0.1)) { squashed = false }
+            }
+            // FLIGHT 1000 ms — curved arc, grows to 1.6, fades the last 250 ms
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.20) {
+                progress = 1
+                withAnimation(AnimationSystem.easeOutCubic(wandFlight)) {
+                    flightScale = 1.6
+                }
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.95) {
+                faded = true
+            }
+            // IMPACT — flash, purple/gold screen wash, medium haptic
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.20) { impact() }
+            finish(after: 1.2 + AnimationSystem.Trail.linger + 0.4)
 
         case .glow:
             // CHARGE 200 ms — pulse 1.0 → 1.2 → 1.0, warm glow builds
@@ -910,6 +1014,199 @@ struct SenderAnimationView<Symbol: View>: View {
             }
             finish(after: 1.9 + 1.2 + 0.3)
         }
+    }
+
+    // ════════════════════════════════════════════════════════════════════
+    // MARK: - ROCKET 🚀 — blast off (full-screen takeover)
+    // ════════════════════════════════════════════════════════════════════
+
+    private static var rocketOrange: Color { Color(hex: "#e0622c") }
+    private static var rocketRed:    Color { Color(hex: "#e03c1c") }
+    private static var rocketGold:   Color { Color(hex: "#FFD27a") }
+
+    /// The flying rocket — body + nose + fins + porthole emoji + a flame
+    /// streaming from the engine (behind the nose, before rotation).
+    private var rocketGlyph: some View {
+        ZStack {
+            // Engine flame, streaming opposite the nose
+            FlameShape()
+                .fill(LinearGradient(colors: [.white, Self.rocketOrange, .clear],
+                                     startPoint: .top, endPoint: .bottom))
+                .frame(width: 26, height: 62)
+                .blur(radius: 2)
+                .offset(y: 60)
+            // Body
+            RocketBodyShape()
+                .fill(LinearGradient(colors: [.white, Color(hex: "#c8c8d2")],
+                                     startPoint: .leading, endPoint: .trailing))
+                .frame(width: 40, height: 96)
+                .overlay(RocketNoseShape().fill(Color(hex: "#9a9aa6"))
+                    .frame(width: 40, height: 96))
+                .overlay(
+                    ZStack {
+                        ForEach([-1.0, 1.0], id: \.self) { side in
+                            RocketFinShape(mirrored: side > 0)
+                                .fill(Self.rocketOrange)
+                                .frame(width: 16, height: 24)
+                                .offset(x: CGFloat(side) * 19, y: 36)
+                        }
+                    }
+                )
+                .overlay(
+                    Circle().fill(Color(hex: "#3a3550"))
+                        .frame(width: 14, height: 14)
+                        .overlay(Circle().stroke(Color(hex: "#6a6a76"), lineWidth: 1.5))
+                        .offset(y: -6)
+                )
+            // The thought rides in the porthole
+            symbol
+                .scaleEffect(0.5)
+                .offset(y: -6)
+        }
+        .frame(width: 60, height: 130)
+    }
+
+    @ViewBuilder
+    private func rocketSend(end: CGSize) -> some View {
+        let start   = CGSize.zero
+        let control = controlOffset(for: end, drama: 30)
+
+        // Instrument fades to ~10 % beneath a dark takeover
+        Color.black.opacity(rkDarken ? 0.9 : 0)
+            .ignoresSafeArea()
+            .animation(.easeIn(duration: 0.4), value: rkDarken)
+
+        // Warm orange ignition wash, 0 → 0.22 → 0
+        Self.rocketOrange.opacity(rkIgnFlash ? 0.22 : 0)
+            .ignoresSafeArea()
+            .animation(.easeInOut(duration: 0.1), value: rkIgnFlash)
+
+        // COUNTDOWN — each number large, then fades
+        if let n = rkCount {
+            Text("\(n)")
+                .font(.system(size: 130, weight: .heavy, design: .rounded))
+                .foregroundColor(.white)
+                .shadow(color: Self.rocketOrange.opacity(0.85), radius: 20)
+                .scaleEffect(rkCountShown ? 1.0 : 1.45)
+                .opacity(rkCountShown ? 1 : 0)
+                .id(n)
+                .animation(.easeOut(duration: 0.3), value: rkCountShown)
+        }
+
+        // IGNITION smoke — soft circles billowing from the base
+        if rkSmoke {
+            ForEach(0..<12, id: \.self) { i in
+                Circle()
+                    .fill(Color.white.opacity(0.16))
+                    .frame(width: 30, height: 30)
+                    .blur(radius: 6)
+                    .scaleEffect(rkSmoke ? 3.4 : 0.4)
+                    .offset(x: CGFloat((i * 53) % 80 - 40),
+                            y: 56 + CGFloat((i * 31) % 44))
+                    .opacity(rkSmoke ? 0 : 0.85)
+                    .animation(.easeOut(duration: 1.1).delay(Double(i) * 0.02), value: rkSmoke)
+            }
+        }
+
+        // TRAIL — the most dramatic in the app: 34 orange/red/white particles
+        // lingering ~2 s along the climb
+        ForEach(0..<34, id: \.self) { i in
+            let palette: [Color] = [Self.rocketOrange, Self.rocketRed, Color.white, Self.rocketGold]
+            let trailColor: Color = palette[i % palette.count].opacity(0.7)
+            let trailSize: CGFloat = 6 + CGFloat(i % 5) * 2.0
+            Circle()
+                .fill(trailColor)
+                .frame(width: trailSize, height: trailSize)
+                .blur(radius: 2)
+                .opacity(rkTrailFaded ? 0 : 1)
+                .modifier(CurvedFlightEffect(progress: rkProgress, start: start,
+                                             control: control, end: end))
+                .animation(.easeIn(duration: 1.5).delay(0.012 * Double(i)), value: rkProgress)
+                .animation(.easeOut(duration: 2.0).delay(0.03 * Double(i % 12)), value: rkTrailFaded)
+        }
+
+        // THE ROCKET — climbs toward the bearing, rotating to face it,
+        // growing dramatically then receding (perspective)
+        rocketGlyph
+            .scaleEffect(rkScale)
+            .rotationEffect(.radians(rad))
+            .opacity(rkFaded ? 0 : 1)
+            .shadow(color: Self.rocketOrange.opacity(0.7), radius: 16)
+            .modifier(CurvedFlightEffect(progress: rkProgress, start: start,
+                                         control: control, end: end))
+            .animation(.easeIn(duration: 1.5), value: rkProgress)
+            .animation(.easeOut(duration: 0.3), value: rkFaded)
+
+        // EXIT — bright flash at the exit point, a small ember lingering
+        Circle()
+            .fill(RadialGradient(colors: [.white, Self.rocketOrange.opacity(0.5), .clear],
+                                 center: .center, startRadius: 2, endRadius: 72))
+            .frame(width: 144, height: 144)
+            .offset(end)
+            .opacity(rkExitFlash ? 1 : 0)
+            .animation(.easeOut(duration: 0.25), value: rkExitFlash)
+        Circle()
+            .fill(Self.rocketOrange.opacity(rkEmber ? 0.0 : 0.5))
+            .frame(width: 16, height: 16)
+            .blur(radius: 4)
+            .offset(end)
+            .animation(.easeOut(duration: 1.4), value: rkEmber)
+    }
+
+    /// 3 · 2 · 1 → ignition → climb → exit. ~4 s total.
+    private func launchRocket() {
+        rkDarken = true
+
+        // COUNTDOWN — 3 · 2 · 1, each with a beep + medium haptic
+        for (idx, n) in [3, 2, 1].enumerated() {
+            DispatchQueue.main.asyncAfter(deadline: .now() + Double(idx) * 0.5) {
+                rkCount = n
+                rkCountShown = false
+                withAnimation(.easeOut(duration: 0.2)) { rkCountShown = true }
+                HapticEngine.rocketCountdown()
+                SoundEngine.shared.play(for: "rocket.countdown")
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.42) {
+                    withAnimation(.easeIn(duration: 0.08)) { rkCountShown = false }
+                }
+            }
+        }
+
+        // IGNITION at 1.5 s — flame burst, smoke, orange flash, roar
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+            rkCount = nil
+            rkSmoke = true
+            SoundEngine.shared.play(for: "rocket.blast")
+            HapticEngine.rocketLaunch()                      // sustained .heavy ×3
+            withAnimation(.easeIn(duration: 0.1)) { rkIgnFlash = true }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                withAnimation(.easeOut(duration: 0.1)) { rkIgnFlash = false }
+            }
+            withAnimation(.easeOut(duration: 0.3)) { rkScale = 2.5 }   // grows close
+        }
+
+        // LAUNCH at 1.8 s — climbs away toward the person, receding
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.8) {
+            rkProgress = 1
+            withAnimation(.easeIn(duration: 1.5)) { rkScale = 0.3 }    // perspective
+        }
+
+        // Fade the rocket + trail near the edge
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3.1) {
+            rkFaded = true
+            rkTrailFaded = true
+        }
+
+        // EXIT at 3.3 s — final bright flash, ember glow lingers
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3.3) {
+            rkExitFlash = true
+            rkEmber = true
+            HapticEngine.sendImpact()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+                withAnimation(.easeOut(duration: 0.2)) { rkExitFlash = false }
+            }
+        }
+
+        finish(after: 4.0)
     }
 }
 

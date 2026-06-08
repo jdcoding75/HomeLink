@@ -23,6 +23,11 @@ final class BreathDetector: ObservableObject {
     @Published private(set) var micDenied = false
     /// 0…1 toward a completed exhale — drives the gathering visuals.
     @Published private(set) var exhaleProgress: Double = 0
+    /// 0…1 live, smoothed mic level — drives the "listening" arc in real
+    /// time so the instrument visibly brightens with each breath. Unlike
+    /// exhaleProgress (which counts toward a confirmed exhale), this is the
+    /// instantaneous loudness, eased so it never flickers.
+    @Published private(set) var level: Double = 0
 
     /// Fires once per detected exhale.
     var onExhale: (() -> Void)?
@@ -30,11 +35,18 @@ final class BreathDetector: ObservableObject {
     private let engine = AVAudioEngine()
     private var sustainedSeconds: Double = 0
     private var previousLevel: Float = 0
+    /// Rolling window of the last RMS readings → a steady level (spec: 10).
+    private var levelWindow: [Float] = []
+    private let windowSize = 10
 
     // Tuning — breath against a quiet room
     private let levelThreshold: Float  = 0.022   // above ambient hiss
     private let spikeJump: Float       = 0.10    // sharp = speech, reject
     private let requiredSeconds        = 1.6     // within the 1.5–2 s window
+    // Live-arc normalization: breath sits roughly in this RMS band. We map
+    // it to 0…1 so the arc reaches full glow on a strong steady exhale.
+    private let levelFloor: Float      = 0.012   // below → silent (dim)
+    private let levelCeiling: Float    = 0.090   // at/above → full glow
 
     func start() {
         guard !isListening else { return }
@@ -56,6 +68,8 @@ final class BreathDetector: ObservableObject {
         isListening = false
         sustainedSeconds = 0
         exhaleProgress = 0
+        level = 0
+        levelWindow.removeAll()
         // Hand the session back to ambient playback (SoundEngine's world)
         try? AVAudioSession.sharedInstance().setCategory(.ambient, options: [.mixWithOthers])
     }
@@ -107,13 +121,22 @@ final class BreathDetector: ObservableObject {
         }
     }
 
-    private func evaluate(level: Float, dt: Double) {
-        defer { previousLevel = level }
+    private func evaluate(level rms: Float, dt: Double) {
+        defer { previousLevel = rms }
+
+        // Rolling average (10 samples) → a steady live level for the arc.
+        levelWindow.append(rms)
+        if levelWindow.count > windowSize { levelWindow.removeFirst() }
+        let smoothed = levelWindow.reduce(0, +) / Float(levelWindow.count)
+        let normalized = Double((smoothed - levelFloor) / (levelCeiling - levelFloor))
+        let target = min(1, max(0, normalized))
+        // Ease toward the target so the arc glides rather than jitters.
+        level += (target - level) * 0.35
 
         // A sharp jump is speech or a bump — breath rises gently
-        let jumped = abs(level - previousLevel) > spikeJump
+        let jumped = abs(rms - previousLevel) > spikeJump
 
-        if level > levelThreshold && !jumped {
+        if rms > levelThreshold && !jumped {
             sustainedSeconds += dt
             exhaleProgress = min(1, sustainedSeconds / requiredSeconds)
             if sustainedSeconds >= requiredSeconds {

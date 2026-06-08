@@ -13,6 +13,7 @@ enum Instrument: String, CaseIterable, Codable, Identifiable {
     case firefly  = "firefly"   // pro
     case flick    = "flick"     // pro
     case rocket   = "rocket"    // pro — fuel · aim · blast off
+    case wand     = "wand"      // pro — load · shake · release
 
     var id: String { rawValue }
 
@@ -25,6 +26,7 @@ enum Instrument: String, CaseIterable, Codable, Identifiable {
         case .firefly: return "wind"      // 🌬️ wind replaced the firefly
         case .flick:   return "flick"     //    (case name kept — wire format)
         case .rocket:  return "rocket"
+        case .wand:    return "wand"
         }
     }
 
@@ -35,6 +37,7 @@ enum Instrument: String, CaseIterable, Codable, Identifiable {
         case .firefly: return "breathe · release"   // wind
         case .flick:   return "load · aim · launch"
         case .rocket:  return "fuel · aim · blast off"
+        case .wand:    return "load · shake · release"
         }
     }
 
@@ -45,6 +48,7 @@ enum Instrument: String, CaseIterable, Codable, Identifiable {
         case .firefly: return "🌬️"   // wind (was 🫧)
         case .flick:   return "👆"
         case .rocket:  return "🚀"
+        case .wand:    return "🪄"
         }
     }
 
@@ -57,6 +61,7 @@ enum Instrument: String, CaseIterable, Codable, Identifiable {
         case .firefly: return .firefly
         case .flick:   return .fingerFlick
         case .rocket:  return .rocket
+        case .wand:    return .wand
         }
     }
 }

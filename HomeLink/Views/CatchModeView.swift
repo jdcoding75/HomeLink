@@ -63,6 +63,8 @@ struct CatchModeView: View {
 
     private var hue: Color { EmojiHue.color(for: ping.emoji) }
     private static let lavender = Color(hex: "#c4a8d4")
+    private static let wandGold = Color(hex: "#D4AF37")
+    private static let wandPurple = Color(hex: "#9b7fc0")
 
     // ── Alignment ─────────────────────────────────────────────────────────
 
@@ -271,16 +273,14 @@ struct CatchModeView: View {
                         radius: AnimationSystem.Glow.radiusMax)
 
         case .firefly:
-            // A soft wandering light — drift grows directional as you align
-            Circle()
-                .fill(RadialGradient(colors: [Color(hex: "#90EE90").opacity(0.9),
-                                              Color(hex: "#90EE90").opacity(0.3), .clear],
-                                     center: .center, startRadius: 3, endRadius: 16))
-                .frame(width: 28, height: 28)
-                .blur(radius: 2)
-                .opacity(orbBrightness * (orbPulse ? 1.0 : 0.8))
-                .shadow(color: Color(hex: "#90EE90").opacity(0.4),
-                        radius: AnimationSystem.Glow.radiusMax)
+            // 🌬️ WIND — not one light but a soft cloud of breath. Barely
+            // visible dots at the edge gather and brighten as you align,
+            // swirl inward on lock, and converge into the bloom. Like
+            // breath on cold air.
+            WindCatchCloud(angleError: angleError,
+                           pulse: orbPulse,
+                           locked: phase == .locked || phase == .flying)
+                .opacity(orbBrightness)
 
         case .fingerFlick:
             // EMBEDDED — the thought arrived so fast it's stuck in the wall
@@ -339,6 +339,58 @@ struct CatchModeView: View {
             .rotationEffect(.radians(compass.state.bearingDegrees * .pi / 180 + .pi / 2))
             .opacity(orbBrightness * (orbPulse ? 1.0 : 0.7))
             .shadow(color: Color(hex: "#FFD700").opacity(angleError < 5 ? 0.7 : 0.3),
+                    radius: AnimationSystem.Glow.radiusMax)
+
+        case .rocket:
+            // 🚀 An incoming rocket — nose pointed inward along the bearing,
+            // flame and brightness swelling as you align, gold inside 5°.
+            VStack(spacing: 0) {
+                Text("🚀")
+                    .font(.system(size: 30))
+                Capsule()
+                    .fill(LinearGradient(colors: [Color(hex: "#FFD700"),
+                                                  Color(hex: "#e0622c"), .clear],
+                                         startPoint: .top, endPoint: .bottom))
+                    .frame(width: 8, height: angleError < 5 ? 18 : (angleError < 15 ? 11 : 5))
+                    .blur(radius: 1)
+                    .opacity(orbPulse ? 1.0 : 0.6)
+            }
+            .rotationEffect(.radians(compass.state.bearingDegrees * .pi / 180))
+            .opacity(orbBrightness * (orbPulse ? 1.0 : 0.7))
+            .shadow(color: Color(hex: "#FFD700").opacity(angleError < 5 ? 0.7 : 0.3),
+                    radius: AnimationSystem.Glow.radiusMax)
+
+        case .wand:
+            // 🪄 An incoming trail of magic — a soft gold/purple glow with
+            // sparkles that gather and brighten as you align, rushing to a
+            // bright point inside 5°.
+            ZStack {
+                // The core glow — emoji-hued, swelling toward lock
+                Circle()
+                    .fill(RadialGradient(colors: [hue.opacity(0.9),
+                                                  Self.wandPurple.opacity(0.4), .clear],
+                                         center: .center, startRadius: 2,
+                                         endRadius: angleError < 5 ? 24 : 14))
+                    .frame(width: 44, height: 44)
+                    .blur(radius: 2)
+
+                // Gold/purple sparkles — more appear and tighten as you align
+                let sparkleCount = angleError < 5 ? 8 : (angleError < 15 ? 5 : 3)
+                let sparkleR: CGFloat = angleError < 5 ? 9 : (angleError < 15 ? 16 : 24)
+                ForEach(0..<sparkleCount, id: \.self) { i in
+                    let a = Double(i) / Double(sparkleCount) * 2 * .pi
+                        + (orbPulse ? 0.2 : -0.2)
+                    Circle()
+                        .fill(i % 2 == 0 ? Self.wandGold : Self.wandPurple)
+                        .frame(width: 3, height: 3)
+                        .blur(radius: 0.5)
+                        .offset(x: CGFloat(cos(a)) * sparkleR,
+                                y: CGFloat(sin(a)) * sparkleR)
+                        .shadow(color: Self.wandGold.opacity(0.5), radius: 2)
+                }
+            }
+            .opacity(orbBrightness * (orbPulse ? 1.0 : 0.75))
+            .shadow(color: Self.wandPurple.opacity(angleError < 5 ? 0.8 : 0.4),
                     radius: AnimationSystem.Glow.radiusMax)
         }
     }
@@ -460,11 +512,37 @@ struct CatchModeView: View {
             return
         }
 
+        if style == .rocket {
+            // 🚀 LANDING SEQUENCE — engines roar on lock, the rocket descends
+            // to the pad with retro 3·2·1 beeps, the flame cuts out just
+            // before touchdown, then a soft thud as it sets down.
+            HapticEngine.rocketLaunch()                    // engines roar
+            withAnimation(AnimationSystem.easeInOutCubic(style.catchTravelDuration)) {
+                flightProgress = 1
+            }
+            for k in 0..<3 {                               // retro beeps 3 · 2 · 1
+                DispatchQueue.main.asyncAfter(deadline: .now() + Double(k) * 0.22) {
+                    SoundEngine.shared.play(for: "rocket.countdown")
+                    HapticEngine.rocketCountdown()
+                }
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + style.catchTravelDuration - 0.2) {
+                SoundEngine.shared.play(for: "rocket.landing")   // flame cuts → glide
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + style.catchTravelDuration) {
+                HapticEngine.rocketLanding()               // touchdown thud
+                reveal()                                   // porthole glows, emoji ejects
+            }
+            return
+        }
+
         flightProgress = 1
         DispatchQueue.main.asyncAfter(deadline: .now() + style.catchTravelDuration) {
             reveal()
         }
     }
+
+    // (WindCatchCloud lives below the main view)
 
     /// Step 5 — the bloom. opened_at is set here: felt means felt.
     private func reveal() {
@@ -495,6 +573,81 @@ struct CatchModeView: View {
                                       + AnimationSystem.Timing.catchReveal + 0.2 + 3.0) {
             named = false
             onFinished()                               // Step 7 — rest in history
+        }
+    }
+}
+
+// ════════════════════════════════════════════════════════════════════════
+// MARK: - WindCatchCloud
+// ════════════════════════════════════════════════════════════════════════
+
+/// The wind instrument's catch — a soft cloud of breath rather than a single
+/// orb. Six faint dots hang at the edge; as the angle closes more appear and
+/// brighten, drifting directionally toward center; on lock they swirl inward
+/// in a slow circle. Lavender and warm white, barely-there — breath on cold
+/// air. The surrounding catch machinery flies the whole cloud home and
+/// blooms the emoji at center.
+private struct WindCatchCloud: View {
+
+    let angleError: Double
+    let pulse: Bool
+    let locked: Bool
+
+    private static let lavender  = Color(hex: "#c4a8d4")
+    private static let warmWhite = Color(hex: "#f2ecf8")
+
+    /// More breath gathers as you align: 6 far out, up to 12 once close.
+    private var count: Int {
+        switch angleError {
+        case ..<5:  return 12
+        case ..<15: return 9
+        default:    return 6
+        }
+    }
+
+    /// The cloud tightens as you align and swirls in on lock.
+    private var radius: CGFloat {
+        if locked { return 9 }
+        switch angleError {
+        case ..<5:  return 16
+        case ..<15: return 22
+        default:    return 30
+        }
+    }
+
+    @State private var swirl = false
+
+    var body: some View {
+        ZStack {
+            ForEach(0..<count, id: \.self) { i in
+                let base = Double(i) / Double(count) * 2 * .pi
+                // On lock the whole ring rotates (the inward swirl); before
+                // that each dot breathes gently in place.
+                let angle = base + (swirl ? .pi * 1.4 : 0) + (pulse ? 0.18 : -0.18)
+                let r = radius * (pulse ? 1.05 : 0.92)
+                Circle()
+                    .fill((i % 2 == 0 ? Self.warmWhite : Self.lavender)
+                            .opacity(locked ? 0.9 : (0.32 + (pulse ? 0.18 : 0))))
+                    .frame(width: i % 3 == 0 ? 4 : 3, height: i % 3 == 0 ? 4 : 3)
+                    .blur(radius: 1)
+                    .offset(x: CGFloat(cos(angle)) * r,
+                            y: CGFloat(sin(angle)) * r)
+                    .shadow(color: Self.lavender.opacity(locked ? 0.6 : 0.2),
+                            radius: locked ? 5 : 2)
+                    .animation(AnimationSystem.easeInOutSine(locked ? 0.4 : 0.8),
+                               value: angle)
+                    .animation(AnimationSystem.easeInOutSine(0.4), value: radius)
+            }
+        }
+        .onChange(of: locked) { _, isLocked in
+            if isLocked {
+                withAnimation(AnimationSystem.easeInOutSine(0.7)
+                                .repeatForever(autoreverses: false)) {
+                    swirl = true
+                }
+            } else {
+                swirl = false
+            }
         }
     }
 }

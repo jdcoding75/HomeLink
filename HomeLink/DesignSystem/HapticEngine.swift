@@ -179,4 +179,51 @@ enum HapticEngine {
         guard hapticsEnabled else { return }
         UINotificationFeedbackGenerator().notificationOccurred(.error)
     }
+
+    // ════════════════════════════════════════════════════════════════════
+    // MARK: - Rocket 🚀 — fueling clicks and the armed-for-launch beat
+    // ════════════════════════════════════════════════════════════════════
+
+    /// ROCKET FUEL — one tap per shake/tap as the tank fills.
+    /// Light for the first three segments, medium at four, heavy at full.
+    static func rocketFuel(segment: Int) {
+        guard hapticsEnabled else { return }
+        let style: UIImpactFeedbackGenerator.FeedbackStyle
+        let intensity: CGFloat
+        switch segment {
+        case ..<4:  style = .light;  intensity = 0.5
+        case 4:     style = .medium; intensity = 0.7
+        default:    style = .heavy;  intensity = 0.9
+        }
+        UIImpactFeedbackGenerator(style: style).impactOccurred(intensity: scaled(intensity))
+    }
+
+    /// ROCKET READY — full tank, aligned: a sharp confirming tap before liftoff.
+    static func rocketReady() {
+        guard hapticsEnabled else { return }
+        UIImpactFeedbackGenerator(style: .rigid).impactOccurred(intensity: scaled(0.9))
+    }
+
+    /// COUNTDOWN — one clean medium tap per number (3 · 2 · 1).
+    static func rocketCountdown() {
+        guard hapticsEnabled else { return }
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred(intensity: scaled(0.7))
+    }
+
+    /// LAUNCH — a sustained rumble: three heavy taps, 50 ms apart.
+    static func rocketLaunch() {
+        guard hapticsEnabled else { return }
+        let gen = UIImpactFeedbackGenerator(style: .heavy)
+        for k in 0..<3 {
+            DispatchQueue.main.asyncAfter(deadline: .now() + Double(k) * 0.05) {
+                gen.impactOccurred(intensity: scaled(1.0))
+            }
+        }
+    }
+
+    /// LANDING — a single soft thud as the rocket touches the catch pad.
+    static func rocketLanding() {
+        guard hapticsEnabled else { return }
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred(intensity: scaled(0.6))
+    }
 }

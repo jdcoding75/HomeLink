@@ -8,7 +8,7 @@
 // existing plumbing keeps working untouched.
 //
 //   FREE   🧭 minimal · 🧭 vintage brass (default)
-//   PRO    🏹 bow & arrow · 👆 flick · 🚀 rocket (coming soon) · 🌬️ wind
+//   PRO    🏹 bow & arrow · 👆 flick · 🚀 rocket · 🌬️ wind
 //
 // (Heart compass retired — its slot in the lineup belongs to the bow.)
 
@@ -24,13 +24,14 @@ enum InstrumentOption: String, CaseIterable, Identifiable {
     case flick  = "flick"
     case rocket = "rocket"   // fuel · aim · blast off
     case wind   = "wind"     // replaced the firefly
+    case wand   = "wand"     // load · shake · release
 
     var id: String { rawValue }
 
     var requiresPro: Bool {
         switch self {
-        case .compassMinimal, .compassVintage: return false
-        case .bow, .flick, .rocket, .wind:     return true
+        case .compassMinimal, .compassVintage:    return false
+        case .bow, .flick, .rocket, .wind, .wand: return true
         }
     }
 
@@ -45,6 +46,7 @@ enum InstrumentOption: String, CaseIterable, Identifiable {
         case .flick:          return "flick"
         case .rocket:         return "rocket"
         case .wind:           return "wind"
+        case .wand:           return "wand"
         }
     }
 
@@ -55,6 +57,7 @@ enum InstrumentOption: String, CaseIterable, Identifiable {
         case .flick:  return "👆"
         case .rocket: return "🚀"
         case .wind:   return "🌬️"
+        case .wand:   return "🪄"
         }
     }
 
@@ -65,21 +68,22 @@ enum InstrumentOption: String, CaseIterable, Identifiable {
         // case .compassHeart: return "love finds its direction"
         case .bow:            return "draw · aim · release"
         case .flick:          return "load · aim · launch"
-        case .rocket:         return "coming soon"
+        case .rocket:         return "fuel · aim · blast off"
         case .wind:           return "breathe · release"
+        case .wand:           return "load · shake · release"
         }
     }
 
     /// The underlying instrument this option routes to.
-    /// (Wind rides the firefly slot — same wire format, new experience.
-    ///  Rocket is a teaser: routes to the compass until it ships.)
+    /// (Wind rides the firefly slot — same wire format, new experience.)
     var instrument: Instrument {
         switch self {
         case .compassMinimal, .compassVintage: return .compass
         case .bow:    return .bow
         case .flick:  return .flick
         case .wind:   return .firefly
-        case .rocket: return .compass
+        case .rocket: return .rocket
+        case .wand:   return .wand
         }
     }
 
@@ -133,6 +137,8 @@ enum InstrumentOption: String, CaseIterable, Identifiable {
         switch Instrument(rawValue: instrumentRaw) ?? .compass {
         case .bow:     derived = .bow
         case .flick:   derived = .flick
+        case .rocket:  derived = .rocket
+        case .wand:    derived = .wand
         case .firefly: derived = .wind
         case .compass:
             switch CompassSkin(rawValue: skinRaw) ?? .vintage {

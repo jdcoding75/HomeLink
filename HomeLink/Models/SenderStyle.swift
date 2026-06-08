@@ -14,6 +14,7 @@ enum SenderStyle: String, CaseIterable, Identifiable {
     case fingerFlick   = "fingerFlick"     // pro
     case bowArrow      = "bowArrow"        // pro
     case rocket        = "rocket"          // pro — fuel · aim · blast off
+    case wand          = "wand"            // pro — load · shake · release
 
     var id: String { rawValue }
 
@@ -29,6 +30,7 @@ enum SenderStyle: String, CaseIterable, Identifiable {
         case .fingerFlick:  return "finger flick"
         case .bowArrow:     return "bow & arrow"
         case .rocket:       return "rocket"
+        case .wand:         return "wand"
         }
     }
 
@@ -40,6 +42,7 @@ enum SenderStyle: String, CaseIterable, Identifiable {
         case .fingerFlick:  return "👆"
         case .bowArrow:     return "🏹"
         case .rocket:       return "🚀"
+        case .wand:         return "🪄"
         }
     }
 
@@ -52,6 +55,7 @@ enum SenderStyle: String, CaseIterable, Identifiable {
         case .fingerFlick:  return "quick and playful"
         case .bowArrow:     return "drawn and released"
         case .rocket:       return "fueled and launched"
+        case .wand:         return "charged and cast"
         }
     }
 
@@ -65,6 +69,7 @@ enum SenderStyle: String, CaseIterable, Identifiable {
         case .fingerFlick:  return 1.30   // transform 300 · compress 200 · snap 80 · flight 800
         case .bowArrow:     return 1.55   // transform 300 · draw 400 · hold 150 · flight 700
         case .rocket:       return 4.00   // countdown 1500 · ignition 200 · flight 1500 · exit 800
+        case .wand:         return 2.00   // charge held · burst 200 · flight 1000 · trail 800
         }
     }
 
@@ -77,6 +82,7 @@ enum SenderStyle: String, CaseIterable, Identifiable {
         case .fingerFlick:  return 0.45   // bounces once mid-flight
         case .bowArrow:     return 0.50   // pulled out, flies home
         case .rocket:       return 0.80   // descends to landing pad with beeps
+        case .wand:         return 0.45   // sparkle trail rushes to center
         }
     }
 

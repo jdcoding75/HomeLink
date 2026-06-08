@@ -714,6 +714,8 @@ struct SenderStylePreview: View {
         case .firefly:      return 1.7
         case .fingerFlick:  return 0.8
         case .bowArrow:     return 1.0
+        case .rocket:       return 1.1
+        case .wand:         return 1.0
         }
     }
 
@@ -724,6 +726,8 @@ struct SenderStylePreview: View {
         case .firefly:      return AnimationSystem.easeInOutSine(duration)
         case .fingerFlick:  return AnimationSystem.easeOutCubic(duration)
         case .bowArrow:     return AnimationSystem.easeOutCubic(duration)
+        case .rocket:       return .easeIn(duration: duration)
+        case .wand:         return AnimationSystem.easeOutCubic(duration)
         }
     }
 
@@ -787,6 +791,33 @@ struct SenderStylePreview: View {
             }
             .rotationEffect(.degrees(-24))
             .shadow(color: Color(hex: "#FFD700").opacity(0.6), radius: 4)
+        case .rocket:
+            // A tiny rocket climbing on a flame
+            VStack(spacing: 0) {
+                Capsule()
+                    .fill(LinearGradient(colors: [.white, Color(hex: "#d0d0d0")],
+                                         startPoint: .top, endPoint: .bottom))
+                    .frame(width: 5, height: 12)
+                Capsule()
+                    .fill(LinearGradient(colors: [Color(hex: "#FFD700"), Color(hex: "#e0622c"), .clear],
+                                         startPoint: .top, endPoint: .bottom))
+                    .frame(width: 4, height: 9)
+                    .blur(radius: 0.5)
+            }
+            .rotationEffect(.degrees(48))   // aimed along the climb
+            .shadow(color: Color(hex: "#e0622c").opacity(0.7), radius: 5)
+        case .wand:
+            // A spark of magic — gold core, purple halo
+            ZStack {
+                Circle()
+                    .fill(Color(hex: "#9b7fc0").opacity(0.5))
+                    .frame(width: 11, height: 11)
+                    .blur(radius: 2)
+                Circle()
+                    .fill(Color(hex: "#D4AF37"))
+                    .frame(width: 6, height: 6)
+            }
+            .shadow(color: Color(hex: "#D4AF37").opacity(0.7), radius: 5)
         }
     }
 

@@ -12,6 +12,9 @@
 
 import SwiftUI
 import Combine
+#if canImport(UIKit)
+import UIKit
+#endif
 
 struct WindInstrumentView: View {
 
@@ -51,6 +54,9 @@ struct WindInstrumentView: View {
     private var usingBreath: Bool { breath.isListening && !breath.micDenied }
     /// How gathered/bright everything is — breath progress or hold progress.
     private var charge: Double { usingBreath ? breath.exhaleProgress : holdProgress }
+    /// The instantaneous, smoothed mic loudness — drives the listening arc
+    /// and the live "particles move with your breath" response.
+    private var liveLevel: Double { usingBreath ? breath.level : 0 }
 
     var body: some View {
         ZStack {
@@ -71,16 +77,29 @@ struct WindInstrumentView: View {
                                ringRadius: 168,
                                showHint: loadedToken == nil)
 
+            // ── The breath-level arc — the instrument listening ──
+            // A soft arc cradling the instrument bottom that brightens in
+            // real time with the mic: dim lavender in silence, full glow on
+            // a strong steady exhale. Only while a thought is loaded and we
+            // can actually hear (mic granted).
+            if loadedToken != nil && usingBreath {
+                breathArc
+            }
+
             // ── The particles — breath made visible ──
+            // Each particle brightens with how gathered we are (charge) and
+            // shimmers a little harder the louder the live breath (liveLevel).
             ForEach(particles) { particle in
                 Circle()
                     .fill((particle.white ? Self.warmWhite : Self.lavender)
-                            .opacity(particle.opacity * (1 + charge * 0.8)))
-                    .frame(width: particle.size, height: particle.size)
+                            .opacity(particle.opacity * (1 + charge * 0.8 + liveLevel * 0.5)))
+                    .frame(width: particle.size * (1 + CGFloat(liveLevel) * 0.4),
+                           height: particle.size * (1 + CGFloat(liveLevel) * 0.4))
                     .blur(radius: 1.5)
                     .offset(gatheredOffset(particle))
                     .animation(AnimationSystem.easeInOutSine(0.8), value: particle.offset)
                     .animation(AnimationSystem.easeInOutSine(0.4), value: charge)
+                    .animation(AnimationSystem.easeInOutSine(0.25), value: liveLevel)
             }
 
             // ── The loaded thought — center, particles gathering around ──
@@ -106,9 +125,28 @@ struct WindInstrumentView: View {
                         .foregroundColor(Self.lavender.opacity(aligned ? 0.95 : 0.7))
                         .transition(.opacity)
                 }
+
+                // Permission denied — wind still sends by holding, but offer
+                // the door to enable the microphone for breath sending.
+                if breath.micDenied {
+                    Button(action: openSettings) {
+                        VStack(spacing: 2) {
+                            Text("allow microphone for breath sending")
+                                .font(.system(size: 11, design: .serif).italic())
+                                .foregroundColor(Self.lavender.opacity(0.7))
+                            Text("tap to enable in Settings")
+                                .font(.system(size: 10))
+                                .foregroundColor(Self.lavender.opacity(0.5))
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.top, 6)
+                    .transition(.opacity)
+                }
             }
             .padding(.bottom, 4)
             .animation(.easeOut(duration: 0.25), value: showAimHint)
+            .animation(.easeOut(duration: 0.3), value: breath.micDenied)
         }
         .frame(width: 370, height: 370)
         .onAppear {
@@ -144,6 +182,37 @@ struct WindInstrumentView: View {
             if charge > 0.05 { return "keep holding…" }
             return "hold toward \(personName)"
         }
+    }
+
+    // ── The listening arc ────────────────────────────────────────────────
+
+    /// A soft arc around the instrument's bottom that shows the live mic
+    /// level: very dim lavender in silence, brightening with breath, full
+    /// glow on a strong steady exhale. It makes the instrument feel like
+    /// it's listening for you.
+    private var breathArc: some View {
+        // Bottom third of the ring (≈ 120° centred on the bottom).
+        Circle()
+            .trim(from: 0.34, to: 0.66)
+            .stroke(
+                Self.lavender.opacity(0.18 + liveLevel * 0.7),
+                style: StrokeStyle(lineWidth: 3 + CGFloat(liveLevel) * 4, lineCap: .round)
+            )
+            .frame(width: 320, height: 320)
+            .blur(radius: 1.5)
+            .shadow(color: Self.warmWhite.opacity(liveLevel * 0.8),
+                    radius: 6 + liveLevel * 16)
+            .animation(AnimationSystem.easeInOutSine(0.25), value: liveLevel)
+            .allowsHitTesting(false)
+    }
+
+    /// Open the iOS Settings page for Pointward so the user can grant the
+    /// microphone. Wind keeps working via hold-to-send regardless.
+    private func openSettings() {
+        #if canImport(UIKit)
+        guard let url = URL(string: UIApplication.openSettingsURLString) else { return }
+        UIApplication.shared.open(url)
+        #endif
     }
 
     // ── Particles ─────────────────────────────────────────────────────────

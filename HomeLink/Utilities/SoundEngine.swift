@@ -89,6 +89,16 @@ final class SoundEngine {
             ("style.chime",   0.40, makeStyleChime),     // firefly send
             ("style.bell",    0.45, makeStyleBell),      // catch reveal
             ("style.shimmer", 0.35, makeStyleShimmer),   // caught confirmation
+
+            // ── ROCKET 🚀 voices (programmatic placeholders) ────────────────
+            // TODO: replace with real_rocket_fuel_click.wav
+            ("rocket.fuel",      0.55, makeRocketFuel),
+            // TODO: replace with real_rocket_countdown.wav
+            ("rocket.countdown", 0.50, makeRocketCountdown),
+            // TODO: replace with real_rocket_blast.wav
+            ("rocket.blast",     0.70, makeRocketBlast),
+            // TODO: replace with real_rocket_landing.wav
+            ("rocket.landing",   0.55, makeRocketLanding),
         ]
         // (Commented out of the core flow, voices kept below for reuse:)
         // ("💜", 0.50, makeHeart), ("💋", 0.55, makeKiss),
@@ -866,6 +876,84 @@ final class SoundEngine {
                 s += sin(2 * .pi * f * t) * exp(-t * (18 + Double(k) * 3))
             }
             data[i] = Float(s * 0.12 * envelope(p, attack: 0.25, release: 0.45))
+        }
+        return buf
+    }
+
+    // ── ROCKET 🚀 — programmatic placeholders ──────────────────────────────
+    // TODO: replace these four with real recorded .wav files when available.
+
+    /// FUEL CLICK — a short low-frequency pulse (~80 Hz), 0.1 s. The
+    /// satisfying mechanical "chunk" of a fuel pump.
+    private func makeRocketFuel() -> AVAudioPCMBuffer? {
+        let d = 0.10
+        guard let (buf, data, n) = makeBuffer(duration: d) else { return nil }
+        for i in 0..<n {
+            let t = Double(i) / sampleRate
+            let p = t / d
+            // 80 Hz body + a tiny click transient at the very start
+            var s = sin(2 * .pi * 80 * t) * exp(-t * 22) * 0.9
+            s += sin(2 * .pi * 160 * t) * exp(-t * 30) * 0.3
+            if p < 0.04 { s += Double.random(in: -1...1) * (1 - p / 0.04) * 0.35 }   // click
+            data[i] = Float(max(-1, min(1, s)) * envelope(p, attack: 0.02, release: 0.4))
+        }
+        return buf
+    }
+
+    /// COUNTDOWN BEEP — a single warm beep; called once per number so the
+    /// 3·2·1 sequence ticks down on its own.
+    private func makeRocketCountdown() -> AVAudioPCMBuffer? {
+        // One representative beep is cached; pitch variation across 3·2·1
+        // comes from playback context (a single warm 660 Hz blip, 0.18 s).
+        let d = 0.18
+        guard let (buf, data, n) = makeBuffer(duration: d) else { return nil }
+        for i in 0..<n {
+            let t = Double(i) / sampleRate
+            let p = t / d
+            var s = sin(2 * .pi * 660 * t) * 0.6
+            s += sin(2 * .pi * 1320 * t) * 0.15 * exp(-t * 6)
+            data[i] = Float(s * envelope(p, attack: 0.04, release: 0.5))
+        }
+        return buf
+    }
+
+    /// BLAST OFF — a low-frequency rumble (~60 Hz) swelling over 1.5 s with
+    /// a noise wash riding on top: the engines roaring to life.
+    private func makeRocketBlast() -> AVAudioPCMBuffer? {
+        let d = 1.5
+        guard let (buf, data, n) = makeBuffer(duration: d) else { return nil }
+        var rng = SystemRandomNumberGenerator()
+        var lp = 0.0
+        for i in 0..<n {
+            let t = Double(i) / sampleRate
+            let p = t / d
+            // 60 Hz fundamental + sub-octave, swelling then sustaining
+            var s = sin(2 * .pi * 60 * t) * 0.7
+            s += sin(2 * .pi * 30 * t) * 0.4
+            s += sin(2 * .pi * 90 * t) * 0.2
+            // Roaring noise through a low-pass, brightening at ignition
+            let noise = Double.random(in: -1...1, using: &rng)
+            lp += (noise - lp) * 0.08
+            s += lp * 0.5
+            // Swell in over 200 ms, sustain, gentle tail
+            let swell = min(1, p / 0.13)
+            data[i] = Float(max(-1, min(1, s)) * 0.5 * swell * envelope(p, attack: 0.0, release: 0.25))
+        }
+        return buf
+    }
+
+    /// LANDING — a soft thud (~100 Hz), 0.3 s. Touchdown on the catch pad.
+    private func makeRocketLanding() -> AVAudioPCMBuffer? {
+        let d = 0.3
+        guard let (buf, data, n) = makeBuffer(duration: d) else { return nil }
+        for i in 0..<n {
+            let t = Double(i) / sampleRate
+            let p = t / d
+            var s = sin(2 * .pi * 100 * t) * exp(-t * 9) * 0.9
+            s += sin(2 * .pi * 50 * t) * exp(-t * 7) * 0.4
+            // A little settling grit at the very start
+            if p < 0.05 { s += Double.random(in: -1...1) * (1 - p / 0.05) * 0.25 }
+            data[i] = Float(max(-1, min(1, s)) * envelope(p, attack: 0.01, release: 0.5))
         }
         return buf
     }
