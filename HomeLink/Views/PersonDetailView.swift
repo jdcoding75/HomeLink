@@ -127,7 +127,8 @@ struct PersonDetailView: View {
                 ReplayOverlayView(
                     emoji: request.emoji,
                     bearingDegrees: request.bearingDegrees,
-                    style: SenderStyle.from(request.styleRaw)
+                    style: SenderStyle.from(request.styleRaw),
+                    fromName: person.name
                 ) {
                     pings.replayRequest = nil
                 }
@@ -622,7 +623,9 @@ struct PingHistoryView: View {
                     bearingDegrees: sent ? bearing : bearing + 180,
                     // The ORIGINAL sender style from the record — a memory
                     // replays the way it first arrived (glow when unknown)
-                    style: SenderStyle.from(record.senderStyle)
+                    style: SenderStyle.from(record.senderStyle),
+                    // [2/5] received thoughts name the sender; ours don't
+                    fromName: sent ? "" : personName
                 ) {
                     replayRecord = nil
                     appState.transition(to: .idle)

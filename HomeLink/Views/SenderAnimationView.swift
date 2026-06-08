@@ -1376,6 +1376,8 @@ struct ReplayOverlayView: View {
     let emoji: String
     let bearingDegrees: Double
     let style: SenderStyle
+    /// [2/5] The sender — shown at the top of the replay, always visible.
+    var fromName: String = ""
     let onDone: () -> Void
 
     @State private var dimmed   = false
@@ -1409,6 +1411,21 @@ struct ReplayOverlayView: View {
                 Color.black.opacity(dimmed ? 0.30 : 0)
                     .ignoresSafeArea()
                     .animation(AnimationSystem.easeInOutQuad(0.2), value: dimmed)
+
+                // [2/5] Sender name — always visible at the top of the replay
+                if !fromName.isEmpty {
+                    VStack {
+                        Text("from \(fromName) ✦")
+                            .font(.system(size: 22, design: .serif).italic())
+                            .foregroundColor(Color(hex: "#c4a8d4"))
+                            .shadow(color: .black.opacity(0.5), radius: 6)
+                            .opacity(dimmed ? 1 : 0)
+                            .animation(.easeIn(duration: 0.4), value: dimmed)
+                            .padding(.top, 70)
+                        Spacer()
+                    }
+                    .allowsHitTesting(false)
+                }
 
                 // 🪄 WAND — a memory of the cast: the crystal is already
                 // glowing (no shake), it bursts at the start, and a sparkle
