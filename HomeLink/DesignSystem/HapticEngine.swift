@@ -228,6 +228,52 @@ enum HapticEngine {
     }
 
     // ════════════════════════════════════════════════════════════════════
+    // MARK: - CATCH — the receipt redesign (arrival · lock · reveal)
+    // ════════════════════════════════════════════════════════════════════
+
+    /// ARRIVAL — a strong, warm double tap the instant a thought lands.
+    /// Impossible to miss: two heavy taps 120 ms apart.
+    static func catchArrival() {
+        guard hapticsEnabled else { return }
+        let gen = UIImpactFeedbackGenerator(style: .heavy)
+        gen.impactOccurred(intensity: scaled(0.9))
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
+            gen.impactOccurred(intensity: scaled(0.8))
+        }
+    }
+
+    /// LOCK SNAP — the most satisfying click in the app, fired exactly at 5°.
+    /// A rigid snap immediately followed by a soft echo.
+    static func catchLock() {
+        guard hapticsEnabled else { return }
+        UIImpactFeedbackGenerator(style: .rigid).impactOccurred(intensity: scaled(1.0))
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.06) {
+            UIImpactFeedbackGenerator(style: .soft).impactOccurred(intensity: scaled(0.4))
+        }
+    }
+
+    /// HOLD ENERGY — a soft pulse while the locked orb charges (call on a
+    /// tightening interval; throttled here).
+    private static var lastCatchHold = Date.distantPast
+    static func catchHold(_ progress: Double) {
+        guard hapticsEnabled else { return }
+        let interval = 0.16 - progress * 0.08
+        guard Date.now.timeIntervalSince(lastCatchHold) >= interval else { return }
+        lastCatchHold = .now
+        UIImpactFeedbackGenerator(style: .soft).impactOccurred(intensity: scaled(0.3 + progress * 0.4))
+    }
+
+    /// REVEAL PEAK — the strongest moment in the app: a success notification
+    /// layered over a heavy tap as the emoji blooms.
+    static func catchReveal() {
+        guard hapticsEnabled else { return }
+        UINotificationFeedbackGenerator().notificationOccurred(.success)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.04) {
+            UIImpactFeedbackGenerator(style: .heavy).impactOccurred(intensity: scaled(1.0))
+        }
+    }
+
+    // ════════════════════════════════════════════════════════════════════
     // MARK: - [5/5] HAPTIC PERSONALITY — each instrument distinct, eyes shut
     // ════════════════════════════════════════════════════════════════════
     //

@@ -38,8 +38,16 @@ struct CatchModeView: View {
 
     @EnvironmentObject var compass: CompassManager
 
-    private enum Phase { case seeking, locked, flying, revealed }
-    @State private var phase: Phase = .seeking
+    // [1/5] `.arriving` is the new dramatic entrance before the search begins.
+    private enum Phase { case arriving, seeking, locked, flying, revealed }
+    @State private var phase: Phase = .arriving
+
+    // [1/5] Arrival — the full-screen entrance
+    @State private var arrivalPulse  = false   // lavender wash 0 → 0.2 → 0
+    @State private var arrivalDim    = false   // screen dims to ~85 %
+    @State private var arrivalTextIn = false   // "something is coming your way ✦"
+    @State private var orbEntered    = false   // orb scale 0 → 1 easeOutBack
+    @State private var entranceGlow  = false   // glow radiates as the orb forms
 
     // Step 1 — orb life
     @State private var orbPulse  = false       // 0.8–1.0 opacity breathing
@@ -47,16 +55,23 @@ struct CatchModeView: View {
     // Step 3 — lock-on
     @State private var lockSnap  = false       // +10 % easeOutBack snap
     @State private var lockHeldSince: Date? = nil
+    @State private var lockFlash   = false     // [3/5] white flash 0 → 0.6 → 0
+    @State private var showLockStar = false    // [3/5] large ✦ at lock
+    @State private var dimOthers   = false     // [3/5] everything but the orb → 60 %
+    @State private var energyBuild = false     // [3/5] orb charges while held
+    @State private var holdProgress: Double = 0
     // Step 4 — catch flight
     @State private var flightProgress: CGFloat = 0
     // Step 5 — reveal
     @State private var bloomed     = false
     @State private var glowRadiate = false
     @State private var revealFlash = false     // shooting star variant
+    @State private var revealFlood = false     // [4/5] warm light flood
+    @State private var revealScatter = false   // [4/5] particles scatter out
     // Step 6 — sender info
     @State private var named       = false
     @State private var debugBypass = false
-    @State private var arrivalLine = false   // "A feeling is coming your way…"
+    @State private var arrivalLine = false   // (legacy seeking line — kept)
 
     // 🪄 WAND full-screen sparkle storm (most dramatic receive)
     private struct StormSpark: Identifiable {
@@ -90,19 +105,38 @@ struct CatchModeView: View {
         return BearingCalculator.alignmentError(relativeBearing: compass.state.bearingDegrees)
     }
 
-    /// [4/5] The big bold catch instruction — per-instrument verb, updating
-    /// as the user turns toward the sender.
+    /// [2/5] The big bold catch instruction — encouraging directional guidance
+    /// that updates as the user turns toward the sender: cardinal direction
+    /// far out → "keep turning right" closer → "hold steady" on lock.
     private var catchInstruction: String {
         if phase == .locked { return "hold steady ✦" }
-        if angleError < 15 { return "almost there ✦" }
-        switch style {
-        case .bowArrow:    return "pull the arrow free"
-        case .fingerFlick: return "flick it free"
-        case .firefly:     return "breathe it in"
-        case .wand:        return "catch the magic"
-        case .rocket:      return "guide it in"
-        default:           return "turn toward \(ping.fromName) to reveal"
+        switch angleError {
+        case ..<15: return "nearly locked — hold steady"
+        case ..<45: return "almost there — keep turning \(turnRight ? "right" : "left")"
+        default:
+            if let absolute = compass.rawBearingToTarget {
+                return "\(ping.fromName) is to your \(Self.fullCardinal(absolute))"
+            }
+            return "turn \(turnRight ? "right" : "left") to find \(ping.fromName)"
         }
+    }
+
+    /// Which way to rotate the phone: the sender clockwise of straight-ahead
+    /// (relative bearing 0…180) means turn right.
+    private var turnRight: Bool {
+        var b = compass.state.bearingDegrees.truncatingRemainder(dividingBy: 360)
+        if b < 0 { b += 360 }
+        return b < 180
+    }
+
+    /// A friendly full-word compass direction ("Northeast").
+    private static func fullCardinal(_ degrees: Double) -> String {
+        let words = ["North", "North-Northeast", "Northeast", "East-Northeast",
+                     "East", "East-Southeast", "Southeast", "South-Southeast",
+                     "South", "South-Southwest", "Southwest", "West-Southwest",
+                     "West", "West-Northwest", "Northwest", "North-Northwest"]
+        let i = ((Int((degrees / 22.5).rounded()) % 16) + 16) % 16
+        return words[i]
     }
 
     /// Step 2 — visual feedback as the angle decreases.
@@ -123,6 +157,15 @@ struct CatchModeView: View {
         }
     }
 
+    /// How dark the room is. Gentle on arrival (85 % bright), the usual dim
+    /// while searching, deep on lock (only the orb stays bright).
+    private var bgDark: Double {
+        if phase == .revealed { return 0.40 }
+        if dimOthers          { return 0.72 }   // [3/5] lock: dim everything else
+        if phase == .arriving { return arrivalDim ? 0.15 : 0 }
+        return 0.45
+    }
+
     var body: some View {
         GeometryReader { geo in
             let rad   = compass.state.bearingDegrees * .pi / 180
@@ -133,8 +176,10 @@ struct CatchModeView: View {
                                  height: edge.height * 0.45 + CGFloat(sin(rad)) * 50 - 30)
 
             ZStack {
-                // The room dims; the direction glows
-                Color.black.opacity(0.45).ignoresSafeArea()
+                // The room dims; the direction glows. The dim deepens on lock
+                // so only the orb stays bright.
+                Color.black.opacity(bgDark).ignoresSafeArea()
+                    .animation(.easeInOut(duration: 0.4), value: bgDark)
                 RadialGradient(
                     colors: [hue.opacity(phase == .revealed ? 0.10 : 0.20), .clear],
                     center: UnitPoint(x: 0.5 + 0.62 * sin(rad),
@@ -143,27 +188,52 @@ struct CatchModeView: View {
                 )
                 .ignoresSafeArea()
 
-                // The arrival line — gentle, fades once you start aligning
-                if phase == .seeking {
-                    VStack {
-                        Text("a feeling is coming your way…")
-                            .font(.system(size: 14, design: .serif).italic())
-                            .foregroundColor(Self.lavender.opacity(0.85))
-                            .opacity(arrivalLine ? 1 : 0)
-                            .padding(.top, 92)
-                        Spacer()
-                    }
+                // [1/5] ARRIVAL — a warm lavender wash floods the whole screen,
+                // 0 → 0.2 → 0 over 800 ms. Impossible to miss.
+                Color(hex: "#c4a8d4").opacity(arrivalPulse ? 0.2 : 0)
+                    .ignoresSafeArea()
                     .allowsHitTesting(false)
-                    .transition(.opacity)
+
+                // [1/5] ARRIVAL TEXT — large serif, dead center, 2 s, fades.
+                if phase == .arriving {
+                    Text("something is coming your way ✦")
+                        .font(.system(size: 28, design: .serif))
+                        .foregroundColor(Color(hex: "#e8e0f0"))
+                        .multilineTextAlignment(.center)
+                        .shadow(color: Self.lavender.opacity(0.6), radius: 12)
+                        .padding(.horizontal, 30)
+                        .opacity(arrivalTextIn ? 1 : 0)
+                        .scaleEffect(arrivalTextIn ? 1 : 0.92)
+                        .animation(.easeInOut(duration: 0.6), value: arrivalTextIn)
+                        .allowsHitTesting(false)
+                }
+
+                // [1/5] ORB ENTRANCE GLOW — a warm ring radiates outward as
+                // the orb materializes at the sender's edge.
+                if phase == .seeking || phase == .locked {
+                    Circle()
+                        .stroke(hue.opacity(entranceGlow ? 0 : 0.6), lineWidth: 3)
+                        .frame(width: 60, height: 60)
+                        .scaleEffect(entranceGlow ? 3.0 : 0.4)
+                        .animation(.easeOut(duration: 0.6), value: entranceGlow)
+                        .position(x: geo.size.width / 2 + edge.width,
+                                  y: geo.size.height / 2 + edge.height)
+                        .allowsHitTesting(false)
                 }
 
                 // ── Steps 1–4: the orb (or streak, or firefly) ────────────
-                if phase != .revealed {
+                // The orb makes a dramatic entrance (scale 0 → 1, easeOutBack),
+                // grows as you approach, freezes + charges on lock, then flies.
+                if phase != .revealed && phase != .arriving {
                     orbView
                         .scaleEffect(phase == .flying ? 0.72 : orbGrowth * (lockSnap ? 1.1 : 1.0))
+                        .scaleEffect(energyBuild ? 1.18 : 1.0)            // [3/5] charge swell
+                        .scaleEffect(orbEntered ? 1 : 0.01)              // [1/5] entrance
+                        .animation(AnimationSystem.easeOutBack(0.5), value: orbEntered)
                         .animation(AnimationSystem.easeOutBack(AnimationSystem.Timing.lockOn),
                                    value: lockSnap)
                         .animation(AnimationSystem.easeInOutSine(0.3), value: orbGrowth)
+                        .animation(AnimationSystem.easeInOutSine(0.5), value: energyBuild)
                         .offset(jitter)
                         .modifier(CurvedFlightEffect(progress: flightProgress,
                                                      start: edge, control: control,
@@ -174,6 +244,8 @@ struct CatchModeView: View {
                                    ? nil
                                    : AnimationSystem.easeInOutCubic(style.catchTravelDuration),
                                    value: flightProgress)
+                        // CurvedFlightEffect already places the orb at the edge
+                        // (start) and flies it to center (end) via progress.
                         .position(x: geo.size.width / 2, y: geo.size.height / 2)
                 }
 
@@ -195,6 +267,12 @@ struct CatchModeView: View {
                     .zIndex(10)
                 }
 
+                // [4/5] WARM LIGHT FLOOD — the whole screen floods with warm
+                // light as the emoji blooms, 0 → 0.15 → 0 over 400 ms.
+                Color(hex: "#fff3d8").opacity(revealFlood ? 0.15 : 0)
+                    .ignoresSafeArea()
+                    .allowsHitTesting(false)
+
                 // ── Step 5: the reveal ────────────────────────────────────
                 if phase == .revealed {
                     ZStack {
@@ -210,6 +288,19 @@ struct CatchModeView: View {
                             .blur(radius: AnimationSystem.Glow.radiusMax)
                             .animation(.easeOut(duration: 1.1), value: glowRadiate)
 
+                        // [4/5] Bloom particle scatter — 16 hued/gold sparks
+                        // bursting outward as the emoji appears.
+                        ForEach(0..<16, id: \.self) { i in
+                            let a = Double(i) / 16 * 2 * .pi
+                            let dist: CGFloat = revealScatter ? 150 + CGFloat(i % 4) * 22 : 0
+                            Circle()
+                                .fill(i % 2 == 0 ? hue : Color(hex: "#FFD700"))
+                                .frame(width: 5, height: 5)
+                                .offset(x: CGFloat(cos(a)) * dist, y: CGFloat(sin(a)) * dist)
+                                .opacity(revealScatter ? 0 : 0.9)
+                                .animation(.easeOut(duration: 0.9), value: revealScatter)
+                        }
+
                         // Shooting star: 100 ms bright flash, then the emoji
                         if style == .shootingStar {
                             Circle()
@@ -221,25 +312,44 @@ struct CatchModeView: View {
                                 .animation(.easeOut(duration: 0.1), value: revealFlash)
                         }
 
-                        VStack(spacing: 16) {
+                        VStack(spacing: 18) {
+                            // [4/5] The emoji stays LARGE — 72 pt, the peak.
                             Text(ping.emoji)
-                                .font(.system(size: 76))
+                                .font(.system(size: 72))
                                 .scaleEffect(bloomed ? 1.0 : 0.3)
                                 .opacity(bloomed ? 1 : 0)
-                                .shadow(color: hue.opacity(0.55),
+                                .shadow(color: hue.opacity(0.6),
                                         radius: AnimationSystem.Glow.radiusMax)
                                 .animation(AnimationSystem.easeOutBack(
                                     AnimationSystem.Timing.catchReveal), value: bloomed)
 
-                            // Step 6 — sender info, serif italic
-                            Text("\(ping.fromName) sent you something")
-                                .font(.system(size: 15, design: .serif).italic())
+                            // [5/5] Aftermath — "from [name]" rests beneath it.
+                            Text("from \(ping.fromName)")
+                                .font(.system(size: 19, design: .serif).italic())
                                 .foregroundColor(Self.lavender)
                                 .opacity(named ? 1 : 0)
-                                .animation(.easeIn(duration: 0.4), value: named)
+                                .animation(.easeIn(duration: 0.5), value: named)
                         }
                     }
                     .position(x: geo.size.width / 2, y: geo.size.height / 2)
+                }
+
+                // [3/5] LOCK FLASH — a bright white flash at the lock moment,
+                // 0 → 0.6 → 0 over ~100 ms.
+                Color.white.opacity(lockFlash ? 0.6 : 0)
+                    .ignoresSafeArea()
+                    .allowsHitTesting(false)
+
+                // [3/5] The big ✦ that appears and fades at the lock.
+                if showLockStar {
+                    Text("✦")
+                        .font(.system(size: 120, weight: .thin))
+                        .foregroundColor(.white)
+                        .shadow(color: Self.lavender.opacity(0.9), radius: 20)
+                        .scaleEffect(showLockStar ? 1.0 : 0.4)
+                        .transition(.scale(scale: 0.4).combined(with: .opacity))
+                        .position(x: geo.size.width / 2, y: geo.size.height / 2)
+                        .allowsHitTesting(false)
                 }
 
                 // [4/5] Big, bold guidance — tells you exactly what to do,
@@ -461,13 +571,45 @@ struct CatchModeView: View {
     @State private var lastAlignmentLog = Date.distantPast
 
     private func begin() {
-        withAnimation(.easeIn(duration: 1.2).delay(0.4)) { arrivalLine = true }
         Self.log.info("catch: ACTIVATED — from=\(ping.fromName, privacy: .public) emoji=\(ping.emoji, privacy: .public) style=\(style.rawValue, privacy: .public) senderBearing=\(Int(compass.state.bearingDegrees), privacy: .public)° headingAvailable=\(compass.isHeadingAvailable, privacy: .public)")
-        // Step 1 — the orb breathes (900 ms easeInOutSine cycle)
+
+        // [1/5] ARRIVAL — strong double haptic + a warm welcoming chime fire
+        // immediately, the whole screen washes lavender, and "something is
+        // coming your way ✦" fades in for 2 seconds.
+        phase = .arriving
+        HapticEngine.catchArrival()
+        SoundEngine.shared.play(for: "catch.arrival")
+        // Full-screen lavender pulse: 0 → 0.2 (400 ms) → 0 (400 ms)
+        withAnimation(.easeOut(duration: 0.4)) { arrivalPulse = true }
+        withAnimation(.easeInOut(duration: 0.5)) { arrivalDim = true }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+            withAnimation(.easeIn(duration: 0.4)) { arrivalPulse = false }
+        }
+        // The arrival text blooms in, holds, then fades
+        withAnimation(.easeInOut(duration: 0.6).delay(0.15)) { arrivalTextIn = true }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.2) {
+            withAnimation(.easeInOut(duration: 0.5)) { arrivalTextIn = false }
+        }
+        // After the text fades, the orb makes its dramatic entrance and the
+        // search begins.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.6) { enterSeeking() }
+    }
+
+    /// [1/5] The orb's dramatic entrance + the start of the search.
+    private func enterSeeking() {
+        guard phase == .arriving else { return }
+        phase = .seeking
+        withAnimation(.easeInOut(duration: 0.4)) { arrivalDim = false }
+        // The orb breathes (900 ms easeInOutSine cycle)
         withAnimation(AnimationSystem.easeInOutSine(AnimationSystem.Timing.glowPulseSlow)
                         .repeatForever(autoreverses: true)) {
             orbPulse = true
         }
+        // Dramatic entrance — the orb expands from nothing with a radiating
+        // glow ring + a soft arrival pop.
+        SoundEngine.shared.play(for: "catch.lock")
+        withAnimation(.easeOut(duration: 0.6)) { entranceGlow = true }
+        withAnimation(AnimationSystem.easeOutBack(0.5)) { orbEntered = true }
         // 🪄 WAND — a full-screen sparkle storm bursts everywhere, then the
         // sparks converge to the sender's edge and form the catch orb.
         if style == .wand { beginWandStorm() }
@@ -519,25 +661,47 @@ struct CatchModeView: View {
             }
         }
 
-        // Step 3 — lock-on inside 5°, hold 0.5 s to confirm
+        // [3/5] LOCK-ON inside 5° — the most satisfying click in the app.
+        // Everything happens at once: a strong snap, the orb freezes, a white
+        // flash, a big ✦, a clean click, and everything else dims to 60 % so
+        // only the locked orb glows. Hold 0.5 s while it charges → the catch.
         if angleError < 5 {
             if phase == .seeking {
                 phase = .locked
                 lockHeldSince = .now
-                lockSnap = true                       // easeOutBack +10 %
+                holdProgress = 0
+                lockSnap = true                       // easeOutBack snap
                 Self.log.info("catch: LOCKED ON (error=\(Int(angleError), privacy: .public)°) — holding 0.5 s")
-                HapticEngine.lockOn()                 // clean medium tap
+                HapticEngine.catchLock()              // the satisfying snap
+                SoundEngine.shared.play(for: "catch.lock")
+                withAnimation(.easeOut(duration: 0.05)) { lockFlash = true }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    withAnimation(.easeOut(duration: 0.1)) { lockFlash = false }
+                }
+                withAnimation(.spring(response: 0.35, dampingFraction: 0.6)) { showLockStar = true }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.7) {
+                    withAnimation(.easeOut(duration: 0.3)) { showLockStar = false }
+                }
+                withAnimation(.easeOut(duration: 0.3)) { dimOthers = true }
+                withAnimation(.easeInOut(duration: 0.6)) { energyBuild = true }
                 DispatchQueue.main.asyncAfter(deadline: .now()
                                               + AnimationSystem.Timing.lockOn) {
                     lockSnap = false
                 }
-            } else if let since = lockHeldSince,
-                      Date.now.timeIntervalSince(since) >= 0.5 {
-                beginCatch()                          // Step 4
+            } else if let since = lockHeldSince {
+                // Hold to confirm — the orb charges with quickening pulses.
+                holdProgress = min(1, Date.now.timeIntervalSince(since) / 0.5)
+                HapticEngine.catchHold(holdProgress)
+                if holdProgress >= 1 { beginCatch() }   // Step 4
             }
         } else if phase == .locked {
             phase = .seeking                          // drifted off — try again
             lockHeldSince = nil
+            holdProgress = 0
+            withAnimation(.easeOut(duration: 0.3)) {
+                dimOthers = false
+                energyBuild = false
+            }
         }
     }
 
@@ -629,14 +793,24 @@ struct CatchModeView: View {
 
     // (WindCatchCloud lives below the main view)
 
-    /// Step 5 — the bloom. opened_at is set here: felt means felt.
+    /// [4/5] THE REVEAL — the emotional peak. The emoji blooms, the screen
+    /// floods warm light, the strongest haptic in the app fires, the warmest
+    /// sound plays, and particles burst outward. opened_at is set here: felt
+    /// means felt.
     private func reveal() {
         Self.log.info("catch: REVEALED — marking felt (opened_at)")
         phase = .revealed
         onRevealed()
-        HapticEngine.reveal()                          // success, as it blooms
-        SoundEngine.shared.play(for: "style.bell")     // soft bell with shimmer
+        withAnimation(.easeOut(duration: 0.3)) { dimOthers = false }   // lift the lock dim
+        HapticEngine.catchReveal()                     // the strongest moment
+        SoundEngine.shared.play(for: "style.bell")     // warm bell with shimmer
         SoundEngine.shared.play(for: ping.emoji)       // the thought's own voice
+
+        // [4/5] Warm light floods the screen, 0 → 0.15 → 0 over 400 ms.
+        withAnimation(.easeOut(duration: 0.2)) { revealFlood = true }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+            withAnimation(.easeIn(duration: 0.2)) { revealFlood = false }
+        }
 
         if style == .shootingStar {
             // Bright flash 100 ms, then the emoji appears
@@ -648,16 +822,18 @@ struct CatchModeView: View {
             bloomed = true
         }
         glowRadiate = true
+        revealScatter = true                           // particles burst outward
 
-        // Step 6 — sender info fades in 200 ms after the reveal, stays 3 s
+        // [5/5] AFTERMATH — "from [name]" fades in beneath the large emoji,
+        // which rests on screen so the moment can land. Tap (or wait) to keep.
         DispatchQueue.main.asyncAfter(deadline: .now()
-                                      + AnimationSystem.Timing.catchReveal + 0.2) {
+                                      + AnimationSystem.Timing.catchReveal + 0.25) {
             named = true
         }
         DispatchQueue.main.asyncAfter(deadline: .now()
-                                      + AnimationSystem.Timing.catchReveal + 0.2 + 3.0) {
+                                      + AnimationSystem.Timing.catchReveal + 0.25 + 4.2) {
             named = false
-            onFinished()                               // Step 7 — rest in history
+            onFinished()                               // rest in history
         }
     }
 }

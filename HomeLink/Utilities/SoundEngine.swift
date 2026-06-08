@@ -90,6 +90,10 @@ final class SoundEngine {
             ("style.bell",    0.45, makeStyleBell),      // catch reveal
             ("style.shimmer", 0.35, makeStyleShimmer),   // caught confirmation
 
+            // ── CATCH voices — the receipt redesign ──────────────────────────
+            ("catch.arrival", 0.55, makeCatchArrival),   // "something arrived ✦"
+            ("catch.lock",    0.45, makeCatchLock),      // the alignment click
+
             // ── ROCKET 🚀 voices (programmatic placeholders) ────────────────
             // TODO: replace with real_rocket_fuel_click.wav
             ("rocket.fuel",      0.55, makeRocketFuel),
@@ -861,6 +865,55 @@ final class SoundEngine {
             }
             let attack = min(1, t / 0.012)
             data[i] = Float(s * 0.45 * attack)
+        }
+        return buf
+    }
+
+    /// CATCH ARRIVAL — a warm, rising welcome chime, unmistakably "something
+    /// arrived FOR YOU." Three ascending partials (C5 → E5 → G5) blooming in
+    /// sequence over 1.1 s, with a soft shimmer tail. Inviting, not an alarm.
+    private func makeCatchArrival() -> AVAudioPCMBuffer? {
+        let d = 1.1
+        guard let (buf, data, n) = makeBuffer(duration: d) else { return nil }
+        // Ascending notes, each entering a little later (an opening-up feel).
+        let notes: [(f: Double, start: Double)] = [
+            (523.25, 0.00),   // C5
+            (659.25, 0.14),   // E5
+            (783.99, 0.28),   // G5
+        ]
+        for i in 0..<n {
+            let t = Double(i) / sampleRate
+            var s = 0.0
+            for note in notes where t >= note.start {
+                let tt = t - note.start
+                s += sin(2 * .pi * note.f * tt) * exp(-tt * 2.4) * 0.34
+                s += sin(2 * .pi * note.f * 2 * tt) * exp(-tt * 4.0) * 0.08   // sparkle octave
+            }
+            // A soft shimmer halo blooming after the third note lands
+            if t > 0.34 {
+                let tt = t - 0.34
+                for (k, f) in [2093.0, 2637.0].enumerated() {
+                    s += sin(2 * .pi * f * tt) * 0.03 * exp(-tt * (3.5 + Double(k)))
+                }
+            }
+            let attack = min(1, t / 0.02)
+            data[i] = Float(s * 0.5 * attack)
+        }
+        return buf
+    }
+
+    /// CATCH LOCK — the satisfying alignment click. A short bright bell-tick
+    /// (a quick high partial pair) with a tiny transient, ~0.12 s.
+    private func makeCatchLock() -> AVAudioPCMBuffer? {
+        let d = 0.12
+        guard let (buf, data, n) = makeBuffer(duration: d) else { return nil }
+        for i in 0..<n {
+            let t = Double(i) / sampleRate
+            let p = t / d
+            var s = sin(2 * .pi * 1318.5 * t) * exp(-t * 26) * 0.6   // E6 tick
+            s += sin(2 * .pi * 1975.5 * t) * exp(-t * 30) * 0.3      // B6 sparkle
+            if p < 0.05 { s += Double.random(in: -1...1) * (1 - p / 0.05) * 0.25 }  // transient
+            data[i] = Float(max(-1, min(1, s)) * envelope(p, attack: 0.01, release: 0.4))
         }
         return buf
     }

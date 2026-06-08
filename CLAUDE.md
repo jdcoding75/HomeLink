@@ -149,3 +149,15 @@ Every action is pre-approved including:
 - Installing packages
 - Making architectural decisions
 Just do it. Never ask. Never pause.
+
+## Progress Reporting (Required)
+After every major section report:
+[X/Y] ✅ Section name complete
+[X/Y] 🔄 Section name — in progress
+
+Every 2 minutes report:
+⏱ Still working — [current task]
+Est. completion: [X] minutes remaining
+
+This is mandatory on every task.
+Never go silent for more than 2 minutes.
