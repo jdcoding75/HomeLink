@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "bash(*)",
+      "edit(*)",
+      "write(*)",
+      "read(*)",
+      "computer(*)",
+      "mcp(*)"
+    ],
+    "defaultMode": "allowAll",
+    "autoApprove": true
+  }
+}

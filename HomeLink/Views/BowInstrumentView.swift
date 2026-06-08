@@ -56,25 +56,28 @@ struct BowInstrumentView: View {
         }
     }
 
-    /// String: dim and slack → slightly brighter → bright lavender glow.
-    private var stringColor: Color {
+    /// String: dim and slack → slightly brighter → bright and taut.
+    private var stringBrightness: Double {
         switch aimBand {
-        case 3:  return Self.lavender.opacity(aimPulse ? 1.0 : 0.85)
-        case 2:  return Self.lavender.opacity(0.9)
-        case 1:  return Self.tint.opacity(0.6)
-        default: return Self.tint.opacity(0.35)
+        case 3:  return aimPulse ? 1.0 : 0.9
+        case 2:  return 0.95
+        case 1:  return 0.6
+        default: return 0.35
         }
     }
 
-    /// Arrow: muted grey → softly glowing → full amber gold.
-    private var arrowColor: Color {
+    /// Arrow glow strength rides the aim bands (the wood/steel colors stay).
+    private var arrowGlow: Double {
         switch aimBand {
-        case 3:  return Self.gold.opacity(aimPulse ? 1.0 : 0.85)
-        case 2:  return Self.gold
-        case 1:  return Self.gold.opacity(0.55)
-        default: return Self.slackGrey.opacity(0.6)
+        case 3:  return aimPulse ? 0.9 : 0.7
+        case 2:  return 0.6
+        case 1:  return 0.3
+        default: return 0.0
         }
     }
+
+    // (previous band-tinted string/arrow colors superseded by the
+    //  handcrafted wood + steel palette; see stringBrightness/arrowGlow)
 
     var body: some View {
         ZStack {
@@ -90,22 +93,50 @@ struct BowInstrumentView: View {
                                ringRadius: 172,
                                showHint: false)
 
-            // ── The bow — fills the circle, aimed at them, breathing.
-            // Aim feedback: slack and dim off-target, lavender-bright and
-            // glowing at the edges once you're within 15°. ──
+            // ── The bow — a real handcrafted traditional bow: warm wood
+            // grain limbs (dark at the tips, chestnut at the grip), a taut
+            // off-white string. Aim feedback rides on top: dim and slack
+            // off-target, glowing at the edges within 15°. ──
             ZStack {
+                // Wood limbs — gradient tips → center → tips
                 BowArchShape(tension: drawAmount * 14)
-                    .stroke(aimBand >= 2 ? Self.tint.opacity(0.95) : Self.tint.opacity(0.5),
-                            style: StrokeStyle(lineWidth: 4, lineCap: .round))
-                    .shadow(color: Self.lavender.opacity(aimBand >= 2 ? 0.55 : 0),
-                            radius: 10)   // the arc glows at the edges
+                    .stroke(
+                        LinearGradient(
+                            stops: [
+                                .init(color: Color(hex: "#4A2208"), location: 0.0),
+                                .init(color: Color(hex: "#D2691E"), location: 0.5),
+                                .init(color: Color(hex: "#4A2208"), location: 1.0),
+                            ],
+                            startPoint: .leading, endPoint: .trailing
+                        ),
+                        style: StrokeStyle(lineWidth: 5, lineCap: .round)
+                    )
+                    .opacity(aimBand >= 2 ? 1.0 : 0.8)
+                // Wood grain — overlapping slimmer passes, slightly offset,
+                // darker and lighter threads running along the limb
+                BowArchShape(tension: drawAmount * 14)
+                    .stroke(Color(hex: "#8B4513").opacity(0.45),
+                            style: StrokeStyle(lineWidth: 2.2, lineCap: .round))
+                    .offset(y: -1)
+                BowArchShape(tension: drawAmount * 14)
+                    .stroke(Color(hex: "#4A2208").opacity(0.30),
+                            style: StrokeStyle(lineWidth: 1.2, lineCap: .round))
+                    .offset(y: 1.2)
+                BowArchShape(tension: drawAmount * 14)
+                    .stroke(Color(hex: "#E8A664").opacity(0.18),
+                            style: StrokeStyle(lineWidth: 0.8, lineCap: .round))
+                    .offset(y: -0.4)
+
+                // The string — off-white, taut, softly luminous
                 BowStringShape(pull: drawAmount * 84)   // 25 % of the bow width
-                    .stroke(stringColor, lineWidth: 2)
-                    .shadow(color: Self.lavender.opacity(aimBand >= 2 ? 0.7 : 0),
-                            radius: 6)
+                    .stroke(Color(hex: "#F5F0E8").opacity(stringBrightness),
+                            lineWidth: 1.5)
+                    .shadow(color: .white.opacity(0.10), radius: 8)
+                    .shadow(color: Self.lavender.opacity(aimBand >= 2 ? 0.6 : 0),
+                            radius: 6)   // ready-glow within 15°
             }
             .frame(width: 333, height: 333)
-            .shadow(color: .black.opacity(0.15), radius: 12)
+            .shadow(color: .black.opacity(0.20), radius: 8)   // soft, grounded
             .rotationEffect(.radians(rad))
             .scaleEffect(breathe ? 1.02 : 0.98)
             .animation(AnimationSystem.easeInOutSine(0.3), value: aimBand)
@@ -121,16 +152,14 @@ struct BowInstrumentView: View {
                     .transition(.opacity)
             }
 
-            // ── The arrow — nocked at center, drawn back with the string.
-            // Muted grey off-target, glowing softly inside 30°, full amber
-            // gold inside 15°, sparkling at the tip inside 5°. ──
+            // ── The arrow — a real one: wood shaft darkening toward the
+            // nock, steel head, three feather fletches, silver nock.
+            // Glow strength rides the aim bands; sparkles inside 5°. ──
             ZStack {
-                ArrowShape()
-                    .fill(arrowColor.opacity(loadedToken == nil ? 1.0 : 0.65))
-                    .frame(width: 13, height: 58)
+                TraditionalArrowView()
+                    .opacity(loadedToken == nil ? 1.0 : 0.7)
                     .offset(y: 8)
-                    .shadow(color: Self.gold.opacity(aimBand >= 1 ? 0.25 * Double(aimBand) : 0),
-                            radius: 8)
+                    .shadow(color: Self.gold.opacity(arrowGlow * 0.6), radius: 8)
                 if let loadedSymbol {
                     loadedSymbol
                         .scaleEffect(x: 1.0, y: 1.0 + drawAmount * 0.4)   // elongates
@@ -336,5 +365,52 @@ struct BounceBackEffect: ViewModifier {
                        ? .spring(response: 0.18, dampingFraction: 0.25)
                        : .easeOut(duration: 0.2),
                        value: active)
+    }
+}
+
+// MARK: - TraditionalArrowView
+
+/// A real arrow, drawn small: wood shaft (darker toward the nock), a steel
+/// triangular head, three feather marks near the tail, a silver nock.
+/// Elegant and handcrafted — never cartoon.
+struct TraditionalArrowView: View {
+
+    var body: some View {
+        ZStack {
+            // Shaft — warm wood, sliding darker toward the nock end
+            Capsule()
+                .fill(
+                    LinearGradient(colors: [Color(hex: "#A0522D"),
+                                            Color(hex: "#6E3A1E")],
+                                   startPoint: .top, endPoint: .bottom)
+                )
+                .frame(width: 3.5, height: 50)
+
+            // Steel head — a small clean triangle at the tip
+            Triangle()
+                .fill(
+                    LinearGradient(colors: [Color(hex: "#E8E8E8"),
+                                            Color(hex: "#C0C0C0")],
+                                   startPoint: .top, endPoint: .bottom)
+                )
+                .frame(width: 10, height: 13)
+                .offset(y: -29)
+
+            // Fletching — three feather marks near the nock
+            ForEach(0..<3, id: \.self) { i in
+                Capsule()
+                    .fill(Color(hex: "#2a2a2a").opacity(0.6))
+                    .frame(width: 6.5, height: 1.8)
+                    .rotationEffect(.degrees(-32))
+                    .offset(x: 3.5, y: 13 + CGFloat(i) * 4.5)
+            }
+
+            // Nock — a tiny silver ring at the tail
+            Circle()
+                .stroke(Color(hex: "#C0C0C0"), lineWidth: 1)
+                .frame(width: 3.5, height: 3.5)
+                .offset(y: 26.5)
+        }
+        .frame(width: 13, height: 58)
     }
 }

@@ -205,22 +205,22 @@ struct SettingsView: View {
             .contentShape(Rectangle())
             .onTapGesture { showAccount = true }
 
-            Divider().background(DesignTokens.Color.border).padding(.leading, 44)
-
-            // All connection UI lives in ConnectView now
-            settingsRow {
-                Image(systemName: "link")
-                    .settingsIcon()
-                Text("your connection")
-                    .settingsLabel()
-                Spacer()
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 12))
-                    .foregroundColor(DesignTokens.Color.textDim)
-            }
-            .contentShape(Rectangle())
-            .onTapGesture { showConnect = true }
-            .sheet(isPresented: $showConnect) { ConnectView() }
+            // ── "your connection" row retired — connecting lives on each
+            // person's own card now (People → tap a person → connect). ──
+            // Divider().background(DesignTokens.Color.border).padding(.leading, 44)
+            // settingsRow {
+            //     Image(systemName: "link")
+            //         .settingsIcon()
+            //     Text("your connection")
+            //         .settingsLabel()
+            //     Spacer()
+            //     Image(systemName: "chevron.right")
+            //         .font(.system(size: 12))
+            //         .foregroundColor(DesignTokens.Color.textDim)
+            // }
+            // .contentShape(Rectangle())
+            // .onTapGesture { showConnect = true }
+            // .sheet(isPresented: $showConnect) { ConnectView() }
 
             // (pairing-code copy row replaced by ConnectView; kept)
             if false, let code = SupabaseService.localPairingCode {

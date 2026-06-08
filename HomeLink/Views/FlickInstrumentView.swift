@@ -12,6 +12,8 @@ struct FlickInstrumentView: View {
 
     let loadedToken: String?
     let loadedSymbol: AnyView?
+    /// Resolved emoji for the loaded thought — drives the pad glow hue.
+    var loadedEmoji: String? = nil
     let bearingDegrees: Double
     let personName: String
     var personEmoji: String = "💜"
@@ -62,18 +64,31 @@ struct FlickInstrumentView: View {
                                ringRadius: 165,
                                showHint: loadedToken == nil)   // own hints while loaded
 
-            // ── The launch pocket — a soft recessed cup ──
+            // ── The launch pad — a clean circular platform with quiet
+            // physical depth: lighter top edge, darker bottom edge, a
+            // lavender ring. The emoji is the star; the pad just holds it. ──
             ZStack {
+                // Platform body
                 Circle()
-                    .trim(from: 0, to: 0.5)
-                    .stroke(Self.lavender.opacity(0.5), lineWidth: 2)
-                    .frame(width: 80, height: 80)
+                    .fill(Color(hex: "#1e1828"))
+                    .frame(width: 60, height: 60)
+                // 3D depth — light falls from above
                 Circle()
-                    .trim(from: 0, to: 0.5)
-                    .fill(Color.black.opacity(0.25))
-                    .frame(width: 80, height: 80)
+                    .stroke(
+                        LinearGradient(colors: [.white.opacity(0.18),
+                                                .black.opacity(0.35)],
+                                       startPoint: .top, endPoint: .bottom),
+                        lineWidth: 1.5
+                    )
+                    .frame(width: 56, height: 56)
+                // The lavender ring
+                Circle()
+                    .stroke(Self.lavender, lineWidth: 2)
+                    .frame(width: 60, height: 60)
+                    .shadow(color: Self.lavender.opacity(0.35), radius: 6)
             }
             .offset(pocketOffset)
+            // (previous half-cup pocket superseded by the platform)
 
             // ── Trajectory while dragging ──
             if dragging, dragDistance > 12 {

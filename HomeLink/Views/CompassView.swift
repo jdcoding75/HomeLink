@@ -90,6 +90,12 @@ struct CompassView: View {
     @State private var showSkinOverlay = false
     @State private var showSkinPaywall = false
     @State private var showConnectSheet = false
+    @State private var showScopeReticle = false   // [2/6] 🎯
+
+    /// The three alignment layers wake whenever aiming or catching.
+    private var alignmentActive: Bool {
+        (selectedToken != nil || pings.nowPlaying != nil) && compass.isHeadingAvailable
+    }
     // (subscription env object already declared at the top)
 
     // ── Send a thought — merged onto the compass (thoughts tab retired) ──
@@ -201,6 +207,52 @@ struct CompassView: View {
                     .id(instrumentStore.selected)              // crossfade on switch
                     .transition(.opacity)
                     .animation(.easeInOut(duration: 0.3), value: instrumentStore.selected)
+                    // [1/6] LAYER 2 — the 8-segment ring scanner, alive
+                    // whenever the user is aiming or catching
+                    .overlay {
+                        if alignmentActive {
+                            RingScannerView(relativeBearing: compass.state.bearingDegrees)
+                                .frame(width: 388, height: 388)
+                                .transition(.opacity)
+                        }
+                    }
+                    // [3/6] The compass hold-to-send progress rings the face
+                    .overlay {
+                        if instrumentStore.selected == .compass && holdProgress > 0 {
+                            Circle()
+                                .trim(from: 0, to: holdProgress)
+                                .stroke(Color(hex: "#e0ccee"),
+                                        style: StrokeStyle(lineWidth: 4, lineCap: .round))
+                                .frame(width: 352, height: 352)
+                                .rotationEffect(.degrees(-90))
+                                .shadow(color: Color(hex: "#c4a8d4").opacity(0.6), radius: 8)
+                                .allowsHitTesting(false)
+                        }
+                    }
+                    // [2/6] 🎯 scope — always reachable, bottom right
+                    .overlay(alignment: .bottomTrailing) {
+                        ScopeButton(active: showScopeReticle) {
+                            HapticEngine.personSelected()
+                            withAnimation(.easeOut(duration: 0.25)) {
+                                showScopeReticle.toggle()
+                            }
+                        }
+                        .padding(6)
+                    }
+                    .overlay {
+                        if showScopeReticle {
+                            ScopeReticleOverlay(
+                                relativeBearing: compass.state.bearingDegrees,
+                                personName: compass.state.personName,
+                                onDismiss: {
+                                    withAnimation(.easeOut(duration: 0.25)) {
+                                        showScopeReticle = false
+                                    }
+                                }
+                            )
+                            .transition(.opacity)
+                        }
+                    }
                     // The catch dims the instrument beneath it, slightly
                     .opacity(appState.currentState == .catchMode ? 0.55 : 1.0)
                     .animation(.easeInOut(duration: 0.3),
@@ -408,6 +460,12 @@ struct CompassView: View {
             // (previous arrival flows retired — views kept for reference:
             //  proOn → ThoughtArrivalView, core → DirectionalArrivalView)
 
+            // ── [1/6] LAYER 3: screen-edge glow on the person's side ──────────
+            if alignmentActive {
+                AlignmentEdgeGlowView(relativeBearing: compass.state.bearingDegrees)
+                    .transition(.opacity)
+            }
+
             // ── Ambient presence — their needle is resting on us ──────────────
             if presenceGlowVisible {
                 presenceGlow
@@ -524,9 +582,11 @@ struct CompassView: View {
         }
         .onChange(of: compass.state.isLocked)        { _, locked in handleLock(locked) }
         .sheet(isPresented: $showSkinPaywall) { PaywallView() }
-        // Hold to Send (Pro, opt-in): the ring fills while aligned within 15°
+        // [3/6] Compass send mechanic: hold within 15° for 2 s → auto-send.
+        // Built-in, every tier — the tap button is gone.
         .onReceive(holdTick) { _ in
-            guard holdToSendActive, let token = selectedToken, flightToken == nil else {
+            guard instrumentStore.selected == .compass,
+                  let token = selectedToken, flightToken == nil else {
                 if holdProgress > 0 { holdProgress = 0 }
                 return
             }
@@ -844,55 +904,55 @@ struct CompassView: View {
         .onAppear { personalSixRow = PersonalSet.load() }
     }
 
-    /// Below the row: tap-send button, or the hold ring (Pro opt-in).
+    /// [1/6] LAYER 1 + [4/6]: one clear line below the instrument —
+    /// alignment guidance until aligned, then the instrument's own action.
+    /// (The tap-send button is GONE — compass sends by holding aligned.)
     @ViewBuilder
     private var sendControl: some View {
-        // The other instruments carry their own send mechanic (draw / hold /
-        // flick) — the button belongs to the compass alone.
-        if instrumentStore.selected != .compass {
-            Color.clear.frame(height: 1)
-        } else if let token = selectedToken, flightToken == nil {
-            if holdToSendActive {
-                VStack(spacing: 5) {
-                    ZStack {
-                        Circle()
-                            .stroke(DesignTokens.Color.borderMid, lineWidth: 3)
-                            .frame(width: 40, height: 40)
-                        Circle()
-                            .trim(from: 0, to: holdProgress)
-                            .stroke(Color(hex: "#e0ccee"),
-                                    style: StrokeStyle(lineWidth: 3, lineCap: .round))
-                            .frame(width: 40, height: 40)
-                            .rotationEffect(.degrees(-90))
-                    }
-                    Text(sendAlignDiff <= 15
-                         ? "hold toward \(compass.state.personName)"
-                         : "point toward \(compass.state.personName) first")
-                        .font(.system(size: 11, design: .serif).italic())
-                        .foregroundColor(sendAlignDiff <= 15
-                                         ? Color(hex: "#e0ccee")
-                                         : DesignTokens.Color.textMuted)
-                }
-                .transition(.opacity)
-            } else {
-                Button {
-                    sendThought(token)
-                } label: {
-                    Text("send →")
-                        .font(DesignTokens.Font.label)
-                        .foregroundColor(DesignTokens.Color.textPrimary)
-                        .padding(.horizontal, 32)
-                        .padding(.vertical, 10)
-                        .background(DesignTokens.Color.accentStrong)
-                        .cornerRadius(DesignTokens.Radius.button)
-                        .shadow(color: Color(hex: "#9b7fc0").opacity(0.4), radius: 8)
-                }
-                .transition(.opacity.combined(with: .move(edge: .bottom)))
-            }
+        if selectedToken == nil && pings.nowPlaying == nil {
+            Text("choose a feeling below")
+                .font(.system(size: 13, design: .serif).italic())
+                .foregroundColor(DesignTokens.Color.textMuted)
+                .frame(height: 22)
         } else {
-            // Keeps the layout from jumping when nothing is selected
-            Color.clear.frame(height: 1)
+            Text(alignmentInstruction)
+                .font(.system(size: 14, design: .serif).italic())
+                .foregroundColor(sendAlignDiff <= 15
+                                 ? Color(hex: "#e0ccee")
+                                 : Color(hex: "#c4a8d4"))
+                .frame(height: 22)
+                .contentTransition(.opacity)
+                .animation(.easeInOut(duration: 0.25), value: alignmentInstruction)
         }
+        // (the old tap "send →" button + mini hold ring are retired —
+        //  the hold progress now rings the compass itself)
+    }
+
+    /// The instrument's own action verb, used once locked.
+    private var instrumentAction: String {
+        let name = compass.state.personName
+        switch instrumentStore.selected {
+        case .compass: return "hold toward \(name) to send"
+        case .bow:     return "draw the string toward \(name)"
+        case .firefly: return "breathe toward \(name) to send"   // wind
+        case .flick:   return "flick toward \(name) to send"
+        }
+    }
+
+    /// Layer-1 text: cardinal sentence → turn hint → almost → locked·action.
+    private var alignmentInstruction: String {
+        // Simulator / indoors: no heading → skip the hunt, show the action
+        guard compass.isHeadingAvailable else { return instrumentAction }
+        let absolute: Double? = {
+            guard let user = compass.userLocation,
+                  let person = people.selectedPerson else { return nil }
+            return BearingCalculator.bearing(from: user.coordinate,
+                                             to: person.coordinate)
+        }()
+        return AlignmentText.guidance(relative: compass.state.bearingDegrees,
+                                      absolute: absolute,
+                                      personName: compass.state.personName,
+                                      lockedAction: instrumentAction)
     }
 
     /// Renders an emoji token, the gecko, or a custom thought's emoji.
