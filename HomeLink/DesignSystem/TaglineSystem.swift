@@ -42,6 +42,19 @@ enum TaglineSystem {
         "You're the direction I always return to.",
     ]
 
+    /// A random poetic tagline — assigned to each new person so they start
+    /// with a voice that then travels with every thought.
+    static var random: String { poeticLibrary.randomElement() ?? defaultTagline }
+
+    /// Cycle to the next tagline after the current one (wraps). nil/unknown
+    /// starts at the top of the library.
+    static func next(after current: String?) -> String {
+        guard let current, let i = poeticLibrary.firstIndex(of: current) else {
+            return poeticLibrary.first ?? defaultTagline
+        }
+        return poeticLibrary[(i + 1) % poeticLibrary.count]
+    }
+
     static func validate(_ text: String) -> TaglineValidation {
         let trimmed = text.trimmingCharacters(in: .whitespaces)
         if trimmed.isEmpty           { return .empty }

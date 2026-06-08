@@ -37,6 +37,9 @@ final class PeopleManager: ObservableObject {
 
     func addPerson(_ person: Person) throws {
         guard canAddPerson() else { throw PeopleError.upgradeRequired }
+        // [1/4] Every new person starts with a tagline (their voice that
+        // then travels with each thought) unless one was set explicitly.
+        if person.tagline == nil { person.tagline = TaglineSystem.random }
         modelContext?.insert(person)
         try modelContext?.save()
         fetchAll()
@@ -82,6 +85,7 @@ final class PeopleManager: ObservableObject {
     /// Insert a fully-built person coming from an accepted invite —
     /// connection-initiated, so it bypasses the free-tier person gate.
     func insertFromInvite(_ person: Person) {
+        if person.tagline == nil { person.tagline = TaglineSystem.random }
         modelContext?.insert(person)
         try? modelContext?.save()
         fetchAll()
@@ -107,6 +111,7 @@ final class PeopleManager: ObservableObject {
             locationDisplayName: name
         )
         person.pairedUserID = friendID.uuidString
+        person.tagline = TaglineSystem.random
         modelContext?.insert(person)
         try? modelContext?.save()
         fetchAll()

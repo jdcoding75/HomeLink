@@ -222,7 +222,15 @@ Deno.serve(async (req) => {
       senderStyle: record.sender_style ?? null,
       fromUserId: record.from_user ?? null,
       message: record.message ?? null,        // [5/5] optional note
+      tagline: record.tagline ?? null,        // sender's per-person tagline
     };
+
+    // The notification body grows more personal when a tagline (or message)
+    // rides along: tagline first ("near is a feeling ✦"), then the message,
+    // then the gentle generic pull.
+    const notifBody = record.tagline
+      ? `${record.tagline} ✦`
+      : (record.message ?? "A feeling is coming your way…");
 
     // QUEUE NOTIFICATION RULE: only the FIRST unread announces itself.
     // A backlog updates the badge silently — no banner, no sound.
@@ -234,10 +242,10 @@ Deno.serve(async (req) => {
       });
     }
 
-    // The mystery is the gift — no emoji, no name, just the pull.
+    // Personal when there's a tagline/message; the gentle pull otherwise.
     return await sendPush(record.to_user, {
       aps: {
-        alert: { title: "Pointward", body: "A feeling is coming your way…" },
+        alert: { title: "Pointward", body: notifBody },
         sound: "default",
         badge: unread,
       },

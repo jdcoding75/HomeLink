@@ -657,6 +657,7 @@ final class SupabaseService: ObservableObject {
         let emoji: String
         var senderStyle: String? = nil
         var message: String? = nil          // [5/5] optional ≤30-char note
+        var tagline: String? = nil          // sender's per-person tagline
 
         enum CodingKeys: String, CodingKey {
             case fromUser    = "from_user"
@@ -664,6 +665,7 @@ final class SupabaseService: ObservableObject {
             case emoji
             case senderStyle = "sender_style"
             case message
+            case tagline
         }
     }
 
@@ -677,6 +679,7 @@ final class SupabaseService: ObservableObject {
         /// glow | shootingStar | firefly — nil on rows from before the migration.
         let senderStyle: String?
         let message: String?          // [5/5] optional note
+        let tagline: String?          // sender's per-person tagline
 
         enum CodingKeys: String, CodingKey {
             case id
@@ -686,6 +689,7 @@ final class SupabaseService: ObservableObject {
             case openedAt    = "opened_at"
             case senderStyle = "sender_style"
             case message
+            case tagline
         }
     }
 
@@ -700,6 +704,7 @@ final class SupabaseService: ObservableObject {
         /// glow | shootingStar | firefly — nil on rows from before the migration.
         let senderStyle: String?
         let message: String?          // [5/5] optional note
+        let tagline: String?          // sender's per-person tagline
 
         enum CodingKeys: String, CodingKey {
             case id
@@ -710,6 +715,7 @@ final class SupabaseService: ObservableObject {
             case openedAt    = "opened_at"
             case senderStyle = "sender_style"
             case message
+            case tagline
         }
     }
 
@@ -720,7 +726,7 @@ final class SupabaseService: ObservableObject {
     /// schema lag never blocks a thought. Network errors are retried and
     /// then THROWN: the caller must surface them, never swallow them.
     func sendPing(to userID: UUID, emoji: String, style: SenderStyle? = nil,
-                  message: String? = nil) async throws {
+                  message: String? = nil, tagline: String? = nil) async throws {
         guard let client else { throw SupabaseServiceError.notConfigured }
         guard let me = await currentUserID else { throw SupabaseServiceError.notSignedIn }
         // One selection defines everything: the wire style follows the
@@ -744,7 +750,8 @@ final class SupabaseService: ObservableObject {
                     .from("pings")
                     .insert(PingPayload(fromUser: me, toUser: userID, emoji: emoji,
                                         senderStyle: styleRaw,
-                                        message: message?.isEmpty == true ? nil : message))
+                                        message: message?.isEmpty == true ? nil : message,
+                                        tagline: tagline?.isEmpty == true ? nil : tagline))
                     .execute()
             }
             log.info("pings: sendPing ✓ insert accepted")

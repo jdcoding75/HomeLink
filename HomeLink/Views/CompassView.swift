@@ -63,6 +63,12 @@ struct CompassView: View {
     @State private var taglinePosition = 0
     private var taglineIndex: Int { taglineOrder[taglinePosition] }
 
+    // [1/4][4/4] PER-PERSON tagline shown on the compass — mirrors the
+    // selected person's tagline so the UI updates instantly on tap/pick;
+    // nil means "no tagline" (none travels with their thoughts).
+    @State private var personTagline: String? = nil
+    @State private var showTaglinePicker = false
+
     // Discovery hint — "tap the words to change them", first three launches
     @AppStorage("discoveryHintCount") private var discoveryHintCount = 0
     @State private var showDiscoveryHint = false
@@ -750,6 +756,7 @@ struct CompassView: View {
             if let person = people.selectedPerson {
                 compass.start(tracking: person)
             }
+            syncPersonTagline()            // [4/4] show the selected person's tagline
             // Locked favourites override the per-launch randomization
             if funnyUnitLocked >= 0 && funnyUnitLocked < DistanceFun.funnyCount {
                 funnyIndex = funnyUnitLocked
@@ -775,9 +782,18 @@ struct CompassView: View {
             if let person = newPerson {
                 compass.start(tracking: person)
             }
+            syncPersonTagline()            // [4/4] switch people → switch tagline
         }
         .sheet(isPresented: $showAddPerson) {
             AddPersonView(geocodingService: appEnv.geocodingService)
+        }
+        // [4/4] The full tagline picker — long-press the tagline to open.
+        .sheet(isPresented: $showTaglinePicker) {
+            if let person = people.selectedPerson {
+                TaglinePickerSheet(current: personTagline) { chosen in
+                    applyTagline(chosen, to: person)
+                }
+            }
         }
     }
 
@@ -917,12 +933,14 @@ struct CompassView: View {
             // (distance moved to the top zone; the "unit:" cycler retired —
             //  the funny unit comes from Pro setup's lock or per-launch random)
 
-            // The poetic tagline, never repeats until all shown —
-            // doubled (13 → 26) so the words carry their weight
+            // [4/4] The SELECTED PERSON's tagline — their voice, which travels
+            // with every thought. Tap to cycle, long-press for the full picker.
+            // nil → a quiet invitation to add one.
             HStack(spacing: 5) {
-                Text(TaglineSystem.poeticLibrary[taglineIndex])
+                Text(personTagline ?? "tap to add a tagline")
                     .font(.system(size: 26, design: .serif).italic())
-                    .foregroundColor(DesignTokens.Color.accentMid)
+                    .foregroundColor(DesignTokens.Color.accentMid
+                                        .opacity(personTagline == nil ? 0.5 : 1))
                     .minimumScaleFactor(0.6)   // long lines stay on one line
                     .lineLimit(1)
                 Text("✦")
@@ -930,16 +948,10 @@ struct CompassView: View {
                     .foregroundColor(DesignTokens.Color.accentMid.opacity(0.55))
             }
             .contentTransition(.opacity)
-            .onTapGesture {
+            .onTapGesture { cycleTagline() }
+            .onLongPressGesture(minimumDuration: 0.4) {
                 HapticEngine.personSelected()
-                withAnimation(.easeInOut(duration: 0.4)) {
-                    if taglinePosition + 1 >= taglineOrder.count {
-                        taglineOrder = TaglineSystem.poeticLibrary.indices.shuffled()
-                        taglinePosition = 0
-                    } else {
-                        taglinePosition += 1
-                    }
-                }
+                showTaglinePicker = true
             }
 
             if compass.state.isFarFromHome {
@@ -951,6 +963,27 @@ struct CompassView: View {
             }
         }
         .animation(.easeInOut(duration: 0.3), value: distanceMode)
+    }
+
+    // [4/4] Per-person tagline management.
+
+    /// Tap the tagline → cycle to the next one for the selected person.
+    private func cycleTagline() {
+        guard let person = people.selectedPerson else { return }
+        HapticEngine.personSelected()
+        applyTagline(TaglineSystem.next(after: personTagline), to: person)
+    }
+
+    /// Set (or clear, when nil) the selected person's tagline and persist it.
+    private func applyTagline(_ tagline: String?, to person: Person) {
+        withAnimation(.easeInOut(duration: 0.4)) { personTagline = tagline }
+        person.tagline = tagline
+        try? people.save()
+    }
+
+    /// Keep the displayed tagline in step with whoever is selected.
+    private func syncPersonTagline() {
+        personTagline = people.selectedPerson?.tagline
     }
 
     /// Line 4 — the thin pill that opens the emoji drawer (thoughts tab).
@@ -1240,7 +1273,8 @@ struct CompassView: View {
             pings.sendRemote(to: recipient,
                              emoji: sendRemoteEmoji(for: token),
                              style: style,
-                             message: outgoingMessage.isEmpty ? nil : outgoingMessage)
+                             message: outgoingMessage.isEmpty ? nil : outgoingMessage,
+                             tagline: people.selectedPerson?.tagline)
         } else {
             CompassView.log.info("send: local only — no paired recipient")
         }

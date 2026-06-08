@@ -218,7 +218,8 @@ struct RootView: View {
                         pings.receivePing(fromName: fromName, emoji: event.emoji,
                                           remoteID: event.id,
                                           senderStyle: event.senderStyle,
-                                          message: event.message)
+                                          message: event.message,
+                                          tagline: event.tagline)
                     }
                 },
                 onFelt: { event in

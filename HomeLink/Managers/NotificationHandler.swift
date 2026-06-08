@@ -25,6 +25,7 @@ final class NotificationHandler: NSObject, ObservableObject {
         let remoteID: UUID?
         let senderStyle: String?
         let message: String?
+        let tagline: String?
     }
 
     /// Pure parser for an APNs payload — extracts the thought's fields, or nil
@@ -40,7 +41,8 @@ final class NotificationHandler: NSObject, ObservableObject {
             fromName: fromName,
             remoteID: (userInfo["pingId"] as? String).flatMap(UUID.init),
             senderStyle: userInfo["senderStyle"] as? String,
-            message: userInfo["message"] as? String
+            message: userInfo["message"] as? String,
+            tagline: userInfo["tagline"] as? String
         )
     }
 
@@ -66,7 +68,7 @@ final class NotificationHandler: NSObject, ObservableObject {
         AppGroupStore.pendingPingTimestamp = .now
         pingManager.receivePing(fromName: parsed.fromName, emoji: parsed.emoji,
                                 remoteID: parsed.remoteID, senderStyle: parsed.senderStyle,
-                                message: parsed.message)
+                                message: parsed.message, tagline: parsed.tagline)
     }
 }
 

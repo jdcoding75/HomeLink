@@ -685,6 +685,20 @@ struct PingHistoryView: View {
                     Text(sent ? "to \(personName)" : "from \(personName)")
                         .font(.system(size: 14, weight: .bold))
                         .foregroundColor(DesignTokens.Color.textPrimary)
+                    // The tagline that travelled with it — small italic muted.
+                    if let tagline = record.tagline, !tagline.isEmpty {
+                        Text(tagline)
+                            .font(.system(size: 11, design: .serif).italic())
+                            .foregroundColor(Self.lavender.opacity(0.8))
+                            .lineLimit(1)
+                    }
+                    // A message preview, if one rode along.
+                    if let message = record.message, !message.isEmpty {
+                        Text("“\(message)”")
+                            .font(.system(size: 11, design: .serif))
+                            .foregroundColor(DesignTokens.Color.textSecondary)
+                            .lineLimit(1)
+                    }
                     Text(PoeticTime.string(for: record.createdAt))
                         .font(.system(size: 12, design: .serif).italic())
                         .foregroundColor(DesignTokens.Color.textMuted)

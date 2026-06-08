@@ -323,20 +323,31 @@ struct CatchModeView: View {
                                 .animation(AnimationSystem.easeOutBack(
                                     AnimationSystem.Timing.catchReveal), value: bloomed)
 
-                            // [5/5] The attached message — prominent, 20 pt serif.
+                            // The sender's tagline — their voice, italic lavender.
+                            if let tagline = ping.tagline, !tagline.isEmpty {
+                                Text(tagline)
+                                    .font(.system(size: 16, design: .serif).italic())
+                                    .foregroundColor(Self.lavender.opacity(0.85))
+                                    .multilineTextAlignment(.center)
+                                    .padding(.horizontal, 32)
+                                    .opacity(bloomed ? 1 : 0)
+                                    .animation(.easeIn(duration: 0.5).delay(0.15), value: bloomed)
+                            }
+
+                            // [5/5] The attached message — prominent, 18 pt serif.
                             if let message = ping.message, !message.isEmpty {
                                 Text("“\(message)”")
-                                    .font(.system(size: 20, design: .serif).italic())
+                                    .font(.system(size: 18, design: .serif).italic())
                                     .foregroundColor(DesignTokens.Color.textPrimary)
                                     .multilineTextAlignment(.center)
                                     .padding(.horizontal, 32)
                                     .opacity(bloomed ? 1 : 0)
-                                    .animation(.easeIn(duration: 0.5).delay(0.2), value: bloomed)
+                                    .animation(.easeIn(duration: 0.5).delay(0.3), value: bloomed)
                             }
 
-                            // [5/5] Aftermath — "from [name] ✦" rests beneath it.
+                            // Aftermath — "from [name] ✦" rests beneath it all.
                             Text("from \(ping.fromName) ✦")
-                                .font(.system(size: 16, design: .serif).italic())
+                                .font(.system(size: 17, design: .serif).italic())
                                 .foregroundColor(Self.lavender)
                                 .opacity(named ? 1 : 0)
                                 .animation(.easeIn(duration: 0.5), value: named)
