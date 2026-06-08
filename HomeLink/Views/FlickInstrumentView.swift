@@ -57,10 +57,13 @@ struct FlickInstrumentView: View {
 
     var body: some View {
         ZStack {
-            // ── The dark instrument circle ──
-            Circle()
-                .stroke(Color.white.opacity(0.08), lineWidth: 1)
+            // ── [4/5] CORK BOARD — warm tan cork fills the instrument circle,
+            // tactile and natural. Deep purple stays outside the circle. ──
+            CorkBoardView()
                 .frame(width: 360, height: 360)
+                .clipShape(Circle())
+                .overlay(Circle().stroke(Color(hex: "#7a5230").opacity(0.6), lineWidth: 3))
+                .shadow(color: .black.opacity(0.35), radius: 10)
 
             // ── Where they are — the person-initial marker, bright to aim at ──
             DirectionIndicator(bearingDegrees: bearingDegrees,
@@ -123,56 +126,42 @@ struct FlickInstrumentView: View {
 
     // ── The paper scroll ────────────────────────────────────────────────────
 
+    /// [4/5] The paper note — a cream square with a folded corner and the
+    /// emoji printed on its face, pinned to the cork with a little red pin.
+    /// When flying, the pin is gone and the note tumbles flat.
     private var paperScroll: some View {
         ZStack {
-            if unrolled {
-                // UNROLLED — a flat little sheet, emoji revealed, tumbling
-                RoundedRectangle(cornerRadius: 4)
-                    .fill(LinearGradient(colors: [Self.paper, Self.paperEdge],
-                                         startPoint: .top, endPoint: .bottom))
-                    .frame(width: 46, height: 56)
-                    .overlay(
-                        VStack(spacing: 5) {
-                            ForEach(0..<4, id: \.self) { _ in
-                                Capsule().fill(Self.paperLine.opacity(0.4))
-                                    .frame(height: 1).padding(.horizontal, 8)
-                            }
-                        }
-                    )
-                    .shadow(color: .black.opacity(0.25), radius: 4, y: 2)
-                if let loadedSymbol {
-                    loadedSymbol
-                        .scaleEffect(1.2)
-                        .rotationEffect(.degrees(Double(flightProgress) * 220))
-                        .shadow(color: hue.opacity(0.6), radius: 10)
+            PaperNoteShape()
+                .fill(LinearGradient(colors: [Color(hex: "#F5F0E0"), Color(hex: "#E8E0C8")],
+                                     startPoint: .topLeading, endPoint: .bottomTrailing))
+                .frame(width: 52, height: 58)
+                .overlay(
+                    // Folded corner at the top-right
+                    PaperFoldShape()
+                        .fill(Color(hex: "#D8CFB0"))
+                        .frame(width: 52, height: 58)
+                )
+                .overlay {
+                    if let loadedSymbol { loadedSymbol.scaleEffect(0.95) }
                 }
-            } else {
-                // ROLLED — a little tube, emoji peeking from the top
-                if let loadedSymbol {
-                    loadedSymbol
-                        .scaleEffect(0.62)
-                        .offset(y: -20)
-                        .shadow(color: hue.opacity(0.4), radius: 5)
+                .shadow(color: .black.opacity(0.3), radius: dragging ? 8 : 4,
+                        y: dragging ? 6 : 2)               // lifts off the board on drag
+                .rotationEffect(.degrees(flying ? Double(flightProgress) * 200 : 0))
+                .scaleEffect(flying ? 1.0 + flightProgress * 0.4
+                                    : (dragging ? 1.04 : (scrollPulse ? 1.02 : 0.98)))
+
+            // The red pin holding it to the board — pops out on flick
+            if !flying {
+                ZStack {
+                    Circle().fill(Color.black.opacity(0.25)).frame(width: 12, height: 12).offset(y: 1)
+                    Circle()
+                        .fill(RadialGradient(colors: [Color(hex: "#FF5533"), Color(hex: "#CC2200")],
+                                             center: UnitPoint(x: 0.35, y: 0.3),
+                                             startRadius: 1, endRadius: 6))
+                        .frame(width: 11, height: 11)
                 }
-                RolledScrollShape()
-                    .fill(LinearGradient(colors: [Self.paper, Self.paperEdge],
-                                         startPoint: .topLeading, endPoint: .bottomTrailing))
-                    .frame(width: 34, height: 44)
-                    .overlay(
-                        // Roll lines + the dark opening at the top
-                        VStack {
-                            Ellipse().fill(Self.paperEdge)
-                                .overlay(Ellipse().stroke(Self.paperLine.opacity(0.6), lineWidth: 1))
-                                .frame(width: 30, height: 9)
-                            Spacer()
-                            Capsule().fill(Self.paperLine.opacity(0.5))
-                                .frame(width: 30, height: 1.2)
-                            Spacer()
-                        }
-                        .padding(.vertical, 3)
-                    )
-                    .shadow(color: .black.opacity(0.3), radius: 5, y: 3)
-                    .scaleEffect(dragging ? 1.05 : (scrollPulse ? 1.03 : 0.97))
+                .offset(y: -26)
+                .scaleEffect(dragging ? 0.9 : 1.0)
             }
         }
     }
@@ -298,5 +287,86 @@ struct FlickInstrumentView: View {
 struct RolledScrollShape: Shape {
     func path(in rect: CGRect) -> Path {
         Path(roundedRect: rect, cornerRadius: rect.width * 0.32)
+    }
+}
+
+// ════════════════════════════════════════════════════════════════════════
+// MARK: - [4/5] Cork board + paper note
+// ════════════════════════════════════════════════════════════════════════
+
+/// A warm tan cork board — base fill with scattered darker ellipses for the
+/// natural cork-grain texture, frozen at first appearance.
+struct CorkBoardView: View {
+    private static let tan  = Color(hex: "#C4956A")
+    private static let dark = Color(hex: "#B8835A")
+
+    private struct Grain: Identifiable {
+        let id = UUID()
+        let x: CGFloat; let y: CGFloat
+        let w: CGFloat; let h: CGFloat
+        let angle: Double; let opacity: Double
+    }
+    @State private var grains: [Grain] = CorkBoardView.makeGrains()
+
+    private static func makeGrains() -> [Grain] {
+        var result: [Grain] = []
+        for i in 0..<60 {
+            let x: CGFloat = CGFloat((i * 53) % 360) - 180
+            let y: CGFloat = CGFloat((i * 97) % 360) - 180
+            let w: CGFloat = CGFloat(4 + (i * 7) % 12)
+            let h: CGFloat = CGFloat(3 + (i * 5) % 8)
+            let angle = Double((i * 37) % 180)
+            let opacity = 0.12 + Double((i * 13) % 10) / 60.0
+            result.append(Grain(x: x, y: y, w: w, h: h, angle: angle, opacity: opacity))
+        }
+        return result
+    }
+
+    var body: some View {
+        ZStack {
+            Self.tan
+            ForEach(grains) { g in
+                Ellipse()
+                    .fill(Self.dark.opacity(g.opacity))
+                    .frame(width: g.w, height: g.h)
+                    .rotationEffect(.degrees(g.angle))
+                    .offset(x: g.x, y: g.y)
+            }
+            // A soft inner shadow at the rim
+            Circle()
+                .stroke(Color.black.opacity(0.18), lineWidth: 14)
+                .blur(radius: 8)
+                .frame(width: 372, height: 372)
+        }
+    }
+}
+
+/// A square paper note with a clipped (folded) top-right corner.
+struct PaperNoteShape: Shape {
+    func path(in rect: CGRect) -> Path {
+        var p = Path()
+        let w = rect.width, h = rect.height
+        let fold = w * 0.26
+        p.move(to: CGPoint(x: 0, y: 0))
+        p.addLine(to: CGPoint(x: w - fold, y: 0))
+        p.addLine(to: CGPoint(x: w, y: fold))
+        p.addLine(to: CGPoint(x: w, y: h))
+        p.addLine(to: CGPoint(x: 0, y: h))
+        p.closeSubpath()
+        return p
+    }
+}
+
+/// The little folded-corner triangle at the note's top-right.
+struct PaperFoldShape: Shape {
+    func path(in rect: CGRect) -> Path {
+        var p = Path()
+        let w = rect.width
+        let fold = w * 0.26
+        p.move(to: CGPoint(x: w - fold, y: 0))
+        p.addLine(to: CGPoint(x: w, y: fold))
+        p.addLine(to: CGPoint(x: w - fold, y: fold))
+        p.closeSubpath()
+        return p
     }
 }

@@ -197,23 +197,20 @@ final class InstrumentOptionTests: XCTestCase {
         XCTAssertEqual(skin.activeSkin, .vintage)
     }
 
-    func testOnlyPlaneIsComingSoon() {
-        // The plane is the lone Coming-Soon teaser — visible but not
-        // selectable; every other option must be live.
-        XCTAssertTrue(InstrumentOption.plane.comingSoon)
-        for opt in InstrumentOption.allCases where opt != .plane {
+    func testNothingIsComingSoon() {
+        // The whole lineup (plane included) has launched — the apply() guard
+        // must never block a selection today.
+        for opt in InstrumentOption.allCases {
             XCTAssertFalse(opt.comingSoon, "\(opt) unexpectedly coming soon")
         }
     }
 
-    func testComingSoonOptionIsNotSelectable() {
-        // apply() must refuse a coming-soon option (the guard holds).
+    func testLaunchedOptionIsSelectable() {
+        // A live (non-coming-soon) option applies cleanly.
         let inst = InstrumentStore()
         let skin = SkinStore()
-        InstrumentOption.apply(.compassVintage, instrumentStore: inst, skinStore: skin)
         InstrumentOption.apply(.plane, instrumentStore: inst, skinStore: skin)
-        // Selection unchanged — plane was blocked.
-        XCTAssertNotEqual(InstrumentOption.selected, .plane)
+        XCTAssertEqual(InstrumentOption.selected, .plane)
     }
 
     func testMigrationDerivesOptionFromLegacyInstrument() {

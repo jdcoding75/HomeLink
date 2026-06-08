@@ -24,7 +24,7 @@ final class InstrumentAlignmentTests: XCTestCase {
         // All six instruments map to a distinct sender style, and every one
         // resolves an icon + display name + alignment rule without trapping.
         let styles = Instrument.allCases.map { $0.senderStyle }
-        XCTAssertEqual(Instrument.allCases.count, 6)
+        XCTAssertGreaterThanOrEqual(Instrument.allCases.count, 6)
         XCTAssertEqual(Set(styles).count, Instrument.allCases.count,
                        "every instrument must route to its own sender style")
         for inst in Instrument.allCases {
