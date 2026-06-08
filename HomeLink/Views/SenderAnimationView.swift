@@ -1408,6 +1408,7 @@ struct ReplayOverlayView: View {
     @State private var bloomed  = false
     @State private var fadingOut = false
     @State private var wandBurst = false       // 🪄 crystal burst at the start
+    @State private var tipping = true          // the 800 ms bucket-tip preamble
     @State private var landingDone = false     // the full landing finished
 
     private var hue: Color { EmojiHue.color(for: emoji) }
@@ -1509,7 +1510,13 @@ struct ReplayOverlayView: View {
                     .ignoresSafeArea()
                     .opacity(dimmed ? 1 : 0)
                     .animation(.easeIn(duration: 0.3), value: dimmed)
-                if dimmed && !landingDone {
+                // The bucket TIPS and SPILLS empty first (800 ms), then the
+                // instrument landing arrives into the emptied bucket.
+                if dimmed && tipping {
+                    BucketTipView(hue: hue, bubbleEmoji: emoji,
+                                  onComplete: { withAnimation(.easeOut(duration: 0.2)) { tipping = false } })
+                }
+                if dimmed && !tipping && !landingDone {
                     InstrumentLandingView(style: style, emoji: emoji,
                                           onComplete: { landingComplete() })
                 }
