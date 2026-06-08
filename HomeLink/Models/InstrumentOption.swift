@@ -22,7 +22,7 @@ enum InstrumentOption: String, CaseIterable, Identifiable {
     // Pro — the instruments
     case bow    = "bow"
     case flick  = "flick"
-    case rocket = "rocket"   // coming soon — visible, not selectable
+    case rocket = "rocket"   // fuel · aim · blast off
     case wind   = "wind"     // replaced the firefly
 
     var id: String { rawValue }
@@ -34,7 +34,7 @@ enum InstrumentOption: String, CaseIterable, Identifiable {
         }
     }
 
-    var comingSoon: Bool { self == .rocket }
+    var comingSoon: Bool { false }   // rocket has launched 🚀
 
     var displayName: String {
         switch self {

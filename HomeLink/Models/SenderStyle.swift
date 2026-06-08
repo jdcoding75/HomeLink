@@ -13,6 +13,7 @@ enum SenderStyle: String, CaseIterable, Identifiable {
     case firefly       = "firefly"         // pro
     case fingerFlick   = "fingerFlick"     // pro
     case bowArrow      = "bowArrow"        // pro
+    case rocket        = "rocket"          // pro — fuel · aim · blast off
 
     var id: String { rawValue }
 
@@ -27,6 +28,7 @@ enum SenderStyle: String, CaseIterable, Identifiable {
         case .firefly:      return "firefly"
         case .fingerFlick:  return "finger flick"
         case .bowArrow:     return "bow & arrow"
+        case .rocket:       return "rocket"
         }
     }
 
@@ -37,6 +39,7 @@ enum SenderStyle: String, CaseIterable, Identifiable {
         case .firefly:      return "🫧"
         case .fingerFlick:  return "👆"
         case .bowArrow:     return "🏹"
+        case .rocket:       return "🚀"
         }
     }
 
@@ -48,6 +51,7 @@ enum SenderStyle: String, CaseIterable, Identifiable {
         case .firefly:      return "slow and intimate"
         case .fingerFlick:  return "quick and playful"
         case .bowArrow:     return "drawn and released"
+        case .rocket:       return "fueled and launched"
         }
     }
 
@@ -60,6 +64,7 @@ enum SenderStyle: String, CaseIterable, Identifiable {
         case .firefly:      return 3.60   // wind: gather 300 · drift 3000 · land 300
         case .fingerFlick:  return 1.30   // transform 300 · compress 200 · snap 80 · flight 800
         case .bowArrow:     return 1.55   // transform 300 · draw 400 · hold 150 · flight 700
+        case .rocket:       return 4.00   // countdown 1500 · ignition 200 · flight 1500 · exit 800
         }
     }
 
@@ -71,6 +76,7 @@ enum SenderStyle: String, CaseIterable, Identifiable {
         case .firefly:      return 0.60   // organic drift
         case .fingerFlick:  return 0.45   // bounces once mid-flight
         case .bowArrow:     return 0.50   // pulled out, flies home
+        case .rocket:       return 0.80   // descends to landing pad with beeps
         }
     }
 
