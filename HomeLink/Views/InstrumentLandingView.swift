@@ -298,30 +298,33 @@ private struct PostItLanding: View {
         let y = startY + (endY - startY) * fly
         ZStack {
             if dust {
-                ForEach(0..<10, id: \.self) { i in
-                    Circle().fill(Color(hex: "#B8835A").opacity(0.7))
-                        .frame(width: 4, height: 4)
-                        .offset(x: CGFloat(i - 5) * 8, y: CGFloat((i * 5) % 14) - 7)
-                        .opacity(0).animation(.easeOut(duration: 0.6), value: dust)
-                        .position(x: endX, y: endY - 20)
+                // Cork dust bursts outward from the pin strike.
+                ForEach(0..<18, id: \.self) { i in
+                    let a = Double(i) / 18 * 2 * .pi
+                    Circle().fill(Color(hex: "#B8835A").opacity(0.75))
+                        .frame(width: CGFloat(3 + i % 3), height: CGFloat(3 + i % 3))
+                        .offset(x: CGFloat(cos(a)) * CGFloat(18 + i % 5 * 6),
+                                y: CGFloat(sin(a)) * CGFloat(14 + i % 4 * 5))
+                        .opacity(0).animation(.easeOut(duration: 0.7), value: dust)
+                        .position(x: endX, y: endY - 22)
                 }
             }
             // the post-it note
             ZStack {
                 PaperNoteShape().fill(LinearGradient(colors: [Color(hex: "#FFEB3B"), Color(hex: "#FFD600")],
                                                      startPoint: .topLeading, endPoint: .bottomTrailing))
-                    .frame(width: 60, height: 66)
-                    .overlay(PaperFoldShape().fill(Color(hex: "#F0C800")).frame(width: 60, height: 66))
-                    .overlay(Text(emoji).font(.system(size: 30)))
+                    .frame(width: 90, height: 98)
+                    .overlay(PaperFoldShape().fill(Color(hex: "#F0C800")).frame(width: 90, height: 98))
+                    .overlay(Text(emoji).font(.system(size: 46)))
                     .shadow(color: .black.opacity(0.3), radius: pinned ? 3 : 6, y: 3)
-                // the pin
+                // the pin — shoots through with a 1.3 overshoot
                 ZStack {
-                    Circle().fill(Color.black.opacity(0.25)).frame(width: 13, height: 13).offset(y: 1)
+                    Circle().fill(Color.black.opacity(0.25)).frame(width: 15, height: 15).offset(y: 1)
                     Circle().fill(RadialGradient(colors: [Color(hex: "#FF5533"), Color(hex: "#CC2200")],
-                                                 center: UnitPoint(x: 0.35, y: 0.3), startRadius: 1, endRadius: 6))
-                        .frame(width: 12, height: 12)
+                                                 center: UnitPoint(x: 0.35, y: 0.3), startRadius: 1, endRadius: 7))
+                        .frame(width: 14, height: 14)
                 }
-                .scaleEffect(pin).offset(y: -28)
+                .scaleEffect(pin).offset(y: -44)
             }
             .rotationEffect(.degrees(pinned ? 0 : spin))
             .scaleEffect(grow)
@@ -344,11 +347,16 @@ private struct PostItLanding: View {
         // LANDING — SLAP
         DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
             pinned = true
+            HapticEngine.thoughtFired()    // sharp THWACK — rigid, satisfying
             HapticEngine.flickRelease()
             SoundEngine.shared.play(for: "style.whoosh")
             dust = true
             shakeScreen()
-            withAnimation(AnimationSystem.easeOutBack(0.4)) { pin = 1 }
+            // Pin SHOOTS through: 0 → 1.3 (fast) → 1.0 (settle).
+            withAnimation(.easeOut(duration: 0.1)) { pin = 1.3 }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                withAnimation(AnimationSystem.easeOutBack(0.35)) { pin = 1.0 }
+            }
             // vibration dampening
             for k in 0..<4 {
                 DispatchQueue.main.asyncAfter(deadline: .now() + Double(k) * 0.08) {
