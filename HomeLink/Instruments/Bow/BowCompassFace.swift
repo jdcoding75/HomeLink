@@ -517,3 +517,29 @@ struct TraditionalArrowView: View {
 // unchanged; this alias gives the new per-instrument name used by the
 // folder system and the animation state-machine work.
 typealias BowCompassFace = BowInstrumentView
+
+// MARK: - ACT 1 state machine — Bow
+//
+// IDLE: bow centered, arrow nocked
+//   - Gentle ambient bow sway; bowstring slightly slack
+//   - Person marker on ring
+// TRIGGERED: finger touches outer rim
+//   - Bow locks, becomes solid; aiming begins
+//   - Haptic: single medium
+// CHARGING: finger spins rim to aim
+//   - Bow rotates with finger; arrow points toward rim
+//   - Person marker glows when aligned
+//   - Within 15°: string begins tensing
+// READY: aligned within 5°
+//   - String fully drawn; arrow at full tension
+//   - Haptic: lock-on heavy; everything vibrating
+// EXITING: release
+//   - String snaps; arrow exits at person bearing
+//   - InstrumentTransition fires; send animation: arrow streaks
+//
+// Additive scaffold — the live aiming/draw gesture in
+// BowInstrumentView is not yet rewired onto this machine.
+extension CompassFaceStateMachine {
+  /// A fresh state machine for the bow compass face.
+  static func bowFace() -> CompassFaceStateMachine { .init(instrument: .bow) }
+}

@@ -644,3 +644,28 @@ struct FlameShape: Shape {
 // unchanged; this alias gives the new per-instrument name used by the
 // folder system and the animation state-machine work.
 typealias RocketCompassFace = RocketInstrumentView
+
+// MARK: - ACT 1 state machine — Rocket
+//
+// IDLE: rocket on pad, small smoke wisps
+//   - Gentle engine idle; tiny smoke particles from base
+//   - Person marker shows bearing
+// TRIGGERED: first fuel tap
+//   - Fuel gauge begins filling; engine sound increases
+//   - Haptic: medium tap per fuel
+// CHARGING: fueling continues
+//   - Each tap adds fuel; smoke increases
+//   - Rocket vibrates more; screen micro-vibrates
+// READY: fully fueled
+//   - Countdown begins 3-2-1; maximum smoke and vibration
+//   - Haptic: building rumble; SILENCE at T-0 — anticipation
+// EXITING: BLAST OFF
+//   - Rocket launches at bearing; exhaust plume fills circle
+//   - InstrumentTransition fires; send animation: full screen launch
+//
+// Additive scaffold — the live fueling/countdown mechanic in
+// RocketInstrumentView is not yet rewired onto this machine.
+extension CompassFaceStateMachine {
+  /// A fresh state machine for the rocket compass face.
+  static func rocketFace() -> CompassFaceStateMachine { .init(instrument: .rocket) }
+}

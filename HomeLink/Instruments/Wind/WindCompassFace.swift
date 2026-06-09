@@ -475,3 +475,31 @@ struct DandelionSeed: View {
 // unchanged; this alias gives the new per-instrument name used by the
 // folder system and the animation state-machine work.
 typealias WindCompassFace = WindInstrumentView
+
+// MARK: - ACT 1 state machine — Wind
+//
+// NOTE: the wind instrument is backed by the .firefly enum case
+// (displayName "wind") — see Instrument.swift.
+//
+// IDLE: leaf gently swaying in sky circle
+//   - Slow side-to-side motion 0.5x speed; seeds occasionally drift off
+//   - Person marker orbits at bearing; sky background with drifting clouds
+// TRIGGERED: breath detected by mic
+//   - Leaf begins to lift from center; seeds increase in frequency
+//   - Subtle glow appears under leaf; haptic: soft single pulse
+// CHARGING: breath continues
+//   - Leaf rises toward person bearing; closer to circle edge
+//   - Wind effect increases; seeds streaming behind leaf
+// READY: leaf at edge of circle
+//   - Brief 0.3s pause — anticipation; leaf trembles slightly
+//   - Haptic: double soft pulse; "release to send ✦" hint
+// EXITING: leaf exits circle
+//   - Leaf crosses circle boundary; fires InstrumentTransition(exitBearing, exitPoint)
+//   - Send animation begins immediately; seamless continuation
+//
+// Additive scaffold — the live breath mechanic in
+// WindInstrumentView is not yet rewired onto this machine.
+extension CompassFaceStateMachine {
+  /// A fresh state machine for the wind compass face (.firefly).
+  static func windFace() -> CompassFaceStateMachine { .init(instrument: .firefly) }
+}

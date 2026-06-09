@@ -30,24 +30,35 @@ struct InstrumentTransition {
   // as its entry point.
   let exitBearing: Double  // 0-360 degrees
 
+  // The exact pixel where the object left the circle.
+  // The send animation continues the object FROM here,
+  // out to the screen edge along exitBearing, so the
+  // two acts read as one continuous journey.
+  let exitPoint: CGPoint
+
+  // What is being sent — carried through so the send
+  // animation (ACT 2) and receipt (ACT 3) have full
+  // context without re-deriving it.
+  let instrument: Instrument
+  let emoji: String
+  let message: String?
+  let tagline: String?
+
   // The screen edge point where the send animation
   // should begin — calculated from exitBearing
   // and screen dimensions.
   func sendEntryPoint(
     screenSize: CGSize
   ) -> CGPoint {
-    let cx = screenSize.width / 2
-    let cy = screenSize.height / 2
+    // Object continues from exitPoint, travels to the
+    // screen edge at the same bearing, then the send
+    // animation begins from there.
     let rad = exitBearing * .pi / 180
-
-    // Place entry point at screen edge
-    // in the direction of exitBearing
     let reach = max(screenSize.width,
-                    screenSize.height) * 0.7
-
+                    screenSize.height) * 0.75
     return CGPoint(
-      x: cx + CGFloat(sin(rad)) * reach,
-      y: cy - CGFloat(cos(rad)) * reach
+      x: screenSize.width / 2 + CGFloat(sin(rad)) * reach,
+      y: screenSize.height / 2 - CGFloat(cos(rad)) * reach
     )
   }
 

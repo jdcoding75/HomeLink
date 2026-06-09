@@ -77,3 +77,64 @@ enum InstrumentBoundaries {
   // Emoji reveal: always heartbeat pattern
   // Pro users: 1.3x intensity multiplier
 }
+
+// MARK: - Compass face state machine (ACT 1 of 3)
+//
+// The compass face is not a static visual — it IS the send
+// mechanic and the first of three animations:
+//   ACT 1: Compass Face (interactive + animated)  ← here
+//   ACT 2: Send Animation (full screen journey)
+//   ACT 3: Receipt Animation (arrival + reveal)
+// The face must flow seamlessly into ACT 2 via the
+// .exiting state, which fires an InstrumentTransition.
+
+enum CompassFaceState {
+  case idle        // instrument at rest
+                   // gentle ambient animation
+                   // waiting for user
+  case triggered   // user started the mechanic
+                   // bow: finger on rim
+                   // wind: breath detected
+                   // rocket: first fuel tap
+                   // wand: first shake
+                   // plane: finger on propeller
+                   // flick: finger on note
+                   // compass: holding toward person
+  case charging    // mechanic building up
+                   // bow: drawing back
+                   // wind: leaf rising
+                   // rocket: fueling
+                   // wand: charge building
+                   // plane: winding up
+                   // flick: pulling back
+                   // compass: orb growing
+  case ready       // fully charged/aimed
+                   // object at edge of circle
+                   // ready to exit
+                   // brief pause here — anticipation
+  case exiting     // object leaves compass circle
+                   // at exitBearing direction
+                   // hands off to send animation
+                   // this state triggers transition
+}
+
+// Timing per state (max durations):
+enum CompassFaceStateDurations {
+  static let idleAmbient: Double = 999  // forever
+  static let triggered: Double = 0.3   // instant response
+  static let charging: Double = 3.0    // max charge time
+  static let ready: Double = 0.5       // anticipation pause
+  static let exiting: Double = 0.4     // exit the circle
+
+  /// Max duration for a given state (idle is effectively
+  /// unbounded — it waits on the user).
+  static func maxDuration(for state: CompassFaceState) -> Double {
+    switch state {
+    case .idle:      return idleAmbient
+    case .triggered: return triggered
+    case .charging:  return charging
+    case .ready:     return ready
+    case .exiting:   return exiting
+    }
+  }
+}

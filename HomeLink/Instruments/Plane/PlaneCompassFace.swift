@@ -484,3 +484,27 @@ struct PlaneLaunchPreview: View {
 // unchanged; this alias gives the new per-instrument name used by the
 // folder system and the animation state-machine work.
 typealias PlaneCompassFace = PlaneInstrumentView
+
+// MARK: - ACT 1 state machine — Plane
+//
+// IDLE: plane on compass face
+//   - Propeller spinning slowly; charming gentle bob; ready to wind up
+// TRIGGERED: finger on propeller
+//   - Propeller responds to finger; wind-up sound begins
+//   - Haptic: light mechanical click
+// CHARGING: circular swirl gesture
+//   - Each circle = one wind; propeller spins faster
+//   - Rubber band tightens visually; 3 circles = fully wound
+// READY: maximum wind
+//   - Propeller blurring; plane vibrating with energy
+//   - "let fly ✦" hint appears; auto-launches after 0.5s
+// EXITING: LAUNCH
+//   - Plane exits toward bearing; wake trail fills circle briefly
+//   - InstrumentTransition fires; send animation: banks away
+//
+// Additive scaffold — the live wind-up gesture in
+// PlaneInstrumentView is not yet rewired onto this machine.
+extension CompassFaceStateMachine {
+  /// A fresh state machine for the plane compass face.
+  static func planeFace() -> CompassFaceStateMachine { .init(instrument: .plane) }
+}

@@ -388,3 +388,28 @@ struct PaperFoldShape: Shape {
 // unchanged; this alias gives the new per-instrument name used by the
 // folder system and the animation state-machine work.
 typealias FlickCompassFace = FlickInstrumentView
+
+// MARK: - ACT 1 state machine — Flick
+//
+// IDLE: post-it note centered on cork
+//   - Note gently bobs and breathes; pin holding it
+//   - Warm cork texture; emoji on note face
+// TRIGGERED: finger touches note
+//   - Pin pops out dramatically; note lifts slightly
+//   - Paper crinkle sound; haptic: light tap
+// CHARGING: drag back from center
+//   - Note follows finger backward; elastic trail shows tension
+//   - Further = more energy; paper stretches slightly
+// READY: full pull back
+//   - Note at maximum tension, vibrating with energy
+//   - Direction indicator shows bearing; "release ✦" hint
+// EXITING: FLICK
+//   - Note snaps toward bearing; paper flutter sound
+//   - InstrumentTransition fires; send animation: tumbling flight
+//
+// Additive scaffold — the live drag/release gesture in
+// FlickInstrumentView is not yet rewired onto this machine.
+extension CompassFaceStateMachine {
+  /// A fresh state machine for the flick compass face.
+  static func flickFace() -> CompassFaceStateMachine { .init(instrument: .flick) }
+}

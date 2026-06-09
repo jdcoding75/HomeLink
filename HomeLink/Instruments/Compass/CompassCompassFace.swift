@@ -16,3 +16,24 @@
 // machine added by the animation work.
 
 import SwiftUI
+
+// MARK: - ACT 1 state machine — Compass
+//
+// IDLE: compass needle pointing
+//   - Slow ambient needle sway; orb hint at center
+// TRIGGERED: hold begins
+//   - Orb starts forming at needle tip; grows with hold progress
+// CHARGING: hold continues
+//   - Orb grows larger; glows warmer; needle steadies
+// READY: aligned and held
+//   - Orb at maximum; needle locked; warm pulse
+// EXITING: release
+//   - Orb separates from needle; needle swings back slightly
+//   - Compass face dims briefly; InstrumentTransition fires
+//
+// Additive scaffold — the live hold mechanic in CompassView
+// is not yet rewired onto this machine.
+extension CompassFaceStateMachine {
+  /// A fresh state machine for the compass face.
+  static func compassFace() -> CompassFaceStateMachine { .init(instrument: .compass) }
+}

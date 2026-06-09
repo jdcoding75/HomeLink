@@ -424,3 +424,27 @@ struct GemShape: Shape {
 // unchanged; this alias gives the new per-instrument name used by the
 // folder system and the animation state-machine work.
 typealias WandCompassFace = WandInstrumentView
+
+// MARK: - ACT 1 state machine — Wand
+//
+// IDLE: wand centered, crystal dim
+//   - Occasional sparkle at tip; gentle floating motion; mysterious and quiet
+// TRIGGERED: first shake
+//   - Crystal tip glows softly; ring of light appears at tip
+//   - Haptic: soft shimmer
+// CHARGING: more shakes
+//   - Each shake adds ring of light; rings spin faster
+//   - Glow intensifies; sparkles increase
+// READY: fully charged
+//   - Rings blur into solid glow; maximum brightness
+//   - PAUSE — one frame of silence; this pause IS the magic
+// EXITING: SUPERNOVA
+//   - Everything erupts outward; particles fill circle
+//   - InstrumentTransition fires; send animation: continues eruption
+//
+// Additive scaffold — the live shake-charge mechanic in
+// WandInstrumentView is not yet rewired onto this machine.
+extension CompassFaceStateMachine {
+  /// A fresh state machine for the wand compass face.
+  static func wandFace() -> CompassFaceStateMachine { .init(instrument: .wand) }
+}
