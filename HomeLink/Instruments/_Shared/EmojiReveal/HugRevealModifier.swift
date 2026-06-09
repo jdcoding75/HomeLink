@@ -95,6 +95,9 @@ struct EmojiRevealData: Identifiable, Equatable {
     let message: String?
     let tagline: String?
     let fromName: String
+    /// The instrument world behind the reveal (defaults to the plain compass
+    /// background). The presenter builds the `.received` context from fromName.
+    var ambient: RevealAmbient = .compass
 }
 
 private struct EmojiRevealPresenter: ViewModifier {
@@ -107,10 +110,10 @@ private struct EmojiRevealPresenter: ViewModifier {
                     emoji: data.emoji,
                     message: data.message,
                     tagline: data.tagline,
-                    fromName: data.fromName
-                ) {
-                    reveal = nil
-                }
+                    context: .received(fromName: data.fromName),
+                    ambient: data.ambient,
+                    onDismiss: { reveal = nil }
+                )
                 .transition(.opacity)
                 .zIndex(50)
             }

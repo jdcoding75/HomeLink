@@ -80,11 +80,14 @@ struct WindReceiptAnimation: View {
         GeometryReader { geo in
             ZStack {
                 if revealing {
-                    // THE PEAK — the shared reveal (hug squeeze for 🤗). The
-                    // emoji sound + reveal haptic fire INSIDE this view, never
-                    // during the landing above.
+                    // THE PEAK — the ONE shared reveal screen. context =
+                    // .received (this is the recipient's side); ambient = .wind
+                    // (daySky + drifting clouds, continuous with the receipt).
+                    // The emoji sound + reveal haptic fire INSIDE this view.
                     EmojiRevealView(emoji: emoji, message: message,
-                                    tagline: tagline, fromName: fromName,
+                                    tagline: tagline,
+                                    context: .received(fromName: fromName),
+                                    ambient: .wind,
                                     onDismiss: onFinished)
                         .transition(.opacity)
                 } else {

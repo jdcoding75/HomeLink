@@ -131,14 +131,16 @@ struct PersonDetailView: View {
         .fullScreenCover(item: $pings.replayRequest) { request in
             ZStack {
                 DesignTokens.Color.background.ignoresSafeArea()
-                ReplayOverlayView(
+                // [6/6] Same EmojiRevealView as the live receipt — the world
+                // (ambient) follows the thought's instrument.
+                EmojiRevealView(
                     emoji: request.emoji,
-                    bearingDegrees: request.bearingDegrees,
-                    style: SenderStyle.from(request.styleRaw),
-                    fromName: person.name
-                ) {
-                    pings.replayRequest = nil
-                }
+                    message: request.message,
+                    tagline: request.tagline,
+                    context: .received(fromName: person.name),
+                    ambient: RevealAmbient.forStyle(SenderStyle.from(request.styleRaw)),
+                    onDismiss: { pings.replayRequest = nil }
+                )
                 VStack {
                     Spacer()
                     Text("tap to dismiss")

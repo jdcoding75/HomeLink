@@ -54,38 +54,51 @@ struct WindSendAnimation: View {
   private static let cloudColor    = Color(hex: "#FFFAF0")
 
   @State private var start: Date? = nil
-  @State private var skyIn = false     // 300 ms crossfade from the compass sky
+  @State private var skyIn = false       // 300 ms crossfade from the compass sky
+  @State private var revealing = false   // leaf departed → sent confirmation
 
   var body: some View {
     GeometryReader { geo in
-      TimelineView(.animation) { timeline in
-        let elapsed = clampedElapsed(now: timeline.date)
-        ZStack {
-          // ── BACKGROUND — the same daytime sky as the compass face, crossfaded
-          //    in over 300 ms (never a hard cut) atop the brand base. ──
-          Color(hex: "#0d0d14").ignoresSafeArea()
-          InstrumentBackground.daySky
-            .ignoresSafeArea()
-            .opacity(skyIn ? 1 : 0)
+      ZStack {
+        if revealing {
+          // [4/5] THE SENT CONFIRMATION — the ONE shared reveal screen,
+          // context = .sent (this is the sender's side), ambient = .wind
+          // (daySky + clouds, continuous with the send). No separate sent
+          // screen exists; this is the same EmojiRevealView the receipt uses.
+          EmojiRevealView(emoji: transition.emoji,
+                          message: transition.message,
+                          tagline: transition.tagline,
+                          context: .sent(recipientName: personName.isEmpty ? "them" : personName),
+                          ambient: .wind,
+                          onDismiss: onComplete)
+            .transition(.opacity)
+        } else {
+          TimelineView(.animation) { timeline in
+            let elapsed = clampedElapsed(now: timeline.date)
+            ZStack {
+              // ── BACKGROUND — the same daytime sky as the compass face,
+              //    crossfaded in over 300 ms (never a hard cut). ──
+              Color(hex: "#0d0d14").ignoresSafeArea()
+              InstrumentBackground.daySky
+                .ignoresSafeArea()
+                .opacity(skyIn ? 1 : 0)
 
-          clouds(geo: geo, elapsed: elapsed)
+              clouds(geo: geo, elapsed: elapsed)
+              seedTrail(geo: geo, elapsed: elapsed)
+              leaf(geo: geo, elapsed: elapsed)
 
-          // ── Seeds streaming behind the leaf (a comet of recent positions) ──
-          seedTrail(geo: geo, elapsed: elapsed)
-
-          // ── The leaf carrying the 🤗 ──
-          leaf(geo: geo, elapsed: elapsed)
-
-          // ── The drifting message ──
-          VStack {
-            Spacer()
-            Text(message(elapsed: elapsed))
-              .font(.system(size: 20, design: .serif).italic())
-              .foregroundColor(InstrumentBackground.accentText)
-              .shadow(color: .black.opacity(0.4), radius: 6)
-              .padding(.bottom, 90)
-              .contentTransition(.opacity)
-              .animation(.easeInOut(duration: 0.5), value: message(elapsed: elapsed))
+              // ── The drifting message ──
+              VStack {
+                Spacer()
+                Text(message(elapsed: elapsed))
+                  .font(.system(size: 20, design: .serif).italic())
+                  .foregroundColor(InstrumentBackground.accentText)
+                  .shadow(color: .black.opacity(0.4), radius: 6)
+                  .padding(.bottom, 90)
+                  .contentTransition(.opacity)
+                  .animation(.easeInOut(duration: 0.5), value: message(elapsed: elapsed))
+              }
+            }
           }
         }
       }
@@ -93,8 +106,13 @@ struct WindSendAnimation: View {
     .ignoresSafeArea()
     .onAppear {
       start = Date()
+      // The approved wind send sound (6.5s, matches the journey).
+      InstrumentSoundPlayer.shared.playSend(.firefly)
       withAnimation(.easeInOut(duration: 0.3)) { skyIn = true }   // crossfade
-      DispatchQueue.main.asyncAfter(deadline: .now() + Self.total) { onComplete() }
+      // After the leaf departs → the sent confirmation reveal.
+      DispatchQueue.main.asyncAfter(deadline: .now() + Self.total) {
+        withAnimation(.easeInOut(duration: 0.3)) { revealing = true }
+      }
     }
   }
 
@@ -118,7 +136,7 @@ struct WindSendAnimation: View {
                              startPoint: .top, endPoint: .bottom))
         .overlay(LeafVeins().stroke(Color.white.opacity(0.18), lineWidth: 1))
         .shadow(color: Self.leafGreen.opacity(0.5), radius: 10, y: 4)
-      Text("🤗").font(.system(size: 60))
+      Text(transition.emoji).font(.system(size: 60))
     }
     .frame(width: Self.leafW, height: Self.leafH)
     .scaleEffect(scale)
@@ -151,8 +169,12 @@ struct WindSendAnimation: View {
   /// that reads as a leaf wandering on the breeze. Continuous with ENTER
   /// (localT 0 → centre) and DEPART (localT 4 → the depart origin).
   private func swirlPos(localT: Double, size: CGSize) -> CGPoint {
-    let sx = sin(localT * 1.4)   // ~0.9 cycles over 4 s — unhurried
-    let sy = sin(localT * 0.7)   // half the rate → an S, not a circle
+    // [1/5] Centre on the TRUE full-screen middle (GeometryReader size) so the
+    // leaf swirls through the centre and never touches the bottom.
+    //   x = cx + sin(t·0.72) · width  · 0.36
+    //   y = cy + sin(t·0.45 + 1.0) · height · 0.15
+    let sx = sin(localT * 0.72)
+    let sy = sin(localT * 0.45 + 1.0)
     return CGPoint(x: size.width  / 2 + CGFloat(sx) * size.width  * Self.swirlWidthAmp,
                    y: size.height / 2 + CGFloat(sy) * size.height * Self.swirlHeightAmp)
   }

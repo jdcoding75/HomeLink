@@ -1524,18 +1524,27 @@ struct ReplaySwipeContainer: View {
     var body: some View {
         ZStack {
             DesignTokens.Color.background.ignoresSafeArea()
-            ReplayOverlayView(emoji: cur.emoji, bearingDegrees: cur.bearingDegrees,
-                              style: SenderStyle.from(cur.styleRaw), fromName: cur.fromName,
-                              message: cur.message, tagline: cur.tagline) {
-                // Reveal finished — auto-advance to the next, or dismiss.
-                if autoAdvance && hasNext {
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
-                        if autoAdvance && self.idx < self.items.count - 1 { withAnimation { idx += 1 } }
+            // [6/6] History replay uses the SAME EmojiRevealView as the live
+            // receipt — identical bloom, animation, sound, and the instrument's
+            // own world (ambient) — so a wind ping replays on sky, a rocket ping
+            // on space, etc. Zero duplication; history is always in sync.
+            EmojiRevealView(
+                emoji: cur.emoji,
+                message: cur.message,
+                tagline: cur.tagline,
+                context: .received(fromName: cur.fromName),
+                ambient: RevealAmbient.forStyle(SenderStyle.from(cur.styleRaw)),
+                onDismiss: {
+                    // Reveal finished — auto-advance to the next, or dismiss.
+                    if autoAdvance && hasNext {
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                            if autoAdvance && self.idx < self.items.count - 1 { withAnimation { idx += 1 } }
+                        }
+                    } else {
+                        onDismiss()
                     }
-                } else {
-                    onDismiss()
                 }
-            }
+            )
             .id(idx)   // re-run the replay for each thought
 
             if items.count > 1 {
