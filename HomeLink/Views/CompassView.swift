@@ -125,6 +125,7 @@ struct CompassView: View {
     @State private var selectedToken: String? = nil
     @State private var messageText: String = ""             // [5/5] optional note (≤30)
     @FocusState private var messageFocused: Bool
+    @State private var composing = false                    // [5/7] message editor open
     @State private var longPressLabel: String? = nil        // [1/3] curated-emoji label on long-press
     @State private var loadFlightToken: String? = nil       // [1/5] load flight
     @State private var loadFlightProgress: CGFloat = 0
@@ -139,7 +140,7 @@ struct CompassView: View {
     // clean reset for all 7 (fuel/draw/charge/wind counters reset to zero) no
     // matter what mid-send state the instrument was holding internally.
     @State private var instrumentResetID = 0
-    private let holdDuration = 2.0
+    private let holdDuration = 1.33   // [6/7] reduced 1/3 (was 2.0) — more responsive
     private let holdTick = Timer.publish(every: 0.05, on: .main, in: .common).autoconnect()
 
     private var holdToSendActive: Bool {
@@ -449,10 +450,11 @@ struct CompassView: View {
                         .animation(.easeInOut(duration: 0.3),
                                    value: appState.currentState == .catchMode)
 
-                    // [5/5] Optional short message — appears once a thought is
-                    // chosen, ≤30 chars, easy to skip.
+                    // [5/7] ONE text zone — the message — appears only once a
+                    // feeling is chosen, auto-filled with that feeling's default.
+                    // Tap it to edit at the top of the screen with suggestions.
                     if selectedToken != nil && appState.currentState != .catchMode {
-                        messageField
+                        messagePill
                             .padding(.top, 8)
                             .transition(.opacity.combined(with: .move(edge: .bottom)))
                     }
@@ -729,6 +731,7 @@ struct CompassView: View {
         // [3/5] Moved top-left (below the nav bar), clear of the send controls.
         .overlay(alignment: .topLeading) { thoughtsIcon }
         .overlay { thoughtsDrawerLayer }
+        .overlay { messageComposeOverlay }   // [5/7] top-of-screen message editor
         .overlay(alignment: .top) { replayCaptionView }
         .task(id: people.selectedPerson) { await loadCompassThoughts() }
         .onChange(of: pings.queueCount) { _, _ in
@@ -987,29 +990,12 @@ struct CompassView: View {
 
     private var bottomZone: some View {
         VStack(spacing: 12) {
-            // (distance moved to the top zone; the "unit:" cycler retired —
-            //  the funny unit comes from Pro setup's lock or per-launch random)
-
-            // [4/4] The SELECTED PERSON's tagline — their voice, which travels
-            // with every thought. Tap to cycle, long-press for the full picker.
-            // nil → a quiet invitation to add one.
-            HStack(spacing: 5) {
-                Text(personTagline ?? "tap to add a tagline")
-                    .font(.system(size: 26, design: .serif).italic())
-                    .foregroundColor(DesignTokens.Color.accentMid
-                                        .opacity(personTagline == nil ? 0.5 : 1))
-                    .minimumScaleFactor(0.6)   // long lines stay on one line
-                    .lineLimit(1)
-                Text("✦")
-                    .font(.system(size: 8))
-                    .foregroundColor(DesignTokens.Color.accentMid.opacity(0.55))
-            }
-            .contentTransition(.opacity)
-            .onTapGesture { cycleTagline() }
-            .onLongPressGesture(minimumDuration: 0.4) {
-                HapticEngine.personSelected()
-                showTaglinePicker = true
-            }
+            // [5/7] The cycling tagline text area is GONE from the compass —
+            // it cluttered the screen alongside the message field. The
+            // per-person tagline still travels with thoughts; it's set on the
+            // person's card (People → tap a person → edit). The compass now
+            // shows ONE text zone only: the message, and only once an emoji is
+            // chosen. (Tagline picker still reachable via showTaglinePicker.)
 
             if compass.state.isFarFromHome {
                 Text("across the distance")
@@ -1101,36 +1087,154 @@ struct CompassView: View {
         subscription.tier == .free ? PersonalSet.coreDefault : personalSixRow
     }
 
-    /// The six, always visible in soft cards. Selection glows and stays.
-    /// [5/5] The optional note field — "add a message (optional)", ≤30 chars.
-    private var messageField: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "text.bubble")
-                .font(.system(size: 12))
-                .foregroundColor(DesignTokens.Color.textMuted)
-            TextField("add a message (optional)", text: $messageText)
-                .font(.system(size: 14, design: .serif))
-                .foregroundColor(DesignTokens.Color.textPrimary)
-                .focused($messageFocused)
-                .submitLabel(.done)
-                .onChange(of: messageText) { _, newValue in
-                    let clamped = MessageRules.clamped(newValue)
-                    if clamped != newValue { messageText = clamped }
-                }
-            if !messageText.isEmpty {
-                Text("\(messageText.count)/30")
-                    .font(.system(size: 10))
+    /// [5/7] The message pill — shows the auto-filled message for the chosen
+    /// feeling; tap to open the compose editor at the top of the screen.
+    private var messagePill: some View {
+        Button {
+            HapticEngine.personSelected()
+            withAnimation(.easeOut(duration: 0.25)) { composing = true }
+        } label: {
+            HStack(spacing: 8) {
+                Image(systemName: "text.bubble")
+                    .font(.system(size: 12))
+                    .foregroundColor(DesignTokens.Color.textMuted)
+                Text(messageText.isEmpty ? "add a message" : messageText)
+                    .font(.system(size: 14, design: .serif))
+                    .foregroundColor(messageText.isEmpty ? DesignTokens.Color.textMuted
+                                                         : DesignTokens.Color.textPrimary)
+                    .lineLimit(1)
+                Spacer(minLength: 4)
+                Image(systemName: "pencil")
+                    .font(.system(size: 11))
                     .foregroundColor(DesignTokens.Color.textDim)
-                    .monospacedDigit()
             }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 9)
+            .background(
+                Capsule().fill(DesignTokens.Color.backgroundCard.opacity(0.85))
+                    .overlay(Capsule().stroke(DesignTokens.Color.border, lineWidth: 1))
+            )
+            .padding(.horizontal, 40)
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 9)
-        .background(
-            Capsule().fill(DesignTokens.Color.backgroundCard.opacity(0.85))
-                .overlay(Capsule().stroke(DesignTokens.Color.border, lineWidth: 1))
-        )
-        .padding(.horizontal, 40)
+        .buttonStyle(.plain)
+    }
+
+    /// [5/7] The compose editor — a card at the TOP of the screen (clear of the
+    /// keyboard) with a focused field and 3–4 suggested messages for the chosen
+    /// feeling. Tap a suggestion to use it, or keep typing a custom one.
+    @ViewBuilder
+    private var messageComposeOverlay: some View {
+        if composing, let token = selectedToken {
+            ZStack(alignment: .top) {
+                // Dim scrim — tap anywhere outside to finish.
+                Color.black.opacity(0.45)
+                    .ignoresSafeArea()
+                    .onTapGesture { finishComposing() }
+
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack {
+                        Text("\(token) your message")
+                            .font(.system(size: 14, design: .serif).italic())
+                            .foregroundColor(Color(hex: "#c4a8d4"))
+                        Spacer()
+                        Button("done") { finishComposing() }
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundColor(DesignTokens.Color.accentSoft)
+                    }
+
+                    HStack(spacing: 8) {
+                        TextField("add a message (optional)", text: $messageText)
+                            .font(.system(size: 16, design: .serif))
+                            .foregroundColor(DesignTokens.Color.textPrimary)
+                            .focused($messageFocused)
+                            .submitLabel(.done)
+                            .onSubmit { finishComposing() }
+                            .onChange(of: messageText) { _, newValue in
+                                let clamped = MessageRules.clamped(newValue)
+                                if clamped != newValue { messageText = clamped }
+                            }
+                        Text("\(messageText.count)/30")
+                            .font(.system(size: 10))
+                            .foregroundColor(DesignTokens.Color.textDim)
+                            .monospacedDigit()
+                    }
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 11)
+                    .background(
+                        RoundedRectangle(cornerRadius: 14)
+                            .fill(DesignTokens.Color.backgroundLift)
+                            .overlay(RoundedRectangle(cornerRadius: 14)
+                                .stroke(DesignTokens.Color.accentMid, lineWidth: 1))
+                    )
+
+                    // Suggested alternatives for this feeling — tap to use.
+                    Text("or tap a suggestion")
+                        .font(DesignTokens.Font.overline)
+                        .foregroundColor(DesignTokens.Color.textMuted)
+                    let options = composeSuggestions(for: token)
+                    VStack(spacing: 6) {
+                        ForEach(options, id: \.self) { option in
+                            Button {
+                                messageText = MessageRules.clamped(option)
+                                HapticEngine.personSelected()
+                            } label: {
+                                HStack {
+                                    Text(option)
+                                        .font(.system(size: 14, design: .serif))
+                                        .foregroundColor(messageText == option
+                                                         ? DesignTokens.Color.textPrimary
+                                                         : DesignTokens.Color.textSecondary)
+                                    Spacer()
+                                    if messageText == option {
+                                        Image(systemName: "checkmark")
+                                            .font(.system(size: 11, weight: .medium))
+                                            .foregroundColor(DesignTokens.Color.accentSoft)
+                                    }
+                                }
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 9)
+                                .background(RoundedRectangle(cornerRadius: 10)
+                                    .fill(messageText == option
+                                          ? DesignTokens.Color.accentStrong
+                                          : DesignTokens.Color.backgroundCard))
+                                .overlay(RoundedRectangle(cornerRadius: 10)
+                                    .stroke(messageText == option
+                                            ? DesignTokens.Color.accentMid
+                                            : DesignTokens.Color.border, lineWidth: 1))
+                                .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
+                .padding(16)
+                .background(
+                    RoundedRectangle(cornerRadius: 18)
+                        .fill(DesignTokens.Color.background)
+                        .overlay(RoundedRectangle(cornerRadius: 18)
+                            .stroke(DesignTokens.Color.border, lineWidth: 1))
+                        .shadow(color: .black.opacity(0.4), radius: 16, y: 8)
+                )
+                .padding(.horizontal, 16)
+                .padding(.top, 60)
+            }
+            .transition(.opacity)
+            .zIndex(20)
+            .onAppear { messageFocused = true }
+        }
+    }
+
+    /// The default message first, then its alternatives — 4 options total.
+    private func composeSuggestions(for token: String) -> [String] {
+        var options: [String] = []
+        if let def = CuratedEmoji.defaultMessage(token) { options.append(def) }
+        options.append(contentsOf: CuratedEmoji.suggestions(token))
+        return options
+    }
+
+    private func finishComposing() {
+        messageFocused = false
+        withAnimation(.easeOut(duration: 0.25)) { composing = false }
     }
 
     /// [1/3] The curated set — base 6 (selectable), pro 5 (locked for free),
@@ -1169,6 +1273,8 @@ struct CompassView: View {
             } else if isSelected {
                 withAnimation(.spring(response: 0.32, dampingFraction: 0.6)) { selectedToken = nil }
                 messageText = ""
+                composing = false               // [5/7] close the message editor
+                messageFocused = false
                 HapticEngine.personSelected()
             } else {
                 withAnimation(.spring(response: 0.32, dampingFraction: 0.6)) { selectedToken = item.emoji }
@@ -1232,9 +1338,11 @@ struct CompassView: View {
         holdProgress = 0
         loadFlightToken = nil
         loadFlightProgress = 0
+        messageFocused = false                   // [5/7] close the message editor
         withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
             selectedToken = nil                  // deselect the feeling
             messageText = ""                     // clear the optional note
+            composing = false                    // [5/7]
             instrumentResetID += 1               // rebuild instrument → idle
         }
     }
@@ -1685,8 +1793,11 @@ struct CompassView: View {
                     .font(.system(size: 22))
                     .foregroundColor(Color(hex: "#c4a8d4"))
                     .frame(width: 44, height: 44)           // 44pt tap target
-                    .opacity(hasThoughts ? 1.0 : 0.2)       // dim when empty
+                    // [7/7] Clearly visible on every instrument screen — soft
+                    // when empty (0.55), full + pulsing when thoughts exist.
+                    .opacity(hasThoughts ? 1.0 : 0.55)
                     .scaleEffect(hasThoughts && thoughtsIconPulse ? 1.05 : 0.95)
+                    .shadow(color: Color(hex: "#c4a8d4").opacity(hasThoughts ? 0.5 : 0.2), radius: 6)
                 if pings.unreadCount > 0 {                  // unread badge
                     Text("\(pings.unreadCount)")
                         .font(.system(size: 10, weight: .semibold))

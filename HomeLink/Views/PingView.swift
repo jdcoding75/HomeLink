@@ -1233,7 +1233,7 @@ struct CreateThoughtSheet: View {
     private let lavenderHi = Color(hex: "#e0ccee")
 
     // Every synthesized voice is available as a preset
-    private let presets = ["💜","💋","🫂","🌸","✨","😢","😤","🤬","⚡️","🔥","💨"]
+    private let presets = ["💜","💋","🤗","🌸","✨","😢","😤","🤬","⚡️","🔥","💨"]
 
     private var canSave: Bool {
         guard !chosenEmoji.isEmpty else { return false }

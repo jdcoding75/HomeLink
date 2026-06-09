@@ -257,32 +257,9 @@ struct BowInstrumentView: View {
                     .transition(.scale(scale: 0.8).combined(with: .opacity))
             }
 
-            // ── Instructions — progressive with aim ──
-            VStack {
-                Spacer()
-                if showAimFirstHint {
-                    Text("spin the bow toward \(personName) first")
-                        .font(.system(size: 12, design: .serif).italic())
-                        .foregroundColor(Self.orange)
-                        .transition(.opacity)
-                } else if showMissHint {
-                    Text("spin the bow toward \(personName)")
-                        .font(.system(size: 12, design: .serif).italic())
-                        .foregroundColor(Self.orange)
-                        .transition(.opacity)
-                } else if loadedToken != nil {
-                    Text(drawAmount >= 0.97 ? "release to send"
-                         : dragging ? ""
-                         : aimBand >= 2 ? "draw to send"
-                         : "spin the bow toward \(personName)")
-                        .font(.system(size: 12, design: .serif).italic())
-                        .foregroundColor(aimBand >= 2 ? Self.lavender.opacity(0.95)
-                                                      : Self.lavender.opacity(0.65))
-                        .transition(.opacity)
-                }
-            }
-            .padding(.bottom, 2)
-            .allowsHitTesting(false)
+            // [4/7] In-instrument progressive instruction REMOVED — the single
+            // instruction lives only at the bottom of the compass screen
+            // (sendControl). "perfect aim ✦" above is a transient cue, kept.
         }
         .frame(width: 370, height: 370)
         .contentShape(Circle())

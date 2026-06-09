@@ -700,7 +700,7 @@ struct EmojiPickerRow: View {
     @State private var customInput = ""
     @FocusState private var customFocused: Bool
 
-    private let options = ["🏠","💜","🌿","🌙","✨","🫂","🌸","☀️","🐾","🎸","⛺️","🌊"]
+    private let options = ["🏠","💜","🌿","🌙","✨","🤗","🌸","☀️","🐾","🎸","⛺️","🌊"]
 
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {

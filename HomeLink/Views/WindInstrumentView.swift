@@ -93,8 +93,10 @@ struct WindInstrumentView: View {
                 leafUnit(loadedSymbol)
             }
 
-            // ── Instructions ──
-            instructions
+            // [4/7] In-instrument instruction REMOVED — single instruction at
+            // the bottom of the compass screen only (sendControl). The mic
+            // permission prompt below stays (it's not an instruction line).
+            micPermissionPrompt
         }
         .frame(width: 370, height: 370)
         .onAppear {
@@ -254,19 +256,11 @@ struct WindInstrumentView: View {
 
     // ── Instructions ──────────────────────────────────────────────────────
 
-    private var instructions: some View {
+    /// [4/7] The instruction line was removed (it duplicated the bottom one);
+    /// only the mic-permission prompt remains — not an instruction, a setup cue.
+    private var micPermissionPrompt: some View {
         VStack {
             Spacer()
-            if loadedToken != nil {
-                Text(instruction)
-                    .font(.system(size: 22, weight: .bold, design: .rounded))
-                    .foregroundColor(Color(hex: "#2c4a5e"))
-                    .minimumScaleFactor(0.7)
-                    .lineLimit(1)
-                    .shadow(color: .white.opacity(0.6), radius: 4)
-                    .transition(.opacity)
-            }
-
             if breath.micDenied {
                 Button(action: openSettings) {
                     VStack(spacing: 2) {
@@ -388,7 +382,7 @@ struct WindInstrumentView: View {
             if !usingBreath && holdProgress > 0 && !lifting { holdProgress = 0 }
             return
         }
-        holdProgress = min(1, holdProgress + 0.05 / 2.0)
+        holdProgress = min(1, holdProgress + 0.075 / 2.0)   // [6/7] hold reduced 1/3
         if Date.now.timeIntervalSince(lastPulseHaptic) >= 0.5 {
             lastPulseHaptic = .now
             HapticEngine.windBreath()       // whisper

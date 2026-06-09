@@ -29,7 +29,8 @@ struct TestMessageSheet: View {
         ("🪄", "wand",    .wand),
         ("✈️", "plane",   .plane),
     ]
-    private let testEmojis = ["💜","❤️","🔥","✨","🌟","😂","🥹","🙏","☕️","🌙","🎉","👋"]
+    // [3/7] Only the curated base set (the 6 with sounds wired).
+    private let testEmojis = CuratedEmoji.base.map { $0.emoji }
 
     private static let lavender = Color(hex: "#c4a8d4")
 

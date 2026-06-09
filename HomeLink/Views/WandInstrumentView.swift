@@ -114,22 +114,9 @@ struct WandInstrumentView: View {
                 .transition(.opacity)
             }
 
-            // ── Instruction — bold, large, names the direction at release ──
-            VStack {
-                Spacer()
-                if loaded {
-                    Text(instruction)
-                        .font(.system(size: 22, weight: .bold, design: .rounded))
-                        .foregroundColor(full ? Color(hex: "#e0ccee")
-                                              : Self.crystalP.opacity(0.85))
-                        .minimumScaleFactor(0.7)
-                        .lineLimit(1)
-                        .shadow(color: Self.crystalP.opacity(0.5), radius: 6)
-                        .transition(.opacity)
-                }
-            }
-            .padding(.horizontal, 16)
-            .padding(.bottom, 4)
+            // [4/7] In-instrument instruction REMOVED — single instruction at
+            // the bottom of the compass screen only (sendControl). The
+            // "sending to [name] ✦" beat above is a transient release cue, kept.
         }
         .frame(width: 370, height: 370)
         .onAppear {
@@ -354,7 +341,7 @@ struct WandInstrumentView: View {
         // irrelevant; the magic simply goes.
         if full {
             fullChargeSeconds += 0.1
-            if fullChargeSeconds >= 1.0 { release() }
+            if fullChargeSeconds >= 0.67 { release() }   // [6/7] hold reduced 1/3 (was 1.0)
         }
     }
 

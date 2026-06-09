@@ -325,7 +325,7 @@ enum HapticEngine {
     static func revealHaptic(for emoji: String) {
         guard hapticsEnabled else { return }
         switch emoji {
-        case "🫂":            // Hug — slow warm enveloping (soft · medium · soft)
+        case "🤗":            // Hug — slow warm enveloping (soft · medium · soft) [1/7]
             tap(.soft,   0.4, after: 0.0)
             tap(.medium, 0.7, after: 0.4)
             tap(.soft,   0.4, after: 0.8)

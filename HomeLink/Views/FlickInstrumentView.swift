@@ -101,13 +101,8 @@ struct FlickInstrumentView: View {
                     .gesture(flying ? nil : flickGesture)
             }
 
-            // ── Instructions ──
-            VStack {
-                Spacer()
-                instructionLine
-                    .padding(.bottom, 2)
-            }
-            .allowsHitTesting(false)
+            // [4/7] In-instrument instruction REMOVED — single instruction at
+            // the bottom of the compass screen only (sendControl).
         }
         .frame(width: 370, height: 370)
         .animation(.easeOut(duration: 0.25), value: showMissHint)

@@ -134,13 +134,8 @@ struct RocketInstrumentView: View {
             }
             .rotationEffect(.radians(rad))
 
-            // ── Instructions ──
-            VStack {
-                Spacer()
-                instruction
-                    .padding(.bottom, 2)
-            }
-            .allowsHitTesting(false)
+            // [4/7] In-instrument instruction REMOVED — single instruction at
+            // the bottom of the compass screen only (sendControl).
         }
         .frame(width: 370, height: 370)
         .contentShape(Circle())

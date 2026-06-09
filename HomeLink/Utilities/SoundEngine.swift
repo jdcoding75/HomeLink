@@ -75,7 +75,7 @@ final class SoundEngine {
             ("💋",    0.50, makeSoftBreath),
             // legacy tokens (old history entries replay through these)
             ("💜",    0.50, makeWarmPulse),
-            ("🫂",    0.50, makeWarmPulse),
+            ("🤗",    0.50, makeWarmPulse),   // [1/7] hug (was 🫂)
             ("😢",    0.55, makeSad),
 
             // ── PRO — with feeling ──────────────────────────────────

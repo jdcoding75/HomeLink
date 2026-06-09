@@ -54,7 +54,7 @@ struct PlaneInstrumentView: View {
     private static let rubber    = Color(hex: "#3a1a0a")
     private static let lavender  = Color(hex: "#c4a8d4")
 
-    static let maxWinds = 4          // [1/5] four full finger-circles to full
+    static let maxWinds = 3          // [6/7] three full finger-circles to full (was 4)
 
     private var rad: Double { bearingDegrees * .pi / 180 }
     /// [1/5] Continuous twist straight from the accumulated swirl — the rubber
@@ -90,13 +90,9 @@ struct PlaneInstrumentView: View {
                 .scaleEffect(launching ? 1.0 + liftoff * 0.3 - liftoff * liftoff * 1.0 : 1.0)
                 .opacity(launching ? Double(1 - liftoff * 0.9) : 1)
 
-            // ── Instruction ──
-            VStack {
-                Spacer()
-                instruction
-                    .padding(.bottom, 2)
-            }
-            .allowsHitTesting(false)
+            // [4/7] In-instrument instruction REMOVED — the single instruction
+            // now lives only at the bottom of the compass screen (sendControl),
+            // never overlapping the circle, never shown twice.
         }
         .frame(width: 370, height: 370)
         // [1/5] SWIRL your finger in circles to wind the propeller — each full
@@ -296,7 +292,8 @@ struct PlaneInstrumentView: View {
         guard !launching, !showRelease else { return }
         withAnimation { showRelease = true }
         HapticEngine.rocketReady()
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+        // [6/7] Auto-launch faster — 0.5 s, not 1 s — so it feels responsive.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
             if maxed && !launching { launch() }
         }
     }
