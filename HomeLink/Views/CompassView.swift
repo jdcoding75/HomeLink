@@ -466,7 +466,7 @@ struct CompassView: View {
                     style: instrumentStore.selected.senderStyle,
                     emoji: sendRemoteEmoji(for: token),
                     bearingDegrees: compass.state.bearingDegrees,
-                    symbol: sendSymbol(token, size: 30)
+                    symbol: sendSymbol(token, size: 45)   // [5/5] 50% bigger base
                 ) {
                     flightToken = nil
                     flightFly   = false
@@ -1568,6 +1568,16 @@ struct CompassView: View {
         }
     }
 
+    /// [4/4] Unread thoughts float to the top (newest within each group); read
+    /// thoughts settle below, slightly dimmer.
+    private var sortedThoughts: [SupabaseService.PingRecord] {
+        compassThoughts.sorted { a, b in
+            let au = a.openedAt == nil, bu = b.openedAt == nil
+            if au != bu { return au }            // unread first
+            return a.createdAt > b.createdAt     // newest within each group
+        }
+    }
+
     private var thoughtsDrawer: some View {
         VStack(alignment: .leading, spacing: 14) {
             Text("your thoughts ✦")
@@ -1580,10 +1590,10 @@ struct CompassView: View {
                     .foregroundColor(DesignTokens.Color.textMuted)
                     .padding(.vertical, 12)
             } else {
-                // Max 6 fit; more scroll horizontally. Most recent first.
+                // Max 6 fit; more scroll horizontally. Unread first, then read.
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 18) {
-                        ForEach(Array(compassThoughts.prefix(12)), id: \.id) { rec in
+                        ForEach(Array(sortedThoughts.prefix(12)), id: \.id) { rec in
                             thoughtBubble(rec)
                         }
                     }
@@ -1604,13 +1614,27 @@ struct CompassView: View {
 
     private func thoughtBubble(_ rec: SupabaseService.PingRecord) -> some View {
         let hue = EmojiHue.color(for: rec.emoji)
+        let unread = rec.openedAt == nil   // [4/4]
         return Button {
             replayThought(rec)
         } label: {
             VStack(spacing: 6) {
-                Text(rec.emoji)
-                    .font(.system(size: 32))
-                    .shadow(color: hue.opacity(0.7), radius: 8)
+                // [4/4] Unread bubbles wear a small lavender "new ✦" badge.
+                ZStack(alignment: .topTrailing) {
+                    Text(rec.emoji)
+                        .font(.system(size: 32))
+                        .shadow(color: hue.opacity(0.7), radius: 8)
+                        .padding(.top, 4)
+                    if unread {
+                        Text("new ✦")
+                            .font(.system(size: 7, weight: .semibold))
+                            .foregroundColor(.black)
+                            .padding(.horizontal, 4)
+                            .padding(.vertical, 1)
+                            .background(Capsule().fill(Color(hex: "#c4a8d4")))
+                            .offset(x: 12, y: -2)
+                    }
+                }
                 // Sender initial (the person this compass points at)
                 Text(String(compass.state.personName.prefix(1)))
                     .font(.system(size: 10, weight: .semibold))
@@ -1623,6 +1647,7 @@ struct CompassView: View {
                     .opacity(0.7)
             }
             .frame(width: 56)
+            .opacity(unread ? 1.0 : 0.7)   // [4/4] read thoughts settle dimmer
         }
         .buttonStyle(.plain)
         .transition(.scale(scale: 0.8).combined(with: .opacity))

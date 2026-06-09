@@ -292,52 +292,61 @@ struct ReceiptView: View {
 
     @ViewBuilder
     private var themedIncoming: some View {
+        // [3/4] Every traveling object is ~50% bigger — substantial, readable,
+        // rocket-grade drama. The emoji is always clearly legible.
         switch style {
-        case .firefly:  // wind — a leaf carrying the emoji
+        case .firefly:  // wind — a big leaf carrying the emoji
             ZStack {
                 LeafShape().fill(Color(hex: "#5a8a3a"))
-                    .frame(width: 64, height: 44)
-                Text(ping.emoji).font(.system(size: 26)).offset(y: -6)
+                    .frame(width: 96, height: 66)
+                Text(ping.emoji).font(.system(size: 40)).offset(y: -9)
             }
             .rotationEffect(.degrees(pulse ? 6 : -6))
         case .rocket:   // rocket descending
-            VStack(spacing: -2) {
-                Text("🚀").font(.system(size: 40)).rotationEffect(.degrees(180))
-                Text(ping.emoji).font(.system(size: 22))
+            VStack(spacing: -3) {
+                Text("🚀").font(.system(size: 60)).rotationEffect(.degrees(180))
+                Text(ping.emoji).font(.system(size: 33))
             }
-        case .fingerFlick:  // a paper note tumbling
+        case .plane:    // [1/4] a plane banking in, carrying the emoji
             ZStack {
-                RoundedRectangle(cornerRadius: 4).fill(Color(hex: "#F5F0E0"))
-                    .frame(width: 54, height: 58)
-                Text(ping.emoji).font(.system(size: 26))
+                Text("✈️").font(.system(size: 64))
+                    .rotationEffect(.degrees(pulse ? 9 : -9))   // banks left/right — alive
+                    .shadow(color: .black.opacity(0.22), radius: 10, y: 8)
+                Text(ping.emoji).font(.system(size: 26)).offset(y: 3)
+            }
+        case .fingerFlick:  // [2/4] a BIG paper note tumbling in
+            ZStack {
+                RoundedRectangle(cornerRadius: 6).fill(Color(hex: "#F5F0E0"))
+                    .frame(width: 84, height: 90)
+                Text(ping.emoji).font(.system(size: 42))
             }
             .rotationEffect(.degrees(approach * 360))
-            .shadow(color: .black.opacity(0.3), radius: 5)
+            .shadow(color: .black.opacity(0.35), radius: 7, y: 4)
         case .bowArrow: // an arrow with the emoji, growing toward you
             ZStack {
                 Circle().fill(RadialGradient(colors: [hue.opacity(0.9), .clear],
-                                             center: .center, startRadius: 2, endRadius: 30))
-                    .frame(width: 60, height: 60)
-                Text(ping.emoji).font(.system(size: 30))
+                                             center: .center, startRadius: 3, endRadius: 45))
+                    .frame(width: 90, height: 90)
+                Text(ping.emoji).font(.system(size: 45))
             }
         case .wand:     // sparkles converging into the emoji
             ZStack {
                 ForEach(0..<8, id: \.self) { i in
                     let a = Double(i) / 8 * 2 * .pi
-                    let r: CGFloat = (1 - approach) * 50 + 10
+                    let r: CGFloat = (1 - approach) * 75 + 14
                     Image(systemName: "sparkle")
-                        .font(.system(size: 8))
+                        .font(.system(size: 12))
                         .foregroundColor(i % 2 == 0 ? Color(hex: "#D4AF37") : Self.lavender)
                         .offset(x: CGFloat(cos(a)) * r, y: CGFloat(sin(a)) * r)
                 }
-                Text(ping.emoji).font(.system(size: 30)).opacity(Double(approach))
+                Text(ping.emoji).font(.system(size: 45)).opacity(Double(approach))
             }
-        default:        // compass + plane + glow — a warm glowing orb
+        default:        // compass + glow — a big warm glowing orb
             ZStack {
                 Circle().fill(RadialGradient(colors: [hue.opacity(0.95), hue.opacity(0.3), .clear],
-                                             center: .center, startRadius: 4, endRadius: 28))
-                    .frame(width: 56, height: 56)
-                Text(ping.emoji).font(.system(size: 26)).opacity(0.9)
+                                             center: .center, startRadius: 6, endRadius: 42))
+                    .frame(width: 84, height: 84)
+                Text(ping.emoji).font(.system(size: 40)).opacity(0.9)
             }
         }
     }
@@ -453,10 +462,11 @@ struct CatchWorldBackground: View {
     var body: some View {
         switch style {
         case .firefly:     SkyWorld()      // wind — day sky + clouds
+        case .plane:       SkyWorld()      // [1/4] plane — daytime blue sky + clouds
         case .fingerFlick: CorkWorld()     // flick — cork board
         case .bowArrow:    TargetWorld()   // bow — archery range
         case .wand:        MagicWorld()    // wand — magical sparkles
-        default:           SpaceWorld()    // rocket · compass · plane · glow — space
+        default:           SpaceWorld()    // rocket · compass · glow — space
         }
     }
 }
