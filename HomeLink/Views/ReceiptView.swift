@@ -85,6 +85,46 @@ struct ReceiptView: View {
     }
 
     var body: some View {
+        // [wind] DISPATCH — wind owns a dedicated, end-to-end receipt
+        // (WindReceiptAnimation): the leaf enters from the sender's bearing,
+        // drifts, AUTO-CATCHES into the bucket over 7.2s, plays wind_receipt.wav,
+        // fires its haptics, and hands off to EmojiRevealView. Every OTHER
+        // instrument keeps the shared spin-to-catch receipt below, untouched.
+        // This intercepts at the receipt layer (the only place that carries
+        // senderBearing/from/message/tagline) so no dispatcher signature
+        // changes and no existing call site is affected.
+        if style == .firefly {
+            windReceipt
+        } else {
+            standardReceipt
+        }
+    }
+
+    // ── WIND — the dedicated full receipt ──────────────────────────────────
+
+    private var windReceipt: some View {
+        WindReceiptAnimation(
+            senderBearing: compass.rawBearingToTarget ?? 120,
+            emoji: ping.emoji,
+            message: ping.message,
+            tagline: ping.tagline,
+            fromName: ping.fromName,
+            onRevealed: {
+                onRevealed()   // "felt means felt" — mark opened at the reveal
+                // AUTO-CATCH — linger on the reveal, then advance on its own.
+                if pings.isAutoCatching {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                        if pings.isAutoCatching { onFinished() }
+                    }
+                }
+            },
+            onFinished: onFinished
+        )
+    }
+
+    // ── The shared spin-to-catch receipt (all non-wind instruments) ────────
+
+    private var standardReceipt: some View {
         GeometryReader { geo in
             ZStack {
                 // ── THE THEMED WORLD fills the whole screen ──

@@ -29,6 +29,9 @@ struct WindReceiptAnimation: View {
     var message: String? = nil
     var tagline: String? = nil
     let fromName: String
+    /// Fired the moment the leaf lands and the reveal begins ("felt means
+    /// felt" — the read receipt). Distinct from onFinished (the dismiss).
+    var onRevealed: () -> Void = {}
     /// The reveal was dismissed (tap) — the receipt is complete.
     var onFinished: () -> Void = {}
 
@@ -126,8 +129,9 @@ struct WindReceiptAnimation: View {
             HapticPattern.doubleSoft.fire()
             withAnimation(.easeOut(duration: 0.6)) { seedBurst = true }
         }
-        // After landing → the emoji reveal.
+        // After landing → the emoji reveal. "Felt means felt" fires here.
         DispatchQueue.main.asyncAfter(deadline: .now() + Self.total) {
+            onRevealed()
             withAnimation(.easeInOut(duration: 0.3)) { revealing = true }
         }
     }
