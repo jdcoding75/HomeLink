@@ -196,7 +196,10 @@ struct CompassView: View {
         }
     }
 
-    var body: some View {
+    // The compass content (the ZStack of zones + instrument). Split out of
+    // `body` so the long modifier chain below stays within the SwiftUI
+    // type-checker's per-expression budget.
+    private var compassRoot: some View {
         ZStack {
             // ── Background ──────────────────────────────────────────────────
             // Phase 1: steady deep purple — the far-from-home colour shift is
@@ -715,6 +718,12 @@ struct CompassView: View {
             //     }
             // }
         }
+    }
+
+    // compassRoot + its overlays. Split from the reaction modifiers (.onChange/
+    // .task/.sheet…) below so each half type-checks within budget.
+    private var decoratedRoot: some View {
+        compassRoot
         // [1/3] CANCEL (X) — top-level overlay so it sits above EVERY instrument
         // surface and gesture; tapping it always works, mid-send, on all 7.
         .overlay(alignment: .topTrailing) { cancelButton }
@@ -746,16 +755,12 @@ struct CompassView: View {
         .overlay(alignment: .topLeading) { thoughtsIcon }
         .overlay { thoughtsDrawerLayer }
         .overlay { messageComposeOverlay }   // [5/7] top-of-screen message editor
-        .overlay { arrivalPreviewLayer }     // [5/6] glimpse of the recipient's catch
-        .overlay(alignment: .top) { sentNoticeToast }   // [5/6] "sent ✦"
-        .confirmationDialog("Keep showing arrival previews?",
-                            isPresented: $showKeepPreviewPrompt, titleVisibility: .visible) {
-            Button("Keep showing them") { arrivalPreviewEnabled = true }
-            Button("Turn off", role: .destructive) { arrivalPreviewEnabled = false }
-        } message: {
-            Text("You've seen 10 — a quick glimpse of what your person catches. You can change this anytime in Settings.")
-        }
+        .overlay { sendFeedbackLayer }       // [5/6] arrival preview + "sent ✦" + keep-prompt
         .overlay(alignment: .top) { replayCaptionView }
+    }
+
+    var body: some View {
+        decoratedRoot
         .task(id: people.selectedPerson) { await loadCompassThoughts() }
         .onChange(of: pings.queueCount) { _, _ in
             Task { await loadCompassThoughts() }   // a new thought just landed
@@ -1529,6 +1534,23 @@ struct CompassView: View {
         let name: String
     }
 
+    /// [5/6] One layer carrying the arrival preview, the "sent ✦" toast, and the
+    /// keep-previews confirmation — bundled so the compass body stays within the
+    /// SwiftUI type-checker's budget.
+    private var sendFeedbackLayer: some View {
+        ZStack(alignment: .top) {
+            arrivalPreviewLayer
+            sentNoticeToast
+        }
+        .confirmationDialog("Keep showing arrival previews?",
+                            isPresented: $showKeepPreviewPrompt, titleVisibility: .visible) {
+            Button("Keep showing them") { arrivalPreviewEnabled = true }
+            Button("Turn off", role: .destructive) { arrivalPreviewEnabled = false }
+        } message: {
+            Text("You've seen 10 — a quick glimpse of what your person catches. You can change this anytime in Settings.")
+        }
+    }
+
     @ViewBuilder
     private var arrivalPreviewLayer: some View {
         if let preview = arrivalPreview {
@@ -1536,7 +1558,6 @@ struct CompassView: View {
                                name: preview.name) {
                 arrivalPreviewFinished()
             }
-            .zIndex(8)
             .transition(.opacity)
         }
     }
@@ -1555,7 +1576,6 @@ struct CompassView: View {
                 )
                 .padding(.top, 60)
                 .transition(.opacity.combined(with: .move(edge: .top)))
-                .zIndex(9)
         }
     }
 
