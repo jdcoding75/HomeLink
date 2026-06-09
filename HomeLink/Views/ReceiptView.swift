@@ -100,6 +100,30 @@ struct ReceiptView: View {
                     bottomZone.frame(height: geo.size.height * 0.2)
                 }
 
+                // [1/5] THE SENDER MARKER + INCOMING THOUGHT live in FULL-SCREEN
+                // space (not the 60% middle band) so the thought begins at the
+                // true screen edge and travels the full distance to the centred
+                // bucket — a long, dramatic journey, never "already near."
+                if phase == .arriving || phase == .seeking || phase == .locked || phase == .dropping {
+                    // Sender initial, FAR out at the edge where the thought starts.
+                    if phase == .seeking || phase == .locked {
+                        PersonInitialMarker(initial: senderInitial, opacity: markerOpacity,
+                                            near: angleError < 30, close: angleError < 15,
+                                            perfect: angleError < 5, pulse: pulse)
+                            .offset(edgeOffset(geo: geo))
+                            .animation(.easeOut(duration: 0.2), value: angleError < 15)
+                            .allowsHitTesting(false)
+                    }
+                    themedIncoming
+                        .scaleEffect(incomingScale)
+                        .opacity(phase == .dropping ? max(0, 1 - Double(approach)) : 1)
+                        .offset(incomingOffset(geo: geo))
+                        .animation(.easeOut(duration: 0.5), value: orbEntered)
+                        .animation(.easeInOut(duration: 0.4), value: approach)
+                        .animation(.easeInOut(duration: 0.4), value: thoughtAngle)
+                        .allowsHitTesting(false)
+                }
+
                 // [3/8] FULL-SCREEN REVEAL — once revealed, the emoji fills the
                 // screen over a deep-purple world; the letter reads beneath it.
                 if phase == .revealed {
@@ -120,7 +144,13 @@ struct ReceiptView: View {
                 }
             }
         }
-        .onAppear { begin() }
+        .onAppear {
+            begin()
+            // [4/5] AUTO-CATCH — when the bucket is draining automatically, bypass
+            // the spin-to-align step so this receipt locks, lands, and reveals on
+            // its own; revealAfterLanding then auto-advances to the next thought.
+            if pings.isAutoCatching { debugBypass = true }
+        }
         .onReceive(tick) { _ in heartbeat() }
     }
 
@@ -241,21 +271,11 @@ struct ReceiptView: View {
                     }
                 }
             } else {
-                // The bucket near the bottom of the middle zone
-                VStack {
-                    Spacer()
-                    bucket
-                }
-                // The incoming thought — travels toward you, GROWING, then drops
-                themedIncoming
-                    .scaleEffect(incomingScale)
-                    .opacity(phase == .dropping ? max(0, 1 - Double(approach)) : 1)
-                    // [2/3] 2D offset — starts at the sender's screen edge, travels
-                    // inward (was a vertical-only drop that read as "centered first").
-                    .offset(incomingOffset(geo: geo))
-                    .animation(.easeOut(duration: 0.5), value: orbEntered)
-                    .animation(.easeInOut(duration: 0.4), value: approach)
-                    .animation(.easeInOut(duration: 0.4), value: thoughtAngle)
+                // [1/5] The bucket is CENTRED in the middle band — and since the
+                // band is the screen's middle 60%, that puts the bucket at ~50%
+                // vertical, with breathing room all around. (The incoming thought
+                // + sender marker now live in full-screen space — see body.)
+                bucket
             }
         }
     }
@@ -269,26 +289,36 @@ struct ReceiptView: View {
     }
 
     /// [2/3] The sender's bearing in radians (screen convention: 0° = up,
-    /// x = sin, y = -cos — matches the person marker on the bucket rim).
+    /// x = sin, y = -cos — matches the rim arrow + the edge marker).
     private var thoughtRad: Double { thoughtAngle * .pi / 180 }
 
-    /// [2/3] The incoming thought's offset. It MUST begin at the sender's screen
-    /// edge — in the correct bearing direction — on its very first frame, then
-    /// travel inward toward the bucket as `approach` grows (0 far → 1 arrived).
-    /// Never centered first, never animated out from the center.
-    ///
-    /// start = the screen edge in the sender's bearing direction (radius reach)
-    /// end   = the bucket mouth (horizontally centred, just below centre)
+    /// [1/5] The point on the SCREEN EDGE in the sender's bearing direction,
+    /// measured as an offset from screen centre. This is where the thought
+    /// begins and where the sender marker sits — the full dramatic distance from
+    /// the centred bucket. Computed as the ray/rectangle intersection so it's a
+    /// true edge point for any bearing (kept a hair inside so it's never clipped).
+    private func edgeOffset(geo: GeometryProxy, inset: CGFloat = 0.94) -> CGSize {
+        let dx = sin(thoughtRad), dy = -cos(thoughtRad)
+        let halfW = geo.size.width / 2, halfH = geo.size.height / 2
+        let tx: CGFloat = abs(dx) < 0.0001 ? .greatestFiniteMagnitude : halfW / CGFloat(abs(dx))
+        let ty: CGFloat = abs(dy) < 0.0001 ? .greatestFiniteMagnitude : halfH / CGFloat(abs(dy))
+        let t = min(tx, ty) * inset
+        return CGSize(width: CGFloat(dx) * t, height: CGFloat(dy) * t)
+    }
+
+    /// [1/5] The incoming thought's offset from screen centre. It MUST begin at
+    /// the screen EDGE (sender's bearing) on its first frame, then travel the
+    /// FULL distance inward to the centred bucket as `approach` grows
+    /// (0 far → 1 arrived). Never centred first, never appears near the bucket.
     private func incomingOffset(geo: GeometryProxy) -> CGSize {
-        let reach = min(geo.size.width, geo.size.height) * 0.46
-        let startX =  CGFloat(sin(thoughtRad)) * reach
-        let startY = -CGFloat(cos(thoughtRad)) * reach
-        let mouthX: CGFloat = 0
-        let mouthY = geo.size.height * 0.16
-        if phase == .dropping { return CGSize(width: mouthX, height: mouthY + 30) }
+        let start = edgeOffset(geo: geo)
+        // End at the bucket mouth — bucket is screen-centred, mouth sits a little
+        // above its centre.
+        let end = CGSize(width: 0, height: -40)
+        if phase == .dropping { return CGSize(width: 0, height: -10) }
         let t = approach
-        return CGSize(width: startX + (mouthX - startX) * t,
-                      height: startY + (mouthY - startY) * t)
+        return CGSize(width: start.width + (end.width - start.width) * t,
+                      height: start.height + (end.height - start.height) * t)
     }
 
     // ── BOTTOM 20% — alignment guidance / continue ─────────────────────────
@@ -338,50 +368,33 @@ struct ReceiptView: View {
     // ── The bucket ──────────────────────────────────────────────────────────
 
     private var bucket: some View {
-        // [5/5] The sender sits at a FIXED bearing around the bucket; the
-        // marker orbits the rim at that angle and never spins with the bucket.
-        // (thoughtRad is the shared view-wide bearing — same one the incoming
-        // thought travels along, so marker + thought agree on direction.)
-        let markerRadius: CGFloat = 112   // just outside the rim arrow's reach
-        return ZStack {
-            // ── The spinning bucket ART (rotates with your finger) ──────────
-            ZStack {
-                Circle().fill(hue.opacity(0.16)).frame(width: 240, height: 240).blur(radius: 40)
-                BucketHandleShape()
-                    .stroke(Color(hex: "#888888"), style: StrokeStyle(lineWidth: 4, lineCap: .round))
-                    .frame(width: 170, height: 60).offset(y: -100)
-                BucketShape()
-                    .fill(LinearGradient(colors: [Color(hex: "#8B4513"), Color(hex: "#6E3A1E")],
-                                         startPoint: .top, endPoint: .bottom))
-                    .frame(width: 180, height: 160)
-                    .overlay(bucketBubbles.clipShape(BucketShape()))
-                    .shadow(color: .black.opacity(0.4), radius: 10, y: 6)
-                // [5/5] Rim arrow — the OPENING. It points outward from the rim
-                // and rotates with the bucket, so "spin until the arrow faces
-                // [Name]" is literally true: line it up with the person marker.
-                Triangle()
-                    .fill(angleError < 5 ? Self.lavender : Self.lavender.opacity(0.9))
-                    .frame(width: 18, height: 16)
-                    .offset(y: -86)
-                    .shadow(color: Self.lavender.opacity(angleError < 5 ? 0.9 : 0.35), radius: 6)
-            }
-            // [1/3] The art spins with your finger (no phone turning). The
-            // rotation is on the art only; the gesture sits on the unrotated
-            // 240×260 frame so spinning never feeds back on itself.
-            .rotationEffect(.degrees(bucketAngle))
-
-            // [5/5] PERSON MARKER — orbits the bucket at the sender's bearing,
-            // FIXED in place (does not rotate with the bucket). It shows which
-            // way to spin the opening. Hidden once the catch locks/lands.
-            if phase == .seeking || phase == .locked {
-                PersonInitialMarker(initial: senderInitial, opacity: markerOpacity,
-                                    near: angleError < 30, close: angleError < 15,
-                                    perfect: angleError < 5, pulse: pulse)
-                    .offset(x: CGFloat(sin(thoughtRad)) * markerRadius,
-                            y: -CGFloat(cos(thoughtRad)) * markerRadius)
-                    .animation(.easeOut(duration: 0.2), value: angleError < 15)
-            }
+        // The bucket ART spins with your finger; its rim arrow is the opening.
+        // The sender marker no longer orbits the rim — it now sits far out at the
+        // screen edge (see body), where the thought begins its journey. [1/5]
+        ZStack {
+            Circle().fill(hue.opacity(0.16)).frame(width: 240, height: 240).blur(radius: 40)
+            BucketHandleShape()
+                .stroke(Color(hex: "#888888"), style: StrokeStyle(lineWidth: 4, lineCap: .round))
+                .frame(width: 170, height: 60).offset(y: -100)
+            BucketShape()
+                .fill(LinearGradient(colors: [Color(hex: "#8B4513"), Color(hex: "#6E3A1E")],
+                                     startPoint: .top, endPoint: .bottom))
+                .frame(width: 180, height: 160)
+                .overlay(bucketBubbles.clipShape(BucketShape()))
+                .shadow(color: .black.opacity(0.4), radius: 10, y: 6)
+            // [5/5] Rim arrow — the OPENING. It points outward from the rim
+            // and rotates with the bucket, so "spin until the arrow faces
+            // [Name]" is literally true: line it up with the edge marker.
+            Triangle()
+                .fill(angleError < 5 ? Self.lavender : Self.lavender.opacity(0.9))
+                .frame(width: 18, height: 16)
+                .offset(y: -86)
+                .shadow(color: Self.lavender.opacity(angleError < 5 ? 0.9 : 0.35), radius: 6)
         }
+        // [1/3] The art spins with your finger (no phone turning). The
+        // rotation is on the art only; the gesture sits on the unrotated
+        // 240×260 frame so spinning never feeds back on itself.
+        .rotationEffect(.degrees(bucketAngle))
         .padding(.bottom, 8)
         .frame(width: 240, height: 260)
         .contentShape(Rectangle())
@@ -562,6 +575,12 @@ struct ReceiptView: View {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
             withAnimation(.easeIn(duration: 0.2)) { revealFlood = false }
         }
+        // [4/5] AUTO-CATCH — linger on the reveal a beat, then move on by itself.
+        if pings.isAutoCatching {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                if pings.isAutoCatching { onFinished() }
+            }
+        }
     }
 
     /// [3/8] Arm the dismiss tap after a beat so the reveal is never rushed.
@@ -583,14 +602,16 @@ struct ReceiptView: View {
         onRevealed()
         HapticEngine.revealHaptic(for: ping.emoji)      // [4/8][5/8] emotional sequence
         armRevealTap()
-        SoundEngine.shared.play(for: "style.bell")
-        SoundEngine.shared.play(for: ping.emoji)
+        SoundEngine.shared.play(for: "style.bell")      // the reveal chime
+        // [3/6] The emoji's own sound fires ONLY at reveal — its curated .wav,
+        // alongside the reveal haptic. (Removed the duplicate synthesized
+        // play(for: ping.emoji); playEmojiSound below is the single emoji voice.)
         withAnimation(.easeOut(duration: 0.2)) { revealFlood = true }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
             withAnimation(.easeIn(duration: 0.2)) { revealFlood = false }
         }
         bloomed = true
-        SoundEngine.shared.playEmojiSound(ping.emoji)   // [2/3] sound as the emoji reaches full size
+        SoundEngine.shared.playEmojiSound(ping.emoji)   // [3/6] curated emoji .wav at reveal
         named = true
     }
 
@@ -750,16 +771,24 @@ private struct CorkWorld: View {
 /// A soft archery range — dark with subtle concentric target rings.
 private struct TargetWorld: View {
     var body: some View {
-        ZStack {
-            RadialGradient(colors: [Color(hex: "#1a1620"), Color(hex: "#0d0b12")],
-                           center: .center, startRadius: 30, endRadius: 460)
-            ForEach(1..<6, id: \.self) { i in
-                Circle()
-                    .stroke(Color(hex: "#c4a8d4").opacity(0.10 + Double(6 - i) * 0.02),
-                            lineWidth: 2)
-                    .frame(width: CGFloat(i) * 120, height: CGFloat(i) * 120)
+        GeometryReader { geo in
+            ZStack {
+                RadialGradient(colors: [Color(hex: "#1a1620"), Color(hex: "#0d0b12")],
+                               center: .center, startRadius: 30, endRadius: 460)
+                    .ignoresSafeArea()
+                // [6/6] The archery target — concentric rings pinned EXACTLY to
+                // the centre of the screen (50% / 50%), so it reads as aiming
+                // straight ahead, never tucked low and to the right.
+                ForEach(1..<6, id: \.self) { i in
+                    Circle()
+                        .stroke(Color(hex: "#c4a8d4").opacity(0.10 + Double(6 - i) * 0.02),
+                                lineWidth: 2)
+                        .frame(width: CGFloat(i) * 120, height: CGFloat(i) * 120)
+                        .position(x: geo.size.width / 2, y: geo.size.height / 2)
+                }
             }
         }
+        .ignoresSafeArea()
     }
 }
 

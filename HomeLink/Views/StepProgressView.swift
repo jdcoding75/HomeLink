@@ -23,15 +23,18 @@ struct StepProgressView: View {
     /// The named steps for each instrument (mirrors the spec).
     static func stepNames(for instrument: Instrument) -> [String] {
         switch instrument {
-        case .compass: return ["load", "orient", "point", "hold"]
-        case .bow:     return ["load", "aim", "draw", "release"]
-        case .flick:   return ["load", "flick"]
-        case .wand:    return ["load", "shake", "release"]
-        case .firefly: return ["load", "breathe"]        // wind
-        case .rocket:  return ["load", "fuel", "aim", "launch"]
-        case .plane:   return ["load", "wind", "let fly"]
+        case .compass: return ["emoji", "message", "point", "hold"]
+        case .bow:     return ["emoji", "message", "aim", "draw", "release"]
+        case .flick:   return ["emoji", "message", "flick"]
+        case .wand:    return ["emoji", "message", "shake", "release"]
+        case .firefly: return ["emoji", "message", "breathe"]        // wind
+        case .rocket:  return ["emoji", "message", "aim", "fuel", "blast"]
+        case .plane:   return ["emoji", "message", "wind", "fly"]
         }
     }
+
+    /// [4/6] The optional step (the message) wears a small "?".
+    static let optionalStep = "message"
 
     private var steps: [String] { Self.stepNames(for: instrument) }
 
@@ -68,7 +71,11 @@ struct StepProgressView: View {
             }
             .shadow(color: Self.lavender.opacity(active ? 0.7 : 0), radius: 4)
 
-            Text(label)
+            // [4/6] The optional message step shows a trailing "?".
+            (Text(label)
+             + (label == Self.optionalStep
+                ? Text(" ?").foregroundColor(Self.lavender.opacity(0.7))
+                : Text("")))
                 .font(.system(size: 8, weight: active ? .semibold : .regular))
                 .foregroundColor(active ? Self.lavender
                                  : (completed ? Self.lavender.opacity(0.7)

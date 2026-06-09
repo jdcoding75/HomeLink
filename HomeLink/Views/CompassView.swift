@@ -130,6 +130,12 @@ struct CompassView: View {
     @State private var loadFlightToken: String? = nil       // [1/5] load flight
     @State private var loadFlightProgress: CGFloat = 0
     @State private var flightToken: String? = nil
+    // [5/6] Arrival preview — a brief glimpse of the recipient's catch.
+    @AppStorage("arrivalPreviewEnabled") private var arrivalPreviewEnabled = true
+    @AppStorage("arrivalPreviewCount")   private var arrivalPreviewCount   = 0
+    @State private var arrivalPreview: ArrivalPreviewData? = nil
+    @State private var sentNotice = false
+    @State private var showKeepPreviewPrompt = false
     // Full-compass sender styles dim the skin to 20 % while they play
     @State private var faceDimmedForInstrument = false
     @State private var faceSendPulse = false           // [4/4] compass send pulse
@@ -155,15 +161,18 @@ struct CompassView: View {
     /// action as the phone lines up; the magic instruments (wind · wand) sit
     /// on their action step since their charge lives inside the instrument.
     private var instrumentStep: Int {
-        guard selectedToken != nil else { return 0 }   // still on "load"
+        // [4/6] Step 0 = choose emoji. Step 1 = message (auto-filled the moment
+        // an emoji is chosen, so it completes immediately and the flow advances
+        // to orient/aim at step 2). Skipping the message is automatic.
+        guard selectedToken != nil else { return 0 }   // still choosing the emoji
         let inst = instrumentStore.selected
         let total = StepProgressView.stepNames(for: inst).count
         switch inst {
         case .firefly, .wand:
-            return 1                                    // breathe / shake
+            return 2                                    // breathe / shake — first action step
         default:
             let aimed = compass.isHeadingAvailable ? sendAlignDiff <= 15 : true
-            return aimed ? total - 1 : 1
+            return aimed ? total - 1 : 2                // orient → final send action
         }
     }
 
@@ -420,10 +429,18 @@ struct CompassView: View {
                         )
                         .contentShape(Circle())
                         .onTapGesture { tapFace() }
-                        .onLongPressGesture(minimumDuration: 0.45) {
-                            HapticEngine.personSelected()
-                            withAnimation(.easeOut(duration: 0.3)) { showSkinOverlay = true }
-                        }
+                        // [2/6] SIMULTANEOUS long-press → instrument picker, so it
+                        // fires on EVERY instrument even when the instrument owns
+                        // its own drag gesture (e.g. the plane's circular swirl).
+                        // A still 0.5 s press opens the picker; any rotation feeds
+                        // the swirl instead — no conflict.
+                        .simultaneousGesture(
+                            LongPressGesture(minimumDuration: 0.5)
+                                .onEnded { _ in
+                                    HapticEngine.personSelected()
+                                    withAnimation(.easeOut(duration: 0.3)) { showSkinOverlay = true }
+                                }
+                        )
 
                     Spacer(minLength: 12)
 
@@ -450,14 +467,9 @@ struct CompassView: View {
                         .animation(.easeInOut(duration: 0.3),
                                    value: appState.currentState == .catchMode)
 
-                    // [5/7] ONE text zone — the message — appears only once a
-                    // feeling is chosen, auto-filled with that feeling's default.
-                    // Tap it to edit at the top of the screen with suggestions.
-                    if selectedToken != nil && appState.currentState != .catchMode {
-                        messagePill
-                            .padding(.top, 8)
-                            .transition(.opacity.combined(with: .move(edge: .bottom)))
-                    }
+                    // [1/6] The separate message box below the emojis is GONE —
+                    // the message now lives in the ONE zone above the emoji row
+                    // (bottomZone), replacing the tagline when a feeling is loaded.
 
                     sendControl
                         .padding(.top, 10)
@@ -479,15 +491,17 @@ struct CompassView: View {
             // ── The flight — the chosen sender style carries the thought
             // out in the real compass direction (glow · star · firefly) ──────
             if let token = flightToken {
+                let previewEmoji = sendRemoteEmoji(for: token)
+                let previewStyle = instrumentStore.selected.senderStyle
                 SenderAnimationView(
-                    style: instrumentStore.selected.senderStyle,
-                    emoji: sendRemoteEmoji(for: token),
+                    style: previewStyle,
+                    emoji: previewEmoji,
                     bearingDegrees: compass.state.bearingDegrees,
                     symbol: sendSymbol(token, size: 45)   // [5/5] 50% bigger base
                 ) {
                     flightToken = nil
                     flightFly   = false
-                    appState.transition(to: .idle)
+                    finishSend(emoji: previewEmoji, style: previewStyle)
                 }
                 .zIndex(6)
             }
@@ -732,10 +746,22 @@ struct CompassView: View {
         .overlay(alignment: .topLeading) { thoughtsIcon }
         .overlay { thoughtsDrawerLayer }
         .overlay { messageComposeOverlay }   // [5/7] top-of-screen message editor
+        .overlay { arrivalPreviewLayer }     // [5/6] glimpse of the recipient's catch
+        .overlay(alignment: .top) { sentNoticeToast }   // [5/6] "sent ✦"
+        .confirmationDialog("Keep showing arrival previews?",
+                            isPresented: $showKeepPreviewPrompt, titleVisibility: .visible) {
+            Button("Keep showing them") { arrivalPreviewEnabled = true }
+            Button("Turn off", role: .destructive) { arrivalPreviewEnabled = false }
+        } message: {
+            Text("You've seen 10 — a quick glimpse of what your person catches. You can change this anytime in Settings.")
+        }
         .overlay(alignment: .top) { replayCaptionView }
         .task(id: people.selectedPerson) { await loadCompassThoughts() }
         .onChange(of: pings.queueCount) { _, _ in
             Task { await loadCompassThoughts() }   // a new thought just landed
+        }
+        .onChange(of: pings.caughtHistory.count) { _, _ in
+            Task { await loadCompassThoughts() }   // [2/5] a thought was caught → history
         }
         .onChange(of: pings.replayRequest) { _, req in
             // When the app-wide replay finishes (request clears), fade in the
@@ -990,12 +1016,51 @@ struct CompassView: View {
 
     private var bottomZone: some View {
         VStack(spacing: 12) {
-            // [5/7] The cycling tagline text area is GONE from the compass —
-            // it cluttered the screen alongside the message field. The
-            // per-person tagline still travels with thoughts; it's set on the
-            // person's card (People → tap a person → edit). The compass now
-            // shows ONE text zone only: the message, and only once an emoji is
-            // chosen. (Tagline picker still reachable via showTaglinePicker.)
+            // [1/6] ONE text zone above the emoji row — never a second box below.
+            //  · no feeling chosen → the per-person tagline (tap to cycle,
+            //    long-press for the picker)
+            //  · feeling chosen → that feeling's message in the SAME spot
+            //    (tap to edit — custom text or a suggestion)
+            if selectedToken != nil {
+                Button {
+                    HapticEngine.personSelected()
+                    withAnimation(.easeOut(duration: 0.25)) { composing = true }
+                } label: {
+                    HStack(spacing: 5) {
+                        Text(messageText.isEmpty ? "add a message" : messageText)
+                            .font(.system(size: 26, design: .serif).italic())
+                            .foregroundColor(messageText.isEmpty
+                                             ? DesignTokens.Color.accentMid.opacity(0.5)
+                                             : DesignTokens.Color.accentMid)
+                            .minimumScaleFactor(0.6)
+                            .lineLimit(1)
+                        Image(systemName: "pencil")
+                            .font(.system(size: 11))
+                            .foregroundColor(DesignTokens.Color.accentMid.opacity(0.55))
+                    }
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .contentTransition(.opacity)
+            } else {
+                HStack(spacing: 5) {
+                    Text(personTagline ?? "tap to add a tagline")
+                        .font(.system(size: 26, design: .serif).italic())
+                        .foregroundColor(DesignTokens.Color.accentMid
+                                            .opacity(personTagline == nil ? 0.5 : 1))
+                        .minimumScaleFactor(0.6)
+                        .lineLimit(1)
+                    Text("✦")
+                        .font(.system(size: 8))
+                        .foregroundColor(DesignTokens.Color.accentMid.opacity(0.55))
+                }
+                .contentTransition(.opacity)
+                .onTapGesture { cycleTagline() }
+                .onLongPressGesture(minimumDuration: 0.4) {
+                    HapticEngine.personSelected()
+                    showTaglinePicker = true
+                }
+            }
 
             if compass.state.isFarFromHome {
                 Text("across the distance")
@@ -1006,6 +1071,7 @@ struct CompassView: View {
             }
         }
         .animation(.easeInOut(duration: 0.3), value: distanceMode)
+        .animation(.easeInOut(duration: 0.3), value: selectedToken)
     }
 
     // [4/4] Per-person tagline management.
@@ -1087,37 +1153,8 @@ struct CompassView: View {
         subscription.tier == .free ? PersonalSet.coreDefault : personalSixRow
     }
 
-    /// [5/7] The message pill — shows the auto-filled message for the chosen
-    /// feeling; tap to open the compose editor at the top of the screen.
-    private var messagePill: some View {
-        Button {
-            HapticEngine.personSelected()
-            withAnimation(.easeOut(duration: 0.25)) { composing = true }
-        } label: {
-            HStack(spacing: 8) {
-                Image(systemName: "text.bubble")
-                    .font(.system(size: 12))
-                    .foregroundColor(DesignTokens.Color.textMuted)
-                Text(messageText.isEmpty ? "add a message" : messageText)
-                    .font(.system(size: 14, design: .serif))
-                    .foregroundColor(messageText.isEmpty ? DesignTokens.Color.textMuted
-                                                         : DesignTokens.Color.textPrimary)
-                    .lineLimit(1)
-                Spacer(minLength: 4)
-                Image(systemName: "pencil")
-                    .font(.system(size: 11))
-                    .foregroundColor(DesignTokens.Color.textDim)
-            }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 9)
-            .background(
-                Capsule().fill(DesignTokens.Color.backgroundCard.opacity(0.85))
-                    .overlay(Capsule().stroke(DesignTokens.Color.border, lineWidth: 1))
-            )
-            .padding(.horizontal, 40)
-        }
-        .buttonStyle(.plain)
-    }
+    // [1/6] messagePill (the separate box below the emojis) retired — the
+    // message now lives in the one zone above the emoji row (bottomZone).
 
     /// [5/7] The compose editor — a card at the TOP of the screen (clear of the
     /// keyboard) with a focused field and 3–4 suggested messages for the chosen
@@ -1406,15 +1443,15 @@ struct CompassView: View {
     /// Per-instrument step guide, shown once a feeling is loaded. The "loaded"
     /// step is checked; the rest are the steps to send.
     private var universalInstruction: String {
-        let name = compass.state.personName
+        // [4/6] The full step flow per instrument: emoji · message · …action.
         switch instrumentStore.selected {
-        case .compass: return "loaded ✓ · orient · point · hold"
-        case .bow:     return "loaded ✓ · spin to aim · pull · release"
-        case .firefly: return "loaded ✓ · breathe to send"          // wind
-        case .flick:   return "loaded ✓ · flick toward \(name)"
-        case .rocket:  return "loaded ✓ · tap to fuel · blast off"
-        case .wand:    return "loaded ✓ · shake · release"
-        case .plane:   return "loaded ✓ · wind it up · let fly"
+        case .compass: return "choose emoji · message · point · hold"
+        case .bow:     return "choose emoji · message · aim · draw · release"
+        case .firefly: return "choose emoji · message · breathe"          // wind
+        case .flick:   return "choose emoji · message · flick"
+        case .rocket:  return "choose emoji · message · aim · fuel · blast"
+        case .wand:    return "choose emoji · message · shake · release"
+        case .plane:   return "choose emoji · message · wind · fly"
         }
     }
 
@@ -1483,6 +1520,79 @@ struct CompassView: View {
         }
     }
 
+    // MARK: - [5/6] Send completion + arrival preview
+
+    struct ArrivalPreviewData: Identifiable {
+        let id = UUID()
+        let emoji: String
+        let style: SenderStyle
+        let name: String
+    }
+
+    @ViewBuilder
+    private var arrivalPreviewLayer: some View {
+        if let preview = arrivalPreview {
+            ArrivalPreviewView(emoji: preview.emoji, style: preview.style,
+                               name: preview.name) {
+                arrivalPreviewFinished()
+            }
+            .zIndex(8)
+            .transition(.opacity)
+        }
+    }
+
+    @ViewBuilder
+    private var sentNoticeToast: some View {
+        if sentNotice {
+            Text("sent ✦")
+                .font(.system(size: 14, design: .serif).italic())
+                .foregroundColor(Color(hex: "#c4a8d4"))
+                .padding(.horizontal, 18)
+                .padding(.vertical, 9)
+                .background(
+                    Capsule().fill(DesignTokens.Color.background.opacity(0.9))
+                        .overlay(Capsule().stroke(Color(hex: "#c4a8d4").opacity(0.35), lineWidth: 1))
+                )
+                .padding(.top, 60)
+                .transition(.opacity.combined(with: .move(edge: .top)))
+                .zIndex(9)
+        }
+    }
+
+    /// The flight finished. Either show a brief glimpse of the recipient's
+    /// catch (the arrival preview), or just confirm "sent ✦".
+    private func finishSend(emoji: String, style: SenderStyle) {
+        if arrivalPreviewEnabled {
+            arrivalPreviewCount += 1
+            let recipient = people.selectedPerson?.name ?? "them"
+            arrivalPreview = ArrivalPreviewData(emoji: emoji, style: style, name: recipient)
+            // The preview view calls back when its glimpse ends.
+        } else {
+            showSentNotice()
+            appState.transition(to: .idle)
+        }
+    }
+
+    /// Called when the arrival preview finishes its ~2.5 s glimpse.
+    private func arrivalPreviewFinished() {
+        arrivalPreview = nil
+        showSentNotice()
+        appState.transition(to: .idle)
+        // After the 10th preview, ask whether to keep showing them.
+        if arrivalPreviewCount == 10 {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                showKeepPreviewPrompt = true
+            }
+        }
+    }
+
+    private func showSentNotice() {
+        withAnimation(.easeOut(duration: 0.3)) { sentNotice = true }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.6) {
+            withAnimation(.easeIn(duration: 0.4)) { sentNotice = false }
+        }
+    }
+
     /// The send: styled flight in the real compass direction, sound, clear.
     /// SenderAnimationView owns the haptics and the style voice; the
     /// thought's own sound still plays here.
@@ -1494,8 +1604,14 @@ struct CompassView: View {
             CompassView.log.warning("send: blocked by app state \(appState.currentState.rawValue, privacy: .public) — try again when free")
             return
         }
-        // [2/3] The emoji's own sound, at the exact moment it launches.
-        SoundEngine.shared.playEmojiSound(sendRemoteEmoji(for: token))
+        // [3/6] NO emoji sound on send — only the INSTRUMENT sound plays during
+        // the flight (the style voice in SenderAnimationView + each instrument's
+        // own sounds). The emoji's own sound is reserved for the REVEAL moment
+        // on the recipient's side (ReceiptView), firing with the reveal haptic.
+        // Compass/glow has no style voice of its own, so give it a soft whoosh.
+        if instrumentStore.selected.senderStyle == .glow {
+            SoundEngine.shared.play(for: "style.whoosh")
+        }
         // [5/5] Capture the note before clearing the field, so it rides along.
         let outgoingMessage = messageText.trimmingCharacters(in: .whitespacesAndNewlines)
         withAnimation(.easeOut(duration: 0.25)) { selectedToken = nil }
@@ -1789,8 +1905,9 @@ struct CompassView: View {
             withAnimation(AnimationSystem.easeOutCubic(0.4)) { showThoughtsDrawer = true }
         } label: {
             ZStack(alignment: .topTrailing) {
-                Image(systemName: "sparkles")
-                    .font(.system(size: 22))
+                // [3/5] A bucket — the home for caught thoughts (was a sparkle).
+                Image(systemName: "basket.fill")
+                    .font(.system(size: 28))
                     .foregroundColor(Color(hex: "#c4a8d4"))
                     .frame(width: 44, height: 44)           // 44pt tap target
                     // [7/7] Clearly visible on every instrument screen — soft
@@ -1846,12 +1963,12 @@ struct CompassView: View {
 
     private var thoughtsDrawer: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text("your thoughts ✦")
+            Text("your bucket ✦")
                 .font(.system(size: 15, design: .serif).italic())
                 .foregroundColor(Color(hex: "#c4a8d4"))
                 .padding(.leading, 4)
             if compassThoughts.isEmpty {
-                Text(thoughtsLoaded ? "no thoughts yet" : "loading…")
+                Text(thoughtsLoaded ? "your bucket is empty ✦" : "loading…")
                     .font(.system(size: 12, design: .serif).italic())
                     .foregroundColor(DesignTokens.Color.textMuted)
                     .padding(.vertical, 12)
@@ -1955,19 +2072,44 @@ struct CompassView: View {
     }
 
     /// Recent RECEIVED thoughts from the currently-tracked person, newest first.
+    /// [2/5] Merges SERVER history (real thoughts, per-person) with LOCAL caught
+    /// history (dev test thoughts + an offline fallback) so every caught thought
+    /// shows in the bucket — deduped by id, newest first.
     private func loadCompassThoughts() async {
-        guard let person = people.selectedPerson,
-              let pid = person.pairedUserID.flatMap(UUID.init) else {
-            compassThoughts = []
+        guard let person = people.selectedPerson else {
+            compassThoughts = mergedLocalHistory(serverRecords: [], person: nil)
             thoughtsLoaded = true
             return
         }
         let me = SupabaseService.localUserID
-        let records = await SupabaseService.shared.fetchPings(with: pid)
-        compassThoughts = records
-            .filter { $0.toUser.uuidString == me?.uuidString }   // addressed to me
-            .sorted { $0.createdAt > $1.createdAt }
+        var server: [SupabaseService.PingRecord] = []
+        if let pid = person.pairedUserID.flatMap(UUID.init) {
+            server = await SupabaseService.shared.fetchPings(with: pid)
+                .filter { $0.toUser.uuidString == me?.uuidString }   // addressed to me
+        }
+        compassThoughts = mergedLocalHistory(serverRecords: server, person: person)
         thoughtsLoaded = true
+    }
+
+    /// [2/5] Fold the local caught-history into the server records. Test thoughts
+    /// always show; locally-caught real thoughts show only under their own
+    /// person. Server rows win on dedupe (they carry the canonical opened state).
+    private func mergedLocalHistory(serverRecords: [SupabaseService.PingRecord],
+                                    person: Person?) -> [SupabaseService.PingRecord] {
+        let me = SupabaseService.localUserID ?? UUID()
+        let pid = person?.pairedUserID.flatMap(UUID.init) ?? me
+        let serverIDs = Set(serverRecords.map(\.id))
+        let local = pings.caughtHistory
+            .filter { $0.isTest || $0.fromName == person?.name }
+            .compactMap { rp -> SupabaseService.PingRecord? in
+                let id = rp.remoteID ?? rp.id
+                if serverIDs.contains(id) { return nil }   // server copy wins
+                return SupabaseService.PingRecord(
+                    id: id, fromUser: pid, toUser: me, emoji: rp.emoji,
+                    createdAt: rp.timestamp, openedAt: rp.timestamp,
+                    senderStyle: rp.senderStyle, message: rp.message, tagline: rp.tagline)
+            }
+        return (serverRecords + local).sorted { $0.createdAt > $1.createdAt }
     }
 
     private static func timeAgo(_ date: Date) -> String {

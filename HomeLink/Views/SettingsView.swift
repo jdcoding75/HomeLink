@@ -23,6 +23,7 @@ struct SettingsView: View {
     @AppStorage("useMiles") private var useMiles = Locale.current.measurementSystem == .us
     @AppStorage("lockScreenWidgetEnabled") private var lockScreenWidget = false
     @AppStorage("notifyPointing") private var notifyPointing = true
+    @AppStorage("arrivalPreviewEnabled") private var arrivalPreviewEnabled = true   // [5/6]
     @AppStorage("funnyUnitLocked")      private var funnyUnitLocked      = -1
     @AppStorage("thoughtTaglineLocked") private var thoughtTaglineLocked = -1
     @AppStorage(ProFeatures.storageKey) private var proFeatures = false
@@ -243,17 +244,37 @@ struct SettingsView: View {
             }
             .buttonStyle(.plain)
 
-            // [2/5] 🎬 Test All Animations — one test thought per instrument,
-            // in sequence (compass → bow → flick → rocket → wind → wand →
-            // plane), each random emoji · message · tagline. They queue on the
-            // bucket; catch one, the next is already waiting.
+            // [5/5] 🎬 Test All Animations — one test thought per instrument, in
+            // sequence (compass → bow → flick → rocket → wind → wand → plane),
+            // each a different base emoji + random message, 2 s apart. All 7
+            // QUEUE in the bucket; then tap "🪣 Auto-catch all" to watch them.
             Button { DevTools.testAllAnimations(pings: devPings) } label: {
                 settingsRow {
                     Image(systemName: "film").settingsIcon()
                         .foregroundColor(Color(hex: "#c4a8d4"))
                     VStack(alignment: .leading, spacing: 2) {
                         Text("🎬 Test All Animations").settingsLabel()
-                        Text("one per instrument · random content")
+                        Text("all 7 queue up · then auto-catch all")
+                            .font(.system(size: 11)).foregroundColor(DesignTokens.Color.textMuted)
+                    }
+                    Spacer()
+                }
+            }
+            .buttonStyle(.plain)
+
+            // [4/5] 🪣 Auto-catch all — drains the whole bucket, auto-aligning
+            // and playing each receipt in sequence with a 2 s pause. No manual
+            // spinning. Perfect after "Test All Animations".
+            Button {
+                NotificationCenter.default.post(name: .pointwardOpenCompass, object: nil)
+                DevTools.autoCatchAll(pings: devPings)
+            } label: {
+                settingsRow {
+                    Image(systemName: "basket.fill").settingsIcon()
+                        .foregroundColor(Color(hex: "#c4a8d4"))
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("🪣 Auto-catch all").settingsLabel()
+                        Text("play every queued thought, 2 s apart")
                             .font(.system(size: 11)).foregroundColor(DesignTokens.Color.textMuted)
                     }
                     Spacer()
@@ -764,6 +785,26 @@ struct SettingsView: View {
                         // Mirror server-side so closed-app pushes respect it too
                         Task { await SupabaseService.shared.setNotifyPointing(enabled) }
                     }
+            }
+
+            Divider().background(DesignTokens.Color.border).padding(.leading, 44)
+
+            // [5/6] A brief glimpse of what your person catches, right after you
+            // send — on by default for your first sends, then your choice.
+            settingsRow {
+                Image(systemName: "eye")
+                    .settingsIcon()
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("show arrival preview")
+                        .settingsLabel()
+                    Text("a 2-second glimpse of their catch after you send")
+                        .font(.system(size: 11))
+                        .foregroundColor(DesignTokens.Color.textDim)
+                }
+                Spacer()
+                Toggle("", isOn: $arrivalPreviewEnabled)
+                    .tint(Self.toggleOn)
+                    .labelsHidden()
             }
         }
     }

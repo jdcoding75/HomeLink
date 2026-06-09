@@ -51,6 +51,14 @@ final class PingManager: ObservableObject {
     /// to 0 automatically when the user catches up (queue drains).
     @Published private(set) var unreadCount: Int = 0
 
+    /// [2/5] LOCAL CAUGHT HISTORY — every thought that's been caught + revealed,
+    /// kept on-device so the bucket drawer shows it even when there's no server
+    /// row (dev test thoughts) or the network is down. Real thoughts ALSO live
+    /// server-side; the drawer dedupes by id. Newest last; capped at 50.
+    @Published private(set) var caughtHistory: [ReceivedPing] = [] {
+        didSet { persistCaughtHistory() }
+    }
+
     static let maxQueued = 50
 
     private let networkService: NetworkServiceProtocol
@@ -88,7 +96,49 @@ final class PingManager: ObservableObject {
     init(networkService: NetworkServiceProtocol, appState: AppStateManager? = nil) {
         self.networkService = networkService
         self.appState = appState
-        restoreQueue()   // waiting thoughts survive an app relaunch
+        restoreQueue()          // waiting thoughts survive an app relaunch
+        restoreCaughtHistory()  // [2/5] caught-thought history survives too
+    }
+
+    static let maxCaughtHistory = 50
+
+    /// [2/5] Record a thought as caught + revealed so it appears in the bucket
+    /// drawer — works for real AND dev test thoughts, the latter having no
+    /// server row. Idempotent by id (a re-reveal never duplicates).
+    func recordCaught(_ ping: ReceivedPing) {
+        if let id = ping.remoteID, caughtHistory.contains(where: { $0.remoteID == id }) { return }
+        if caughtHistory.contains(where: { $0.id == ping.id }) { return }
+        var updated = caughtHistory
+        updated.append(ping)
+        if updated.count > Self.maxCaughtHistory {
+            updated.removeFirst(updated.count - Self.maxCaughtHistory)
+        }
+        caughtHistory = updated
+        log.info("history: recorded caught thought from \(ping.fromName, privacy: .public) (\(self.caughtHistory.count) kept)")
+    }
+
+    private func persistCaughtHistory() {
+        let stored = caughtHistory.map {
+            PersistedPing(fromName: $0.fromName, emoji: $0.emoji,
+                          timestamp: $0.timestamp, remoteID: $0.remoteID,
+                          senderStyle: $0.senderStyle, message: $0.message,
+                          tagline: $0.tagline, isTest: $0.isTest)
+        }
+        if let data = try? JSONEncoder().encode(stored) {
+            UserDefaults.standard.set(data, forKey: "caughtHistory")
+        }
+    }
+
+    private func restoreCaughtHistory() {
+        guard let data = UserDefaults.standard.data(forKey: "caughtHistory"),
+              let stored = try? JSONDecoder().decode([PersistedPing].self, from: data),
+              !stored.isEmpty else { return }
+        caughtHistory = stored.map {
+            ReceivedPing(fromName: $0.fromName, emoji: $0.emoji,
+                         timestamp: $0.timestamp, remoteID: $0.remoteID,
+                         senderStyle: $0.senderStyle, message: $0.message,
+                         tagline: $0.tagline, isTest: $0.isTest)
+        }
     }
 
     // ── Queue persistence — unread thoughts survive relaunches ──────────
@@ -135,6 +185,7 @@ final class PingManager: ObservableObject {
     /// anything that ever arrived from a partner — are left untouched.
     func clearTestThoughts() {
         queue.removeAll { $0.isTest }
+        caughtHistory.removeAll { $0.isTest }   // [2/5] also drop test thoughts from history
         if nowPlaying?.isTest == true {
             nowPlaying = nil
             AppGroupStore.clearPendingPing()
@@ -147,11 +198,13 @@ final class PingManager: ObservableObject {
     /// "clear all my data" flow (user data only).
     func clearAllThoughts() {
         queue.removeAll()
+        caughtHistory.removeAll()   // [2/5] history is local user data — wipe it too
         nowPlaying = nil
         pendingPing = nil
         AppGroupStore.clearPendingPing()
         UserDefaults.standard.removeObject(forKey: "seenPingIDs")
         UserDefaults.standard.removeObject(forKey: "pendingThoughtQueue")
+        UserDefaults.standard.removeObject(forKey: "caughtHistory")
         log.info("DEV: cleared ALL local thoughts")
     }
     #endif
@@ -280,7 +333,8 @@ final class PingManager: ObservableObject {
     /// History (it's already persisted server-side in the pings table).
     func receivePing(fromName: String, emoji: String, remoteID: UUID? = nil,
                      senderStyle: String? = nil, message: String? = nil,
-                     tagline: String? = nil, isTest: Bool = false) {
+                     tagline: String? = nil, isTest: Bool = false,
+                     autoPlay: Bool = true) {
         log.info("receivePing: from=\(fromName, privacy: .public) emoji=\(emoji, privacy: .public) remoteID=\(remoteID?.uuidString ?? "nil", privacy: .public) style=\(senderStyle ?? "nil", privacy: .public)")
 
         // DEDUPE: in the foreground the same thought arrives twice — once
@@ -338,7 +392,10 @@ final class PingManager: ObservableObject {
         // the screen is free, open the next thought. A DEV test thought is
         // always honoured immediately — it jumps the queue so the developer
         // sees the full receipt every time, even behind older waiting ones.
-        if nowPlaying == nil {
+        // [5/5] autoPlay:false queues the thought silently for later (used by
+        // "Test All Animations" so all 7 stack in the bucket, then "Auto-catch
+        // all" plays them in sequence).
+        if autoPlay && nowPlaying == nil {
             if appState?.currentState == .sending {
                 // [2/5] SIMULTANEOUS SEND/RECEIVE — never let an arriving
                 // thought interrupt a send in progress. While sending it sits
@@ -368,6 +425,9 @@ final class PingManager: ObservableObject {
 
     /// The thought was actually experienced — bloom played, sound heard.
     func markOpened(_ ping: ReceivedPing) {
+        // [2/5] Save it to local history the moment it's revealed, so the bucket
+        // drawer shows it — test thoughts included (they have no server row).
+        recordCaught(ping)
         if let remoteID = ping.remoteID {
             log.info("markOpened: id=\(remoteID.uuidString, privacy: .public)")
             Task { await SupabaseService.shared.markPingOpened(remoteID) }
@@ -485,9 +545,39 @@ final class PingManager: ObservableObject {
         guard nowPlaying?.id == ping.id else { return }
         nowPlaying = nil
         AppGroupStore.clearPendingPing()
+        // [4/5] AUTO-CATCH — when draining the bucket automatically, pause 2 s
+        // then catch the next thought; stop when the bucket is empty.
+        if isAutoCatching {
+            if queue.isEmpty {
+                isAutoCatching = false
+                log.info("auto-catch: bucket drained ✓")
+            } else {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
+                    guard let self, self.isAutoCatching else { return }
+                    self.playNext()
+                }
+            }
+            return
+        }
         if !queue.isEmpty {
             log.info("queue: \(self.queue.count) thought(s) waiting — badge shows, user taps to catch")
         }
+    }
+
+    /// [4/5] DEBUG auto-catch — drains the entire bucket, auto-aligning and
+    /// playing each receipt in turn (ReceiptView watches `isAutoCatching` to
+    /// auto-lock and auto-advance), with a 2 s pause between thoughts. The flag
+    /// itself compiles in all builds but is only ever set from Developer Tools.
+    @Published var isAutoCatching = false
+
+    func startAutoCatch() {
+        guard nowPlaying != nil || !queue.isEmpty else {
+            log.info("auto-catch: nothing in the bucket")
+            return
+        }
+        log.info("auto-catch: starting — \(self.queue.count + (self.nowPlaying == nil ? 0 : 1)) thought(s)")
+        isAutoCatching = true
+        if nowPlaying == nil { playNext() }
     }
 
     /// Tap-to-skip: jump straight to the next thought, no 2-second gap.

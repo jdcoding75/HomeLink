@@ -85,7 +85,8 @@ enum DevTools {
     /// catch mode, landing animation, the works — as if it came from a phone.
     @MainActor
     static func sendTestThought(pings: PingManager, style: SenderStyle, emoji: String,
-                                message: String?, tagline: String?, fromName: String) {
+                                message: String?, tagline: String?, fromName: String,
+                                autoPlay: Bool = true) {
         pings.receivePing(
             fromName: fromName.isEmpty ? mockName : fromName,
             emoji: emoji,
@@ -93,7 +94,8 @@ enum DevTools {
             senderStyle: style.rawValue,
             message: (message?.isEmpty ?? true) ? nil : message,
             tagline: (tagline?.isEmpty ?? true) ? nil : tagline,
-            isTest: true)
+            isTest: true,
+            autoPlay: autoPlay)
     }
 
     // ── [2/5] Automated animation testing ────────────────────────────────
@@ -119,25 +121,36 @@ enum DevTools {
         ("✈️", .plane),       // plane
     ]
 
-    /// Send ONE random-content test thought for each instrument, in order.
-    /// Each is queued (distinct sender name so none de-dupe away); the first
-    /// opens the receipt and the rest wait on the bucket badge — catch one,
-    /// the next is already there. Random emoji · message · tagline each.
+    /// [5/5] Send ONE test thought for EACH of the 7 instruments, in order
+    /// (compass → bow → flick → rocket → wind → wand → plane). Each gets a
+    /// DIFFERENT emoji from the curated base set, a random default message, and
+    /// a 2-second gap between sends. They all QUEUE in the bucket (autoPlay:
+    /// false — none auto-opens), so the dev can then tap "🪣 Auto-catch all" to
+    /// watch all 7 receive animations play in sequence.
     @MainActor
     static func testAllAnimations(pings: PingManager) {
-        // Stagger the inserts a touch so the queue settles in order.
+        let emojis = testEmojis   // the curated base set (6)
         for (i, entry) in instrumentSequence.enumerated() {
-            let delay = Double(i) * 0.4
+            let delay = Double(i) * 2.0    // 2 s gap between sends
+            let emoji = emojis.isEmpty ? "✨" : emojis[i % emojis.count]   // distinct, cycles
             DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
                 sendTestThought(
                     pings: pings,
                     style: entry.style,
-                    emoji: testEmojis.randomElement() ?? "✨",
+                    emoji: emoji,
                     message: testMessages.randomElement(),
                     tagline: testTaglines.randomElement(),
-                    fromName: "\(entry.icon) \(entry.style.displayName) test")
+                    fromName: "\(entry.icon) \(entry.style.displayName) test",
+                    autoPlay: false)            // queue only — Auto-catch plays them
             }
         }
+    }
+
+    /// [4/5] Auto-catch the entire bucket — plays every queued thought's full
+    /// landing in sequence, auto-aligned, 2 s apart. No manual spinning.
+    @MainActor
+    static func autoCatchAll(pings: PingManager) {
+        pings.startAutoCatch()
     }
 
     /// Send ONE random instrument with random content — the quickest single
