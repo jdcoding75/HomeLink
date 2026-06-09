@@ -4,8 +4,10 @@
 // Presented as a sheet from PeopleListView when the user taps "+".
 // Owns the full add-person flow:
 //   Step 1 — name + emoji
-//   Step 2 — tagline (preset or custom)
-//   Step 3 — address with live geocoding
+//   Step 2 — address with live geocoding
+//
+// (Per-person taglines were removed — taglines now travel with thoughts
+//  automatically, and the compass has its own rotating taglines.)
 //
 // GeocodingService is injected from the environment so Previews and
 // tests can swap in MockGeocodingService with zero friction.
@@ -31,10 +33,6 @@ struct AddPersonView: View {
     @State private var emoji: String = "🏠"
 
     // Step 2
-    @State private var tagline: String = ""
-    @State private var selectedPreset: String = TaglineSystem.presets[0]
-
-    // Step 3
     @State private var addressText: String = ""
     @StateObject private var autocomplete = AddressAutocompleteService()
     @State private var selectedAddressText: String? = nil  // skip re-searching text we just filled in
@@ -69,7 +67,6 @@ struct AddPersonView: View {
                     VStack(alignment: .leading, spacing: 0) {
                         switch step {
                         case 1:  stepOne
-                        case 2:  stepTwo
                         default: stepThree
                         }
                     }
@@ -106,7 +103,7 @@ struct AddPersonView: View {
                     .foregroundColor(DesignTokens.Color.accentSoft)
             }
             Spacer()
-            Text(step == 1 ? "add person" : step == 2 ? "tagline" : "location")
+            Text(step == 1 ? "add person" : "location")
                 .font(DesignTokens.Font.label)
                 .foregroundColor(DesignTokens.Color.textPrimary)
             Spacer()
@@ -122,7 +119,7 @@ struct AddPersonView: View {
 
     private var progressDots: some View {
         HStack(spacing: 6) {
-            ForEach(1...3, id: \.self) { s in
+            ForEach(1...2, id: \.self) { s in
                 Capsule()
                     .fill(s == step
                           ? DesignTokens.Color.accentSoft
@@ -185,96 +182,7 @@ struct AddPersonView: View {
         }
     }
 
-    // MARK: - Step 2: Tagline
-
-    private var stepTwo: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            // Mini preview
-            taglinePreviewCard
-                .padding(.vertical, DesignTokens.Spacing.lg)
-
-            formLabel("choose a preset")
-            VStack(spacing: 6) {
-                ForEach(TaglineSystem.presets, id: \.self) { preset in
-                    presetChip(preset)
-                }
-            }
-            .padding(.bottom, DesignTokens.Spacing.md)
-
-            formLabel("or write your own  ·  \(TaglineSystem.counterText(tagline.count))")
-            TextField(TaglineSystem.defaultTagline, text: $tagline)
-                .formInput()
-                .onChange(of: tagline) { _, new in
-                    if new.count > TaglineSystem.maxLength {
-                        tagline = String(new.prefix(TaglineSystem.maxLength))
-                    }
-                    // Deselect preset if user types something custom
-                    if !TaglineSystem.presets.contains(new) {
-                        selectedPreset = ""
-                    }
-                }
-        }
-    }
-
-    private var taglinePreviewCard: some View {
-        VStack(spacing: 6) {
-            Text("10px") // invisible spacer trick
-                .font(.system(size: 1)).opacity(0)
-            Text(name.isEmpty ? "their name" : name)
-                .font(DesignTokens.Font.compassName)
-                .foregroundColor(DesignTokens.Color.textPrimary)
-            Text(resolvedTagline)
-                .font(.system(size: 13).italic())
-                .foregroundColor(DesignTokens.Color.accentMid)
-                .multilineTextAlignment(.center)
-                .animation(.easeOut(duration: 0.3), value: resolvedTagline)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(DesignTokens.Spacing.md)
-        .background(DesignTokens.Color.backgroundLift)
-        .cornerRadius(DesignTokens.Radius.card)
-        .overlay(
-            RoundedRectangle(cornerRadius: DesignTokens.Radius.card)
-                .stroke(DesignTokens.Color.border, lineWidth: 1)
-        )
-    }
-
-    private func presetChip(_ preset: String) -> some View {
-        let isSelected = selectedPreset == preset && tagline == preset
-        return Button {
-            selectedPreset = preset
-            tagline        = preset
-        } label: {
-            HStack {
-                Text(preset)
-                    .font(.system(size: 13).italic())
-                    .foregroundColor(isSelected
-                                     ? DesignTokens.Color.accentSoft
-                                     : DesignTokens.Color.textSecondary)
-                Spacer()
-                if isSelected {
-                    Image(systemName: "checkmark")
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundColor(DesignTokens.Color.accentSoft)
-                }
-            }
-            .padding(.horizontal, DesignTokens.Spacing.md)
-            .padding(.vertical, 10)
-            .background(isSelected
-                        ? DesignTokens.Color.accentStrong
-                        : DesignTokens.Color.backgroundCard)
-            .cornerRadius(DesignTokens.Radius.button)
-            .overlay(
-                RoundedRectangle(cornerRadius: DesignTokens.Radius.button)
-                    .stroke(isSelected
-                            ? DesignTokens.Color.accentMid
-                            : DesignTokens.Color.border,
-                            lineWidth: 1)
-            )
-        }
-    }
-
-    // MARK: - Step 3: Address + Geocode
+    // MARK: - Step 2: Address + Geocode
 
     private var stepThree: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -450,7 +358,6 @@ struct AddPersonView: View {
     private var ctaLabel: String {
         switch step {
         case 1:  return "next"
-        case 2:  return "next"
         default: return "save"
         }
     }
@@ -458,7 +365,6 @@ struct AddPersonView: View {
     private var ctaEnabled: Bool {
         switch step {
         case 1:  return !name.trimmingCharacters(in: .whitespaces).isEmpty
-        case 2:  return true   // tagline is optional
         default:
             if case .success = geocodeState { return true }
             return false
@@ -469,7 +375,7 @@ struct AddPersonView: View {
 
     private func handleCTA() {
         saveError = nil
-        if step < 3 {
+        if step < 2 {
             withAnimation(.easeOut(duration: 0.25)) { step += 1 }
             return
         }
@@ -552,12 +458,10 @@ struct AddPersonView: View {
             return
         }
 
-        let finalTagline = tagline.trimmingCharacters(in: .whitespaces)
         let person = Person(
             name:    name.trimmingCharacters(in: .whitespaces),
             emoji:   emoji,
-            geocoded: location,
-            tagline: finalTagline.isEmpty ? nil : finalTagline
+            geocoded: location
         )
 
         do {
@@ -612,11 +516,6 @@ struct AddPersonView: View {
     }
 
     // MARK: - Helpers
-
-    private var resolvedTagline: String {
-        let t = tagline.trimmingCharacters(in: .whitespaces)
-        return t.isEmpty ? TaglineSystem.defaultTagline : t
-    }
 
     private func coordString(_ coord: CLLocationCoordinate2D) -> String {
         String(format: "%.4f°, %.4f° · stored offline", coord.latitude, coord.longitude)

@@ -187,7 +187,7 @@ extension Notification.Name {
 // MARK: - PersonCard
 
 // A relationship, not a contact-list row: large glowing avatar, bold name,
-// their tagline in lavender, distance whispered beneath.
+// distance whispered beneath.
 struct PersonCard: View {
     let person: Person
     let isSelected: Bool
@@ -225,11 +225,6 @@ struct PersonCard: View {
                 Text(person.name)
                     .font(.system(size: 17, weight: .semibold))
                     .foregroundColor(DesignTokens.Color.textPrimary)
-
-                Text(person.resolvedTagline)
-                    .font(.system(size: 12).italic())
-                    .foregroundColor(DesignTokens.Color.accentMid)
-                    .lineLimit(1)
 
                 Text(distanceText
                      ?? (person.displayAddress.isEmpty

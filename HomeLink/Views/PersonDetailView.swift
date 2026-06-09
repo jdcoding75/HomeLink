@@ -62,13 +62,7 @@ struct PersonDetailView: View {
                         Text(person.name)
                             .font(.system(size: 28, weight: .semibold, design: .serif))
                             .foregroundColor(DesignTokens.Color.textPrimary)
-
-                        Text(person.resolvedTagline)
-                            .font(.system(size: 14, design: .serif).italic())
-                            .foregroundColor(DesignTokens.Color.accentMid)
-                            .multilineTextAlignment(.center)
-                            .padding(.horizontal, 36)
-                            .padding(.top, 2)
+                            .padding(.bottom, 2)
 
                         Text(person.displayAddress.isEmpty
                              ? person.locationDisplayName : person.displayAddress)
@@ -97,8 +91,8 @@ struct PersonDetailView: View {
                 }
             }
             .toolbar {
-                // [4/4] Edit how YOU see this person — name · emoji · address ·
-                // tagline, all local. Their own profile is untouched.
+                // [4/4] Edit how YOU see this person — name · emoji · address,
+                // all local. Their own profile is untouched.
                 ToolbarItem(placement: .topBarLeading) {
                     Button("edit") { showEdit = true }
                         .foregroundColor(DesignTokens.Color.accentSoft)

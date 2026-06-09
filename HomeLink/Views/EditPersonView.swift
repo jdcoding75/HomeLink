@@ -4,7 +4,10 @@
 // Presented as a sheet from PeopleListView when the user taps "edit" on a card.
 // Pre-populates all fields from the existing Person model.
 // Re-geocodes only if the address field changes — preserves the stored coordinate
-// if the user edits name/emoji/tagline only (stays offline, no network hit).
+// if the user edits name/emoji only (stays offline, no network hit).
+//
+// (Per-person taglines were removed — taglines now travel with thoughts
+//  automatically, and the compass has its own rotating taglines.)
 
 import SwiftUI
 import CoreLocation
@@ -22,8 +25,6 @@ struct EditPersonView: View {
     // MARK: - Form state (pre-populated from person)
     @State private var name:  String
     @State private var emoji: String
-    @State private var tagline: String
-    @State private var selectedPreset: String
 
     // Address state
     @State private var addressText: String
@@ -47,8 +48,6 @@ struct EditPersonView: View {
         // Pre-populate from model
         _name            = State(initialValue: person.name)
         _emoji           = State(initialValue: person.emoji)
-        _tagline         = State(initialValue: person.tagline ?? "")
-        _selectedPreset  = State(initialValue: person.tagline ?? "")
         _addressText     = State(initialValue: person.displayAddress)
 
         // Show the stored location as already-confirmed so the save button is enabled
@@ -102,7 +101,6 @@ struct EditPersonView: View {
                             .padding(.bottom, DesignTokens.Spacing.lg)
                         nameSection
                         emojiSection
-                        taglineSection
                         addressSection
                         deleteSection
                     }
@@ -160,12 +158,6 @@ struct EditPersonView: View {
                 .font(DesignTokens.Font.compassName)
                 .foregroundColor(DesignTokens.Color.textPrimary)
 
-            Text(resolvedTagline)
-                .font(.system(size: 13).italic())
-                .foregroundColor(DesignTokens.Color.accentMid)
-                .multilineTextAlignment(.center)
-                .animation(.easeOut(duration: 0.3), value: resolvedTagline)
-
             if case .success(let loc) = geocodeState {
                 Text(loc.displayName)
                     .font(DesignTokens.Font.caption)
@@ -200,40 +192,6 @@ struct EditPersonView: View {
         VStack(alignment: .leading, spacing: 8) {
             formLabel("emoji")
             EmojiPickerRow(selected: $emoji)
-                .padding(.bottom, DesignTokens.Spacing.md)
-        }
-    }
-
-    // MARK: - Tagline
-
-    private var taglineSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                formLabel("tagline")
-                Spacer()
-                Text(TaglineSystem.counterText(tagline.count))
-                    .font(.system(size: 11))
-                    .foregroundColor(counterColor)
-            }
-
-            TextField(TaglineSystem.defaultTagline, text: $tagline)
-                .formInput()
-                .onChange(of: tagline) { _, new in
-                    if new.count > TaglineSystem.maxLength {
-                        tagline = String(new.prefix(TaglineSystem.maxLength))
-                    }
-                    if !TaglineSystem.presets.contains(new) { selectedPreset = "" }
-                }
-                .padding(.bottom, 10)
-
-            VStack(spacing: 6) {
-                ForEach(TaglineSystem.presets, id: \.self) { preset in
-                    presetChip(preset)
-                }
-            }
-            .padding(.bottom, DesignTokens.Spacing.md)
-
-            Divider().background(DesignTokens.Color.border)
                 .padding(.bottom, DesignTokens.Spacing.md)
         }
     }
@@ -446,43 +404,6 @@ struct EditPersonView: View {
         .background(DesignTokens.Color.background)
     }
 
-    // MARK: - Preset chip
-
-    private func presetChip(_ preset: String) -> some View {
-        let isSelected = tagline == preset
-        return Button {
-            selectedPreset = preset
-            tagline        = preset
-        } label: {
-            HStack {
-                Text(preset)
-                    .font(.system(size: 13).italic())
-                    .foregroundColor(isSelected
-                                     ? DesignTokens.Color.accentSoft
-                                     : DesignTokens.Color.textSecondary)
-                Spacer()
-                if isSelected {
-                    Image(systemName: "checkmark")
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundColor(DesignTokens.Color.accentSoft)
-                }
-            }
-            .padding(.horizontal, DesignTokens.Spacing.md)
-            .padding(.vertical, 10)
-            .background(isSelected
-                        ? DesignTokens.Color.accentStrong
-                        : DesignTokens.Color.backgroundCard)
-            .cornerRadius(DesignTokens.Radius.button)
-            .overlay(
-                RoundedRectangle(cornerRadius: DesignTokens.Radius.button)
-                    .stroke(isSelected
-                            ? DesignTokens.Color.accentMid
-                            : DesignTokens.Color.border,
-                            lineWidth: 1)
-            )
-        }
-    }
-
     // MARK: - Address editing
 
     /// "change" tapped — switch to the autocomplete editor with a blank field.
@@ -587,12 +508,9 @@ struct EditPersonView: View {
             return
         }
 
-        let trimmedTagline = tagline.trimmingCharacters(in: .whitespaces)
-
         // Mutate the SwiftData model directly (it's a reference type)
         person.name                = name.trimmingCharacters(in: .whitespaces)
         person.emoji               = emoji
-        person.tagline             = trimmedTagline.isEmpty ? nil : trimmedTagline
         person.latitude            = location.coordinate.latitude
         person.longitude           = location.coordinate.longitude
         person.displayAddress      = location.fullAddress
@@ -638,19 +556,6 @@ struct EditPersonView: View {
         return nameOk
     }
 
-    private var resolvedTagline: String {
-        let t = tagline.trimmingCharacters(in: .whitespaces)
-        return t.isEmpty ? TaglineSystem.defaultTagline : t
-    }
-
-    private var counterColor: Color {
-        switch TaglineSystem.counterState(tagline.count) {
-        case .normal:  return DesignTokens.Color.textDim
-        case .warning: return Color(hex: "#c4845a")
-        case .atLimit: return .red
-        }
-    }
-
     private func coordString(_ coord: CLLocationCoordinate2D) -> String {
         String(format: "%.4f°, %.4f°", coord.latitude, coord.longitude)
     }
@@ -671,8 +576,7 @@ struct EditPersonView: View {
         latitude: 51.5074,
         longitude: -0.1278,
         displayAddress: "London, UK",
-        locationDisplayName: "London",
-        tagline: "Never far."
+        locationDisplayName: "London"
     )
     return EditPersonView(person: person, geocodingService: MockGeocodingService())
         .environmentObject(PeopleManager(subscriptionManager: SubscriptionManager()))
