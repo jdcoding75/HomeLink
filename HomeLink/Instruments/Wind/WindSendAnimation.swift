@@ -158,11 +158,23 @@ struct WindSendAnimation: View {
       // SWIRL — lazy side-to-side S-curve around centre.
       return swirlPos(localT: elapsed - Self.enterEnd, size: size)
     } else {
-      // DEPART — back out toward the SAME exitBearing edge, easeInOut.
+      // DEPART — back out along the SAME exitBearing, all the way OFF screen
+      // (1.15× reach per axis, RULE 5), easeInOut. `edge` (the entry) is the
+      // same direction, so the journey reads as continuous.
+      _ = edge
       let from = swirlPos(localT: Self.swirlDur, size: size)
       let p = easeInOut((elapsed - Self.swirlEnd) / Self.departDur)
-      return lerp(from, edge, p)
+      return lerp(from, departPoint(size), p)
     }
+  }
+
+  /// The off-screen exit — same bearing as the entry, extended to 1.15× of each
+  /// axis from centre so the leaf clearly leaves the screen (RULE 5). Uses the
+  /// screen convention (0° = up) to match `sendEntryPoint`.
+  private func departPoint(_ size: CGSize) -> CGPoint {
+    let rad = transition.exitBearing * .pi / 180
+    return CGPoint(x: size.width  / 2 + CGFloat(sin(rad)) * size.width  * 1.15,
+                   y: size.height / 2 - CGFloat(cos(rad)) * size.height * 1.15)
   }
 
   /// The S-curve: x oscillates wide, y waves at half the rate — a lazy figure

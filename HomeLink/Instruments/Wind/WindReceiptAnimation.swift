@@ -169,12 +169,15 @@ struct WindReceiptAnimation: View {
 
     /// The entry edge — FROM the sender's bearing.
     private func entryPoint(_ size: CGSize) -> CGPoint {
-        CGPoint(x: size.width / 2 + CGFloat(cos(rad)) * size.width * 0.7,
-                y: size.height / 2 + CGFloat(sin(rad)) * size.height * 0.7)
+        // Enters FROM the sender's bearing, off-screen (RULE 5 entryReach 0.75).
+        CGPoint(x: size.width / 2 + CGFloat(cos(rad)) * size.width * 0.75,
+                y: size.height / 2 + CGFloat(sin(rad)) * size.height * 0.75)
     }
 
     private func bucketPoint(_ size: CGSize) -> CGPoint {
-        CGPoint(x: size.width / 2, y: size.height - 110)
+        // Bucket at the bottom (RULE 6): height - bucketHeight - 6% margin.
+        CGPoint(x: size.width / 2,
+                y: size.height - Self.bucketH - size.height * 0.06)
     }
 
     private func leafPos(geo: GeometryProxy, elapsed: Double) -> CGPoint {
@@ -198,8 +201,10 @@ struct WindReceiptAnimation: View {
     }
 
     private func driftPos(localT: Double, size: CGSize) -> CGPoint {
-        let sx = sin(localT * 1.4)
-        let sy = sin(localT * 0.7)
+        // Swirl center = geo.size / 2 EXACTLY (RULE 4), same coefficients as the
+        // send so the two acts feel like one continuous breeze.
+        let sx = sin(localT * 0.72)
+        let sy = sin(localT * 0.45 + 1.0)
         return CGPoint(x: size.width  / 2 + CGFloat(sx) * size.width  * Self.driftWidthAmp,
                        y: size.height / 2 + CGFloat(sy) * size.height * Self.driftHeightAmp)
     }
