@@ -560,65 +560,138 @@ private struct WandLanding: View {
 // MARK: - [6/7] PLANE LANDING ✈️
 // ════════════════════════════════════════════════════════════════════════
 
+// Full cinematic arrival:
+//   APPROACH  a speck on the horizon grows over 3 s, its shadow sweeping in
+//   FLYOVER   it buzzes the bucket low, shadow racing across it
+//   LOOP      a full victory loop around the screen, banking hard
+//   FINAL     gear drops, flaps extend, it lines up and descends
+//   TOUCHDOWN gentle thud, roll-out, prop winds down
+//   DELIVERY  the door swings open and the thought hops out into the bucket
 private struct PlaneLanding: View {
     let emoji: String; let size: CGSize; var onComplete: () -> Void
 
-    @State private var fly: CGFloat = 0
-    @State private var grow: CGFloat = 0.3
-    @State private var bank = false
+    // Phase: 0 approach · 1 flyover · 2 loop · 3 final descent · 4 landed · 5 deliver
+    @State private var phase = 0
+    @State private var segT: CGFloat = 0          // 0…1 within the current segment
+    @State private var loopT: CGFloat = 0         // 0…1 = 0…360° of the loop
+    @State private var scale: CGFloat = 0.05      // speck → full size
     @State private var prop: Double = 0
+    @State private var bank: Double = 0           // wing-bank tilt (3D y-axis)
     @State private var gear: CGFloat = 0
-    @State private var shake: CGFloat = 0
+    @State private var flaps: CGFloat = 0
     @State private var doorOpen: CGFloat = 0
+    @State private var shake: CGFloat = 0
+    @State private var shadow: CGFloat = 0        // 0…1 ground-shadow strength
+    @State private var bucketTilt: Double = 0
+    @State private var propRun = true
     @State private var emojiScale: CGFloat = 0
     @State private var emojiUp: CGFloat = 0
-    @State private var propRun = true
 
     private static let red = Color(hex: "#CC2200")
     private static let yellow = Color(hex: "#FFD700")
 
-    var body: some View {
-        let startX = size.width * 0.85, startY = size.height * 0.18
-        let endX = size.width / 2, endY = size.height * 0.62
-        let x = startX + (endX - startX) * fly
-        let y = startY + (endY - startY) * fly
-        ZStack {
-            plane
-                .scaleEffect(grow)
-                .rotationEffect(.degrees(bank ? sin(prop * 0.04) * 10 : 0))
-                .offset(y: shake)
-                .position(x: x, y: y)
+    // ── Geometry ──
+    private var cx: CGFloat { size.width / 2 }
+    private var bucketPos: CGPoint { CGPoint(x: cx, y: size.height * 0.72) }
+    private var speckStart: CGPoint { CGPoint(x: size.width * 0.98, y: size.height * 0.05) }
+    private var loopCenter: CGPoint { CGPoint(x: cx, y: size.height * 0.40) }
+    private var loopRadius: CGFloat { min(size.width, size.height) * 0.34 }
+    /// Top of the loop circle — the approach ends here and the descent begins.
+    private var loopTop: CGPoint { CGPoint(x: loopCenter.x, y: loopCenter.y - loopRadius) }
+    /// A low flyover point just above the bucket.
+    private var flyoverPoint: CGPoint { CGPoint(x: cx, y: bucketPos.y - 70) }
 
+    private func lerp(_ a: CGPoint, _ b: CGPoint, _ t: CGFloat) -> CGPoint {
+        CGPoint(x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t)
+    }
+
+    /// The plane's position + heading for the current phase.
+    private var planePlacement: (pos: CGPoint, rot: Double) {
+        switch phase {
+        case 0:  return (lerp(speckStart, flyoverPoint, segT), 150)            // approach
+        case 1:  return (lerp(flyoverPoint, loopTop, segT), 200 - Double(segT) * 110) // flyover→climb
+        case 2:                                                                 // loop
+            let a = Double(loopT) * 2 * .pi
+            return (CGPoint(x: loopCenter.x + CGFloat(sin(a)) * loopRadius,
+                            y: loopCenter.y - CGFloat(cos(a)) * loopRadius),
+                    Double(loopT) * 360 + 90)
+        default: return (lerp(loopTop, bucketPos, segT), 180)                  // descend, nose down
+        }
+    }
+
+    var body: some View {
+        let place = planePlacement
+        ZStack {
+            bucket.position(bucketPos)
+
+            // Travelling ground shadow — sweeps under the plane.
+            Ellipse()
+                .fill(Color.black.opacity(0.22 * Double(shadow)))
+                .frame(width: 70 * scale + 30, height: 18 * scale + 8)
+                .blur(radius: 4)
+                .position(x: place.pos.x, y: bucketPos.y + 30)
+                .opacity(phase >= 4 ? 0 : 1)
+
+            plane
+                .scaleEffect(scale)
+                .rotationEffect(.degrees(place.rot))
+                .rotation3DEffect(.degrees(bank), axis: (x: 0, y: 1, z: 0))
+                .offset(y: shake)
+                .position(place.pos)
+                .opacity(phase >= 5 ? 0 : 1)
+
+            // The delivered thought — hops up out of the bucket.
             EmergingEmoji(emoji: emoji, hue: hueFor(emoji), scale: emojiScale)
                 .offset(y: -emojiUp)
-                .position(x: endX + 36, y: endY - 20)
+                .position(x: bucketPos.x, y: bucketPos.y - 6)
         }
-        .onAppear { run(endX: endX, endY: endY) }
+        .onAppear { run() }
+    }
+
+    private var bucket: some View {
+        BucketShape()
+            .fill(LinearGradient(colors: [Color(hex: "#3a3550"), Color(hex: "#1e1828")],
+                                 startPoint: .top, endPoint: .bottom))
+            .frame(width: 96, height: 84)
+            .overlay(BucketShape().stroke(Color(hex: "#c4a8d4").opacity(0.5), lineWidth: 1.5))
+            .rotationEffect(.degrees(bucketTilt), anchor: .bottom)
+            .shadow(color: .black.opacity(0.3), radius: 6, y: 3)
     }
 
     private var plane: some View {
         ZStack {
-            // wings
-            Capsule().fill(Self.yellow).frame(width: 104, height: 18)
-            // fuselage
-            Capsule().fill(Self.red).frame(width: 40, height: 110)
+            // Wings
+            Capsule().fill(LinearGradient(colors: [Color(hex: "#FFE869"), Self.yellow],
+                                          startPoint: .leading, endPoint: .trailing))
+                .frame(width: 104, height: 18)
+            // Flaps — extend down off the wing trailing edge on final approach
+            ForEach([-1.0, 1.0], id: \.self) { side in
+                Capsule().fill(Color(hex: "#E0B000"))
+                    .frame(width: 30, height: 7)
+                    .rotationEffect(.degrees(Double(side) * Double(flaps) * 35), anchor: .top)
+                    .offset(x: CGFloat(side) * 34, y: 9)
+                    .opacity(Double(flaps))
+            }
+            // Fuselage + side door
+            Capsule().fill(LinearGradient(colors: [Color(hex: "#FF5533"), Self.red],
+                                          startPoint: .leading, endPoint: .trailing))
+                .frame(width: 40, height: 110)
                 .overlay(
-                    // door on the side
-                    RoundedRectangle(cornerRadius: 3).fill(Color(hex: "#FF7755"))
+                    RoundedRectangle(cornerRadius: 3).fill(Color(hex: "#FF8866"))
                         .frame(width: 18, height: 22)
-                        .rotationEffect(.degrees(doorOpen * 70), anchor: .leading)
+                        .rotationEffect(.degrees(doorOpen * 75), anchor: .leading)
                         .offset(x: 14, y: 6)
                 )
-            // tail
+            // Tail
             Capsule().fill(Self.yellow).frame(width: 44, height: 14).offset(y: 56)
-            // nose + propeller
+            // Nose + propeller
             Circle().fill(Self.red).frame(width: 30, height: 30).offset(y: -54)
             ForEach(0..<2, id: \.self) { i in
                 Capsule().fill(Color(hex: "#4a4a4a")).frame(width: 5, height: 44)
                     .rotationEffect(.degrees(Double(i) * 90 + prop))
             }
-            .offset(y: -58).blur(radius: propRun ? 1 : 0)
-            // landing gear
+            .offset(y: -58).blur(radius: propRun ? 1.5 : 0)
+            // Landing gear — drops on final approach
             ForEach([-1.0, 1.0], id: \.self) { side in
                 VStack(spacing: 0) {
                     Rectangle().fill(Color(hex: "#333")).frame(width: 2, height: 12 * gear)
@@ -630,34 +703,64 @@ private struct PlaneLanding: View {
         .frame(width: 120, height: 150)
     }
 
-    private func run(endX: CGFloat, endY: CGFloat) {
-        withAnimation(.linear(duration: 5.5)) { prop = 360 * 14 }
-        bank = true
-        withAnimation(.easeInOut(duration: 3.0)) { fly = 0.7; grow = 1.0 }
-        // APPROACH — gear out
+    private func run() {
+        withAnimation(.linear(duration: 9.0)) { prop = 360 * 22 }   // prop blurs the whole flight
+        SoundEngine.shared.play(for: "plane.wind")
+
+        // PHASE 0 — APPROACH (3 s): a speck grows in, shadow sweeping under it.
+        withAnimation(.easeIn(duration: 3.0)) { segT = 1; scale = 0.85; shadow = 1 }
+        withAnimation(.easeInOut(duration: 1.0)) { bank = -18 }
+
+        // PHASE 1 — FLYOVER (1.2 s): buzz the bucket, shadow races across.
         DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
-            withAnimation(AnimationSystem.easeOutBack(0.5)) { gear = 1 }
+            phase = 1; segT = 0; bank = 0
+            HapticEngine.planeWind()
+            withAnimation(.easeInOut(duration: 1.2)) { segT = 1; scale = 1.0 }
         }
-        // LANDING — gentle thud, roll to stop
-        DispatchQueue.main.asyncAfter(deadline: .now() + 4.0) {
-            withAnimation(.easeOut(duration: 0.6)) { fly = 1; bank = false }
+        // PHASE 2 — LOOP (2.6 s): a full victory loop, banking hard.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 4.2) {
+            phase = 2; loopT = 0
+            HapticEngine.send()
+            withAnimation(.easeInOut(duration: 2.6)) { loopT = 1 }
+            withAnimation(.easeInOut(duration: 0.6)) { bank = 30 }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                withAnimation(.easeInOut(duration: 0.6)) { bank = 0 }
+            }
+        }
+        // PHASE 3 — FINAL: gear drops + flaps extend, then descend to the bucket.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 6.8) {
+            phase = 3; segT = 0
+            HapticEngine.planeWind()
+            withAnimation(AnimationSystem.easeOutBack(0.5)) { gear = 1 }
+            withAnimation(.easeOut(duration: 0.5)) { flaps = 1 }
+            withAnimation(.easeInOut(duration: 1.4)) { segT = 1 }
+        }
+        // PHASE 4 — TOUCHDOWN: gentle thud, roll-out, prop winds down.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 8.2) {
+            phase = 4
             HapticEngine.rocketLanding()
             SoundEngine.shared.play(for: "style.bell")
-            withAnimation(.spring(response: 0.1, dampingFraction: 0.4)) { shake = 3 }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-                withAnimation(.spring(response: 0.2, dampingFraction: 0.5)) { shake = 0 }
+            withAnimation(.spring(response: 0.12, dampingFraction: 0.4)) { shake = 4 }
+            withAnimation(.easeOut(duration: 0.3)) { bucketTilt = -5 }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.18) {
+                withAnimation(.spring(response: 0.25, dampingFraction: 0.5)) {
+                    shake = 0; bucketTilt = 0
+                }
             }
             propRun = false
+            withAnimation(.linear(duration: 0.6)) { prop += 90 }   // wind down
         }
-        // DELIVERY — door opens, emoji jumps out
-        DispatchQueue.main.asyncAfter(deadline: .now() + 4.7) {
+        // PHASE 5 — DELIVERY: door swings open, the thought hops out.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 8.9) {
             withAnimation(AnimationSystem.easeOutBack(0.5)) { doorOpen = 1 }
         }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 5.1) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 9.3) {
+            phase = 5
             HapticEngine.catchReveal()
-            withAnimation(AnimationSystem.easeOutBack(0.5)) { emojiScale = 1; emojiUp = 40 }
+            SoundEngine.shared.play(for: emoji)
+            withAnimation(AnimationSystem.easeOutBack(0.55)) { emojiScale = 1; emojiUp = 46 }
         }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 5.8) { onComplete() }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 10.2) { onComplete() }
     }
 }
 
