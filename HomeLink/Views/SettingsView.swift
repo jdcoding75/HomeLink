@@ -187,9 +187,12 @@ struct SettingsView: View {
             }
             .buttonStyle(.plain)
 
-            // [2/4] Skip straight to the compass with mock Sarah + connection.
+            // Skip straight to the compass with mock Sarah + connection.
+            // withHistory:false → lands on a CLEAN compass (seeding live
+            // thoughts would pop a catch that buries it); use the "send test
+            // thought" tool for catches. Matches the -skipOnboarding result.
             Button {
-                DevTools.injectMockData(people: devPeople, pings: devPings, withHistory: true)
+                DevTools.injectMockData(people: devPeople, pings: devPings, withHistory: false)
                 if let s = devPeople.selectedPerson { devCompass.start(tracking: s) }
                 NotificationCenter.default.post(name: .pointwardOpenCompass, object: nil)
             } label: {
