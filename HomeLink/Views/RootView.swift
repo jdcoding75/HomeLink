@@ -82,6 +82,7 @@ struct RootView: View {
             #if DEBUG
             applySkipOnboardingIfNeeded()
             #endif
+            ensureDemoPersonIfAppropriate()   // [5/6] Alex when no one's added yet
             startCompassIfNeeded()
             startRealtimePings()
             skinStore.enforceTier(subscription.tier)   // free = Minimal, always
@@ -92,6 +93,7 @@ struct RootView: View {
         }
         .onChange(of: hasCompletedOnboarding) { _, done in
             people.configure(with: modelContext)
+            if done { ensureDemoPersonIfAppropriate() }   // [5/6] no one added → Alex
             startCompassIfNeeded()
             // One-time gentle nudge after first setup
             if done && !connectPromptShown {
@@ -273,6 +275,18 @@ struct RootView: View {
                 }
             )
         }
+    }
+
+    /// [5/6] When there's no one to point toward yet, create the friendly demo
+    /// person (Alex) so the compass feels alive from the first launch. Skipped
+    /// during -skipOnboarding (Sarah owns that path) and while onboarding is
+    /// still in progress (the user is adding their own first real person).
+    private func ensureDemoPersonIfAppropriate() {
+        #if DEBUG
+        if DevTools.wantsSkipOnboarding { return }
+        #endif
+        guard hasCompletedOnboarding else { return }
+        people.ensureDemoPersonIfNeeded()
     }
 
     /// Launching with a saved person should immediately show that person on the

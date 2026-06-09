@@ -73,6 +73,28 @@ struct EditPersonView: View {
                 header
                 ScrollView {
                     VStack(alignment: .leading, spacing: 0) {
+                        // [4/4] Edits here are LOCAL — they only change how YOU
+                        // see this person. Their own profile on their phone is
+                        // never touched.
+                        HStack(spacing: 8) {
+                            Image(systemName: "eye")
+                                .font(.system(size: 12))
+                                .foregroundColor(DesignTokens.Color.accentMid)
+                            Text("changes only affect how you see them")
+                                .font(.system(size: 12, design: .serif).italic())
+                                .foregroundColor(DesignTokens.Color.textMuted)
+                            Spacer()
+                        }
+                        .padding(DesignTokens.Spacing.md)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(DesignTokens.Color.backgroundCard)
+                        .cornerRadius(DesignTokens.Radius.button)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: DesignTokens.Radius.button)
+                                .stroke(DesignTokens.Color.border, lineWidth: 1)
+                        )
+                        .padding(.top, DesignTokens.Spacing.md)
+
                         livePreviewCard
                             .padding(.vertical, DesignTokens.Spacing.lg)
                         Divider()

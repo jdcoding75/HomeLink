@@ -286,7 +286,9 @@ final class PingManager: ObservableObject {
         // DEDUPE: in the foreground the same thought arrives twice — once
         // over realtime (with remoteID) and once as the APNs push (without).
         // Same id, or same emoji+sender within 15 s → one catch, not two.
-        let isDuplicate = ([nowPlaying].compactMap { $0 } + queue).contains { existing in
+        // [3/6] DEV test thoughts are EXEMPT — sending the same emoji to
+        // yourself twice in a row must always play, never silently de-dupe.
+        let isDuplicate = !isTest && ([nowPlaying].compactMap { $0 } + queue).contains { existing in
             if let id = remoteID, existing.remoteID == id { return true }
             return existing.emoji == emoji
                 && existing.fromName == fromName
@@ -327,15 +329,27 @@ final class PingManager: ObservableObject {
 
         // A catch already on screen finishes its moment; anything else
         // waits on the badge and plays when the user taps for it.
-        if nowPlaying == nil && queue.count == 1 {
-            // [2/5] SIMULTANEOUS SEND/RECEIVE — never let an arriving thought
-            // interrupt a send in progress. While sending, it sits in the
-            // queue (badge only); the catch fires the instant the send
-            // completes (the screen returns to idle and the queue drains).
+        //
+        // [3/6] BUG FIX — the auto-play gate used to be `queue.count == 1`,
+        // so when ANY thought was already waiting in the bucket (e.g. a
+        // restored offline thought, or a previous dev test), a freshly sent
+        // "test thought to myself" would land silently and NEVER open the
+        // receipt. The correct gate is "nothing is currently on screen": if
+        // the screen is free, open the next thought. A DEV test thought is
+        // always honoured immediately — it jumps the queue so the developer
+        // sees the full receipt every time, even behind older waiting ones.
+        if nowPlaying == nil {
             if appState?.currentState == .sending {
+                // [2/5] SIMULTANEOUS SEND/RECEIVE — never let an arriving
+                // thought interrupt a send in progress. While sending it sits
+                // in the queue (badge only); the catch fires the instant the
+                // send completes (the screen returns to idle and drains).
                 log.info("receivePing: send in progress — queued, catch will play when the send completes")
                 appState?.queueAnimation { [weak self] in self?.playNext() }
-            } else {
+            } else if isTest, let idx = queue.firstIndex(where: { $0.id == ping.id }) {
+                // DEV test thought jumps straight to the front of an idle screen.
+                nowPlaying = queue.remove(at: idx)
+            } else if queue.count == 1 {
                 playNext()
             }
         }

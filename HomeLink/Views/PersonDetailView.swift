@@ -14,7 +14,10 @@ struct PersonDetailView: View {
     @EnvironmentObject var people: PeopleManager
     @EnvironmentObject var compass: CompassManager
     @EnvironmentObject var pings: PingManager
+    @EnvironmentObject var appEnv: AppEnvironment
     @Environment(\.dismiss) private var dismiss
+
+    @State private var showEdit = false
 
     @State private var codeInput = ""
     @State private var isBusy = false
@@ -94,11 +97,21 @@ struct PersonDetailView: View {
                 }
             }
             .toolbar {
+                // [4/4] Edit how YOU see this person — name · emoji · address ·
+                // tagline, all local. Their own profile is untouched.
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("edit") { showEdit = true }
+                        .foregroundColor(DesignTokens.Color.accentSoft)
+                }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("done") { dismiss() }
                         .foregroundColor(DesignTokens.Color.accentSoft)
                 }
             }
+        }
+        .sheet(isPresented: $showEdit) {
+            EditPersonView(person: person, geocodingService: appEnv.geocodingService)
+                .environmentObject(people)
         }
         .onAppear { fetchPresence() }
         // [5/6] Load the thought count for the minimal row (replay lives on the compass).
@@ -320,15 +333,23 @@ struct PersonDetailView: View {
         }
         isBusy = true
         errorMessage = nil
+        // [2/4] The invite carries MY profile (name · emoji · location), so the
+        // recipient auto-builds a pre-filled card for ME. owner_person_id ties
+        // it to this card on my side. Falls back to this card's identity if no
+        // profile exists yet.
+        let profile = people.profile
+        let ownerName  = profile?.displayName ?? person.name
+        let ownerEmoji = profile?.emoji ?? person.emoji
+        let ownerLat   = (profile?.hasLocation == true) ? profile?.latitude : nil
+        let ownerLng   = (profile?.hasLocation == true) ? profile?.longitude : nil
         Task {
             defer { isBusy = false }
             do {
-                // Stored server-side as: owner=me, owner_person_id=this card,
-                // person_name + person_emoji — acceptance links the right
-                // person on both phones.
                 let code = try await SupabaseService.shared.createInvite(
-                    personName: person.name, personEmoji: person.emoji, personID: person.id)
-                personInvite = AppLinks.personInviteMessage(personName: person.name,
+                    ownerName: ownerName, ownerEmoji: ownerEmoji,
+                    ownerLatitude: ownerLat, ownerLongitude: ownerLng,
+                    ownerPersonID: person.id)
+                personInvite = AppLinks.personInviteMessage(personName: ownerName,
                                                             code: code)
                 personInviteLink = AppLinks.pairLink(code: code)
             } catch {

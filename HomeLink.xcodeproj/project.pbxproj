@@ -45,6 +45,7 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		529440762FD85F27002473F5 /* Configuration.storekit */ = {isa = PBXFileReference; lastKnownFileType = text; path = Configuration.storekit; sourceTree = "<group>"; };
 		52C0B2DF2FD392DF002A6B41 /* HomeLink.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = HomeLink.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		52C0B69B2FD49C4C002A6B41 /* PointwardWidgetsExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = PointwardWidgetsExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		52C0B69D2FD49C4C002A6B41 /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = System/Library/Frameworks/WidgetKit.framework; sourceTree = SDKROOT; };
@@ -129,6 +130,7 @@
 		52C0B2D62FD392DF002A6B41 = {
 			isa = PBXGroup;
 			children = (
+				529440762FD85F27002473F5 /* Configuration.storekit */,
 				52C0B6B32FD49C7F002A6B41 /* PointwardWidgetsExtension.entitlements */,
 				52C0B2E12FD392DF002A6B41 /* HomeLink */,
 				7A0000012FD4000000000009 /* HomeLinkTests */,

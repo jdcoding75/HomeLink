@@ -16,12 +16,10 @@ Pointward
 *(max 30 characters)*
 
 ```
-Point toward the people you love
+Point toward the ones you love
 ```
-> Note: "Point toward the people you love" is 32 characters — 2 over Apple's
-> 30-char subtitle limit. Use one of these if App Store Connect rejects it:
-> - `Point toward who you love` (25)
-> - `Point toward the ones you love` (30)
+> "Point toward the ones you love" is exactly 30 characters — fits Apple's
+> 30-char subtitle limit precisely.
 
 ## Promotional Text (optional, max 170 characters)
 
@@ -75,12 +73,12 @@ Pointward Pro — $2.99 · one time · yours forever
 *(max 100 characters, comma-separated, no spaces after commas for max density)*
 
 ```
-compass,distance,long distance,military,missing,love,emotional,point,direction,couples,family,deployment,college,homesick,connection,thoughts
+compass,distance,military,missing,love,emotional,direction,couples,family,deployment,college,homesick,connection
 ```
-> Note: the full list above is 138 characters — over Apple's 100-char keyword
-> limit. Trimmed 100-char version (highest-value terms kept):
+> Note: the list above is 112 characters — 12 over Apple's 100-char keyword
+> limit. Trimmed 100-char version (highest-value terms kept), ready to paste:
 > ```
-> compass,long distance,military,missing,love,direction,couples,family,deployment,homesick,connection
+> compass,distance,military,missing,love,direction,couples,family,deployment,homesick,connection
 > ```
 
 ---

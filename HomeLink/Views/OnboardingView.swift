@@ -54,51 +54,45 @@ struct OnboardingView: View {
         ZStack {
             Color(hex: "#0d0d14").ignoresSafeArea()
 
-            if showCompletion {
-                CompletionMoment(name: name.trimmingCharacters(in: .whitespaces),
-                                 emoji: emoji) {
-                    finishToApp()
+            VStack(spacing: 0) {
+                // [1/4] NEW ORDER: hero · sign in · about you (self profile) ·
+                // your code · instruments · pro · giving · let's go.
+                TabView(selection: $page) {
+                    heroScreen.tag(0)
+                    signInScreen.tag(1)        // sign in before your profile
+                    aboutYouScreen.tag(2)      // [1/4] YOUR profile
+                    yourCodeScreen.tag(3)      // [1/4] share your code
+                    instrumentsScreen.tag(4)
+                    proScreen.tag(5)
+                    givingScreen.tag(6)
+                    letsGoScreen.tag(7)
+                }
+                .tabViewStyle(.page(indexDisplayMode: .never))
+                .animation(.easeInOut(duration: 0.4), value: page)
+
+                pageDots
+                    .padding(.bottom, 14)
+            }
+
+            // Skip — only the showcase screens (instruments · pro · giving)
+            // jump to the finish. The profile + code screens carry their own.
+            if (4...6).contains(page) {
+                VStack {
+                    HStack {
+                        Spacer()
+                        Button("skip") {
+                            withAnimation(.easeInOut(duration: 0.4)) { page = 7 }
+                        }
+                        .font(.system(size: 13))
+                        .foregroundColor(DesignTokens.Color.textMuted)
+                        .padding(.trailing, 22)
+                        .padding(.top, 14)
+                    }
+                    Spacer()
                 }
                 .transition(.opacity)
-            } else {
-                VStack(spacing: 0) {
-                    TabView(selection: $page) {
-                        heroScreen.tag(0)
-                        signInScreen.tag(1)        // sign in before adding anyone
-                        instrumentsScreen.tag(2)   // (was compassScreen — kept below)
-                        thoughtScreen.tag(3)
-                        proScreen.tag(4)
-                        givingScreen.tag(5)
-                        setupScreen.tag(6)
-                    }
-                    .tabViewStyle(.page(indexDisplayMode: .never))
-                    .animation(.easeInOut(duration: 0.4), value: page)
-
-                    pageDots
-                        .padding(.bottom, 14)
-                }
-
-                // Skip — screens 3-6 only, straight to setup (the sign-in
-                // screen carries its own "use offline only" skip)
-                if (2...5).contains(page) {
-                    VStack {
-                        HStack {
-                            Spacer()
-                            Button("skip") {
-                                withAnimation(.easeInOut(duration: 0.4)) { page = 6 }
-                            }
-                            .font(.system(size: 13))
-                            .foregroundColor(DesignTokens.Color.textMuted)
-                            .padding(.trailing, 22)
-                            .padding(.top, 14)
-                        }
-                        Spacer()
-                    }
-                    .transition(.opacity)
-                }
             }
         }
-        .animation(.easeInOut(duration: 0.5), value: showCompletion)
         .preferredColorScheme(.dark)
         .sheet(isPresented: $showContactPicker) {
             ContactPickerView { contact in
@@ -134,7 +128,7 @@ struct OnboardingView: View {
 
     private var pageDots: some View {
         HStack(spacing: 7) {
-            ForEach(0..<7, id: \.self) { i in
+            ForEach(0..<8, id: \.self) { i in
                 Circle()
                     .fill(i == page ? Self.lavender : DesignTokens.Color.borderMid)
                     .frame(width: i == page ? 7 : 5, height: i == page ? 7 : 5)
@@ -435,7 +429,7 @@ struct OnboardingView: View {
     /// 2-second pause on each instrument, looping while the screen shows.
     private func cycleInstruments() {
         DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
-            guard page == 2, !showCompletion else { return }
+            guard page == 4 else { return }   // instruments is page 4 now
             withAnimation(.easeInOut(duration: 0.35)) {
                 carouselIndex = (carouselIndex + 1) % Instrument.allCases.count
             }
@@ -696,161 +690,63 @@ struct OnboardingView: View {
         }
     }
 
-    // MARK: - Screen 6 · Get started
+    // MARK: - Screen 3 · About you (YOUR profile)
 
-    private var setupScreen: some View {
+    @State private var codeReady: String? = nil
+    @State private var codeBusy = false
+
+    private var aboutYouScreen: some View {
         ScrollView {
             VStack(spacing: 0) {
-                Text("who do you point toward?")
+                Text("tell us about you ✦")
                     .font(.system(size: 27, weight: .semibold, design: .serif))
                     .foregroundColor(DesignTokens.Color.textPrimary)
-                    .padding(.top, 64)
+                    .padding(.top, 56)
 
-                Text("add someone to begin")
+                Text("this is what others will see")
                     .font(.system(size: 14, design: .serif).italic())
                     .foregroundColor(DesignTokens.Color.textMuted)
                     .padding(.top, 6)
-                    .padding(.bottom, 30)
+                    .padding(.bottom, 28)
 
                 VStack(alignment: .leading, spacing: 18) {
-                    // Or pick straight from the address book — fills the
-                    // name and pre-geocodes their address when it has one
-                    Button {
-                        showContactPicker = true
-                    } label: {
-                        HStack(spacing: 8) {
-                            Image(systemName: "person.crop.circle")
-                                .font(.system(size: 14))
-                            Text("choose from contacts")
-                                .font(DesignTokens.Font.label)
-                        }
-                        .foregroundColor(DesignTokens.Color.accentSoft)
-                        .frame(maxWidth: .infinity)
-                        .padding(DesignTokens.Spacing.md)
-                        .background(DesignTokens.Color.backgroundCard)
-                        .cornerRadius(DesignTokens.Radius.button)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: DesignTokens.Radius.button)
-                                .stroke(DesignTokens.Color.borderMid, lineWidth: 1)
-                        )
-                    }
-
-                    // Name
-                    TextField("Mum, Dad, Home...", text: $name)
+                    // Your name
+                    fieldLabel("your name")
+                    TextField("your name", text: $name)
                         .formInput()
 
-                    // Their emoji — the core six as chips
-                    HStack(spacing: 10) {
-                        ForEach(coreEmojis, id: \.self) { e in
-                            Button {
-                                withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
-                                    emoji = e
-                                }
-                            } label: {
-                                Text(e)
-                                    .font(.system(size: 22))
-                                    .frame(width: 46, height: 46)
-                                    .background(emoji == e
-                                                ? DesignTokens.Color.accentStrong
-                                                : DesignTokens.Color.backgroundCard)
-                                    .cornerRadius(13)
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: 13)
-                                            .stroke(emoji == e
-                                                    ? DesignTokens.Color.accentMid
-                                                    : DesignTokens.Color.border, lineWidth: 1)
-                                    )
-                                    .scaleEffect(emoji == e ? 1.08 : 1.0)
-                            }
-                        }
-                    }
+                    // Your emoji — tap to change (the full picker)
+                    fieldLabel("your emoji")
+                    EmojiPickerRow(selected: $emoji)
 
-                    // Address with live autocomplete
-                    VStack(alignment: .leading, spacing: 6) {
-                        TextField("their address or city", text: $addressText)
-                            .formInput()
-                            .autocorrectionDisabled()
-                            .onChange(of: addressText) { _, new in
-                                handleAddressInput(new)
-                            }
-                            .onSubmit { geocodeTypedAddress() }
+                    // Where you are — MKLocalSearch autocomplete
+                    fieldLabel("where you are")
+                    addressAutocompleteField
 
-                        if !autocomplete.suggestions.isEmpty {
-                            VStack(spacing: 0) {
-                                ForEach(autocomplete.suggestions) { suggestion in
-                                    Button {
-                                        selectSuggestion(suggestion)
-                                    } label: {
-                                        VStack(alignment: .leading, spacing: 1) {
-                                            Text(suggestion.title)
-                                                .font(.system(size: 14))
-                                                .foregroundColor(DesignTokens.Color.textPrimary)
-                                            if !suggestion.subtitle.isEmpty {
-                                                Text(suggestion.subtitle)
-                                                    .font(.system(size: 11))
-                                                    .foregroundColor(DesignTokens.Color.textMuted)
-                                            }
-                                        }
-                                        .frame(maxWidth: .infinity, alignment: .leading)
-                                        .padding(.horizontal, 14)
-                                        .padding(.vertical, 9)
-                                        .contentShape(Rectangle())
-                                    }
-                                    .buttonStyle(.plain)
-                                    if suggestion.id != autocomplete.suggestions.last?.id {
-                                        Divider().background(DesignTokens.Color.border)
-                                    }
-                                }
-                            }
-                            .background(DesignTokens.Color.backgroundCard)
-                            .cornerRadius(12)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 12)
-                                    .stroke(DesignTokens.Color.borderMid, lineWidth: 1)
-                            )
-                        }
-
-                        switch geocodeState {
-                        case .geocoding:
-                            HStack(spacing: 6) {
-                                ProgressView().scaleEffect(0.7)
-                                Text("finding them…")
-                            }
-                            .font(.system(size: 11))
-                            .foregroundColor(DesignTokens.Color.textMuted)
-                        case .success(let location):
-                            Text("✓ \(location.displayName)")
-                                .font(.system(size: 11))
-                                .foregroundColor(Color(hex: "#5dcaa5"))
-                        case .failure(let message):
-                            Text(message)
-                                .font(.system(size: 11))
-                                .foregroundColor(.red)
-                        default:
-                            EmptyView()
-                        }
-                    }
+                    Text("your location lets people you connect with point\ntoward you — share only what you're comfortable with")
+                        .font(.system(size: 11, design: .serif).italic())
+                        .foregroundColor(DesignTokens.Color.textDim)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
                 .padding(.horizontal, 30)
 
                 Spacer(minLength: 26)
 
-                // The moment of commitment — glows when ready
                 Button {
-                    startCompletion()
+                    saveAboutYou()
                 } label: {
-                    Text("set my compass →")
+                    Text("continue →")
                         .font(DesignTokens.Font.label)
                         .foregroundColor(DesignTokens.Color.textPrimary)
                         .frame(maxWidth: .infinity)
                         .padding(DesignTokens.Spacing.md)
                         .background(DesignTokens.Color.accentStrong)
                         .cornerRadius(DesignTokens.Radius.button)
-                        .shadow(color: Self.glow.opacity(canFinish ? 0.55 : 0), radius: 12)
+                        .shadow(color: Self.glow.opacity(canContinueProfile ? 0.55 : 0), radius: 12)
                 }
-                .disabled(!canFinish)
-                .opacity(canFinish ? 1 : 0.4)
-                .animation(.easeOut(duration: 0.3), value: canFinish)
+                .disabled(!canContinueProfile)
+                .opacity(canContinueProfile ? 1 : 0.4)
+                .animation(.easeOut(duration: 0.3), value: canContinueProfile)
                 .padding(.horizontal, 30)
                 .padding(.bottom, 30)
             }
@@ -858,10 +754,281 @@ struct OnboardingView: View {
         .scrollDismissesKeyboard(.interactively)
     }
 
-    private var canFinish: Bool {
-        guard !name.trimmingCharacters(in: .whitespaces).isEmpty else { return false }
-        if case .success = geocodeState { return true }
-        return false
+    /// Name is required; an address is encouraged but optional.
+    private var canContinueProfile: Bool {
+        !name.trimmingCharacters(in: .whitespaces).isEmpty
+    }
+
+    private func fieldLabel(_ text: String) -> some View {
+        Text(text)
+            .font(DesignTokens.Font.overline)
+            .foregroundColor(DesignTokens.Color.textMuted)
+    }
+
+    /// The shared address field with live MKLocalSearch suggestions.
+    private var addressAutocompleteField: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            TextField("your address or city", text: $addressText)
+                .formInput()
+                .autocorrectionDisabled()
+                .onChange(of: addressText) { _, new in
+                    handleAddressInput(new)
+                }
+                .onSubmit { geocodeTypedAddress() }
+
+            if !autocomplete.suggestions.isEmpty {
+                VStack(spacing: 0) {
+                    ForEach(autocomplete.suggestions) { suggestion in
+                        Button {
+                            selectSuggestion(suggestion)
+                        } label: {
+                            VStack(alignment: .leading, spacing: 1) {
+                                Text(suggestion.title)
+                                    .font(.system(size: 14))
+                                    .foregroundColor(DesignTokens.Color.textPrimary)
+                                if !suggestion.subtitle.isEmpty {
+                                    Text(suggestion.subtitle)
+                                        .font(.system(size: 11))
+                                        .foregroundColor(DesignTokens.Color.textMuted)
+                                }
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 9)
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        if suggestion.id != autocomplete.suggestions.last?.id {
+                            Divider().background(DesignTokens.Color.border)
+                        }
+                    }
+                }
+                .background(DesignTokens.Color.backgroundCard)
+                .cornerRadius(12)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(DesignTokens.Color.borderMid, lineWidth: 1)
+                )
+            }
+
+            switch geocodeState {
+            case .geocoding:
+                HStack(spacing: 6) {
+                    ProgressView().scaleEffect(0.7)
+                    Text("finding you…")
+                }
+                .font(.system(size: 11))
+                .foregroundColor(DesignTokens.Color.textMuted)
+            case .success(let location):
+                Text("✓ \(location.displayName)")
+                    .font(.system(size: 11))
+                    .foregroundColor(Color(hex: "#5dcaa5"))
+            case .failure(let message):
+                Text(message)
+                    .font(.system(size: 11))
+                    .foregroundColor(.red)
+            default:
+                EmptyView()
+            }
+        }
+    }
+
+    /// Save YOUR profile to SwiftData (+ mirror to Supabase), request the
+    /// natural permissions, then advance to your code.
+    private func saveAboutYou() {
+        let trimmed = name.trimmingCharacters(in: .whitespaces)
+        guard !trimmed.isEmpty else { return }
+
+        var geocoded: GeocodedLocation? = nil
+        if case .success(let location) = geocodeState { geocoded = location }
+        people.saveProfile(name: trimmed, emoji: emoji, geocoded: geocoded)
+
+        // Mirror to Supabase users (best-effort) when a location was set.
+        if let geocoded {
+            Task {
+                await SupabaseService.shared.updateUserProfile(
+                    name: trimmed, emoji: emoji,
+                    latitude: geocoded.coordinate.latitude,
+                    longitude: geocoded.coordinate.longitude)
+            }
+        }
+
+        // Permissions, at the natural moment.
+        locationManager.requestWhenInUseAuthorization()
+        if !notificationsRequested {
+            Task {
+                _ = try? await UNUserNotificationCenter.current()
+                    .requestAuthorization(options: [.alert, .sound, .badge])
+            }
+            notificationsRequested = true
+        }
+
+        HapticEngine.connectionFelt()
+        withAnimation(.easeInOut(duration: 0.4)) { page = 3 }
+    }
+
+    // MARK: - Screen 4 · Your connection code
+
+    private var yourCodeScreen: some View {
+        VStack(spacing: 0) {
+            Spacer()
+
+            Text("your connection code ✦")
+                .font(.system(size: 27, weight: .semibold, design: .serif))
+                .foregroundColor(DesignTokens.Color.textPrimary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 24)
+
+            Text("share this with people you love")
+                .font(.system(size: 14, design: .serif).italic())
+                .foregroundColor(Self.lavender.opacity(0.85))
+                .padding(.top, 8)
+                .padding(.bottom, 30)
+
+            // The code, big, on a soft lavender card
+            ZStack {
+                RoundedRectangle(cornerRadius: 18)
+                    .fill(Self.lavender.opacity(0.10))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 18)
+                            .stroke(Self.lavender.opacity(0.45), lineWidth: 1)
+                    )
+                    .shadow(color: Self.glow.opacity(0.3), radius: 14)
+
+                if let code = codeReady {
+                    Text(code.replacingOccurrences(of: "-", with: " · "))
+                        .font(.system(size: 34, weight: .semibold, design: .monospaced))
+                        .foregroundColor(DesignTokens.Color.textPrimary)
+                        .minimumScaleFactor(0.6)
+                        .lineLimit(1)
+                        .padding(.horizontal, 20)
+                } else if codeBusy {
+                    ProgressView().tint(Self.lavender)
+                } else {
+                    Text("sign in to get your code")
+                        .font(.system(size: 14, design: .serif).italic())
+                        .foregroundColor(DesignTokens.Color.textMuted)
+                }
+            }
+            .frame(height: 100)
+            .padding(.horizontal, 36)
+
+            // Share
+            if let code = codeReady {
+                ShareLink(item: Self.shareCodeMessage(code: code)) {
+                    HStack(spacing: 8) {
+                        Text("📱")
+                        Text("share my code")
+                    }
+                    .font(DesignTokens.Font.label)
+                    .foregroundColor(DesignTokens.Color.textPrimary)
+                    .frame(maxWidth: .infinity)
+                    .padding(DesignTokens.Spacing.md)
+                    .background(DesignTokens.Color.accentStrong)
+                    .cornerRadius(DesignTokens.Radius.button)
+                }
+                .padding(.horizontal, 36)
+                .padding(.top, 26)
+            }
+
+            Spacer()
+
+            Button {
+                withAnimation(.easeInOut(duration: 0.4)) { page = 4 }
+            } label: {
+                Text(codeReady == nil ? "continue →" : "I'll share later →")
+                    .font(.system(size: 14))
+                    .foregroundColor(DesignTokens.Color.textMuted)
+            }
+            .padding(.bottom, 10)
+
+            Text("you can always find your code in Settings")
+                .font(.system(size: 11, design: .serif).italic())
+                .foregroundColor(DesignTokens.Color.textDim)
+                .padding(.bottom, 36)
+        }
+        .onAppear { mintCodeIfNeeded() }
+    }
+
+    /// The pre-filled share message for your code.
+    private static func shareCodeMessage(code: String) -> String {
+        "Connect with me on Pointward ✦\n\(AppLinks.pairLink(code: code))"
+    }
+
+    /// Mint YOUR connection code, carrying your profile, once signed in.
+    private func mintCodeIfNeeded() {
+        guard codeReady == nil, !codeBusy else { return }
+        guard SupabaseService.localUserID != nil else { return }   // offline → no code
+        codeBusy = true
+        Task {
+            defer { codeBusy = false }
+            let profile = people.profile
+            let lat = (profile?.hasLocation == true) ? profile?.latitude : nil
+            let lng = (profile?.hasLocation == true) ? profile?.longitude : nil
+            do {
+                let code = try await SupabaseService.shared.createProfileInvite(
+                    name: profile?.displayName ?? name.trimmingCharacters(in: .whitespaces),
+                    emoji: profile?.emoji ?? emoji,
+                    latitude: lat, longitude: lng)
+                codeReady = code
+                people.setProfileCode(code)
+            } catch {
+                // Stays on "sign in to get your code"; not fatal to onboarding.
+            }
+        }
+    }
+
+    // MARK: - Screen 8 · Let's go
+
+    @State private var letsGoGlow = false
+
+    private var letsGoScreen: some View {
+        VStack(spacing: 0) {
+            Spacer()
+
+            ZStack {
+                Circle()
+                    .fill(Self.glow.opacity(letsGoGlow ? 0.30 : 0.14))
+                    .frame(width: 200, height: 200)
+                    .blur(radius: 32)
+                Text(emoji)
+                    .font(.system(size: 78))
+                    .scaleEffect(letsGoGlow ? 1.05 : 1.0)
+                    .shadow(color: Self.glow.opacity(0.7), radius: 22)
+            }
+
+            Text("you're all set ✦")
+                .font(.system(size: 28, weight: .semibold, design: .serif))
+                .foregroundColor(DesignTokens.Color.textPrimary)
+                .padding(.top, 24)
+
+            Text("point toward the people you love")
+                .font(.system(size: 14, design: .serif).italic())
+                .foregroundColor(Self.lavender.opacity(0.85))
+                .padding(.top, 8)
+
+            Spacer()
+
+            Button {
+                finishToApp()
+            } label: {
+                Text("enter Pointward →")
+                    .font(DesignTokens.Font.label)
+                    .foregroundColor(DesignTokens.Color.textPrimary)
+                    .frame(maxWidth: .infinity)
+                    .padding(DesignTokens.Spacing.md)
+                    .background(DesignTokens.Color.accentStrong)
+                    .cornerRadius(DesignTokens.Radius.button)
+                    .shadow(color: Self.glow.opacity(0.5), radius: 12)
+            }
+            .padding(.horizontal, 36)
+            .padding(.bottom, 40)
+        }
+        .onAppear {
+            withAnimation(.easeInOut(duration: 2.0).repeatForever(autoreverses: true)) {
+                letsGoGlow = true
+            }
+        }
     }
 
     private var nextButton: some View {

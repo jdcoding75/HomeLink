@@ -28,6 +28,7 @@ struct PairAcceptView: View {
 
     @EnvironmentObject var people: PeopleManager
     @EnvironmentObject var compass: CompassManager
+    @EnvironmentObject var appEnv: AppEnvironment
 
     private enum Step { case who, addNew, linkExisting, celebrating }
     @State private var step: Step = .who
@@ -126,18 +127,32 @@ struct PairAcceptView: View {
                         .padding(.bottom, 14)
                 }
 
-                // ── The two choices ───────────────────────────────────────
+                // ── [3/4] One tap to accept — their card builds itself from
+                // the profile that travelled with the invite (name · emoji ·
+                // location). No form, no manual address. ──
                 if cardsShown {
                     VStack(spacing: 14) {
-                        choiceCard(
-                            icon: "person.badge.plus",
-                            title: "add \(displayName) as new person",
-                            subtitle: "a fresh card on your compass"
-                        ) {
-                            newName  = inviteName ?? ""
-                            newEmoji = inviteEmoji ?? "💜"
-                            withAnimation(.easeOut(duration: 0.3)) { step = .addNew }
+                        Button {
+                            acceptFromProfile()
+                        } label: {
+                            Text(isBusy ? "connecting…" : "connect with \(displayName) ✦")
+                                .font(DesignTokens.Font.label)
+                                .foregroundColor(DesignTokens.Color.textPrimary)
+                                .frame(maxWidth: .infinity)
+                                .padding(DesignTokens.Spacing.md)
+                                .background(DesignTokens.Color.accentStrong)
+                                .cornerRadius(DesignTokens.Radius.button)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: DesignTokens.Radius.button)
+                                        .stroke(Self.lavender.opacity(0.5), lineWidth: 1)
+                                )
+                                .shadow(color: Self.lavender.opacity(0.3), radius: 8)
                         }
+                        .disabled(isBusy)
+
+                        Text("their card fills itself in — edit it any time")
+                            .font(.system(size: 11, design: .serif).italic())
+                            .foregroundColor(DesignTokens.Color.textDim)
 
                         if !people.people.isEmpty {
                             choiceCard(
@@ -149,10 +164,22 @@ struct PairAcceptView: View {
                             }
                         }
 
+                        // Fallback for full control — name/emoji/address by hand.
+                        Button {
+                            newName  = inviteName ?? ""
+                            newEmoji = inviteEmoji ?? "💜"
+                            withAnimation(.easeOut(duration: 0.3)) { step = .addNew }
+                        } label: {
+                            Text("enter details manually →")
+                                .font(DesignTokens.Font.caption)
+                                .foregroundColor(DesignTokens.Color.accentSoft)
+                        }
+                        .padding(.top, 2)
+
                         Button("not now", action: onDone)
                             .font(DesignTokens.Font.caption)
                             .foregroundColor(DesignTokens.Color.textMuted)
-                            .padding(.top, 8)
+                            .padding(.top, 4)
                     }
                     .padding(.horizontal, 26)
                     .transition(.opacity.combined(with: .move(edge: .bottom)))
@@ -481,17 +508,71 @@ struct PairAcceptView: View {
     /// the link belongs to. Returns the partner id, or nil after showing
     /// the error.
     private func redeemFirst(cardID: UUID) async -> UUID? {
+        await redeemFirstFull(cardID: cardID)?.ownerID
+    }
+
+    /// Full redeem — returns the owner id PLUS the profile (incl. location) the
+    /// invite carried, or nil after showing the error.
+    private func redeemFirstFull(cardID: UUID) async -> SupabaseService.RedeemResult? {
         guard SupabaseService.localUserID != nil else {
             errorMessage = "Sign in first — Settings → account — then try again."
             return nil
         }
         do {
-            let result = try await SupabaseService.shared.redeem(code, friendPersonID: cardID)
-            return result.ownerID
+            return try await SupabaseService.shared.redeem(code, friendPersonID: cardID)
         } catch {
             Self.log.error("accept: redeem failed — \(error.localizedDescription, privacy: .public)")
             errorMessage = error.localizedDescription
             return nil
+        }
+    }
+
+    /// [3/4] The one-tap path — claim the code and auto-build a pre-filled card
+    /// for the sender from the profile that travelled with the invite.
+    private func acceptFromProfile() {
+        isBusy = true
+        errorMessage = nil
+        Task {
+            defer { isBusy = false }
+            let name  = (inviteName?.isEmpty == false) ? inviteName! : "Someone"
+            let emoji = inviteEmoji ?? "💜"
+            // Build the card FIRST so its id rides along as friend_person_id.
+            let person = Person(name: name, emoji: emoji,
+                                latitude: 0, longitude: 0, locationDisplayName: name)
+            guard let result = await redeemFirstFull(cardID: person.id) else { return }
+            person.pairedUserID = result.ownerID.uuidString
+
+            // Use the location their profile shared; otherwise place them near
+            // me (distance ~0) until I edit the card. Either way, editable.
+            if let lat = result.ownerLatitude, let lng = result.ownerLongitude,
+               (lat != 0 || lng != 0) {
+                person.latitude  = lat
+                person.longitude = lng
+            } else if let coordinate = compass.userLocation?.coordinate {
+                person.latitude  = coordinate.latitude
+                person.longitude = coordinate.longitude
+            }
+            people.insertFromInvite(person)
+            Self.log.info("accept: paired ✓ auto-card for \(person.name, privacy: .public)")
+            // Best-effort: turn the shared coordinate into a friendly place name.
+            if person.latitude != 0 || person.longitude != 0 {
+                reverseGeocode(person)
+            }
+            celebrate(with: person)
+        }
+    }
+
+    /// Fill displayAddress / locationDisplayName from the shared coordinate so
+    /// the card reads "London" rather than raw numbers. Silent on failure.
+    private func reverseGeocode(_ person: Person) {
+        let coordinate = person.coordinate
+        Task {
+            if let location = try? await appEnv.geocodingService
+                .reverseGeocode(coordinate: coordinate) {
+                person.displayAddress      = location.fullAddress
+                person.locationDisplayName = location.displayName
+                try? people.save()
+            }
         }
     }
 

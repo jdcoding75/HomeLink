@@ -25,7 +25,7 @@ final class ServiceContainer: ObservableObject {
     let appStateManager:     AppStateManager
 
     init() {
-        let schema       = Schema([Person.self, Ping.self])
+        let schema       = Schema([Person.self, Ping.self, UserProfile.self])
         modelContainer   = try! ModelContainer(for: schema)
         skinStore        = SkinStore()
         instrumentStore  = InstrumentStore()

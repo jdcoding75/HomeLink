@@ -32,7 +32,13 @@ enum DevTools {
     // ── Mock data injection ──────────────────────────────────────────────
 
     /// Inject mock Sarah + a mock connection so the compass points at someone
-    /// and sending/receiving work with no sign-in or partner. Idempotent.
+    /// (New York) and sending/receiving work with no sign-in or partner.
+    /// Idempotent — re-selects an existing Sarah rather than duplicating her.
+    ///
+    /// ⚠️ DO NOT REMOVE — required for testing. This is the single source of
+    /// truth behind `-skipOnboarding` (see RootView.applySkipOnboardingIfNeeded)
+    /// and the testSkipOnboardingInjectsSarah regression test. Changing the
+    /// mock identity/coords below will break both.
     @MainActor
     static func injectMockData(people: PeopleManager, pings: PingManager? = nil,
                                withHistory: Bool = false) {

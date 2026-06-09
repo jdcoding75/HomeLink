@@ -41,6 +41,7 @@ struct SettingsView: View {
     @State private var showTestSheet = false
     @State private var showCustomEmojiPicker = false
     @State private var showAnimationLab = false
+    @State private var showAnimationFeedback = false
     @State private var mockHeadingOn = false
     @State private var farAwayOn = false
     @State private var nearbyOn = false
@@ -73,6 +74,11 @@ struct SettingsView: View {
 
                     sectionHeader("account")
                     accountSection
+
+                    // [1/6] Notifications preferences — the single "thoughts"
+                    // toggle (a gentle word when someone points toward you).
+                    sectionHeader("notifications")
+                    notificationsSection
 
                     sectionHeader("about")
                     aboutSection
@@ -139,6 +145,9 @@ struct SettingsView: View {
         }
         .fullScreenCover(isPresented: $showAnimationLab) {
             AnimationTestLabView()
+        }
+        .sheet(isPresented: $showAnimationFeedback) {
+            AnimationFeedbackView()
         }
         #endif
     }
@@ -207,6 +216,24 @@ struct SettingsView: View {
                     VStack(alignment: .leading, spacing: 2) {
                         Text("🧪 Animation Test Lab").settingsLabel()
                         Text("every send + land animation, in isolation")
+                            .font(.system(size: 11)).foregroundColor(DesignTokens.Color.textMuted)
+                    }
+                    Spacer()
+                    Image(systemName: "chevron.right").font(.system(size: 12))
+                        .foregroundColor(DesignTokens.Color.textDim)
+                }
+            }
+            .buttonStyle(.plain)
+
+            // [2/6] 📋 View animation feedback — the approved / needs-work
+            // summary of every animation, from the ratings made in the lab.
+            Button { showAnimationFeedback = true } label: {
+                settingsRow {
+                    Image(systemName: "list.clipboard").settingsIcon()
+                        .foregroundColor(Color(hex: "#c4a8d4"))
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("📋 View animation feedback").settingsLabel()
+                        Text("approved / needs-work summary from the lab")
                             .font(.system(size: 11)).foregroundColor(DesignTokens.Color.textMuted)
                     }
                     Spacer()
