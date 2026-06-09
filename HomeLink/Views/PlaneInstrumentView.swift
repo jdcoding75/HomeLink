@@ -37,6 +37,10 @@ struct PlaneInstrumentView: View {
     @State private var liftoff: CGFloat = 0      // 0…1 launch travel
     @State private var bankPhase: Double = 0     // gentle left/right roll
     @State private var showRelease = false
+    // [1/5] CIRCULAR SWIRL — track the finger's accumulated rotation around the
+    // propeller centre; each full 360° = one wind, four to full.
+    @State private var totalRotation: Double = 0
+    @State private var lastAngle: Double? = nil
 
     private let tick = Timer.publish(every: 1.0 / 30.0, on: .main, in: .common).autoconnect()
 
@@ -50,10 +54,12 @@ struct PlaneInstrumentView: View {
     private static let rubber    = Color(hex: "#3a1a0a")
     private static let lavender  = Color(hex: "#c4a8d4")
 
-    static let maxWinds = 8
+    static let maxWinds = 4          // [1/5] four full finger-circles to full
 
     private var rad: Double { bearingDegrees * .pi / 180 }
-    private var tension: Double { Double(winds) / Double(Self.maxWinds) }
+    /// [1/5] Continuous twist straight from the accumulated swirl — the rubber
+    /// band tightens smoothly as the finger circles, not in discrete steps.
+    private var tension: Double { min(1, abs(totalRotation) / (360 * Double(Self.maxWinds))) }
     private var maxed: Bool { winds >= Self.maxWinds }
 
     var body: some View {
@@ -93,11 +99,11 @@ struct PlaneInstrumentView: View {
             .allowsHitTesting(false)
         }
         .frame(width: 370, height: 370)
-        // [6/7] TAP to spin the propeller — tap anywhere; the propeller whirs,
-        // the rubber band twists, the wind counter climbs. Far more intuitive
-        // than a rotation gesture (kids and adults both just tap).
+        // [1/5] SWIRL your finger in circles to wind the propeller — each full
+        // 360° loop twists the band one more turn (four to full), then it lets
+        // fly toward the person on its own.
         .contentShape(Circle())
-        .onTapGesture { tapWind() }
+        .gesture(swirlGesture)
         .onReceive(tick) { _ in heartbeat() }
     }
 
@@ -230,24 +236,60 @@ struct PlaneInstrumentView: View {
         }
     }
 
-    /// "wind · let fly" — the plane auto-aims, so there is NO aim step.
+    /// [1/5] "swirl to wind · let fly" — the plane auto-aims, so no aim step.
     private var stepText: String {
-        if loadedToken == nil { return "load · wind · let fly" }
+        if loadedToken == nil { return "load · swirl · let fly" }
         if maxed { return "let fly ✦" }
-        return "wind · let fly · \(winds)/\(Self.maxWinds)"
+        return "swirl to wind · let fly · \(winds)/\(Self.maxWinds)"
     }
 
-    // ── [6/7] Tap-to-spin mechanic ───────────────────────────────────────────
+    // ── [1/5] Circular-swirl winding ─────────────────────────────────────────
 
-    /// Each tap winds the propeller half a turn (a whir) and twists the band.
-    private func tapWind() {
-        guard loadedToken != nil else { HapticEngine.personSelected(); return }
-        guard !launching, !maxed else { return }
-        withAnimation(.easeOut(duration: 0.2)) { winds += 1 }
-        propBoost = 34                                   // a visible whir burst
-        HapticEngine.send()                              // light click each tap
+    /// The finger's angle around the propeller centre (frame is 370 → centre
+    /// (185,185)). 0° = up, clockwise positive.
+    private func angleFromCenter(_ p: CGPoint) -> Double {
+        atan2(Double(p.x - 185), -Double(p.y - 185)) * 180 / .pi
+    }
+
+    private var swirlGesture: some Gesture {
+        DragGesture(minimumDistance: 0)
+            .onChanged { value in
+                guard loadedToken != nil, !launching, !maxed else {
+                    if loadedToken == nil { HapticEngine.personSelected() }
+                    return
+                }
+                let angle = angleFromCenter(value.location)
+                if let last = lastAngle {
+                    var delta = angle - last
+                    if delta > 180 { delta -= 360 }
+                    if delta < -180 { delta += 360 }
+                    totalRotation += delta
+                    propSpin += delta * 1.6              // the prop follows the finger
+                    let newWinds = min(Self.maxWinds, Int(abs(totalRotation) / 360))
+                    if newWinds > winds {
+                        winds = newWinds
+                        circleCompleted(winds)
+                    }
+                }
+                lastAngle = angle
+            }
+            .onEnded { _ in
+                lastAngle = nil
+                if maxed { armLaunch() }                 // safety: arm on lift too
+            }
+    }
+
+    /// One full circle just completed — a satisfying click (a heavy rumble at
+    /// the final circle), a whir burst, and at full it arms the auto-launch.
+    private func circleCompleted(_ n: Int) {
+        propBoost = 42
         SoundEngine.shared.play(for: "plane.wind")
-        if maxed { armLaunch() }
+        if n >= Self.maxWinds {
+            HapticEngine.rocketLaunch()                  // strong rumble at full wind
+            armLaunch()                                  // "let fly" → auto-launch in 1 s
+        } else {
+            HapticEngine.planeWind()                     // crisp click per circle
+        }
     }
 
     private func armLaunch() {
@@ -269,6 +311,7 @@ struct PlaneInstrumentView: View {
         // Reset for the next wind once the takeover clears.
         DispatchQueue.main.asyncAfter(deadline: .now() + 2.2) {
             winds = 0
+            totalRotation = 0; lastAngle = nil          // [1/5] reset the swirl
             launching = false; liftoff = 0; shudder = 0
         }
     }

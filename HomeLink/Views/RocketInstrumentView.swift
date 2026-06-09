@@ -54,8 +54,13 @@ struct RocketInstrumentView: View {
 
     /// The rocket faces the FINGER-SPUN angle now, not the phone bearing.
     private var rad: Double { spinAngle * .pi / 180 }
+    /// [3/5] SOFT LOCK — the aim target FREEZES the moment a thought is loaded,
+    /// so turning/wobbling the phone afterwards never moves it or breaks the
+    /// lock. The rocket is aimed purely by finger spin against this fixed
+    /// target. (Mirrors the bow.)
+    @State private var aimTarget: Double = 0
     private var alignDiff: Double {
-        BearingCalculator.alignmentError(relativeBearing: spinAngle - bearingDegrees)
+        BearingCalculator.alignmentError(relativeBearing: spinAngle - aimTarget)
     }
     private var aligned: Bool { alignDiff <= 15 }
     private var onTarget: Bool { alignDiff <= 5 }     // lock threshold
@@ -90,7 +95,7 @@ struct RocketInstrumentView: View {
             .frame(width: 360, height: 360)
 
             // ── Where they are — marker brightens as the SPIN aim closes in ──
-            DirectionIndicator(bearingDegrees: bearingDegrees,
+            DirectionIndicator(bearingDegrees: aimTarget,   // [3/5] frozen target
                                personName: personName,
                                personEmoji: personEmoji,
                                ringRadius: 168,
@@ -144,6 +149,7 @@ struct RocketInstrumentView: View {
         .animation(.easeOut(duration: 0.25), value: showLaunchPrompt)
         .animation(.easeOut(duration: 0.3), value: lockedAim)
         .onAppear {
+            aimTarget = bearingDegrees           // [3/5] seed the frozen target
             withAnimation(AnimationSystem.easeInOutSine(1.5)
                             .repeatForever(autoreverses: true)) {
                 breathe = true
@@ -155,7 +161,13 @@ struct RocketInstrumentView: View {
             twinkle = true
             refreshFuelHint()
         }
-        .onChange(of: loadedToken) { _, _ in
+        // [3/5] The aim target tracks the live bearing until a thought is
+        // loaded; once armed it FREEZES so the phone can't move it.
+        .onChange(of: bearingDegrees) { _, newValue in
+            if loadedToken == nil { aimTarget = newValue }
+        }
+        .onChange(of: loadedToken) { _, token in
+            if token == nil { aimTarget = bearingDegrees }   // re-arm: re-sync
             // Emoji changed (or cleared) → reset the tank + aim, re-show hint
             if !launched {
                 withAnimation(.easeOut(duration: 0.3)) {

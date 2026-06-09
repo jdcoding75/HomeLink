@@ -47,10 +47,10 @@ private struct EmergingEmoji: View {
     var body: some View {
         ZStack {
             Circle().fill(hue.opacity(0.35 * Double(min(1, scale))))
-                .frame(width: 150, height: 150).blur(radius: 36)
-            Text(emoji).font(.system(size: 72))
+                .frame(width: 225, height: 225).blur(radius: 44)   // [5/5] 50% bigger
+            Text(emoji).font(.system(size: 108))                    // [5/5] 50% bigger
                 .scaleEffect(scale)
-                .shadow(color: hue.opacity(0.7), radius: 24)
+                .shadow(color: hue.opacity(0.7), radius: 28)
         }
     }
 }

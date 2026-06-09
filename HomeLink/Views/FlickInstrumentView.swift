@@ -50,7 +50,10 @@ struct FlickInstrumentView: View {
     private var hue: Color { EmojiHue.color(for: loadedEmoji ?? "💜") }
 
     /// The scroll rests near the bottom of the circle.
-    private let restOffset = CGSize(width: 0, height: 120)
+    // [2/5] The note rests at the COMPASS CENTRE — drag backward in ANY
+    // direction and flick toward the person, full travel distance for every
+    // bearing, no dead zones.
+    private let restOffset = CGSize(width: 0, height: 0)
 
     private let minFlickSpeed: CGFloat = 300          // points / second
     private let aimTolerance: Double   = 45           // forgiving

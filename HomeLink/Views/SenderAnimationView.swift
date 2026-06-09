@@ -393,7 +393,9 @@ struct SenderAnimationView<Symbol: View>: View {
 
     @ViewBuilder
     private func fireflySend(end: CGSize) -> some View {
-        let start = ringStart
+        // [4/5] FIX B — the leaf lifts from the BOTTOM of the screen (not the
+        // ring), for maximum visual impact and the longest travel.
+        let start = CGSize(width: 0, height: 340)
         let c1 = CGSize(width: start.width + (end.width - start.width) * 0.30 + wander1.width,
                         height: start.height + (end.height - start.height) * 0.30 + wander1.height)
         let c2 = CGSize(width: start.width + (end.width - start.width) * 0.70 + wander2.width,
@@ -415,13 +417,14 @@ struct SenderAnimationView<Symbol: View>: View {
         // [2/3] The thought rides a BIG leaf (120×80) across the sky — emoji
         // ~48 pt, swaying as it drifts: ±15 px lateral, ±8 px bounce, ±8° roll.
         ZStack {
+            // [4/5] FIX B — a BIG leaf (160×100) carrying a 56 pt emoji.
             LeafShape()
                 .fill(LinearGradient(colors: [Color(hex: "#a8d672"), Color(hex: "#6fae3e")],
                                      startPoint: .topLeading, endPoint: .bottomTrailing))
-                .frame(width: 120, height: 80)
-                .shadow(color: Color(hex: "#3d6b22").opacity(0.45), radius: 10)
+                .frame(width: 160, height: 100)
+                .shadow(color: Color(hex: "#3d6b22").opacity(0.45), radius: 12)
             symbol
-                .scaleEffect(1.4)   // emoji riding the leaf, ~48 pt
+                .scaleEffect(1.25)   // emoji riding the leaf, ~56 pt
         }
         // [4/5] Bigger wander during the FLOAT phase (±40/±20/±10°), settling
         // to the alive sway (±15/±8/±8°) once it gathers to fly.
@@ -1062,40 +1065,42 @@ struct SenderAnimationView<Symbol: View>: View {
             finish(after: 0.7 + 0.9 + 0.55)
 
         case .firefly:
-            // [4/5] THREE PHASES — the most beautiful send, worth the wait.
-            // PHASE 1 · FLOAT (3 s)  the leaf lifts and wanders the sky, in no
-            //                        hurry — ±40 px / ±20 px / ±10°.
-            // PHASE 2 · GATHER (1 s) the wander settles, the wind picks a way.
-            // PHASE 3 · SEND (2.5 s) the leaf accelerates toward them and fades.
+            // [4/5] FIX C — the leaf lifts from the bottom and SWIRLS lazily
+            // around the sky for ~8 s (the most beautiful send, worth waiting
+            // for), gathers for 1 s, then catches the wind and departs toward
+            // the person.
+            // PHASE 1 · SWIRL (8 s)   the leaf drifts the interior, in no hurry.
+            // PHASE 2 · GATHER (1 s)  the wander settles, the wind picks a way.
+            // PHASE 3 · SEND (2.5 s)  the leaf accelerates toward them and fades.
             HapticEngine.sendSoft()
             SoundEngine.shared.play(for: "style.chime")
             chargeGlow = true
             windSky = true                                   // full-screen sky in
-            windFloating = true                              // big, idle wander
-            withAnimation(AnimationSystem.easeInOutSine(1.5)
+            windFloating = true                              // big, lazy swirl
+            withAnimation(AnimationSystem.easeInOutSine(2.4)
                             .repeatForever(autoreverses: true)) {
                 orbPulse = true
             }
-            // PHASE 2 — GATHER at 3.0 s: the wander shrinks, the leaf orients.
-            DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
+            // PHASE 2 — GATHER at 8.0 s: the wander shrinks, the leaf orients.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 8.0) {
                 withAnimation(.easeInOut(duration: 1.0)) { windFloating = false }
             }
-            // PHASE 3 — SEND at 4.0 s: accelerate to the screen edge.
-            DispatchQueue.main.asyncAfter(deadline: .now() + 4.0) {
+            // PHASE 3 — DEPART at 9.0 s: accelerate to the screen edge.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 9.0) {
                 progress = 1
                 withAnimation(AnimationSystem.easeInOutSine(fireflyFlight)) {
                     flightScale = 1.3
                 }
             }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 6.2) {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 11.2) {
                 faded = true
             }
             // The sky recedes as the leaf leaves; gentle landing tap.
-            DispatchQueue.main.asyncAfter(deadline: .now() + 6.4) {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 11.4) {
                 windSky = false
                 impact(flash: false)
             }
-            finish(after: 6.4 + AnimationSystem.Trail.lingerMax + 0.45)
+            finish(after: 11.4 + AnimationSystem.Trail.lingerMax + 0.45)
 
         case .fingerFlick:
             // SLINGSHOT LAUNCH — blazing 600 ms. The thought explodes from the

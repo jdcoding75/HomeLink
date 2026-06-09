@@ -734,7 +734,11 @@ struct CompassView: View {
                 if holdProgress > 0 { holdProgress = 0 }
                 return
             }
-            if sendAlignDiff <= 15 {
+            // [3/5] SOFT LOCK — the hold STARTS within 15°, but once it has
+            // begun it tolerates drift up to 30° (hysteresis), so a small
+            // wobble of the phone never breaks the lock or freezes the hold.
+            let holding = holdProgress > 0
+            if sendAlignDiff <= 15 || (holding && sendAlignDiff <= 30) {
                 holdProgress += 0.05 / holdDuration
                 if holdProgress >= 1.0 {
                     holdProgress = 0
