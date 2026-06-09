@@ -470,35 +470,317 @@ struct DandelionSeed: View {
     }
 }
 
-// MARK: - Naming alias (structural move — zero behavior change)
-// The struct keeps its original name so all existing call sites compile
-// unchanged; this alias gives the new per-instrument name used by the
-// folder system and the animation state-machine work.
-typealias WindCompassFace = WindInstrumentView
+// ════════════════════════════════════════════════════════════════════════
+// MARK: - ACT 1 — WIND COMPASS FACE (approved prototype)
+// ════════════════════════════════════════════════════════════════════════
+//
+// A sky window inside the compass circle, a leaf carrying the 🤗 emoji
+// breathing at the centre, lifted and spiralled out by the user's breath.
+//
+//   · Sky fill (InstrumentBackground.daySkyCompassFace) + drifting clouds,
+//     clipped INSIDE the circle — no sky outside it.
+//   · NO needle · NO cardinal labels · NO person marker — the wind is
+//     non-directional; the wind finds them.
+//   · Driven by CompassFaceStateMachine(.firefly): idle → triggered →
+//     charging → ready → exiting. On exit it records the leaf's angle and
+//     fires an InstrumentTransition into the send animation (ACT 2).
+//   · NO sound during the compass face — the user's breath is the sound.
+//
+// (The live, shipping breath mechanic remains WindInstrumentView above; this
+//  is the ACT 1 face the new state-machine pipeline drives.)
+struct WindCompassFace: View {
 
-// MARK: - ACT 1 state machine — Wind
+    /// What is being sent — carried through to the InstrumentTransition.
+    var selectedEmoji:   String  = "🤗"
+    var selectedMessage: String? = nil
+    var selectedTagline: String? = nil
+    /// The hand-off to ACT 2 when the leaf leaves the circle.
+    var onTransition: ((InstrumentTransition) -> Void)? = nil
+
+    @StateObject private var machine = CompassFaceStateMachine(instrument: .firefly)
+    @StateObject private var breath  = BreathDetector()
+
+    private struct FaceSeed: Identifiable {
+        let id = UUID()
+        var angle:  Double
+        var radius: CGFloat
+        var size:   CGFloat
+        var drift:  Double
+    }
+
+    @State private var seeds: [FaceSeed] = []
+    @State private var spiralAngle: Double = 0      // leaf angle around centre (rad)
+    @State private var leafRadius:  CGFloat = 0     // leaf distance from centre
+    @State private var trembling = false            // ready-state shiver
+    @State private var exiting   = false            // leaf leaving the circle
+    @State private var breatheRing = false          // outer ring breathing
+
+    private static let faceSize: CGFloat = 360
+    private static let edgeR:    CGFloat = 150       // the leaf at the circle edge
+
+    private let tick     = Timer.publish(every: 1.0 / 30.0, on: .main, in: .common).autoconnect()
+    private let seedTick = Timer.publish(every: 0.5, on: .main, in: .common).autoconnect()
+
+    private static let lavender  = Color(hex: "#c4a8d4")
+    private static let leafGreen = Color(hex: "#5a8a3a")
+    private static let sunGlow   = Color(hex: "#FFF3A3")
+
+    /// 0…1 charge while the breath builds.
+    private var charge: Double { machine.chargeProgress }
+
+    private static let faceClouds: [Cloud] = [
+        Cloud(y: -70, scale: 0.6,  period: 18, phase: 0.15),
+        Cloud(y:  10, scale: 0.95, period: 25, phase: 0.55),
+        Cloud(y:  84, scale: 0.55, period: 16, phase: 0.80),
+    ]
+
+    var body: some View {
+        ZStack {
+            skyCircle
+            ringStructure
+            seedLayer
+            leaf
+        }
+        .frame(width: 370, height: 370)
+        .onAppear { begin() }
+        .onDisappear { breath.stop() }
+        .onReceive(tick)     { _ in drive() }
+        .onReceive(seedTick) { _ in driftSeeds() }
+    }
+
+    // ── The sky window — sky + clouds, clipped INSIDE the circle ────────────
+
+    private var skyCircle: some View {
+        ZStack {
+            InstrumentBackground.daySkyCompassFace
+            TimelineView(.animation) { tl in
+                let t = tl.date.timeIntervalSinceReferenceDate
+                ZStack {
+                    ForEach(Self.faceClouds) { cloud in
+                        windCloud
+                            .scaleEffect(cloud.scale)
+                            .offset(x: cloudX(cloud, t: t), y: cloud.y)
+                            .opacity(0.6 + cloud.scale * 0.2)
+                    }
+                }
+            }
+        }
+        .frame(width: Self.faceSize, height: Self.faceSize)
+        .clipShape(Circle())     // sky + clouds ONLY inside the circle
+    }
+
+    private var windCloud: some View {
+        ZStack {
+            Circle().frame(width: 40, height: 40).offset(x: -26, y: 5)
+            Circle().frame(width: 56, height: 56)
+            Circle().frame(width: 44, height: 44).offset(x: 26, y: 4)
+            Capsule().frame(width: 84, height: 26).offset(y: 12)
+        }
+        .foregroundColor(Color(hex: "#FFFAF0").opacity(0.7))
+        .blur(radius: 3)
+    }
+
+    private func cloudX(_ cloud: Cloud, t: TimeInterval) -> CGFloat {
+        let span: CGFloat = 440
+        let p = (t / cloud.period + cloud.phase).truncatingRemainder(dividingBy: 1)
+        return CGFloat(p) * span - span / 2
+    }
+
+    // ── Rings — structural only, no direction meaning ───────────────────────
+
+    private var ringStructure: some View {
+        ZStack {
+            // Outer breathing ring — subtle lavender
+            Circle()
+                .stroke(Self.lavender.opacity(breatheRing ? 0.35 : 0.14),
+                        lineWidth: 2)
+                .frame(width: breatheRing ? 374 : 362, height: breatheRing ? 374 : 362)
+            // Main compass ring border
+            Circle()
+                .stroke(Color.white.opacity(0.55), lineWidth: 1.5)
+                .frame(width: Self.faceSize, height: Self.faceSize)
+            // Inner dashed ring
+            Circle()
+                .stroke(Self.lavender.opacity(0.22),
+                        style: StrokeStyle(lineWidth: 1, dash: [4, 6]))
+                .frame(width: 312, height: 312)
+            // Minimal tick marks every 30° — structural, NOT directional
+            ForEach(0..<12, id: \.self) { i in
+                Capsule()
+                    .fill(Self.lavender.opacity(0.3))
+                    .frame(width: 1.5, height: 8)
+                    .offset(y: -(Self.faceSize / 2 - 4))
+                    .rotationEffect(.degrees(Double(i) * 30))
+            }
+        }
+        .allowsHitTesting(false)
+    }
+
+    // ── Seeds drifting on the breeze ────────────────────────────────────────
+
+    private var seedLayer: some View {
+        ZStack {
+            ForEach(seeds) { seed in
+                DandelionSeed(size: seed.size, opacity: 0.45 + charge * 0.45)
+                    .offset(x: CGFloat(cos(seed.angle)) * seed.radius,
+                            y: CGFloat(sin(seed.angle)) * seed.radius)
+                    .animation(AnimationSystem.easeInOutSine(0.5), value: seed.radius)
+            }
+        }
+        .frame(width: Self.faceSize, height: Self.faceSize)
+        .clipShape(Circle())
+        .allowsHitTesting(false)
+    }
+
+    // ── The leaf carrying the emoji — always visible, breathing ─────────────
+
+    private var leaf: some View {
+        TimelineView(.animation) { tl in
+            let t = tl.date.timeIntervalSinceReferenceDate
+            // Idle: gentle sway + breathe (per the spec).
+            let sway = sin(t * 0.65) * 5                       // ±5°
+            let breatheScale = 1 + sin(t * 1.0) * 0.06         // ±6 %
+            let lifted = machine.state != .idle
+            let leafOffset = CGSize(width: CGFloat(cos(spiralAngle)) * leafRadius,
+                                    height: CGFloat(sin(spiralAngle)) * leafRadius)
+            ZStack {
+                // Soft glow under the leaf once the breath is felt.
+                if lifted {
+                    Circle()
+                        .fill(Self.sunGlow.opacity(0.28 + charge * 0.45))
+                        .frame(width: 74, height: 74)
+                        .blur(radius: 18)
+                }
+                // The leaf — ~68×40.
+                LeafShape()
+                    .fill(LinearGradient(colors: [Self.leafGreen, Color(hex: "#4a7a2e")],
+                                         startPoint: .topLeading, endPoint: .bottomTrailing))
+                    .frame(width: 68, height: 40)
+                    .overlay(LeafVeins().stroke(Color(hex: "#7aa85a").opacity(0.7), lineWidth: 0.8)
+                        .frame(width: 68, height: 40))
+                    .shadow(color: .black.opacity(0.18), radius: 4, y: 2)
+                // The 🤗 emoji sitting ON the leaf — always visible, 28 pt.
+                Text(selectedEmoji)
+                    .font(.system(size: 28))
+                    .offset(y: -6)
+                    .shadow(color: Self.sunGlow.opacity(0.5 + charge * 0.4),
+                            radius: 6 + charge * 12)
+            }
+            .scaleEffect(breatheScale * (1 + charge * 0.14))
+            .rotationEffect(.degrees(sway + (trembling ? Double.random(in: -3.5...3.5) : 0)))
+            .offset(leafOffset)
+            .opacity(exiting ? 0 : 1)
+            .animation(.easeOut(duration: 0.3), value: exiting)
+        }
+    }
+
+    // ── State machine driver (breath → idle/triggered/charging/ready/exit) ──
+
+    private func begin() {
+        machine.onExit = onTransition
+        seeds = (0..<10).map { _ in
+            FaceSeed(angle: .random(in: 0...(2 * .pi)),
+                     radius: .random(in: 28...140),
+                     size: .random(in: 6...11),
+                     drift: .random(in: -1...1))
+        }
+        withAnimation(.easeInOut(duration: 3).repeatForever(autoreverses: true)) {
+            breatheRing = true
+        }
+        breath.start()   // the breath drives the states (no sound here)
+    }
+
+    /// The live breath progress when we can hear it; 0 otherwise.
+    private var breathProgress: Double {
+        (breath.isListening && !breath.micDenied) ? breath.exhaleProgress : 0
+    }
+
+    private func drive() {
+        guard !exiting else { return }
+        let p = breathProgress
+        switch machine.state {
+        case .idle:
+            if leafRadius != 0 { leafRadius = 0 }
+            if p > 0.03 {
+                machine.trigger()                          // breath detected
+                HapticPattern.singleSoft.fire()            // soft single pulse
+            }
+        case .triggered, .charging:
+            machine.charge(progress: p)
+            // Leaf spirals organically outward — NO fixed direction; the radius
+            // follows charge² (cos/sin of time × charge²), per the spec.
+            spiralAngle += 0.05 + charge * 0.16
+            leafRadius = Self.edgeR * CGFloat(charge * charge)
+            if p >= 0.999 { becomeReady() }
+        case .ready:
+            spiralAngle += 0.18                            // keep drifting at the edge
+        case .exiting:
+            break
+        }
+    }
+
+    /// Leaf at the circle edge — a brief trembling pause, then it flies.
+    private func becomeReady() {
+        guard machine.state == .charging else { return }
+        machine.markReady()
+        HapticPattern.doubleSoft.fire()                    // double soft pulse
+        withAnimation(.easeInOut(duration: 0.1).repeatCount(4, autoreverses: true)) {
+            trembling = true
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + CompassFaceStateDurations.ready) {
+            fireExit()
+        }
+    }
+
+    /// The leaf exits past the boundary; record the exit angle and fire the
+    /// transition into the send animation.
+    private func fireExit() {
+        guard machine.state == .ready, !exiting else { return }
+        exiting   = true
+        trembling = false
+        // The leaf's offset is relative to the circle centre, so the exit angle
+        // is atan2(leafY − centre, leafX − centre) with the centre at the origin.
+        let leafX = cos(spiralAngle) * Double(Self.edgeR)
+        let leafY = sin(spiralAngle) * Double(Self.edgeR)
+        let exitAngle = atan2(leafY, leafX)
+        let exitBearing = (exitAngle * 180 / .pi).truncatingRemainder(dividingBy: 360)
+        let exitPoint = CGPoint(x: Self.faceSize / 2 + CGFloat(leafX),
+                                y: Self.faceSize / 2 + CGFloat(leafY))
+        withAnimation(.easeIn(duration: CompassFaceStateDurations.exiting)) {
+            leafRadius = Self.edgeR * 1.7                   // past the circle
+        }
+        machine.exit(bearing: exitBearing < 0 ? exitBearing + 360 : exitBearing,
+                     point: exitPoint,
+                     emoji: selectedEmoji,
+                     message: selectedMessage,
+                     tagline: selectedTagline)
+        // Reset to idle once the hand-off completes.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+            machine.reset()
+            leafRadius = 0; spiralAngle = 0; exiting = false
+        }
+    }
+
+    /// Seeds wander gently in idle and stream off increasingly with charge.
+    private func driftSeeds() {
+        let streaming = charge > 0.05
+        for i in seeds.indices {
+            seeds[i].angle += seeds[i].drift * 0.2 + (streaming ? 0.12 : 0)
+            let dr: CGFloat = streaming ? CGFloat(8 + charge * 30)
+                                        : CGFloat.random(in: -6...6)
+            var r = seeds[i].radius + dr
+            if r > 150 { r = CGFloat.random(in: 18...60) }   // recycle inward
+            withAnimation(AnimationSystem.easeInOutSine(0.5)) {
+                seeds[i].radius = max(10, r)
+            }
+        }
+    }
+}
+
+// MARK: - ACT 1 state machine factory — Wind
 //
 // NOTE: the wind instrument is backed by the .firefly enum case
 // (displayName "wind") — see Instrument.swift.
-//
-// IDLE: leaf gently swaying in sky circle
-//   - Slow side-to-side motion 0.5x speed; seeds occasionally drift off
-//   - Person marker orbits at bearing; sky background with drifting clouds
-// TRIGGERED: breath detected by mic
-//   - Leaf begins to lift from center; seeds increase in frequency
-//   - Subtle glow appears under leaf; haptic: soft single pulse
-// CHARGING: breath continues
-//   - Leaf rises toward person bearing; closer to circle edge
-//   - Wind effect increases; seeds streaming behind leaf
-// READY: leaf at edge of circle
-//   - Brief 0.3s pause — anticipation; leaf trembles slightly
-//   - Haptic: double soft pulse; "release to send ✦" hint
-// EXITING: leaf exits circle
-//   - Leaf crosses circle boundary; fires InstrumentTransition(exitBearing, exitPoint)
-//   - Send animation begins immediately; seamless continuation
-//
-// Additive scaffold — the live breath mechanic in
-// WindInstrumentView is not yet rewired onto this machine.
 extension CompassFaceStateMachine {
   /// A fresh state machine for the wind compass face (.firefly).
   static func windFace() -> CompassFaceStateMachine { .init(instrument: .firefly) }

@@ -28,4 +28,8 @@ enum WindSounds {
   static let receiptFile = "wind_receipt"
   static let sendDuration: Double = 6.5
   static let receiptDuration: Double = 7.2
+
+  // ACT 1 — the compass face plays NO sound.
+  // Reason: the user's own breath IS the sound.
+  // WindSounds.compassFaceSound = .none
 }
