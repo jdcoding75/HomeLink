@@ -469,3 +469,9 @@ struct DandelionSeed: View {
         .shadow(color: Color(hex: "#6aa6d0").opacity(0.35), radius: 1)
     }
 }
+
+// MARK: - Naming alias (structural move — zero behavior change)
+// The struct keeps its original name so all existing call sites compile
+// unchanged; this alias gives the new per-instrument name used by the
+// folder system and the animation state-machine work.
+typealias WindCompassFace = WindInstrumentView

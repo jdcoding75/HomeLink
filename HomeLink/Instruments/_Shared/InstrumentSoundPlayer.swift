@@ -1,0 +1,127 @@
+// InstrumentSoundPlayer.swift
+// Pointward › Instruments › _Shared
+//
+// FILE-BASED instrument sound playback.
+//
+// NOTE ON COEXISTENCE:
+// The shipping app currently synthesizes instrument
+// voices programmatically in SoundEngine.swift
+// ("no audio files"). This player is the FOUNDATION
+// for the file-based system described in each
+// instrument's [Name]Sounds.swift creative brief.
+// It is intentionally NOT yet wired into the live
+// send/receipt pipeline — adopting it is a future,
+// deliberate step. Nothing here changes current
+// behavior; it simply provides a clean, shared way
+// to play the per-instrument .wav files once they
+// are approved and the call sites are switched over.
+//
+// THE RULES (from InstrumentBoundaries):
+// - Sound duration MUST equal animation duration
+// - Fade in:  first 2% of duration
+// - Fade out: last  5% of duration
+// - Send sound never plays during receipt
+// - Receipt sound never plays during send
+// - Emoji sound ONLY at the reveal moment
+//
+// Files live flat in the bundle (the synchronized
+// file group flattens Sounds/Instruments/*.wav), so
+// lookup is by base name + "wav" — matching how
+// SoundEngine loads the curated emoji files today.
+
+import AVFoundation
+
+final class InstrumentSoundPlayer {
+
+  static let shared = InstrumentSoundPlayer()
+
+  /// Which phase a sound belongs to — used to enforce
+  /// the "send never overlaps receipt" rule.
+  enum Phase {
+    case send
+    case receipt
+    case reveal
+  }
+
+  private var players: [String: AVAudioPlayer] = [:]
+  private var currentPhase: Phase?
+
+  private init() {
+    // Ambient: respects the silent switch, mixes with
+    // the user's music — same posture as SoundEngine.
+    try? AVAudioSession.sharedInstance()
+      .setCategory(.ambient, options: [.mixWithOthers])
+  }
+
+  // MARK: - Public API
+
+  /// Play an instrument sound file for a given phase.
+  /// Stops any sound from a different phase first, so
+  /// send and receipt never overlap.
+  ///
+  /// - Parameters:
+  ///   - file: base name, e.g. "wind_send"
+  ///   - phase: send / receipt / reveal
+  ///   - duration: the matching animation duration —
+  ///     used to schedule the fade-out. Pass the
+  ///     instrument's value from InstrumentBoundaries.
+  ///   - proIntensity: 1.0 free, 1.3 pro (volume lift)
+  func play(
+    file: String,
+    phase: Phase,
+    duration: Double,
+    proIntensity: Float = 1.0
+  ) {
+    // Enforce phase exclusivity.
+    if let active = currentPhase, active != phase {
+      stopAll()
+    }
+    currentPhase = phase
+
+    guard let player = player(for: file) else { return }
+
+    let peak = min(1.0, 0.85 * proIntensity)
+
+    // Fade in over the first 2% of the duration.
+    player.volume = 0
+    player.currentTime = 0
+    player.play()
+    player.setVolume(peak,
+                     fadeDuration: duration * 0.02)
+
+    // Fade out over the last 5% of the duration.
+    let fadeOutLead = duration * 0.05
+    let fadeOutStart = max(0, duration - fadeOutLead)
+    DispatchQueue.main.asyncAfter(
+      deadline: .now() + fadeOutStart
+    ) { [weak player] in
+      player?.setVolume(0, fadeDuration: fadeOutLead)
+    }
+  }
+
+  /// Stop everything immediately (e.g. on cancel).
+  func stopAll() {
+    for (_, p) in players { p.stop() }
+    currentPhase = nil
+  }
+
+  // MARK: - Cache
+
+  private func player(for file: String) -> AVAudioPlayer? {
+    if let cached = players[file] { return cached }
+    guard let url = Bundle.main.url(
+      forResource: file, withExtension: "wav"
+    ) else {
+      #if DEBUG
+      print("[InstrumentSoundPlayer] missing: \(file).wav")
+      #endif
+      return nil
+    }
+    guard let p = try? AVAudioPlayer(contentsOf: url) else {
+      return nil
+    }
+    p.prepareToPlay()
+    players[file] = p
+    return p
+  }
+}

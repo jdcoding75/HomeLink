@@ -1,0 +1,33 @@
+// FlickReceiptAnimation.swift
+// Pointward › Instruments › Flick
+//
+// ACT 3 of 3 — arrival + emoji reveal.
+//
+// CURRENT IMPLEMENTATION:
+// The live receipt animation for this instrument is driven
+// by InstrumentLandingView (the shared dispatcher). It has
+// NOT been surgically extracted here yet — same zero-
+// behavior-change safety rule as the send animation.
+//
+// This file is the typed integration point for that
+// extraction.
+//
+// ENTRY RULE (differs from send): the object arrives FROM
+// the sender's bearing (real GPS or symbolic) — it does
+// NOT need to match the compass-face exit bearing. The
+// receipt is its own emotional moment.
+
+import SwiftUI
+
+enum FlickReceiptAnimation {
+  /// Full-screen receipt duration (seconds). Source of truth:
+  /// InstrumentBoundaries.Receipt.flick.
+  static let duration: Double = InstrumentBoundaries.Receipt.flick
+
+  /// Sound file + duration for the receipt phase.
+  static let soundFile: String = FlickSounds.receiptFile
+  static let soundDuration: Double = FlickSounds.receiptDuration
+
+  /// Emoji reveal linger — shared across all instruments.
+  static let revealLinger: Double = InstrumentBoundaries.Reveal.linger
+}

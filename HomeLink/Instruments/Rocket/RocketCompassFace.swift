@@ -638,3 +638,9 @@ struct FlameShape: Shape {
         return p
     }
 }
+
+// MARK: - Naming alias (structural move — zero behavior change)
+// The struct keeps its original name so all existing call sites compile
+// unchanged; this alias gives the new per-instrument name used by the
+// folder system and the animation state-machine work.
+typealias RocketCompassFace = RocketInstrumentView
