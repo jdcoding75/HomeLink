@@ -250,9 +250,12 @@ struct ReceiptView: View {
                 themedIncoming
                     .scaleEffect(incomingScale)
                     .opacity(phase == .dropping ? max(0, 1 - Double(approach)) : 1)
-                    .offset(y: incomingY(geo: geo))
+                    // [2/3] 2D offset — starts at the sender's screen edge, travels
+                    // inward (was a vertical-only drop that read as "centered first").
+                    .offset(incomingOffset(geo: geo))
                     .animation(.easeOut(duration: 0.5), value: orbEntered)
                     .animation(.easeInOut(duration: 0.4), value: approach)
+                    .animation(.easeInOut(duration: 0.4), value: thoughtAngle)
             }
         }
     }
@@ -265,13 +268,27 @@ struct ReceiptView: View {
         return grow * entered * pop
     }
 
-    /// The thought drifts down from the top of the middle zone toward the
-    /// bucket as `approach` grows; on drop it dives into the bucket mouth.
-    private func incomingY(geo: GeometryProxy) -> CGFloat {
-        let top = -geo.size.height * 0.22
-        let bucketMouth = geo.size.height * 0.16
-        if phase == .dropping { return bucketMouth + 30 }
-        return top + (bucketMouth - top) * approach
+    /// [2/3] The sender's bearing in radians (screen convention: 0° = up,
+    /// x = sin, y = -cos — matches the person marker on the bucket rim).
+    private var thoughtRad: Double { thoughtAngle * .pi / 180 }
+
+    /// [2/3] The incoming thought's offset. It MUST begin at the sender's screen
+    /// edge — in the correct bearing direction — on its very first frame, then
+    /// travel inward toward the bucket as `approach` grows (0 far → 1 arrived).
+    /// Never centered first, never animated out from the center.
+    ///
+    /// start = the screen edge in the sender's bearing direction (radius reach)
+    /// end   = the bucket mouth (horizontally centred, just below centre)
+    private func incomingOffset(geo: GeometryProxy) -> CGSize {
+        let reach = min(geo.size.width, geo.size.height) * 0.46
+        let startX =  CGFloat(sin(thoughtRad)) * reach
+        let startY = -CGFloat(cos(thoughtRad)) * reach
+        let mouthX: CGFloat = 0
+        let mouthY = geo.size.height * 0.16
+        if phase == .dropping { return CGSize(width: mouthX, height: mouthY + 30) }
+        let t = approach
+        return CGSize(width: startX + (mouthX - startX) * t,
+                      height: startY + (mouthY - startY) * t)
     }
 
     // ── BOTTOM 20% — alignment guidance / continue ─────────────────────────
@@ -323,7 +340,8 @@ struct ReceiptView: View {
     private var bucket: some View {
         // [5/5] The sender sits at a FIXED bearing around the bucket; the
         // marker orbits the rim at that angle and never spins with the bucket.
-        let thoughtRad = thoughtAngle * .pi / 180
+        // (thoughtRad is the shared view-wide bearing — same one the incoming
+        // thought travels along, so marker + thought agree on direction.)
         let markerRadius: CGFloat = 112   // just outside the rim arrow's reach
         return ZStack {
             // ── The spinning bucket ART (rotates with your finger) ──────────
@@ -475,6 +493,10 @@ struct ReceiptView: View {
     private func begin() {
         Self.log.info("receipt: from=\(ping.fromName, privacy: .public) emoji=\(ping.emoji, privacy: .public) style=\(style.rawValue, privacy: .public)")
         phase = .arriving
+        // [2/3] Lock the sender's bearing BEFORE the first frame so the incoming
+        // thought is placed at the correct screen edge from the very start —
+        // never centered, never re-homed when seeking begins.
+        thoughtAngle = compass.rawBearingToTarget ?? 120
         HapticEngine.catchArrival()
         SoundEngine.shared.play(for: "catch.arrival")
         withAnimation(.easeOut(duration: 0.4)) { arrivalPulse = true }
