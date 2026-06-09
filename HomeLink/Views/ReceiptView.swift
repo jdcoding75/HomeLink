@@ -95,6 +95,8 @@ struct ReceiptView: View {
         // changes and no existing call site is affected.
         if style == .firefly {
             windReceipt
+        } else if style == .rocket {
+            rocketReceipt
         } else {
             standardReceipt
         }
@@ -109,17 +111,34 @@ struct ReceiptView: View {
             message: ping.message,
             tagline: ping.tagline,
             fromName: ping.fromName,
-            onRevealed: {
-                onRevealed()   // "felt means felt" — mark opened at the reveal
-                // AUTO-CATCH — linger on the reveal, then advance on its own.
-                if pings.isAutoCatching {
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
-                        if pings.isAutoCatching { onFinished() }
-                    }
-                }
-            },
+            onRevealed: { revealHandoff() },
             onFinished: onFinished
         )
+    }
+
+    // ── ROCKET — the dedicated v2 parachute receipt ────────────────────────
+
+    private var rocketReceipt: some View {
+        RocketReceiptAnimation(
+            senderBearing: compass.rawBearingToTarget ?? 120,
+            emoji: ping.emoji,
+            message: ping.message,
+            tagline: ping.tagline,
+            fromName: ping.fromName,
+            onRevealed: { revealHandoff() },
+            onFinished: onFinished
+        )
+    }
+
+    /// "Felt means felt" at the reveal, plus the auto-catch linger/advance —
+    /// shared by every dedicated full-receipt instrument.
+    private func revealHandoff() {
+        onRevealed()
+        if pings.isAutoCatching {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                if pings.isAutoCatching { onFinished() }
+            }
+        }
     }
 
     // ── The shared spin-to-catch receipt (all non-wind instruments) ────────

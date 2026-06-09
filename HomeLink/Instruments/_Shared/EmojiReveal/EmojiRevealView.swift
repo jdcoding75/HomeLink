@@ -31,6 +31,10 @@ struct EmojiRevealView: View {
   @State private var glowScale: CGFloat = 1.0
   @State private var hugOpen = false
   @State private var hugClose = false
+  // 👊 fist bump — punches in from the left, then 3 pumps (sound on the 3rd).
+  @State private var fistOffsetX: CGFloat = -120
+  @State private var fistScaleX: CGFloat = 0
+  @State private var fistScaleY: CGFloat = 0
 
   var body: some View {
     ZStack {
@@ -70,6 +74,10 @@ struct EmojiRevealView: View {
                hugClose ? 1.15 : 1.0
           )
           .scaleEffect(bloomed ? 1.0 : 0.8)
+          // 👊 fist bump motion (identity for every other emoji).
+          .scaleEffect(x: emoji == "👊" ? fistScaleX : 1,
+                       y: emoji == "👊" ? fistScaleY : 1)
+          .offset(x: emoji == "👊" ? fistOffsetX : 0)
           .animation(
             .spring(response: 1.0,
                    dampingFraction: 0.6),
@@ -173,8 +181,10 @@ struct EmojiRevealView: View {
   }
 
   private func startReveal() {
-    // Sound at bloom
-    EmojiRevealSound.play(emoji)
+    // Sound at bloom — EXCEPT 👊, whose sound fires on its 3rd pump instead.
+    if emoji != "👊" {
+      EmojiRevealSound.play(emoji)
+    }
 
     // Bloom
     DispatchQueue.main.asyncAfter(
@@ -217,6 +227,11 @@ struct EmojiRevealView: View {
       }
     }
 
+    // Fist bump for 👊 — entry slam + 3 pumps, sound on the 3rd.
+    if emoji == "👊" {
+      startFistBumpAnimation()
+    }
+
     // Text sequence
     DispatchQueue.main.asyncAfter(
       deadline: .now() + 0.6) {
@@ -240,5 +255,63 @@ struct EmojiRevealView: View {
       deadline: .now() + 6.0) {
       onDismiss()
     }
+  }
+
+  // MARK: - 👊 Fist bump
+
+  /// The fist punches IN from the left, then pumps 3 times. Sound fires ONLY on
+  /// the 3rd pump's punch-forward — never the 1st or 2nd.
+  private func startFistBumpAnimation() {
+    let punch = Animation.timingCurve(0.1, 0, 0.05, 1, duration: 0.14)
+
+    func after(_ t: Double, _ work: @escaping () -> Void) {
+      DispatchQueue.main.asyncAfter(deadline: .now() + t, execute: work)
+    }
+
+    // ENTRY SLAM (at bloom + 0.1 ≈ 0.2s): scale 0 / x −120 → slam in → settle.
+    after(0.2) {
+      withAnimation(.easeOut(duration: 0.16)) {
+        fistScaleX = 1.45; fistScaleY = 1.45; fistOffsetX = 8
+      }
+    }
+    after(0.36) {
+      withAnimation(.easeOut(duration: 0.15)) {
+        fistScaleX = 0.88; fistScaleY = 0.88; fistOffsetX = 6
+      }
+    }
+    after(0.51) {
+      withAnimation(.spring(response: 0.28, dampingFraction: 0.6)) {
+        fistScaleX = 1.0; fistScaleY = 1.0; fistOffsetX = 0
+      }
+    }
+
+    // One pump cycle: pull back → punch forward → recoil → settle.
+    func pump(base: Double, punchScale: CGFloat, punchX: CGFloat, sound: Bool) {
+      after(base) {                                   // pull back (easeIn 0.18)
+        withAnimation(.easeIn(duration: 0.18)) {
+          fistScaleX = 0.72; fistScaleY = 0.72; fistOffsetX = 38
+        }
+      }
+      after(base + 0.18) {                            // punch forward (0.14)
+        if sound { EmojiRevealSound.play("👊") }
+        withAnimation(punch) {
+          fistScaleX = punchScale; fistScaleY = punchScale; fistOffsetX = punchX
+        }
+      }
+      after(base + 0.32) {                            // recoil (easeOut 0.12)
+        withAnimation(.easeOut(duration: 0.12)) {
+          fistScaleX = 0.88; fistScaleY = 0.88; fistOffsetX = 10
+        }
+      }
+      after(base + 0.44) {                            // settle (spring)
+        withAnimation(.spring(response: 0.28, dampingFraction: 0.6)) {
+          fistScaleX = 1.0; fistScaleY = 1.0; fistOffsetX = 0
+        }
+      }
+    }
+
+    pump(base: 1.2, punchScale: 1.52, punchX: -18, sound: false)   // PUMP 1 — no sound
+    pump(base: 2.0, punchScale: 1.52, punchX: -18, sound: false)   // PUMP 2 — no sound
+    pump(base: 2.8, punchScale: 1.60, punchX: -22, sound: true)    // PUMP 3 — SOUND
   }
 }

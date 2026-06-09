@@ -30,5 +30,5 @@ enum RocketSounds {
   static let sendFile = "rocket_send"
   static let receiptFile = "rocket_receipt"
   static let sendDuration: Double = 4.0
-  static let receiptDuration: Double = 4.0
+  static let receiptDuration: Double = 7.75   // v2 parachute receipt
 }

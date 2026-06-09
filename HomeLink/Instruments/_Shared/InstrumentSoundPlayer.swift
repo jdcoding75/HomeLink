@@ -119,14 +119,17 @@ final class InstrumentSoundPlayer {
   private static func sendInfo(_ instrument: Instrument) -> (String, Double)? {
     switch instrument {
     case .firefly: return (WindSounds.sendFile, WindSounds.sendDuration)
+    case .rocket:  return (RocketSounds.sendFile, RocketSounds.sendDuration)
     default:       return nil
     }
   }
 
-  /// Receipt file + duration per instrument. WIND: wind_receipt.wav · 7.2s.
+  /// Receipt file + duration per instrument.
+  /// WIND: wind_receipt.wav · 7.2s · ROCKET: rocket_receipt.wav · 7.75s.
   private static func receiptInfo(_ instrument: Instrument) -> (String, Double)? {
     switch instrument {
     case .firefly: return (WindSounds.receiptFile, WindSounds.receiptDuration)
+    case .rocket:  return (RocketSounds.receiptFile, RocketSounds.receiptDuration)
     default:       return nil
     }
   }

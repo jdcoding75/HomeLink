@@ -38,12 +38,12 @@ enum InstrumentBoundaries {
   enum Receipt {
     static let minimum: Double = 1.0
     static let standard: Double = 4.0
-    static let maximum: Double = 7.2   // wind only
+    static let maximum: Double = 7.75  // rocket v2 parachute (longest receipt)
 
     static let compass: Double = 1.5
     static let bow:     Double = 1.1
     static let flick:   Double = 1.0
-    static let rocket:  Double = 4.0
+    static let rocket:  Double = 7.75  // v2 parachute: fall · chute · float · land
     static let wind:    Double = 7.2
     static let wand:    Double = 1.1
     static let plane:   Double = 5.0
