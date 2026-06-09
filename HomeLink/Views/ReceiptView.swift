@@ -214,9 +214,11 @@ struct ReceiptView: View {
                         .minimumScaleFactor(0.7).lineLimit(2)
                         .shadow(color: Self.lavender.opacity(angleError < 5 ? 0.8 : 0.4), radius: 8)
                         .animation(.easeInOut(duration: 0.2), value: guidanceLine)
-                    Text("spin the bucket with your finger")
+                    Text("spin until the arrow faces \(ping.fromName)")
                         .font(.system(size: 13))
                         .foregroundColor(DesignTokens.Color.textMuted)
+                        .multilineTextAlignment(.center)
+                        .minimumScaleFactor(0.8)
                     #if DEBUG
                     Button("⚙︎ align (sim)") { debugBypass = true }
                         .font(.system(size: 9)).foregroundColor(DesignTokens.Color.textDim)
@@ -241,31 +243,70 @@ struct ReceiptView: View {
     // ── The bucket ──────────────────────────────────────────────────────────
 
     private var bucket: some View {
-        ZStack {
-            Circle().fill(hue.opacity(0.16)).frame(width: 240, height: 240).blur(radius: 40)
-            BucketHandleShape()
-                .stroke(Color(hex: "#888888"), style: StrokeStyle(lineWidth: 4, lineCap: .round))
-                .frame(width: 170, height: 60).offset(y: -100)
-            BucketShape()
-                .fill(LinearGradient(colors: [Color(hex: "#8B4513"), Color(hex: "#6E3A1E")],
-                                     startPoint: .top, endPoint: .bottom))
-                .frame(width: 180, height: 160)
-                .overlay(bucketBubbles.clipShape(BucketShape()))
-                .shadow(color: .black.opacity(0.4), radius: 10, y: 6)
-            // [1/3] Rim arrow — marks which way the opening faces as it spins.
-            Triangle()
-                .fill(angleError < 5 ? Self.lavender : Self.lavender.opacity(0.85))
-                .frame(width: 16, height: 14)
-                .offset(y: -86)
+        // [5/5] The sender sits at a FIXED bearing around the bucket; the
+        // marker orbits the rim at that angle and never spins with the bucket.
+        let thoughtRad = thoughtAngle * .pi / 180
+        let markerRadius: CGFloat = 112   // just outside the rim arrow's reach
+        return ZStack {
+            // ── The spinning bucket ART (rotates with your finger) ──────────
+            ZStack {
+                Circle().fill(hue.opacity(0.16)).frame(width: 240, height: 240).blur(radius: 40)
+                BucketHandleShape()
+                    .stroke(Color(hex: "#888888"), style: StrokeStyle(lineWidth: 4, lineCap: .round))
+                    .frame(width: 170, height: 60).offset(y: -100)
+                BucketShape()
+                    .fill(LinearGradient(colors: [Color(hex: "#8B4513"), Color(hex: "#6E3A1E")],
+                                         startPoint: .top, endPoint: .bottom))
+                    .frame(width: 180, height: 160)
+                    .overlay(bucketBubbles.clipShape(BucketShape()))
+                    .shadow(color: .black.opacity(0.4), radius: 10, y: 6)
+                // [5/5] Rim arrow — the OPENING. It points outward from the rim
+                // and rotates with the bucket, so "spin until the arrow faces
+                // [Name]" is literally true: line it up with the person marker.
+                Triangle()
+                    .fill(angleError < 5 ? Self.lavender : Self.lavender.opacity(0.9))
+                    .frame(width: 18, height: 16)
+                    .offset(y: -86)
+                    .shadow(color: Self.lavender.opacity(angleError < 5 ? 0.9 : 0.35), radius: 6)
+            }
+            // [1/3] The art spins with your finger (no phone turning). The
+            // rotation is on the art only; the gesture sits on the unrotated
+            // 240×260 frame so spinning never feeds back on itself.
+            .rotationEffect(.degrees(bucketAngle))
+
+            // [5/5] PERSON MARKER — orbits the bucket at the sender's bearing,
+            // FIXED in place (does not rotate with the bucket). It shows which
+            // way to spin the opening. Hidden once the catch locks/lands.
+            if phase == .seeking || phase == .locked {
+                PersonInitialMarker(initial: senderInitial, opacity: markerOpacity,
+                                    near: angleError < 30, close: angleError < 15,
+                                    perfect: angleError < 5, pulse: pulse)
+                    .offset(x: CGFloat(sin(thoughtRad)) * markerRadius,
+                            y: -CGFloat(cos(thoughtRad)) * markerRadius)
+                    .animation(.easeOut(duration: 0.2), value: angleError < 15)
+            }
         }
         .padding(.bottom, 8)
-        // [1/3] The whole bucket spins with your finger (no phone turning). The
-        // rotation is on the art; the gesture sits on the unrotated 240×260
-        // frame so spinning never feeds back on itself.
-        .rotationEffect(.degrees(bucketAngle))
         .frame(width: 240, height: 260)
         .contentShape(Rectangle())
         .gesture(spinGesture)
+    }
+
+    /// The sender's first initial for the orbiting marker (• when unknown).
+    private var senderInitial: String {
+        let trimmed = ping.fromName.trimmingCharacters(in: .whitespaces)
+        return trimmed.first.map { String($0).uppercased() } ?? "•"
+    }
+
+    /// Marker brightness — brightens steadily as the spin approaches the
+    /// sender's bearing, mirroring DirectionIndicator's behaviour.
+    private var markerOpacity: Double {
+        switch angleError {
+        case ..<5:   return pulse ? 1.0 : 0.9
+        case ..<15:  return 0.9
+        case ..<30:  return 0.65
+        default:     return 0.45
+        }
     }
 
     private var bucketBubbles: some View {

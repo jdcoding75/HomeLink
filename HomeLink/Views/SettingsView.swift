@@ -39,6 +39,7 @@ struct SettingsView: View {
     @State private var showClearConnConfirm = false
     @State private var devBusy = false
     @State private var showTestSheet = false
+    @State private var showCustomEmojiPicker = false
     @State private var mockHeadingOn = false
     @State private var farAwayOn = false
     @State private var nearbyOn = false
@@ -129,6 +130,12 @@ struct SettingsView: View {
         .sheet(isPresented: $showTestSheet) {
             TestMessageSheet().environmentObject(devPings)
         }
+        .sheet(isPresented: $showCustomEmojiPicker) {
+            DevCustomEmojiPicker { token in
+                showCustomEmojiPicker = false
+                DevTools.sendTestCustomEmoji(pings: devPings, token: token)
+            }
+        }
         #endif
     }
 
@@ -187,19 +194,54 @@ struct SettingsView: View {
             }
             .buttonStyle(.plain)
 
-            // Skip straight to the compass with mock Sarah + connection.
-            // withHistory:false → lands on a CLEAN compass (seeding live
-            // thoughts would pop a catch that buries it); use the "send test
-            // thought" tool for catches. Matches the -skipOnboarding result.
-            Button {
-                DevTools.injectMockData(people: devPeople, pings: devPings, withHistory: false)
-                if let s = devPeople.selectedPerson { devCompass.start(tracking: s) }
-                NotificationCenter.default.post(name: .pointwardOpenCompass, object: nil)
-            } label: {
+            // [2/5] 🎬 Test All Animations — one test thought per instrument,
+            // in sequence (compass → bow → flick → rocket → wind → wand →
+            // plane), each random emoji · message · tagline. They queue on the
+            // bucket; catch one, the next is already waiting.
+            Button { DevTools.testAllAnimations(pings: devPings) } label: {
                 settingsRow {
-                    Image(systemName: "wand.and.stars").settingsIcon()
-                    Text("Skip to compass (mock data)").settingsLabel()
+                    Image(systemName: "film").settingsIcon()
+                        .foregroundColor(Color(hex: "#c4a8d4"))
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("🎬 Test All Animations").settingsLabel()
+                        Text("one per instrument · random content")
+                            .font(.system(size: 11)).foregroundColor(DesignTokens.Color.textMuted)
+                    }
                     Spacer()
+                }
+            }
+            .buttonStyle(.plain)
+
+            // [2/5] 🎬 Test Random — one random instrument, fastest single check.
+            Button { DevTools.testRandom(pings: devPings) } label: {
+                settingsRow {
+                    Image(systemName: "shuffle").settingsIcon()
+                    Text("🎬 Test Random").settingsLabel()
+                    Spacer()
+                }
+            }
+            .buttonStyle(.plain)
+
+            // [2/5] 🗑️ Clear test thoughts — removes only dev-generated thoughts
+            // from the bucket; real thoughts are kept.
+            Button { devPings.clearTestThoughts() } label: {
+                settingsRow {
+                    Image(systemName: "trash.slash").settingsIcon()
+                    Text("🗑️ Clear test thoughts").settingsLabel()
+                    Spacer()
+                }
+            }
+            .buttonStyle(.plain)
+
+            // [2/5] 👆 Test Custom Emoji — pick one of your saved slots and send
+            // a test with it, to verify custom emojis travel correctly.
+            Button { showCustomEmojiPicker = true } label: {
+                settingsRow {
+                    Image(systemName: "hand.point.up.left").settingsIcon()
+                    Text("👆 Test Custom Emoji").settingsLabel()
+                    Spacer()
+                    Image(systemName: "chevron.right").font(.system(size: 12))
+                        .foregroundColor(DesignTokens.Color.textDim)
                 }
             }
             .buttonStyle(.plain)
@@ -266,8 +308,16 @@ struct SettingsView: View {
     private func runClearAll() {
         devBusy = true
         Task {
+            // Server side: device_tokens · pings · connections · compass_bearings
+            // · users, then sign out.
             try? await SupabaseService.shared.clearAllMyData()
             await MainActor.run {
+                // [4/5] Local side: SURGICAL — only user data (people, thoughts,
+                // and an explicit list of UserDefaults keys). Developer tool
+                // settings, sound personalities, instrument/skin/emoji choices,
+                // subscription, and iOS permissions are all left intact.
+                DevTools.clearLocalUserData(people: devPeople, pings: devPings)
+                devCompass.stop()
                 devBusy = false
                 // Sign-out flips the app back to onboarding via RootView's
                 // auth observer; nudge the compass tab so it lands cleanly.
@@ -895,18 +945,23 @@ struct SettingsView: View {
                 }
             }
 
-            Divider().background(DesignTokens.Color.border).padding(.leading, 44)
-
-            settingsRow {
-                Image(systemName: "antenna.radiowaves.left.and.right")
-                    .settingsIcon()
-                Text("connection mode")
-                    .settingsLabel()
-                Spacer()
-                Text("offline")
-                    .font(DesignTokens.Font.caption)
-                    .foregroundColor(Color(hex: "#5dcaa5"))
-            }
+            // [1/5] "connection mode · offline" row retired — a permanent
+            // status indicator only confused people ("am I broken?"). Send
+            // failures now surface contextually instead: PingManager sets
+            // sendFailedNotice ("couldn't send — check your connection") only
+            // when a real send fails, shown as a transient toast on the
+            // compass (CompassView). No standing status line anywhere.
+            // Divider().background(DesignTokens.Color.border).padding(.leading, 44)
+            // settingsRow {
+            //     Image(systemName: "antenna.radiowaves.left.and.right")
+            //         .settingsIcon()
+            //     Text("connection mode")
+            //         .settingsLabel()
+            //     Spacer()
+            //     Text("offline")
+            //         .font(DesignTokens.Font.caption)
+            //         .foregroundColor(Color(hex: "#5dcaa5"))
+            // }
         }
     }
 
@@ -959,3 +1014,70 @@ private extension Text {
             .foregroundColor(DesignTokens.Color.textPrimary)
     }
 }
+
+#if DEBUG
+// MARK: - [2/5] Developer custom-emoji picker
+//
+// Lists the user's saved slots (their personal six); tapping one sends a test
+// thought with that emoji so custom emojis can be verified end to end.
+struct DevCustomEmojiPicker: View {
+
+    let onPick: (String) -> Void
+
+    @Environment(\.dismiss) private var dismiss
+    @ObservedObject private var customStore = CustomThoughtStore.shared
+    @State private var tokens = PersonalSet.load()
+
+    private let columns = Array(repeating: GridItem(.flexible(), spacing: 14), count: 3)
+
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                DesignTokens.Color.background.ignoresSafeArea()
+                VStack(spacing: 18) {
+                    Text("tap a slot to send a test with it")
+                        .font(.system(size: 13, design: .serif).italic())
+                        .foregroundColor(DesignTokens.Color.textMuted)
+                        .padding(.top, 12)
+                    LazyVGrid(columns: columns, spacing: 14) {
+                        ForEach(tokens, id: \.self) { token in
+                            Button { onPick(token) } label: {
+                                ZStack {
+                                    if token == "gecko" {
+                                        LeopardGeckoView(size: 30)
+                                    } else if token.hasPrefix("yours:"),
+                                              let id = UUID(uuidString: String(token.dropFirst(6))),
+                                              let thought = customStore.thought(id: id) {
+                                        Text(thought.emoji).font(.system(size: 30))
+                                    } else {
+                                        Text(token).font(.system(size: 30))
+                                    }
+                                }
+                                .frame(width: 70, height: 70)
+                                .background(DesignTokens.Color.backgroundCard)
+                                .cornerRadius(14)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 14)
+                                        .stroke(DesignTokens.Color.border, lineWidth: 1)
+                                )
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    .padding(.horizontal, 24)
+                    Spacer()
+                }
+            }
+            .navigationTitle("test custom emoji")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("cancel") { dismiss() }
+                        .foregroundColor(DesignTokens.Color.textMuted)
+                }
+            }
+        }
+        .preferredColorScheme(.dark)
+    }
+}
+#endif

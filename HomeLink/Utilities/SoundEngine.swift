@@ -122,13 +122,21 @@ final class SoundEngine {
     /// Free: single clean voice. Pro: the layered enhanced version of the
     /// same voice (catch reveals, send completions, confirmations — all of
     /// them route through here).
-    func play(for token: String) {
-        if isProTier, let rich = proCache[token] {
-            play(rich.buffer, volume: rich.volume)
+    ///
+    /// [3/5] The user's per-instrument SOUND PERSONALITY shapes every voice:
+    /// warm plays quieter and clean, playful plays full, dramatic plays louder
+    /// and (when available) layered. Pass an explicit `style` to audition one
+    /// in the picker; nil reads the selected instrument's saved choice.
+    func play(for token: String, style: SoundStyle? = nil) {
+        let personality = style ?? SoundStyle.current
+        // Dramatic prefers the layered body; pro tier always gets it too.
+        let wantsEnhanced = isProTier || personality.prefersEnhanced
+        if wantsEnhanced, let rich = proCache[token] {
+            play(rich.buffer, volume: rich.volume * personality.volumeScale)
             return
         }
         guard let entry = cache[token] else { return }
-        play(entry.buffer, volume: entry.volume)
+        play(entry.buffer, volume: entry.volume * personality.volumeScale)
     }
 
     /// Read the tier straight from UserDefaults — SoundEngine has no view
@@ -1058,7 +1066,9 @@ final class SoundEngine {
         if !engine.isRunning { try? engine.start() }
         guard engine.isRunning else { engine.detach(node); return }
 
-        node.volume = isQuiet ? volume * 0.4 : volume
+        // Clamp into the player node's 0…1 range — dramatic personalities can
+        // scale a loud base voice past unity.
+        node.volume = min(1.0, isQuiet ? volume * 0.4 : volume)
         node.scheduleBuffer(buffer) { [weak self] in
             DispatchQueue.main.async {
                 node.stop()

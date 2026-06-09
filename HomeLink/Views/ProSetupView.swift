@@ -51,7 +51,10 @@ struct ProSetupView: View {
                         // if instrumentStore.selected == .compass { skinSection }
                         // senderStyleSection   // superseded by the instrument selection
                         emojiSetSection
-                        customSoundsSection
+                        // [3/5] custom sound RECORDING retired (no microphone) —
+                        // replaced by a curated per-instrument personality picker.
+                        // customSoundsSection
+                        soundPersonalitySection
                         funnyDistanceSection
                         // holdToSendSection   // [6/6] built into the compass instrument now
                         Spacer(minLength: 30)
@@ -483,6 +486,79 @@ struct ProSetupView: View {
             }
         }
         .onAppear { personalSix = PersonalSet.load() }
+    }
+
+    // MARK: - [3/5] Your sound (per-instrument personality)
+
+    /// Bumped after a personality is chosen so the rows re-render their check.
+    @State private var soundStyleTick = 0
+
+    /// Three curated personalities for the user's CURRENTLY selected instrument
+    /// (warm · playful · dramatic), each auditionable, one applied. This is the
+    /// replacement for the retired "record your own sound" feature.
+    private var soundPersonalitySection: some View {
+        let instrument = InstrumentOption.selected.instrument
+        _ = soundStyleTick   // establish the re-render dependency
+        return VStack(alignment: .leading, spacing: 8) {
+            sectionLabel("your sound")
+            Text("how \(instrument.icon) \(instrument.displayName) sounds when it lands")
+                .font(.system(size: 12, design: .serif).italic())
+                .foregroundColor(DesignTokens.Color.textMuted)
+                .padding(.bottom, 2)
+            lockable {
+                VStack(spacing: 0) {
+                    ForEach(Array(SoundStyle.allCases.enumerated()), id: \.element) { idx, style in
+                        if idx > 0 {
+                            Divider().background(DesignTokens.Color.border).padding(.leading, 44)
+                        }
+                        soundStyleRow(style, instrument: instrument)
+                    }
+                }
+                .padding(14)
+            }
+        }
+    }
+
+    private func soundStyleRow(_ style: SoundStyle, instrument: Instrument) -> some View {
+        let isActive = SoundStyle.selected(for: instrument) == style
+        return HStack(spacing: 12) {
+            Image(systemName: style.icon)
+                .font(.system(size: 14))
+                .foregroundColor(isActive ? Self.lavender : DesignTokens.Color.textMuted)
+                .frame(width: 26)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(style.displayName)
+                    .font(.system(size: 14, weight: isActive ? .semibold : .regular))
+                    .foregroundColor(DesignTokens.Color.textPrimary)
+                Text(style.blurb)
+                    .font(.system(size: 11, design: .serif).italic())
+                    .foregroundColor(DesignTokens.Color.textDim)
+            }
+            Spacer()
+            // Preview — hear it without selecting
+            Button {
+                SoundEngine.shared.play(for: SoundStyle.previewToken(for: instrument),
+                                        style: style)
+            } label: {
+                Image(systemName: "speaker.wave.2.fill")
+                    .font(.system(size: 14))
+                    .foregroundColor(Self.lavender)
+                    .padding(8)
+            }
+            .buttonStyle(.plain)
+            // Selected indicator
+            Image(systemName: isActive ? "checkmark.circle.fill" : "circle")
+                .font(.system(size: 18))
+                .foregroundColor(isActive ? Self.lavender : DesignTokens.Color.borderMid)
+        }
+        .padding(.vertical, 10)
+        .contentShape(Rectangle())
+        .onTapGesture {
+            SoundStyle.select(style, for: instrument)
+            soundStyleTick += 1
+            HapticEngine.skinSelected()
+            SoundEngine.shared.play(for: SoundStyle.previewToken(for: instrument), style: style)
+        }
     }
 
     // MARK: - Your custom sounds

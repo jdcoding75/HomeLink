@@ -1220,7 +1220,8 @@ struct CreateThoughtSheet: View {
 
     @State private var chosenEmoji   = ""
     @State private var thoughtName   = ""               // optional, step 3
-    @State private var soundChoice: SoundChoice = .record
+    // [3/5] Recording retired (no microphone) — default to a curated preset.
+    @State private var soundChoice: SoundChoice = .preset
     @State private var presetToken: String? = nil
     @State private var systemSoundID: UInt32? = nil     // Apple system sound
     @State private var keepExistingRecording = false   // editing a recorded thought
@@ -1237,7 +1238,7 @@ struct CreateThoughtSheet: View {
     private var canSave: Bool {
         guard !chosenEmoji.isEmpty else { return false }
         switch soundChoice {
-        case .record: return recorder.hasRecording || keepExistingRecording
+        case .record: return false   // [3/5] recording retired — unreachable
         case .preset: return presetToken != nil
         case .phone:  return systemSoundID != nil
         }
@@ -1279,10 +1280,11 @@ struct CreateThoughtSheet: View {
                         }
                         .padding(.bottom, 18)
 
-                    // b) The sound
+                    // b) The sound — [3/5] "record your own" retired (no mic);
+                    // choose a curated preset voice or a warm phone sound.
                     sectionLabel("its sound")
                     Picker("", selection: $soundChoice) {
-                        Text("record your own").tag(SoundChoice.record)
+                        // Text("record your own").tag(SoundChoice.record)
                         Text("preset").tag(SoundChoice.preset)
                         Text("phone sounds").tag(SoundChoice.phone)
                     }
@@ -1291,7 +1293,7 @@ struct CreateThoughtSheet: View {
 
                     Group {
                         switch soundChoice {
-                        case .record: recordSection
+                        case .record: presetSection   // recording retired → preset
                         case .preset: presetSection
                         case .phone:  phoneSoundSection
                         }
@@ -1372,8 +1374,10 @@ struct CreateThoughtSheet: View {
                     soundChoice = .phone
                     systemSoundID = soundID
                 case .recording:
-                    soundChoice = .record
-                    keepExistingRecording = true   // keep it unless they retake
+                    // [3/5] Legacy recorded thought — recording is retired, so
+                    // editing falls back to choosing a preset voice.
+                    soundChoice = .preset
+                    keepExistingRecording = false
                 }
             }
         }
