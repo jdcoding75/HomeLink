@@ -80,15 +80,7 @@ struct RootView: View {
         .onAppear {
             people.configure(with: modelContext)
             #if DEBUG
-            // [4/6] Consume the -skipOnboarding inject flag once: mock Sarah +
-            // connection so the compass points at her immediately. withHistory
-            // is FALSE — seeding live thoughts pops a catch that buries the
-            // compass on every launch; the "send test thought" dev tool covers
-            // catch testing on demand instead.
-            if UserDefaults.standard.bool(forKey: DevTools.injectFlagKey) {
-                UserDefaults.standard.removeObject(forKey: DevTools.injectFlagKey)
-                DevTools.injectMockData(people: people, pings: pings, withHistory: false)
-            }
+            applySkipOnboardingIfNeeded()
             #endif
             startCompassIfNeeded()
             startRealtimePings()
@@ -290,6 +282,35 @@ struct RootView: View {
             compass.start(tracking: person)
         }
     }
+
+    #if DEBUG
+    // ════════════════════════════════════════════════════════════════════
+    // ⚠️ DO NOT REMOVE — the PERMANENT skip-onboarding entry point.
+    // This is the SINGLE source of truth, checked here in RootView (which has
+    // the configured SwiftData context) rather than relying on a UserDefaults
+    // flag set in App.init that a concurrent build can stomp. It reads the
+    // launch argument DIRECTLY every launch, so `-skipOnboarding` always lands
+    // straight on the compass with Sarah — independent of any other change.
+    // ════════════════════════════════════════════════════════════════════
+    private func applySkipOnboardingIfNeeded() {
+        // The launch argument is authoritative and re-checked every launch.
+        if DevTools.wantsSkipOnboarding {
+            if !hasCompletedOnboarding { hasCompletedOnboarding = true }
+            // No stale mock catch should bury the compass.
+            UserDefaults.standard.removeObject(forKey: "pendingThoughtQueue")
+            // Idempotent — injectMockData re-selects an existing Sarah or
+            // creates her (name 💜 / NYC / paired / tagline) and connects.
+            DevTools.injectMockData(people: people, pings: pings, withHistory: false)
+            rootLog.info("skip-onboarding: launch arg present → Sarah injected, compass ready")
+            return
+        }
+        // The "Skip to compass (mock data)" dev button sets this flag instead.
+        if UserDefaults.standard.bool(forKey: DevTools.injectFlagKey) {
+            UserDefaults.standard.removeObject(forKey: DevTools.injectFlagKey)
+            DevTools.injectMockData(people: people, pings: pings, withHistory: false)
+        }
+    }
+    #endif
 }
 
 // MARK: - Post-onboarding connect prompt (shown once, ever)
