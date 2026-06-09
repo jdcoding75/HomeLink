@@ -1,0 +1,36 @@
+{
+  "identifier" : "B1C0FFEE-0001-4000-8000-00000000C0DE",
+  "nonRenewingSubscriptions" : [],
+  "products" : [
+    {
+      "displayPrice" : "2.99",
+      "familyShareable" : false,
+      "internalID" : "1001",
+      "localizations" : [
+        {
+          "description" : "Unlock all Pro instruments, skins, custom thoughts, and up to 5 people — a one-time purchase, no subscription. 50% supports charity.",
+          "displayName" : "Pointward Pro",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "com.jdcoding75.pointward.pro",
+      "referenceName" : "Pointward Pro",
+      "type" : "NonConsumable"
+    }
+  ],
+  "settings" : {
+    "_applicationInternalID" : "0",
+    "_developerTeamID" : "78842PK6A3",
+    "_failTransactionsEnabled" : false,
+    "_lastSynchronizedDate" : 0,
+    "_locale" : "en_US",
+    "_storefront" : "USA",
+    "_storeKitErrors" : [
+    ]
+  },
+  "subscriptionGroups" : [],
+  "version" : {
+    "major" : 4,
+    "minor" : 0
+  }
+}

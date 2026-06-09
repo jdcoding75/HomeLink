@@ -12,13 +12,18 @@ struct PointwardApp: App {
     @StateObject private var container = ServiceContainer()
 
     init() {
-        // ── TESTING DEFAULTS — revert before App Store submission ────────
-        // Default tier .pro, Pro features on. (Skin default is .vintage in
-        // SkinStore.) Remove this register block to restore .free defaults.
+        #if DEBUG
+        // ═══════════════════════════════════════════════════════════════════
+        // ⚠️ DEBUG-ONLY TESTING DEFAULTS — REMOVE BEFORE APP STORE SUBMISSION ⚠️
+        // Forces tier .pro + Pro features on so DEBUG builds skip the paywall.
+        // This is wrapped in #if DEBUG, so RELEASE builds start at .free and the
+        // real StoreKit entitlement (SubscriptionManager) decides Pro access.
+        // ═══════════════════════════════════════════════════════════════════
         UserDefaults.standard.register(defaults: [
             "subscriptionTier": "unlocked",      // SubscriptionTier.pro
             ProFeatures.storageKey: true,        // proFeaturesEnabled
         ])
+        #endif
 
         // Carry "Expressive Mode" users into the renamed Pro key
         ProFeatures.migrateLegacyKey()

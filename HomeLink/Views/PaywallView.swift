@@ -141,22 +141,22 @@ struct PaywallView: View {
                             .padding(.bottom, 14)
                         }
 
-                        // CTA
+                        // CTA — real StoreKit purchase, real price.
                         Button {
-                            isPurchasing = true
                             Task {
                                 await subscription.upgrade()
-                                isPurchasing = false
-                                dismiss()
+                                if subscription.tier == .pro { dismiss() }
                             }
                         } label: {
                             HStack(spacing: 8) {
-                                if isPurchasing {
+                                if subscription.isPurchasing {
                                     ProgressView()
                                         .tint(DesignTokens.Color.textPrimary)
                                         .scaleEffect(0.8)
                                 }
-                                Text(isPurchasing ? "unlocking…" : "unlock pro · $2.99")
+                                Text(subscription.isPurchasing
+                                     ? "unlocking…"
+                                     : "unlock pro · \(subscription.proPriceText)")
                             }
                             .font(DesignTokens.Font.label)
                             .foregroundColor(DesignTokens.Color.textPrimary)
@@ -169,15 +169,36 @@ struct PaywallView: View {
                                     .stroke(DesignTokens.Color.accentMid, lineWidth: 1)
                             )
                         }
-                        .disabled(isPurchasing)
-                        .padding(.bottom, 10)
+                        .disabled(subscription.isPurchasing)
+                        .padding(.bottom, 8)
+
+                        // Purchase error, if any
+                        if let err = subscription.purchaseError {
+                            Text(err)
+                                .font(.system(size: 11))
+                                .foregroundColor(Color(hex: "#e08a3c"))
+                                .multilineTextAlignment(.center)
+                                .padding(.horizontal, 20)
+                                .padding(.bottom, 6)
+                        }
 
                         Button("restore purchase") {
-                            Task { await subscription.restorePurchases() }
+                            Task {
+                                await subscription.restorePurchases()
+                                if subscription.tier == .pro { dismiss() }
+                            }
                         }
                         .font(DesignTokens.Font.caption)
                         .foregroundColor(DesignTokens.Color.textMuted)
                         .padding(.bottom, 8)
+
+                        // Subtle, non-blocking loading hint while the store fetches.
+                        if !subscription.productsLoaded {
+                            Text("loading store…")
+                                .font(.system(size: 10))
+                                .foregroundColor(DesignTokens.Color.textDim)
+                                .padding(.bottom, 6)
+                        }
 
                         Text("one time purchase · no subscription")
                             .font(.system(size: 10))
