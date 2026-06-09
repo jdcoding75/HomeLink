@@ -134,6 +134,11 @@ struct CompassView: View {
     @State private var faceSendPulse = false           // [4/4] compass send pulse
     @State private var flightFly = false
     @State private var holdProgress: Double = 0
+    // [1/3] Bumped by cancelInstrument — folded into the instrument's .id so a
+    // cancel REBUILDS the instrument fresh in its idle state, guaranteeing a
+    // clean reset for all 7 (fuel/draw/charge/wind counters reset to zero) no
+    // matter what mid-send state the instrument was holding internally.
+    @State private var instrumentResetID = 0
     private let holdDuration = 2.0
     private let holdTick = Timer.publish(every: 0.05, on: .main, in: .common).autoconnect()
 
@@ -310,26 +315,15 @@ struct CompassView: View {
                             )
                         }
                     }
-                    .id(instrumentStore.selected)              // crossfade on switch
+                    // [1/3] CANCEL — the X used to live here, as an overlay on
+                    // the instrument Group. During an in-progress send some
+                    // instruments lay their own gesture surface across this
+                    // region and swallowed the tap, so the X "did nothing."
+                    // It's now a TOP-LEVEL overlay (see body root, zIndex 30)
+                    // that always sits above every instrument and gesture.
+                    .id(instrumentIdentity)                    // crossfade on switch · reset on cancel
                     .transition(.opacity)
                     .animation(.easeInOut(duration: 0.3), value: instrumentStore.selected)
-                    // [6/8] CANCEL — a small X at the top-right whenever a
-                    // feeling is loaded; tap it to gently deselect and reset.
-                    .overlay(alignment: .topTrailing) {
-                        if selectedToken != nil && pings.nowPlaying == nil {
-                            Button { cancelInstrument() } label: {
-                                Image(systemName: "xmark")
-                                    .font(.system(size: 13, weight: .bold))
-                                    .foregroundColor(Color(hex: "#c4a8d4"))
-                                    .frame(width: 30, height: 30)
-                                    .background(Circle().fill(DesignTokens.Color.background.opacity(0.8)))
-                                    .overlay(Circle().stroke(Color(hex: "#7c6b8e").opacity(0.6), lineWidth: 1))
-                            }
-                            .buttonStyle(.plain)
-                            .padding(.top, 14).padding(.trailing, 14)
-                            .transition(.scale.combined(with: .opacity))
-                        }
-                    }
                     // [1/6] LAYER 2 — the 8-segment ring scanner, alive
                     // whenever the user is aiming or catching
                     .overlay {
@@ -705,6 +699,10 @@ struct CompassView: View {
             //     }
             // }
         }
+        // [1/3] CANCEL (X) — top-level overlay so it sits above EVERY instrument
+        // surface and gesture; tapping it always works, mid-send, on all 7.
+        .overlay(alignment: .topTrailing) { cancelButton }
+        .animation(.spring(response: 0.4, dampingFraction: 0.7), value: selectedToken != nil)
         // ── Reactions to state changes ────────────────────────────────────────
         .onChange(of: pings.partnerPointingAt) { _, stamp in
             guard stamp != nil else { return }
@@ -1229,10 +1227,44 @@ struct CompassView: View {
     /// note, soft-haptic confirmation. Shared by the X button and tap-outside.
     private func cancelInstrument() {
         guard selectedToken != nil else { return }
-        HapticEngine.caughtConfirmation()
+        HapticEngine.caughtConfirmation()        // soft confirmation tap
+        // Cut any in-flight hold/load progress so nothing fires after a cancel.
+        holdProgress = 0
+        loadFlightToken = nil
+        loadFlightProgress = 0
         withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
-            selectedToken = nil
-            messageText = ""
+            selectedToken = nil                  // deselect the feeling
+            messageText = ""                     // clear the optional note
+            instrumentResetID += 1               // rebuild instrument → idle
+        }
+    }
+
+    /// [1/3] The instrument's view identity: changes when the user switches
+    /// instruments (crossfade) AND when a cancel bumps instrumentResetID, which
+    /// rebuilds the current instrument fresh in its idle state.
+    private var instrumentIdentity: String {
+        "\(instrumentStore.selected)-\(instrumentResetID)"
+    }
+
+    /// [1/3] The cancel (X) control — lives at the screen's top-trailing as a
+    /// top-level overlay (see body root) so it ALWAYS sits above every
+    /// instrument surface and gesture. Shown whenever a feeling is loaded and
+    /// no receipt is playing; works identically on all 7 instruments.
+    @ViewBuilder
+    private var cancelButton: some View {
+        if selectedToken != nil && pings.nowPlaying == nil {
+            Button { cancelInstrument() } label: {
+                Image(systemName: "xmark")
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundColor(Color(hex: "#c4a8d4"))
+                    .frame(width: 38, height: 38)   // generous tap target
+                    .background(Circle().fill(DesignTokens.Color.background.opacity(0.85)))
+                    .overlay(Circle().stroke(Color(hex: "#7c6b8e").opacity(0.6), lineWidth: 1))
+            }
+            .buttonStyle(.plain)
+            .contentShape(Circle())
+            .padding(.top, 14).padding(.trailing, 18)
+            .transition(.scale.combined(with: .opacity))
         }
     }
 

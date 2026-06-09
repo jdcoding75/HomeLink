@@ -440,11 +440,14 @@ final class SupabaseService: ObservableObject {
 
     /// Peek at an invite without claiming it — powers the accept sheet's
     /// "[name] wants to connect with you".
-    func lookupInvite(_ rawCode: String) async throws -> (name: String?, emoji: String?) {
+    func lookupInvite(_ rawCode: String) async throws
+        -> (name: String?, emoji: String?, latitude: Double?, longitude: Double?) {
         guard let client else { throw SupabaseServiceError.notConfigured }
         let code = Self.normalizePairingCode(rawCode)
         log.info("pairing: lookupInvite \(code, privacy: .public)")
-        let rows: [ConnectionRow] = try await withRetry(label: "lookupInvite") {
+        // FullConnectionRow also carries the owner's location (nil pre-migration),
+        // so the accept screen can show where the sender is before claiming.
+        let rows: [FullConnectionRow] = try await withRetry(label: "lookupInvite") {
             try await client
                 .from("connections")
                 .select()
@@ -455,7 +458,7 @@ final class SupabaseService: ObservableObject {
             log.warning("pairing: lookupInvite — code not found")
             throw SupabaseServiceError.codeNotFound
         }
-        return (row.personName, row.personEmoji)
+        return (row.personName, row.personEmoji, row.ownerLatitude, row.ownerLongitude)
     }
 
     /// Fetch (or create on first call) this user's pairing code, e.g. "POINT-4729".

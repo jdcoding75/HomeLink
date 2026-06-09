@@ -6,6 +6,7 @@
 
 import SwiftUI
 import MessageUI
+import CoreLocation
 import os
 
 struct ConnectView: View {
@@ -290,8 +291,18 @@ struct ConnectView: View {
         codeError = nil
         Task {
             do {
-                code = try await SupabaseService.shared.myPairingCode()
-                Self.log.info("connect: my code ready \(code ?? "?", privacy: .public)")
+                // Pre-populate the invite's sender info from YOUR profile so the
+                // recipient sees a real name · emoji · location — and the app feels
+                // alive even before you've filled anything in (falls back to the
+                // friendly demo person, Alex).
+                let snapshot = UserProfile.snapshot
+                let name  = snapshot?.displayName ?? DemoPerson.name
+                let emoji = snapshot?.emoji ?? DemoPerson.emoji
+                let lat   = (snapshot?.hasLocation == true) ? snapshot?.latitude  : DemoPerson.coordinate.latitude
+                let lng   = (snapshot?.hasLocation == true) ? snapshot?.longitude : DemoPerson.coordinate.longitude
+                code = try await SupabaseService.shared.createProfileInvite(
+                    name: name, emoji: emoji, latitude: lat, longitude: lng)
+                Self.log.info("connect: my code ready \(code ?? "?", privacy: .public) (sender: \(name, privacy: .public))")
             } catch {
                 Self.log.error("connect: code fetch failed: \(error.localizedDescription, privacy: .public)")
                 codeError = error.localizedDescription

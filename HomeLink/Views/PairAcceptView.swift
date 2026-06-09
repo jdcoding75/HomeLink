@@ -36,6 +36,9 @@ struct PairAcceptView: View {
 
     @State private var inviteName:  String?
     @State private var inviteEmoji: String?
+    @State private var inviteLatitude:  Double?
+    @State private var inviteLongitude: Double?
+    @State private var inviteLocationName: String?
     @State private var isBusy = false
     @State private var errorMessage: String?
     @State private var linkedPerson: Person?
@@ -95,15 +98,22 @@ struct PairAcceptView: View {
                 }
                 .padding(.bottom, 14)
 
-                Text("\(displayName) wants to connect")
-                    .font(.system(size: 26, weight: .semibold, design: .serif))
+                Text(displayName)
+                    .font(.system(size: 28, weight: .semibold, design: .serif))
                     .foregroundColor(DesignTokens.Color.textPrimary)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 28)
 
-                Text("thoughts will travel between your instruments")
-                    .font(.system(size: 13, design: .serif).italic())
-                    .foregroundColor(Self.lavender.opacity(0.8))
+                if let inviteLocationName {
+                    Text(inviteLocationName)
+                        .font(.system(size: 14))
+                        .foregroundColor(DesignTokens.Color.textMuted)
+                        .padding(.top, 3)
+                }
+
+                Text("wants to connect with you ✦")
+                    .font(.system(size: 15, design: .serif).italic())
+                    .foregroundColor(Self.lavender.opacity(0.85))
                     .padding(.top, 8)
                     .padding(.bottom, 26)
 
@@ -150,7 +160,7 @@ struct PairAcceptView: View {
                         }
                         .disabled(isBusy)
 
-                        Text("their card fills itself in — edit it any time")
+                        Text("one tap — their card builds itself, edit it any time")
                             .font(.system(size: 11, design: .serif).italic())
                             .foregroundColor(DesignTokens.Color.textDim)
 
@@ -170,7 +180,7 @@ struct PairAcceptView: View {
                             newEmoji = inviteEmoji ?? "💜"
                             withAnimation(.easeOut(duration: 0.3)) { step = .addNew }
                         } label: {
-                            Text("enter details manually →")
+                            Text("edit details")
                                 .font(DesignTokens.Font.caption)
                                 .foregroundColor(DesignTokens.Color.accentSoft)
                         }
@@ -468,6 +478,16 @@ struct PairAcceptView: View {
                 withAnimation(.easeOut(duration: 0.3)) {
                     inviteName  = info.name
                     inviteEmoji = info.emoji
+                    inviteLatitude  = info.latitude
+                    inviteLongitude = info.longitude
+                }
+                // Turn the sender's shared coordinate into a friendly place name
+                // for the "[Name] · [place]" header. Best-effort, silent on fail.
+                if let lat = info.latitude, let lng = info.longitude, (lat != 0 || lng != 0) {
+                    let coordinate = CLLocationCoordinate2D(latitude: lat, longitude: lng)
+                    if let location = try? await appEnv.geocodingService.reverseGeocode(coordinate: coordinate) {
+                        withAnimation(.easeOut(duration: 0.3)) { inviteLocationName = location.displayName }
+                    }
                 }
             } catch let error as SupabaseServiceError where error == .codeNotFound {
                 Self.log.warning("accept: code \(code, privacy: .public) not found")
