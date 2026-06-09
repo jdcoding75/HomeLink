@@ -134,6 +134,8 @@ struct CompassView: View {
     @AppStorage("arrivalPreviewEnabled") private var arrivalPreviewEnabled = true
     @AppStorage("arrivalPreviewCount")   private var arrivalPreviewCount   = 0
     @State private var arrivalPreview: ArrivalPreviewData? = nil
+    @State private var sentMessage: String? = nil   // [2/3] for the sent confirmation
+    @State private var sentTagline: String? = nil
     @State private var sentNotice = false
     @State private var showKeepPreviewPrompt = false
     // Full-compass sender styles dim the skin to 20 % while they play
@@ -1554,10 +1556,17 @@ struct CompassView: View {
     @ViewBuilder
     private var arrivalPreviewLayer: some View {
         if let preview = arrivalPreview {
-            ArrivalPreviewView(emoji: preview.emoji, style: preview.style,
-                               name: preview.name) {
-                arrivalPreviewFinished()
-            }
+            // [2/3] SENT CONFIRMATION — every instrument's send ends with the
+            // ONE shared EmojiRevealView: context = .sent ("sent to [Name] ✦"),
+            // ambient = the instrument's world. Same component as the receipt.
+            EmojiRevealView(
+                emoji: preview.emoji,
+                message: sentMessage,
+                tagline: sentTagline,
+                context: .sent(recipientName: preview.name),
+                ambient: RevealAmbient.forStyle(preview.style),
+                onDismiss: { arrivalPreviewFinished() }
+            )
             .transition(.opacity)
         }
     }
@@ -1634,6 +1643,9 @@ struct CompassView: View {
         }
         // [5/5] Capture the note before clearing the field, so it rides along.
         let outgoingMessage = messageText.trimmingCharacters(in: .whitespacesAndNewlines)
+        // [2/3] Capture what was sent for the sent-confirmation reveal.
+        sentMessage = outgoingMessage.isEmpty ? nil : outgoingMessage
+        sentTagline = people.selectedPerson?.tagline
         withAnimation(.easeOut(duration: 0.25)) { selectedToken = nil }
         messageFocused = false
         messageText = ""

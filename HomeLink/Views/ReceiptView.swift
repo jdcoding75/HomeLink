@@ -164,10 +164,21 @@ struct ReceiptView: View {
                         .allowsHitTesting(false)
                 }
 
-                // [3/8] FULL-SCREEN REVEAL — once revealed, the emoji fills the
-                // screen over a deep-purple world; the letter reads beneath it.
+                // THE REVEAL — once landed, EVERY instrument hands off to the
+                // ONE shared EmojiRevealView: emoji blooms to 156pt (🤗 arm
+                // squeeze ×3), the emoji .wav + reveal haptic fire inside it,
+                // "from [Name] ✦", over the instrument's own world (ambient).
+                // (Wind takes the dedicated WindReceiptAnimation path instead.)
                 if phase == .revealed {
-                    fullScreenReveal.transition(.opacity)
+                    EmojiRevealView(
+                        emoji: ping.emoji,
+                        message: ping.message,
+                        tagline: ping.tagline,
+                        context: .received(fromName: ping.fromName),
+                        ambient: RevealAmbient.forStyle(style),
+                        onDismiss: { onFinished() }
+                    )
+                    .transition(.opacity)
                 }
 
                 // ── Reveal flash/flood over everything ──
@@ -607,9 +618,9 @@ struct ReceiptView: View {
         phase = .revealed
         onRevealed()
         bloomed = true
-        SoundEngine.shared.playEmojiSound(ping.emoji)   // [2/3] sound as the emoji reaches full size
         named = true
-        HapticEngine.revealHaptic(for: ping.emoji)      // [4/8][5/8] emotional sequence
+        // The emoji .wav + reveal haptic now fire INSIDE EmojiRevealView (the
+        // single reveal screen) — no longer played here, so they never double.
         armRevealTap()
         withAnimation(.easeOut(duration: 0.2)) { revealFlood = true }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
@@ -640,18 +651,15 @@ struct ReceiptView: View {
     private func revealFromBucket() {
         phase = .revealed
         onRevealed()
-        HapticEngine.revealHaptic(for: ping.emoji)      // [4/8][5/8] emotional sequence
         armRevealTap()
-        SoundEngine.shared.play(for: "style.bell")      // the reveal chime
-        // [3/6] The emoji's own sound fires ONLY at reveal — its curated .wav,
-        // alongside the reveal haptic. (Removed the duplicate synthesized
-        // play(for: ping.emoji); playEmojiSound below is the single emoji voice.)
+        SoundEngine.shared.play(for: "style.bell")      // the soft catch chime
+        // The emoji .wav + reveal haptic fire INSIDE EmojiRevealView (the single
+        // reveal screen) — not here, so they never double.
         withAnimation(.easeOut(duration: 0.2)) { revealFlood = true }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
             withAnimation(.easeIn(duration: 0.2)) { revealFlood = false }
         }
         bloomed = true
-        SoundEngine.shared.playEmojiSound(ping.emoji)   // [3/6] curated emoji .wav at reveal
         named = true
     }
 
