@@ -17,7 +17,8 @@ struct PaywallView: View {
         ("🏹", "bow & arrow — draw and release"),
         ("🌬️", "wind — breathe and release"),
         ("👆", "flick — load aim launch"),
-        ("😤", "pro emojis and custom sounds"),
+        ("💬", "add a personal message"),
+        ("😤", "5 pro feelings + 3 occasion emojis"),
         ("📏", "funny distances"),
         ("🚀", "rocket — fuel aim blast off"),
         // ("🎨", "vintage brass and heart compass skins"),   // skins are free now; heart retired

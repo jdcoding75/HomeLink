@@ -10,6 +10,7 @@
 // on the tap path.
 
 import AVFoundation
+import AudioToolbox
 
 final class SoundEngine {
 
@@ -31,6 +32,30 @@ final class SoundEngine {
         try? AVAudioSession.sharedInstance().setCategory(.ambient, options: [.mixWithOthers])
         buildCache()
         buildProCache()
+    }
+
+    // MARK: - [2/3] Curated emoji sounds (shipped .wav files)
+
+    private var emojiSoundIDs: [String: SystemSoundID] = [:]
+
+    /// Play the short .wav for a curated emoji, if one is shipped. The system
+    /// sound id is created once per file and cached; graceful no-op otherwise.
+    func playEmojiSound(_ emoji: String) {
+        guard let soundName = CuratedEmoji.soundMap[emoji] else { return }
+        if let id = emojiSoundIDs[soundName] {
+            AudioServicesPlaySystemSound(id)
+            return
+        }
+        guard let url = Bundle.main.url(forResource: soundName, withExtension: "wav") else {
+            #if DEBUG
+            print("[SoundEngine] emoji sound not in bundle: \(soundName).wav")
+            #endif
+            return
+        }
+        var soundID: SystemSoundID = 0
+        AudioServicesCreateSystemSoundID(url as CFURL, &soundID)
+        emojiSoundIDs[soundName] = soundID
+        AudioServicesPlaySystemSound(soundID)
     }
 
     // Quiet Mode retired — full emotional intensity, always.

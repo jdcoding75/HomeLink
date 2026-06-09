@@ -122,6 +122,7 @@ struct CompassView: View {
     @State private var selectedToken: String? = nil
     @State private var messageText: String = ""             // [5/5] optional note (≤30)
     @FocusState private var messageFocused: Bool
+    @State private var longPressLabel: String? = nil        // [1/3] curated-emoji label on long-press
     @State private var loadFlightToken: String? = nil       // [1/5] load flight
     @State private var loadFlightProgress: CGFloat = 0
     @State private var flightToken: String? = nil
@@ -1080,36 +1081,87 @@ struct CompassView: View {
         .padding(.horizontal, 40)
     }
 
+    /// [1/3] The curated set — base 6 (selectable), pro 5 (locked for free),
+    /// occasion 3 (coming soon). Long-press shows the label; tap auto-fills the
+    /// default message [3/3]. Horizontally scrollable to fit all 14.
     private var emojiRow: some View {
-        HStack(spacing: 10) {
-            ForEach(rowTokens, id: \.self) { token in
-                let isSelected = selectedToken == token
-                Button {
-                    withAnimation(.spring(response: 0.32, dampingFraction: 0.6)) {
-                        selectedToken = isSelected ? nil : token
-                    }
-                    // [1/5] Selecting a thought flies it into the instrument.
-                    if !isSelected { triggerLoadFlight(token) }
-                    else { HapticEngine.personSelected() }
-                } label: {
-                    sendSymbol(token, size: 26)
-                        .frame(width: 50, height: 50)
-                        .background(DesignTokens.Color.backgroundCard.opacity(isSelected ? 1 : 0.7))
-                        .cornerRadius(15)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 15)
-                                .stroke(isSelected ? DesignTokens.Color.accentMid
-                                                   : DesignTokens.Color.border.opacity(0.6),
-                                        lineWidth: 1)
-                        )
-                        .shadow(color: Color(hex: "#c4a8d4").opacity(isSelected ? 0.55 : 0),
-                                radius: 10)
-                        .scaleEffect(isSelected ? 1.1 : 1.0)
+        VStack(spacing: 6) {
+            if let longPressLabel {
+                Text(longPressLabel)
+                    .font(.system(size: 12, design: .serif).italic())
+                    .foregroundColor(Color(hex: "#c4a8d4"))
+                    .transition(.opacity)
+            }
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 10) {
+                    ForEach(CuratedEmoji.all) { item in emojiCell(item) }
                 }
-                .buttonStyle(.plain)
+                .padding(.horizontal, 18)
             }
         }
-        .onAppear { personalSixRow = PersonalSet.load() }
+    }
+
+    @ViewBuilder
+    private func emojiCell(_ item: CuratedEmoji.Item) -> some View {
+        let isPro = subscription.tier != .free
+        let locked = item.access == .pro && !isPro
+        let comingSoon = item.access == .comingSoon
+        let isSelected = selectedToken == item.emoji
+        Button {
+            if comingSoon {
+                HapticEngine.personSelected()
+                showLabel("\(item.label) · coming soon")
+            } else if locked {
+                HapticEngine.paywallReached()
+                showSkinPaywall = true                   // tap locked → upgrade
+            } else if isSelected {
+                withAnimation(.spring(response: 0.32, dampingFraction: 0.6)) { selectedToken = nil }
+                messageText = ""
+                HapticEngine.personSelected()
+            } else {
+                withAnimation(.spring(response: 0.32, dampingFraction: 0.6)) { selectedToken = item.emoji }
+                // [3/3] Auto-fill the warm default message (user can edit/clear).
+                messageText = MessageRules.clamped(item.defaultMessage)
+                triggerLoadFlight(item.emoji)
+            }
+        } label: {
+            ZStack(alignment: .topTrailing) {
+                sendSymbol(item.emoji, size: 26)
+                    .frame(width: 50, height: 50)
+                    .opacity(locked || comingSoon ? 0.5 : 1)
+                    .background(DesignTokens.Color.backgroundCard.opacity(isSelected ? 1 : 0.7))
+                    .cornerRadius(15)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 15)
+                            .stroke(isSelected ? DesignTokens.Color.accentMid
+                                               : DesignTokens.Color.border.opacity(0.6),
+                                    lineWidth: 1)
+                    )
+                    .shadow(color: Color(hex: "#c4a8d4").opacity(isSelected ? 0.55 : 0), radius: 10)
+                    .scaleEffect(isSelected ? 1.1 : 1.0)
+                if locked {
+                    Image(systemName: "lock.fill")
+                        .font(.system(size: 9))
+                        .foregroundColor(Color(hex: "#c4a8d4"))
+                        .padding(2).background(Circle().fill(DesignTokens.Color.background))
+                        .offset(x: 4, y: -4)
+                } else if comingSoon {
+                    Text("✨")
+                        .font(.system(size: 11))
+                        .offset(x: 5, y: -5)
+                }
+            }
+        }
+        .buttonStyle(.plain)
+        .onLongPressGesture(minimumDuration: 0.3) { showLabel(item.label) }
+    }
+
+    private func showLabel(_ text: String) {
+        HapticEngine.personSelected()
+        withAnimation(.easeOut(duration: 0.2)) { longPressLabel = text }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.6) {
+            withAnimation(.easeIn(duration: 0.3)) { if longPressLabel == text { longPressLabel = nil } }
+        }
     }
 
     /// [1/6] LAYER 1 + [4/6]: one clear line below the instrument —
@@ -1237,6 +1289,8 @@ struct CompassView: View {
             CompassView.log.warning("send: blocked by app state \(appState.currentState.rawValue, privacy: .public) — try again when free")
             return
         }
+        // [2/3] The emoji's own sound, at the exact moment it launches.
+        SoundEngine.shared.playEmojiSound(sendRemoteEmoji(for: token))
         // [5/5] Capture the note before clearing the field, so it rides along.
         let outgoingMessage = messageText.trimmingCharacters(in: .whitespacesAndNewlines)
         withAnimation(.easeOut(duration: 0.25)) { selectedToken = nil }

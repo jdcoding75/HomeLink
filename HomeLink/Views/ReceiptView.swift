@@ -39,6 +39,8 @@ struct ReceiptView: View {
     @State private var dimWorld = false
     @State private var bubbleSettle = false
     @State private var bloomed = false
+    @State private var breathe = false       // [3/8] full-screen reveal breathing
+    @State private var revealTapArmed = false // [3/8] ignore stray taps for ~1.2 s
     @State private var revealFlood = false
     @State private var named = false
     @State private var debugBypass = false
@@ -98,6 +100,12 @@ struct ReceiptView: View {
                     bottomZone.frame(height: geo.size.height * 0.2)
                 }
 
+                // [3/8] FULL-SCREEN REVEAL — once revealed, the emoji fills the
+                // screen over a deep-purple world; the letter reads beneath it.
+                if phase == .revealed {
+                    fullScreenReveal.transition(.opacity)
+                }
+
                 // ── Reveal flash/flood over everything ──
                 Color.white.opacity(lockFlash ? 0.5 : 0).ignoresSafeArea().allowsHitTesting(false)
                 Color(hex: "#fff3d8").opacity(revealFlood ? 0.15 : 0).ignoresSafeArea().allowsHitTesting(false)
@@ -105,7 +113,11 @@ struct ReceiptView: View {
             .contentShape(Rectangle())
             .onTapGesture {
                 if phase == .caught { revealFromBucket() }
-                else if phase == .revealed { onFinished() }
+                // [3/8] never rushed — ignore taps for the first ~1.2 s.
+                else if phase == .revealed && revealTapArmed {
+                    HapticEngine.stopRevealPresence()   // [4/8] end the lingering pulse
+                    onFinished()
+                }
             }
         }
         .onAppear { begin() }
@@ -126,6 +138,60 @@ struct ReceiptView: View {
                 .padding(.horizontal, 24)
             Spacer()
         }
+    }
+
+    // ── [3/8] FULL-SCREEN REVEAL — the emoji fills the screen, like a letter ─
+    private var fullScreenReveal: some View {
+        ZStack {
+            // Deep purple world.
+            RadialGradient(colors: [Color(hex: "#1a1228"), Color(hex: "#0d0d14")],
+                           center: .center, startRadius: 30, endRadius: 540)
+                .ignoresSafeArea()
+            // Warm glow in the emoji's hue, radiating slowly outward.
+            Circle().fill(hue.opacity(0.30))
+                .frame(width: 360, height: 360).blur(radius: 90)
+                .scaleEffect(breathe ? 1.18 : 0.88)
+                .animation(.easeInOut(duration: 3).repeatForever(autoreverses: true), value: breathe)
+
+            VStack(spacing: 22) {
+                Text(ping.emoji)
+                    .font(.system(size: 140))
+                    .scaleEffect(breathe ? 1.02 : 0.98)   // breathing 0.98–1.02, 3 s
+                    .shadow(color: hue.opacity(0.6), radius: 42)
+                    .animation(.easeInOut(duration: 3).repeatForever(autoreverses: true), value: breathe)
+
+                if let message = ping.message, !message.isEmpty {
+                    Text(message)
+                        .font(.system(size: 28, design: .serif))
+                        .foregroundColor(Self.lavender)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 36)
+                }
+                if let tagline = ping.tagline, !tagline.isEmpty {
+                    Text(tagline)
+                        .font(.system(size: 20, design: .serif).italic())
+                        .foregroundColor(Self.lavender.opacity(0.7))
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 36)
+                }
+                Text("from \(ping.fromName) ✦")
+                    .font(.system(size: 24, design: .serif))
+                    .foregroundColor(Self.warmWhite)
+            }
+            .padding(.bottom, 20)
+
+            VStack {
+                Spacer()
+                Text("tap anywhere to continue")
+                    .font(.system(size: 13, design: .serif).italic())
+                    .foregroundColor(Self.lavender.opacity(0.5))
+                    .opacity(revealTapArmed ? 1 : 0)
+                    .animation(.easeIn(duration: 0.6), value: revealTapArmed)
+                    .padding(.bottom, 44)
+            }
+        }
+        .allowsHitTesting(false)   // taps fall through to the container's gesture
+        .onAppear { breathe = true }
     }
 
     // ── MIDDLE 60% — the themed approach + bucket, or the reveal ───────────
@@ -466,11 +532,20 @@ struct ReceiptView: View {
         phase = .revealed
         onRevealed()
         bloomed = true
+        SoundEngine.shared.playEmojiSound(ping.emoji)   // [2/3] sound as the emoji reaches full size
         named = true
+        HapticEngine.revealHaptic(for: ping.emoji)      // [4/8][5/8] emotional sequence
+        armRevealTap()
         withAnimation(.easeOut(duration: 0.2)) { revealFlood = true }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
             withAnimation(.easeIn(duration: 0.2)) { revealFlood = false }
         }
+    }
+
+    /// [3/8] Arm the dismiss tap after a beat so the reveal is never rushed.
+    private func armRevealTap() {
+        revealTapArmed = false
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { revealTapArmed = true }
     }
 
     private func caught() {
@@ -492,6 +567,7 @@ struct ReceiptView: View {
             withAnimation(.easeIn(duration: 0.2)) { revealFlood = false }
         }
         bloomed = true
+        SoundEngine.shared.playEmojiSound(ping.emoji)   // [2/3] sound as the emoji reaches full size
         named = true
     }
 
@@ -514,12 +590,34 @@ struct CatchWorldBackground: View {
 
     var body: some View {
         switch style {
-        case .firefly:     SkyWorld()      // wind — day sky + clouds
-        case .plane:       SkyWorld()      // [1/4] plane — daytime blue sky + clouds
-        case .fingerFlick: CorkWorld()     // flick — cork board
-        case .bowArrow:    TargetWorld()   // bow — archery range
-        case .wand:        MagicWorld()    // wand — magical sparkles
-        default:           SpaceWorld()    // rocket · compass · glow — space
+        case .firefly:     SkyWorld()          // wind — day sky + clouds
+        case .plane:       SkyWorld()          // plane — daytime blue sky + clouds
+        case .fingerFlick: CorkWorld()         // flick — cork board
+        case .bowArrow:    TargetWorld()       // bow — archery range
+        case .wand:        MagicWorld()        // wand — magical sparkles
+        case .glow:        CompassGlowWorld()  // [2/8] compass — deep purple glow
+        default:           SpaceWorld()        // rocket — deep space + stars
+        }
+    }
+}
+
+/// [2/8] COMPASS — a deep purple glow that radiates slowly from the centre.
+private struct CompassGlowWorld: View {
+    var body: some View {
+        ZStack {
+            Color(hex: "#0d0d14")
+            TimelineView(.animation) { tl in
+                let t = tl.date.timeIntervalSinceReferenceDate
+                let pulse = (sin(t / 2.0) + 1) / 2        // 0…1, ~12 s cycle
+                RadialGradient(
+                    colors: [Color(hex: "#7c6b8e").opacity(0.55),
+                             Color(hex: "#3a2f4a").opacity(0.35),
+                             Color(hex: "#0d0d14")],
+                    center: .center,
+                    startRadius: 20 + CGFloat(pulse) * 40,
+                    endRadius: 360 + CGFloat(pulse) * 120)
+                .opacity(0.85)
+            }
         }
     }
 }

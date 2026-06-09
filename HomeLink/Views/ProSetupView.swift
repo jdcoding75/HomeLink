@@ -50,7 +50,9 @@ struct ProSetupView: View {
                         // instrumentSection
                         // if instrumentStore.selected == .compass { skinSection }
                         // senderStyleSection   // superseded by the instrument selection
-                        emojiSetSection
+                        // [1/3] Custom emoji slot picker retired — the send row
+                        // is a fixed curated set now (CuratedEmoji). Kept, unused.
+                        // emojiSetSection
                         // [3/5] custom sound RECORDING retired (no microphone) —
                         // replaced by a curated per-instrument personality picker.
                         // customSoundsSection
