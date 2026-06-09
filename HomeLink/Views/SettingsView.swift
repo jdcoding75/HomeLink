@@ -40,6 +40,7 @@ struct SettingsView: View {
     @State private var devBusy = false
     @State private var showTestSheet = false
     @State private var showCustomEmojiPicker = false
+    @State private var showAnimationLab = false
     @State private var mockHeadingOn = false
     @State private var farAwayOn = false
     @State private var nearbyOn = false
@@ -136,6 +137,9 @@ struct SettingsView: View {
                 DevTools.sendTestCustomEmoji(pings: devPings, token: token)
             }
         }
+        .fullScreenCover(isPresented: $showAnimationLab) {
+            AnimationTestLabView()
+        }
         #endif
     }
 
@@ -187,6 +191,24 @@ struct SettingsView: View {
                         .settingsIcon()
                         .foregroundColor(Color(hex: "#c4a8d4"))
                     Text("Send myself a test thought").settingsLabel()
+                    Spacer()
+                    Image(systemName: "chevron.right").font(.system(size: 12))
+                        .foregroundColor(DesignTokens.Color.textDim)
+                }
+            }
+            .buttonStyle(.plain)
+
+            // 🧪 Animation Test Lab — a dedicated space to fire every send and
+            // land animation in isolation (no queue, no pairing, no compass).
+            Button { showAnimationLab = true } label: {
+                settingsRow {
+                    Image(systemName: "theatermasks").settingsIcon()
+                        .foregroundColor(Color(hex: "#c4a8d4"))
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("🧪 Animation Test Lab").settingsLabel()
+                        Text("every send + land animation, in isolation")
+                            .font(.system(size: 11)).foregroundColor(DesignTokens.Color.textMuted)
+                    }
                     Spacer()
                     Image(systemName: "chevron.right").font(.system(size: 12))
                         .foregroundColor(DesignTokens.Color.textDim)
