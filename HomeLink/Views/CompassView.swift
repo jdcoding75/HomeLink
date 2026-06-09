@@ -1683,7 +1683,9 @@ struct CompassView: View {
             PingManager.ReplayItem(emoji: $0.emoji,
                                    bearingDegrees: compass.state.bearingDegrees,
                                    styleRaw: $0.senderStyle,
-                                   fromName: compass.state.personName)
+                                   fromName: compass.state.personName,
+                                   message: $0.message,        // AUDIT [5/6]
+                                   tagline: $0.tagline)
         }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
             pings.requestReplaySequence(items, startIndex: start)

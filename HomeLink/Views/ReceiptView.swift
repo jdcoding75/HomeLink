@@ -151,6 +151,18 @@ struct ReceiptView: View {
                         .foregroundColor(Self.warmWhite)
                         .opacity(named ? 1 : 0)
                         .animation(.easeIn(duration: 0.5), value: named)
+                    // AUDIT [5/6]: the sender's per-person tagline travels with
+                    // the thought — show it on the live catch (was only in the
+                    // orphaned CatchModeView before).
+                    if let tagline = ping.tagline, !tagline.isEmpty {
+                        Text(tagline)
+                            .font(.system(size: 16, design: .serif).italic())
+                            .foregroundColor(Self.lavender.opacity(0.75))
+                            .multilineTextAlignment(.center)
+                            .opacity(named ? 1 : 0)
+                            .animation(.easeIn(duration: 0.55), value: named)
+                            .padding(.horizontal, 30)
+                    }
                     // [ReceiptView] optional short message, if the sender added one
                     if let message = ping.message, !message.isEmpty {
                         Text(message)

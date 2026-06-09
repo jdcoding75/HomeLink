@@ -385,6 +385,10 @@ final class PingManager: ObservableObject {
         let bearingDegrees: Double
         let styleRaw: String?
         var fromName: String = ""
+        // AUDIT [5/6]: the note + tagline travel with the thought; carry them
+        // into replay so a replayed thought shows everything the live catch did.
+        var message: String? = nil
+        var tagline: String? = nil
     }
     struct ReplayRequest: Identifiable, Equatable {
         let id = UUID()
@@ -392,6 +396,8 @@ final class PingManager: ObservableObject {
         let bearingDegrees: Double
         let styleRaw: String?
         var fromName: String = ""
+        var message: String? = nil
+        var tagline: String? = nil
         // The full list this replay belongs to + our position, so the overlay
         // can SWIPE to the next/previous thought without re-presenting.
         var siblings: [ReplayItem] = []
@@ -400,10 +406,11 @@ final class PingManager: ObservableObject {
     @Published var replayRequest: ReplayRequest?
 
     func requestReplay(emoji: String, bearingDegrees: Double, styleRaw: String?,
-                       fromName: String = "") {
+                       fromName: String = "", message: String? = nil, tagline: String? = nil) {
         log.info("replay: requested — \(emoji, privacy: .public) bearing=\(Int(bearingDegrees), privacy: .public)°")
         replayRequest = ReplayRequest(emoji: emoji, bearingDegrees: bearingDegrees,
-                                      styleRaw: styleRaw, fromName: fromName)
+                                      styleRaw: styleRaw, fromName: fromName,
+                                      message: message, tagline: tagline)
     }
 
     /// Replay a whole list, starting at `startIndex` — the overlay can swipe
@@ -414,6 +421,7 @@ final class PingManager: ObservableObject {
         let it = items[i]
         replayRequest = ReplayRequest(emoji: it.emoji, bearingDegrees: it.bearingDegrees,
                                       styleRaw: it.styleRaw, fromName: it.fromName,
+                                      message: it.message, tagline: it.tagline,
                                       siblings: items, index: i)
     }
 

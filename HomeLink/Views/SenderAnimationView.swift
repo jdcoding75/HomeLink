@@ -1416,7 +1416,8 @@ struct ReplaySwipeContainer: View {
     private var items: [PingManager.ReplayItem] {
         request.siblings.isEmpty
             ? [PingManager.ReplayItem(emoji: request.emoji, bearingDegrees: request.bearingDegrees,
-                                      styleRaw: request.styleRaw, fromName: request.fromName)]
+                                      styleRaw: request.styleRaw, fromName: request.fromName,
+                                      message: request.message, tagline: request.tagline)]
             : request.siblings
     }
     private var cur: PingManager.ReplayItem { items[min(max(0, idx), items.count - 1)] }
@@ -1427,7 +1428,8 @@ struct ReplaySwipeContainer: View {
         ZStack {
             DesignTokens.Color.background.ignoresSafeArea()
             ReplayOverlayView(emoji: cur.emoji, bearingDegrees: cur.bearingDegrees,
-                              style: SenderStyle.from(cur.styleRaw), fromName: cur.fromName) {
+                              style: SenderStyle.from(cur.styleRaw), fromName: cur.fromName,
+                              message: cur.message, tagline: cur.tagline) {
                 // Reveal finished — auto-advance to the next, or dismiss.
                 if autoAdvance && hasNext {
                     DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
@@ -1483,6 +1485,10 @@ struct ReplayOverlayView: View {
     let style: SenderStyle
     /// [2/5] The sender — shown at the top of the replay, always visible.
     var fromName: String = ""
+    // AUDIT [5/6]: the note + tagline travel with the thought — show them on
+    // replay too (previously only the live catch displayed them).
+    var message: String? = nil
+    var tagline: String? = nil
     let onDone: () -> Void
 
     @State private var dimmed   = false
@@ -1521,7 +1527,7 @@ struct ReplayOverlayView: View {
 
                 // [2/5] Sender name — always visible at the top of the replay
                 if !fromName.isEmpty {
-                    VStack {
+                    VStack(spacing: 6) {
                         Text("from \(fromName) ✦")
                             .font(.system(size: 22, design: .serif).italic())
                             .foregroundColor(Color(hex: "#c4a8d4"))
@@ -1529,6 +1535,25 @@ struct ReplayOverlayView: View {
                             .opacity(dimmed ? 1 : 0)
                             .animation(.easeIn(duration: 0.4), value: dimmed)
                             .padding(.top, 70)
+                        // AUDIT [5/6]: tagline + note carried into replay.
+                        if let tagline, !tagline.isEmpty {
+                            Text(tagline)
+                                .font(.system(size: 15, design: .serif).italic())
+                                .foregroundColor(Color(hex: "#c4a8d4").opacity(0.7))
+                                .multilineTextAlignment(.center)
+                                .opacity(dimmed ? 1 : 0)
+                                .animation(.easeIn(duration: 0.45), value: dimmed)
+                                .padding(.horizontal, 30)
+                        }
+                        if let message, !message.isEmpty {
+                            Text(message)
+                                .font(.system(size: 17, design: .serif).italic())
+                                .foregroundColor(Color(hex: "#c4a8d4").opacity(0.9))
+                                .multilineTextAlignment(.center)
+                                .opacity(dimmed ? 1 : 0)
+                                .animation(.easeIn(duration: 0.5), value: dimmed)
+                                .padding(.horizontal, 30)
+                        }
                         Spacer()
                     }
                     .allowsHitTesting(false)
