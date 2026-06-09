@@ -115,6 +115,12 @@ struct SenderAnimationView<Symbol: View>: View {
     @State private var wandWhiteFlash = false       // wand: full-screen white flash
     @State private var wandExplode    = false       // wand: implosion → explosion scatter
     @State private var compassExpand  = false       // compass: face expand/contract pulse
+    // [1/8] ✈️ PLANE SEND — its own full-screen flight (no longer glow).
+    @State private var planeSky   = false            // full-screen sky takeover
+    @State private var planeFly: CGFloat = 0         // 0 centre → 1 off-screen
+    @State private var planeScale: CGFloat = 0.32    // perspective: grow then recede
+    @State private var planeBank: Double = 0         // climb-bank tilt
+    @State private var planeProp: Double = 0         // propeller spin
 
     // Full-compass instrument phases (finger flick + bow & arrow)
     @State private var instrumentShown = false   // 300 ms transform in
@@ -218,6 +224,13 @@ struct SenderAnimationView<Symbol: View>: View {
             if style == .firefly {
                 windSkyLayer
             }
+            // [1/8] ✈️ full-screen daytime sky for the plane send.
+            if style == .plane {
+                CatchWorldBackground(style: .plane)
+                    .ignoresSafeArea()
+                    .opacity(planeSky ? 1 : 0)
+                    .animation(.easeInOut(duration: 0.4), value: planeSky)
+            }
 
             GeometryReader { geo in
                 let end = endOffset(in: geo)
@@ -230,13 +243,13 @@ struct SenderAnimationView<Symbol: View>: View {
                     case .bowArrow:     bowArrowSend(end: end)
                     case .rocket:       rocketSend(end: end)
                     case .wand:         wandSend(end: end)
-                    case .plane:        glowSend(end: end)   // ✈️ placeholder cross-screen flight [3/5]
+                    case .plane:        planeSend(end: end)  // [1/8] real plane flight
                     }
 
                     // IMPACT — brief flash where the thought leaves the screen
                     // (the firefly lands softly instead; the rocket owns its
                     //  own exit flash + ember)
-                    if style != .firefly && style != .rocket {
+                    if style != .firefly && style != .rocket && style != .plane {
                         Circle()
                             .fill(RadialGradient(
                                 colors: [.white.opacity(0.9),
@@ -976,6 +989,83 @@ struct SenderAnimationView<Symbol: View>: View {
         DispatchQueue.main.asyncAfter(deadline: .now() + seconds) { onComplete() }
     }
 
+    // ── [1/8] ✈️ PLANE SEND — full-screen flight, 2000 ms ───────────────────
+    //   SKY     a daytime sky fades in behind everything
+    //   LAUNCH  the plane lifts from the compass centre, prop a full blur
+    //   CLIMB   it grows toward the viewer and banks into the turn
+    //   RECEDE  it shrinks into the distance, a wake spiral curling behind
+    //   EXIT    it flies off-screen toward the person's bearing
+    @ViewBuilder
+    private func planeSend(end: CGSize) -> some View {
+        let rad  = bearingDegrees * .pi / 180
+        let exit = CGSize(width: end.width * 1.6, height: end.height * 1.6)
+        ZStack {
+            // Wake spiral trail behind the propeller — a curl of vapour.
+            ForEach(0..<12, id: \.self) { i in
+                let t = max(0, planeFly - CGFloat(i) * 0.05)
+                let phase = Double(i) * 0.9 + Double(planeFly) * 6
+                Circle()
+                    .fill(Color.white.opacity(0.45 - Double(i) * 0.03))
+                    .frame(width: 9, height: 9)
+                    .blur(radius: 2)
+                    .scaleEffect(planeScale * (1 - CGFloat(i) * 0.05))
+                    .offset(x: exit.width * t + CGFloat(sin(phase) * 10),
+                            y: exit.height * t + CGFloat(cos(phase) * 10))
+                    .opacity(faded ? 0 : 1)
+            }
+            // The toy plane — nose toward the person, banking as it climbs.
+            planeBody
+                .rotationEffect(.radians(rad))
+                .rotation3DEffect(.degrees(planeBank), axis: (x: 0, y: 1, z: 0))
+                .scaleEffect(planeScale)
+                .offset(x: exit.width * planeFly, y: exit.height * planeFly)
+                .opacity(faded ? 0 : 1)
+        }
+    }
+
+    private var planeBody: some View {
+        ZStack {
+            Capsule().fill(Color(hex: "#FFD700")).frame(width: 70, height: 12)         // wings
+            Capsule().fill(Color(hex: "#CC2200")).frame(width: 26, height: 76)         // fuselage
+            Capsule().fill(Color(hex: "#FFD700")).frame(width: 30, height: 9).offset(y: 38)   // tail
+            Circle().fill(Color(hex: "#CC2200")).frame(width: 20, height: 20).offset(y: -38)  // nose
+            ForEach(0..<2, id: \.self) { i in
+                Capsule().fill(Color(hex: "#4a4a4a")).frame(width: 4, height: 32)
+                    .rotationEffect(.degrees(Double(i) * 90 + planeProp))
+            }
+            .offset(y: -40).blur(radius: 2)   // prop at full blur
+        }
+        .frame(width: 80, height: 100)
+        .shadow(color: .black.opacity(0.2), radius: 5, y: 3)
+    }
+
+    private func launchPlane() {
+        planeSky = true
+        HapticEngine.send()
+        SoundEngine.shared.play(for: "plane.wind")
+        // Prop blurs the whole flight.
+        withAnimation(.linear(duration: 2.0)) { planeProp = 360 * 16 }
+        // CLIMB — grow toward the viewer + bank into the turn (first 0.7 s).
+        withAnimation(.easeOut(duration: 0.7)) { planeScale = 1.35 }
+        withAnimation(.easeInOut(duration: 0.6)) { planeBank = -16 }
+        // FLIGHT — accelerate toward the person's bearing over 2 s.
+        withAnimation(.easeIn(duration: 2.0)) { planeFly = 1 }
+        // RECEDE — shrink into the distance after the climb (0.9 s in).
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.9) {
+            withAnimation(.easeIn(duration: 1.1)) { planeScale = 0.12 }
+            withAnimation(.easeInOut(duration: 0.6)) { planeBank = 8 }
+            HapticEngine.sendImpact()
+        }
+        // Fade the plane + wake as it leaves the screen.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.75) {
+            withAnimation(.easeOut(duration: 0.25)) { faded = true }
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.9) {
+            withAnimation(.easeInOut(duration: 0.4)) { planeSky = false }
+        }
+        finish(after: 2.1)
+    }
+
     private func launch() {
         switch style {
 
@@ -1010,7 +1100,10 @@ struct SenderAnimationView<Symbol: View>: View {
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.20) { impact() }
             finish(after: 1.2 + AnimationSystem.Trail.linger + 0.4)
 
-        case .glow, .plane:   // ✈️ plane rides the glow launch as a placeholder [3/5]
+        case .plane:
+            launchPlane()
+
+        case .glow:
             // [6/6] CHARGE 200 ms — the whole compass face expands and glows,
             // the needle locks, the golden ring blooms from center.
             chargeScale = 1.2

@@ -559,7 +559,8 @@ struct ReceiptView: View {
     private func revealFromBucket() {
         phase = .revealed
         onRevealed()
-        HapticEngine.catchReveal()
+        HapticEngine.revealHaptic(for: ping.emoji)      // [4/8][5/8] emotional sequence
+        armRevealTap()
         SoundEngine.shared.play(for: "style.bell")
         SoundEngine.shared.play(for: ping.emoji)
         withAnimation(.easeOut(duration: 0.2)) { revealFlood = true }

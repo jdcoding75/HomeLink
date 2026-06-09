@@ -46,6 +46,9 @@ struct CompassView: View {
 
     // Empty state
     @State private var showAddPerson = false
+    // [5/6] The demo-person "replace with someone real" hint — shown once,
+    // then dismissed forever (tapped or once a real person is added).
+    @AppStorage("demoHintDismissed") private var demoHintDismissed = false
 
     // Tagline animation trigger
     @State private var taglineKey: UUID = UUID()
@@ -310,6 +313,23 @@ struct CompassView: View {
                     .id(instrumentStore.selected)              // crossfade on switch
                     .transition(.opacity)
                     .animation(.easeInOut(duration: 0.3), value: instrumentStore.selected)
+                    // [6/8] CANCEL — a small X at the top-right whenever a
+                    // feeling is loaded; tap it to gently deselect and reset.
+                    .overlay(alignment: .topTrailing) {
+                        if selectedToken != nil && pings.nowPlaying == nil {
+                            Button { cancelInstrument() } label: {
+                                Image(systemName: "xmark")
+                                    .font(.system(size: 13, weight: .bold))
+                                    .foregroundColor(Color(hex: "#c4a8d4"))
+                                    .frame(width: 30, height: 30)
+                                    .background(Circle().fill(DesignTokens.Color.background.opacity(0.8)))
+                                    .overlay(Circle().stroke(Color(hex: "#7c6b8e").opacity(0.6), lineWidth: 1))
+                            }
+                            .buttonStyle(.plain)
+                            .padding(.top, 14).padding(.trailing, 14)
+                            .transition(.scale.combined(with: .opacity))
+                        }
+                    }
                     // [1/6] LAYER 2 — the 8-segment ring scanner, alive
                     // whenever the user is aiming or catching
                     .overlay {
@@ -873,28 +893,62 @@ struct CompassView: View {
     /// The name — largest text on screen, a dedication in a book.
     /// ✦ marks it tappable when there's more than one person.
     private var nameHeader: some View {
-        HStack(spacing: 7) {
-            Text(compass.state.personName)
-                .font(.system(size: 34, weight: .semibold, design: .serif))
-                .foregroundColor(DesignTokens.Color.textPrimary)
-                .contentTransition(.opacity)
-                .animation(.easeInOut(duration: 0.35), value: compass.state.personName)
-            if people.people.count > 1 {
-                Text("✦")
-                    .font(.system(size: 11))
-                    .foregroundColor(DesignTokens.Color.accentMid.opacity(0.7))
+        VStack(spacing: 5) {
+            HStack(spacing: 7) {
+                Text(compass.state.personName)
+                    .font(.system(size: 34, weight: .semibold, design: .serif))
+                    .foregroundColor(DesignTokens.Color.textPrimary)
+                    .contentTransition(.opacity)
+                    .animation(.easeInOut(duration: 0.35), value: compass.state.personName)
+                // [5/6] Subtle "demo" badge on Alex's card — quietly says
+                // "this one's a placeholder," never shouts.
+                if isDemoSelected {
+                    Text("demo")
+                        .font(.system(size: 9, weight: .semibold))
+                        .foregroundColor(DesignTokens.Color.accentSoft)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(Capsule().stroke(DesignTokens.Color.accentMid.opacity(0.6),
+                                                     lineWidth: 1))
+                } else if people.people.count > 1 {
+                    Text("✦")
+                        .font(.system(size: 11))
+                        .foregroundColor(DesignTokens.Color.accentMid.opacity(0.7))
+                }
             }
-        }
-        .onTapGesture {
-            guard people.people.count > 1 else { return }
-            HapticEngine.personSelected()
-            showPersonSwitcher = true
+            .onTapGesture {
+                guard people.people.count > 1 else { return }
+                HapticEngine.personSelected()
+                showPersonSwitcher = true
+            }
+
+            // [5/6] One-time gentle nudge — shown only while Alex is the only
+            // card and not yet dismissed. Tapping opens "add someone real"
+            // and retires the hint forever.
+            if isDemoSelected && !demoHintDismissed {
+                Button {
+                    withAnimation { demoHintDismissed = true }
+                    HapticEngine.personSelected()
+                    showAddPerson = true
+                } label: {
+                    Text("replace with someone real →")
+                        .font(.system(size: 12, design: .serif).italic())
+                        .foregroundColor(DesignTokens.Color.accentMid)
+                }
+                .buttonStyle(.plain)
+                .transition(.opacity)
+            }
         }
         .sheet(isPresented: $showPersonSwitcher) {
             PersonSwitcherSheet()
                 .presentationDetents([.height(min(420, CGFloat(people.people.count) * 64 + 90))])
                 .presentationDragIndicator(.visible)
         }
+    }
+
+    /// [5/6] True when the compass is showing the auto-created demo person (Alex).
+    private var isDemoSelected: Bool {
+        people.selectedPerson.map(DemoPerson.isDemo) ?? false
     }
 
     // ── BOTTOM ZONE ───────────────────────────────────────────────────────
@@ -1171,6 +1225,17 @@ struct CompassView: View {
     /// for every instrument. When nothing is loaded it tells you to pick a
     /// feeling; once loaded it shows the per-instrument steps with the "loaded"
     /// step already checked off.
+    /// [6/8] Gently cancel the loaded feeling — deselect, clear the optional
+    /// note, soft-haptic confirmation. Shared by the X button and tap-outside.
+    private func cancelInstrument() {
+        guard selectedToken != nil else { return }
+        HapticEngine.caughtConfirmation()
+        withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
+            selectedToken = nil
+            messageText = ""
+        }
+    }
+
     @ViewBuilder
     private var sendControl: some View {
         if pings.nowPlaying != nil {

@@ -274,6 +274,85 @@ enum HapticEngine {
     }
 
     // ════════════════════════════════════════════════════════════════════
+    // MARK: - [4/8] Emotional reveal — a heartbeat, then a quiet presence
+    // ════════════════════════════════════════════════════════════════════
+    //
+    // Replaces the single reveal tap: silence → soft → warm → gentle double →
+    // warm, then a barely-there pulse every 3 s until dismissed. Pro's 1.3×
+    // (via scaled) makes every beat warmer and deeper.
+
+    private static func tap(_ style: UIImpactFeedbackGenerator.FeedbackStyle,
+                            _ intensity: CGFloat, after delay: TimeInterval) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+            guard hapticsEnabled else { return }
+            UIImpactFeedbackGenerator(style: style).impactOccurred(intensity: scaled(intensity))
+        }
+    }
+
+    static func revealHeartbeat() {
+        guard hapticsEnabled else { return }
+        // 0 ms silence — anticipation.
+        tap(.soft,   0.3, after: 0.20)   // very soft pulse
+        tap(.medium, 0.7, after: 0.50)   // stronger warm pulse
+        tap(.soft,   0.4, after: 0.80)   // gentle double …
+        tap(.soft,   0.4, after: 0.92)   // … pulse
+        tap(.medium, 0.6, after: 1.20)   // single warm pulse
+        startRevealPresence()
+    }
+
+    /// A barely-perceptible pulse every 3 s while the reveal lingers.
+    private static var presenceTimer: Timer?
+    private static func startRevealPresence() {
+        stopRevealPresence()
+        presenceTimer = Timer.scheduledTimer(withTimeInterval: 3.0, repeats: true) { _ in
+            guard hapticsEnabled else { return }
+            UIImpactFeedbackGenerator(style: .soft).impactOccurred(intensity: scaled(0.2))
+        }
+    }
+    /// Stops the lingering presence pulse — call when the reveal is dismissed.
+    static func stopRevealPresence() {
+        presenceTimer?.invalidate()
+        presenceTimer = nil
+    }
+
+    // ════════════════════════════════════════════════════════════════════
+    // MARK: - [5/8] Emoji-matched reveal haptics — each gesture feels itself
+    // ════════════════════════════════════════════════════════════════════
+    //
+    // The single entry point for the reveal moment: a matched emoji fires its
+    // own signature; everything else gets the emotional heartbeat. Both leave
+    // the gentle presence pulse running until dismissed.
+    static func revealHaptic(for emoji: String) {
+        guard hapticsEnabled else { return }
+        switch emoji {
+        case "🫂":            // Hug — slow warm enveloping (soft · medium · soft)
+            tap(.soft,   0.4, after: 0.0)
+            tap(.medium, 0.7, after: 0.4)
+            tap(.soft,   0.4, after: 0.8)
+        case "😘":            // Kiss — single sharp, then a flutter
+            tap(.rigid, 0.8, after: 0.0)
+            tap(.soft,  0.3, after: 0.3)
+        case "🙌":            // Celebration — rapid joyful triple → medium
+            tap(.light,  0.5, after: 0.0)
+            tap(.light,  0.5, after: 0.12)
+            tap(.light,  0.5, after: 0.24)
+            tap(.medium, 0.7, after: 0.4)
+        case "👊":            // Fist bump — single decisive heavy
+            tap(.heavy, 0.9, after: 0.0)
+        case "🖐️", "🖐", "✋":  // High five — sharp slap, then a vibrate
+            tap(.rigid, 0.9, after: 0.0)
+            for k in 1...4 { tap(.soft, 0.3, after: Double(k) * 0.05) }
+        case "🫶":            // Heart hands — double soft heartbeat
+            tap(.soft, 0.35, after: 0.0)
+            tap(.soft, 0.35, after: 0.6)
+        default:
+            revealHeartbeat()   // the emotional default
+            return
+        }
+        startRevealPresence()
+    }
+
+    // ════════════════════════════════════════════════════════════════════
     // MARK: - [5/5] HAPTIC PERSONALITY — each instrument distinct, eyes shut
     // ════════════════════════════════════════════════════════════════════
     //
