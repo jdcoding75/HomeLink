@@ -99,6 +99,38 @@ final class InstrumentSoundPlayer {
     }
   }
 
+  // MARK: - Per-instrument convenience
+
+  /// Play the SEND sound for an instrument (file + duration matched).
+  /// Currently only WIND is approved/wired; others are no-ops until their
+  /// .wav files land.
+  func playSend(_ instrument: Instrument, proIntensity: Float = 1.0) {
+    guard let (file, dur) = Self.sendInfo(instrument) else { return }
+    play(file: file, phase: .send, duration: dur, proIntensity: proIntensity)
+  }
+
+  /// Play the RECEIPT sound for an instrument (file + duration matched).
+  func playReceipt(_ instrument: Instrument, proIntensity: Float = 1.0) {
+    guard let (file, dur) = Self.receiptInfo(instrument) else { return }
+    play(file: file, phase: .receipt, duration: dur, proIntensity: proIntensity)
+  }
+
+  /// Send file + duration per instrument. WIND: wind_send.wav · 6.5s.
+  private static func sendInfo(_ instrument: Instrument) -> (String, Double)? {
+    switch instrument {
+    case .firefly: return (WindSounds.sendFile, WindSounds.sendDuration)
+    default:       return nil
+    }
+  }
+
+  /// Receipt file + duration per instrument. WIND: wind_receipt.wav · 7.2s.
+  private static func receiptInfo(_ instrument: Instrument) -> (String, Double)? {
+    switch instrument {
+    case .firefly: return (WindSounds.receiptFile, WindSounds.receiptDuration)
+    default:       return nil
+    }
+  }
+
   /// Stop everything immediately (e.g. on cancel).
   func stopAll() {
     for (_, p) in players { p.stop() }

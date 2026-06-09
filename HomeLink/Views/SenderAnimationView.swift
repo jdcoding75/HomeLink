@@ -1167,6 +1167,10 @@ struct SenderAnimationView<Symbol: View>: View {
             // PHASE 3 · SEND (2.5 s)  the leaf accelerates toward them and fades.
             HapticEngine.sendSoft()
             SoundEngine.shared.play(for: "style.chime")
+            // [5/5] WIND SEND SOUND — the approved wind_send.wav (6.5s, matches
+            // the send duration) plays alongside the chime for the live wind
+            // send. (The extracted full-screen prototype is WindSendAnimation.)
+            InstrumentSoundPlayer.shared.playSend(.firefly)
             chargeGlow = true
             windSky = true                                   // full-screen sky in
             windFloating = true                              // big, lazy swirl

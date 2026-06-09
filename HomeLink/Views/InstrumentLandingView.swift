@@ -22,6 +22,13 @@ struct InstrumentLandingView: View {
             ZStack {
                 switch style {
                 case .rocket:       RocketLanding(emoji: emoji, size: geo.size, onComplete: onComplete)
+                // [5/5] WIND — the live receipt's landing beat. The full ACT-3
+                // (sky · big bucket · auto-catch · EmojiRevealView · the
+                // approved wind_receipt.wav) lives in WindReceiptAnimation,
+                // which needs senderBearing/from/message/tagline this thin
+                // dispatcher doesn't carry — so the embedded landing stays
+                // LeafLanding, and WindReceiptAnimation is the standalone
+                // full-screen receipt for the migrated pipeline.
                 case .firefly:      LeafLanding(emoji: emoji, size: geo.size, onComplete: onComplete)
                 case .fingerFlick:  PostItLanding(emoji: emoji, size: geo.size, onComplete: onComplete)
                 case .bowArrow:     ArrowLanding(emoji: emoji, size: geo.size, onComplete: onComplete)
