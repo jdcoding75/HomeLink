@@ -1396,6 +1396,83 @@ struct SenderAnimationView<Symbol: View>: View {
 // MARK: - ReplayOverlayView
 // ════════════════════════════════════════════════════════════════════════
 
+/// [swipe] Wraps ReplayOverlayView with horizontal-swipe navigation between a
+/// list of thoughts, subtle nav hints, and an auto-advance toggle. A request
+/// with no siblings is just a single replay (no nav chrome shown).
+struct ReplaySwipeContainer: View {
+    let request: PingManager.ReplayRequest
+    let onDismiss: () -> Void
+
+    @State private var idx: Int
+    @AppStorage("replayAutoAdvance") private var autoAdvance = false
+    private static let lav = Color(hex: "#c4a8d4")
+
+    init(request: PingManager.ReplayRequest, onDismiss: @escaping () -> Void) {
+        self.request = request
+        self.onDismiss = onDismiss
+        _idx = State(initialValue: request.index)
+    }
+
+    private var items: [PingManager.ReplayItem] {
+        request.siblings.isEmpty
+            ? [PingManager.ReplayItem(emoji: request.emoji, bearingDegrees: request.bearingDegrees,
+                                      styleRaw: request.styleRaw, fromName: request.fromName)]
+            : request.siblings
+    }
+    private var cur: PingManager.ReplayItem { items[min(max(0, idx), items.count - 1)] }
+    private var hasPrev: Bool { idx > 0 }
+    private var hasNext: Bool { idx < items.count - 1 }
+
+    var body: some View {
+        ZStack {
+            DesignTokens.Color.background.ignoresSafeArea()
+            ReplayOverlayView(emoji: cur.emoji, bearingDegrees: cur.bearingDegrees,
+                              style: SenderStyle.from(cur.styleRaw), fromName: cur.fromName) {
+                // Reveal finished — auto-advance to the next, or dismiss.
+                if autoAdvance && hasNext {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                        if autoAdvance && self.idx < self.items.count - 1 { withAnimation { idx += 1 } }
+                    }
+                } else {
+                    onDismiss()
+                }
+            }
+            .id(idx)   // re-run the replay for each thought
+
+            if items.count > 1 {
+                VStack {
+                    HStack {
+                        if hasPrev { HStack(spacing: 3) { Image(systemName: "chevron.left"); Text("prev") } }
+                        Spacer()
+                        if hasNext { HStack(spacing: 3) { Text("next"); Image(systemName: "chevron.right") } }
+                    }
+                    .font(.system(size: 12)).foregroundColor(Self.lav.opacity(0.7))
+                    .padding(.horizontal, 22).padding(.top, 58)
+                    Spacer()
+                    HStack(spacing: 6) {
+                        Circle().fill(autoAdvance ? Self.lav : .clear).frame(width: 9, height: 9)
+                            .overlay(Circle().stroke(Self.lav, lineWidth: 1))
+                        Text("auto")
+                    }
+                    .font(.system(size: 13)).foregroundColor(Self.lav.opacity(0.85))
+                    .padding(10).contentShape(Rectangle())
+                    .onTapGesture { autoAdvance.toggle() }
+                    .padding(.bottom, 54)
+                }
+                .allowsHitTesting(true)
+            }
+        }
+        .contentShape(Rectangle())
+        .gesture(
+            DragGesture(minimumDistance: 40)
+                .onEnded { v in
+                    if v.translation.width < -40, hasNext { withAnimation { idx += 1 } }
+                    else if v.translation.width > 40, hasPrev { withAnimation { idx -= 1 } }
+                }
+        )
+    }
+}
+
 /// A memory, not a new message. Background dims 30 %, the emoji re-enters
 /// from its original direction at 70–80 % of the original duration, blooms,
 /// rests 1.5 s, and fades. easeInOutQuad throughout.

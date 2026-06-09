@@ -1675,10 +1675,18 @@ struct CompassView: View {
     private func replayThought(_ rec: SupabaseService.PingRecord) {
         withAnimation(AnimationSystem.easeOutCubic(0.3)) { showThoughtsDrawer = false }
         pendingReplayCaption = "from \(compass.state.personName) · \(Self.timeAgo(rec.createdAt))"
+        // [swipe] Pass the FULL sorted list (unread-first) so the replay can
+        // swipe between thoughts; start at the tapped one.
+        let list = sortedThoughts
+        let start = list.firstIndex(where: { $0.id == rec.id }) ?? 0
+        let items = list.map {
+            PingManager.ReplayItem(emoji: $0.emoji,
+                                   bearingDegrees: compass.state.bearingDegrees,
+                                   styleRaw: $0.senderStyle,
+                                   fromName: compass.state.personName)
+        }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
-            pings.requestReplay(emoji: rec.emoji,
-                                bearingDegrees: compass.state.bearingDegrees,
-                                styleRaw: rec.senderStyle)
+            pings.requestReplaySequence(items, startIndex: start)
         }
     }
 

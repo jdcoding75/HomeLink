@@ -379,12 +379,23 @@ final class PingManager: ObservableObject {
 
     // ── Replay, app-wide ─────────────────────────────────────────────────
     /// Set from any tab; RootView presents the full-screen replay overlay.
+    struct ReplayItem: Identifiable, Equatable {
+        let id = UUID()
+        let emoji: String
+        let bearingDegrees: Double
+        let styleRaw: String?
+        var fromName: String = ""
+    }
     struct ReplayRequest: Identifiable, Equatable {
         let id = UUID()
         let emoji: String
         let bearingDegrees: Double
         let styleRaw: String?
         var fromName: String = ""
+        // The full list this replay belongs to + our position, so the overlay
+        // can SWIPE to the next/previous thought without re-presenting.
+        var siblings: [ReplayItem] = []
+        var index: Int = 0
     }
     @Published var replayRequest: ReplayRequest?
 
@@ -393,6 +404,17 @@ final class PingManager: ObservableObject {
         log.info("replay: requested — \(emoji, privacy: .public) bearing=\(Int(bearingDegrees), privacy: .public)°")
         replayRequest = ReplayRequest(emoji: emoji, bearingDegrees: bearingDegrees,
                                       styleRaw: styleRaw, fromName: fromName)
+    }
+
+    /// Replay a whole list, starting at `startIndex` — the overlay can swipe
+    /// between the thoughts.
+    func requestReplaySequence(_ items: [ReplayItem], startIndex: Int) {
+        guard !items.isEmpty else { return }
+        let i = max(0, min(items.count - 1, startIndex))
+        let it = items[i]
+        replayRequest = ReplayRequest(emoji: it.emoji, bearingDegrees: it.bearingDegrees,
+                                      styleRaw: it.styleRaw, fromName: it.fromName,
+                                      siblings: items, index: i)
     }
 
     // ── Felt receipts, live ──────────────────────────────────────────────

@@ -602,19 +602,14 @@ struct MainTabView: View {
         // to the original tab (selection untouched). ──
         .fullScreenCover(item: $pings.replayRequest) { request in
             ZStack {
-                DesignTokens.Color.background.ignoresSafeArea()
-                ReplayOverlayView(
-                    emoji: request.emoji,
-                    bearingDegrees: request.bearingDegrees,
-                    style: SenderStyle.from(request.styleRaw),
-                    fromName: request.fromName
-                ) {
+                // [swipe] The container handles single OR a swipeable list.
+                ReplaySwipeContainer(request: request) {
                     pings.replayRequest = nil
                     appState.transition(to: .idle)   // never strand .replay
                 }
                 VStack {
                     Spacer()
-                    Text("tap to dismiss")
+                    Text(request.siblings.count > 1 ? "swipe ‹ › · tap to dismiss" : "tap to dismiss")
                         .font(.system(size: 11, design: .serif).italic())
                         .foregroundColor(DesignTokens.Color.textDim)
                         .padding(.bottom, 28)
