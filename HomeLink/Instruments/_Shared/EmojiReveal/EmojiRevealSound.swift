@@ -13,7 +13,7 @@
 //    synced to arm squeeze animation
 // 😘 emoji_kiss.wav    ✅
 // 🙌 emoji_celebration.wav ✅
-// 👊 emoji_fistbump.wav ✅
+// 👊 emoji_punch.wav ✅ (renamed) · 🤜🤛 emoji_fistbump_real.wav ✅
 // 🖐️ emoji_highfive.wav ✅
 // 🫶 emoji_hearthands.wav ✅
 //
@@ -59,13 +59,21 @@ enum EmojiRevealSound {
         _ emoji: String
     ) -> String? {
         switch emoji {
-        case "🤗": return "emoji_hug_v2"
-        case "😘": return "emoji_kiss"
-        case "🙌": return "emoji_celebration"
-        case "👊": return "emoji_fistbump"
-        case "🖐️": return "emoji_highfive"
-        case "🫶": return "emoji_hearthands"
-        default:   return nil
+        case "🤗":   return "emoji_hug_v2"
+        case "😘":   return "emoji_kiss"
+        case "🙌":   return "emoji_celebration"
+        case "👊":   return "emoji_punch"          // renamed from emoji_fistbump
+        case "🤜🤛": return "emoji_fistbump_real"   // the two-fist bump
+        case "🖐️":   return "emoji_highfive"
+        case "🫶":   return "emoji_hearthands"
+        case "💭":   return "emoji_thoughtbubble"
+        case "💌":   return "emoji_envelope"
+        case "💥":   return "emoji_explosion"
+        case "🎁":   return "emoji_gift"
+        case "🎆":   return "emoji_fireworks"
+        case "🎓":   return "emoji_graduation"
+        case "🎂":   return "emoji_birthday"
+        default:     return nil
         }
     }
 }

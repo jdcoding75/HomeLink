@@ -337,8 +337,24 @@ enum HapticEngine {
             tap(.light,  0.5, after: 0.12)
             tap(.light,  0.5, after: 0.24)
             tap(.medium, 0.7, after: 0.4)
-        case "👊":            // Fist bump — single decisive heavy
+        case "👊":            // Punch — single decisive heavy
             tap(.heavy, 0.9, after: 0.0)
+        case "🤜🤛":           // Fist bump — two fists meet: medium ×2
+            tap(.medium, 0.8, after: 0.0)
+            tap(.medium, 0.8, after: 0.16)
+        case "😘":            // Kiss — a light pop at the pucker
+            tap(.light, 0.6, after: 0.7)
+        case "💭", "💌":       // Thought / love note — soft pulses
+            tap(.soft, 0.5, after: 0.2)
+            tap(.soft, 0.4, after: 0.5)
+        case "💥":            // Explosion — heavy + sharp
+            tap(.heavy, 1.0, after: 0.45)
+            tap(.rigid, 0.7, after: 0.55)
+        case "🎁", "🎂":       // Gift / birthday — medium + success flourish
+            tap(.medium, 0.7, after: 0.3)
+            for k in 1...3 { tap(.light, 0.4, after: 0.6 + Double(k) * 0.06) }
+        case "🎆", "🎓":       // Fireworks / graduation — celebratory taps
+            for k in 0...4 { tap(.light, 0.5, after: 0.6 + Double(k) * 0.12) }
         case "🖐️", "🖐", "✋":  // High five — sharp slap, then a vibrate
             tap(.rigid, 0.9, after: 0.0)
             for k in 1...4 { tap(.soft, 0.3, after: Double(k) * 0.05) }
