@@ -500,9 +500,16 @@ private struct WandLanding: View {
     @State private var reform: CGFloat = 0       // 0 scattered → 1 emoji
     @State private var emojiScale: CGFloat = 0
     @State private var orbit = false
+    // [wand bucket] the drop into the bucket after the twinkles, before reveal.
+    @State private var bucketIn = false          // bucket fades in
+    @State private var drop: CGFloat = 0         // 0 at twinkle centre → 1 in bucket
+    @State private var bucketGlow = false        // purple catch glow on land
 
     private static let gold = Color(hex: "#D4AF37")
     private static let purple = Color(hex: "#9b7fc0")
+    private static let lavender = Color(hex: "#c4a8d4")
+    private static let bucketW: CGFloat = 96
+    private static let bucketH: CGFloat = 104     // mouth sits bucketH/2 = 52 above centre
 
     private struct Spark: Identifiable {
         let id = UUID(); let base: Double; let radius: CGFloat; let gold: Bool
@@ -519,6 +526,11 @@ private struct WandLanding: View {
 
     var body: some View {
         let cx = size.width / 2, cy = size.height * 0.5
+        // [wand bucket] bottom-right bucket; emoji drops to its mouth.
+        let bx = size.width - 80, by = size.height - 95
+        let mouth = CGPoint(x: bx, y: by - 52)
+        let emojiPos = CGPoint(x: cx + (mouth.x - cx) * drop,
+                               y: cy + (mouth.y - cy) * drop)
         ZStack {
             Color.white.opacity(flash ? 0.7 : 0).ignoresSafeArea().allowsHitTesting(false)
             Self.purple.opacity(0.12 * Double(converge)).ignoresSafeArea().allowsHitTesting(false)
@@ -534,10 +546,53 @@ private struct WandLanding: View {
                     .position(x: cx, y: cy)
             }
 
+            // [wand bucket] the wooden bucket (wood/brass · 3 stave lines).
+            wandBucket.position(x: bx, y: by).opacity(bucketIn ? 1 : 0)
+
+            // [wand bucket] soft purple glow trail behind the falling emoji.
+            if drop > 0.01 && drop < 0.99 {
+                Capsule()
+                    .fill(LinearGradient(colors: [Self.lavender.opacity(0.4), .clear],
+                                         startPoint: .bottom, endPoint: .top))
+                    .frame(width: 20, height: 80)
+                    .blur(radius: 3)
+                    .position(x: emojiPos.x, y: emojiPos.y - 48)
+                    .allowsHitTesting(false)
+            }
+
             EmergingEmoji(emoji: emoji, hue: hueFor(emoji), scale: emojiScale)
-                .position(x: cx, y: cy)
+                .position(emojiPos)
         }
         .onAppear { run() }
+    }
+
+    /// The bottom-right wooden bucket the emoji drops into (wood + brass, 3
+    /// stave lines) with a purple/lavender catch glow on landing.
+    private var wandBucket: some View {
+        let wood = Color(hex: "#8B4513"); let woodDark = Color(hex: "#6E3A1E")
+        let brass = Color(hex: "#C9A86A")
+        return ZStack {
+            Circle().fill(Self.lavender.opacity(bucketGlow ? 0.2 : 0))
+                .frame(width: 120, height: 120).blur(radius: 28).offset(y: -8)
+            BucketHandleShape()
+                .stroke(brass, style: StrokeStyle(lineWidth: 3.5, lineCap: .round))
+                .frame(width: Self.bucketW * 0.9, height: 40)
+                .offset(y: -Self.bucketH / 2 - 12)
+            BucketShape()
+                .fill(LinearGradient(colors: [wood, woodDark], startPoint: .top, endPoint: .bottom))
+                .frame(width: Self.bucketW, height: Self.bucketH)
+                .overlay(
+                    VStack(spacing: 0) {
+                        Capsule().fill(brass).frame(height: 5).padding(.top, 14)
+                        Spacer()
+                        Capsule().fill(brass).frame(height: 5)
+                        Spacer()
+                        Capsule().fill(brass).frame(height: 5).padding(.bottom, 14)
+                    }
+                    .frame(width: Self.bucketW, height: Self.bucketH).opacity(0.85)
+                )
+                .shadow(color: .black.opacity(0.4), radius: 8, y: 5)
+        }
     }
 
     /// converge in → explode out → reform inward.
@@ -573,8 +628,22 @@ private struct WandLanding: View {
         DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
             HapticEngine.catchReveal()
             withAnimation(AnimationSystem.easeOutBack(0.6)) { emojiScale = 1 }
+            // [wand bucket] the bucket fades in once the emoji has formed.
+            withAnimation(.easeOut(duration: 0.3)) { bucketIn = true }
         }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 3.8) { onComplete() }
+        // [wand bucket] the emoji drops from the twinkle centre into the bucket
+        // (0.6s, easeIn = gravity feel), shrinking to settle inside.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3.3) {
+            withAnimation(.easeIn(duration: 0.6)) { drop = 1; emojiScale = 0.5 }
+        }
+        // [wand bucket] landing: soft thud + purple/lavender bucket glow.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3.9) {
+            InstrumentSoundPlayer.shared.playCue(file: PlaneSounds.catchFile, duration: 0.45)
+            HapticPattern.singleSoft.fire()
+            withAnimation(.easeOut(duration: 0.4)) { bucketGlow = true }
+        }
+        // [wand bucket] emoji visible in the bucket ~0.5s, then the reveal fires.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 4.4) { onComplete() }
     }
 }
 
