@@ -21,7 +21,19 @@ struct InstrumentLandingView: View {
         GeometryReader { geo in
             ZStack {
                 switch style {
-                case .rocket:       RocketLanding(emoji: emoji, size: geo.size, onComplete: onComplete)
+                // ROCKET now uses the v2 parachute receipt (RocketReceiptAnimation)
+                // instead of the old legs-down RocketLanding. The live receive
+                // already routes .rocket → RocketReceiptAnimation at the
+                // ReceiptView layer; this brings the test-lab / replay preview
+                // paths in line too. (Old RocketLanding kept below, unused.)
+                case .rocket:       RocketReceiptAnimation(
+                                        senderBearing: 0,
+                                        emoji: emoji,
+                                        message: nil,
+                                        tagline: nil,
+                                        fromName: "",
+                                        onRevealed: {},
+                                        onFinished: onComplete)
                 // [5/5] WIND — the live receipt's landing beat. The full ACT-3
                 // (sky · big bucket · auto-catch · EmojiRevealView · the
                 // approved wind_receipt.wav) lives in WindReceiptAnimation,
