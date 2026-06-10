@@ -45,6 +45,7 @@ struct AnimationTestLabView: View {
         let emoji: String
         var style: SenderStyle { entry.style }
         var isV2: Bool { entry.version == "V2" }
+        var isBirthday: Bool { entry.name == "Birthday Cake" }
     }
     @State private var playing: Playing?
 
@@ -61,6 +62,7 @@ struct AnimationTestLabView: View {
         LabEntry(icon: "🪄", name: "Wand",    style: .wand,        version: "V1"),
         LabEntry(icon: "✈️", name: "Plane",   style: .plane,       version: "V1"),
         LabEntry(icon: "✈️", name: "Plane",   style: .plane,       version: "V2"),
+        LabEntry(icon: "🎂", name: "Birthday Cake", style: .glow,  version: nil),
     ]
 
     private let columns = [GridItem(.flexible(), spacing: 12),
@@ -117,7 +119,8 @@ struct AnimationTestLabView: View {
 
     private func tile(_ entry: LabEntry, isSend: Bool) -> some View {
         Button {
-            playing = Playing(isSend: isSend, entry: entry, emoji: randomEmoji)
+            let emoji = entry.name == "Birthday Cake" ? "🎂" : randomEmoji
+            playing = Playing(isSend: isSend, entry: entry, emoji: emoji)
         } label: {
             VStack(spacing: 8) {
                 Text(entry.icon)
@@ -205,7 +208,11 @@ struct AnimationTestLabView: View {
 
     @ViewBuilder
     private func sendPlayer(_ p: Playing) -> some View {
-        if p.isV2 {
+        if p.isBirthday {
+            // 🎂 — the special tap-the-candles compass-face send mechanic.
+            BirthdayCakeCompassFace(personName: "them",
+                                    onSend: { autoDismiss(p, after: 0.3) })
+        } else if p.isV2 {
             let t = InstrumentTransition(exitBearing: 0, exitPoint: .zero,
                                          instrument: instrumentKind(p.style),
                                          emoji: p.emoji, message: nil, tagline: nil)
@@ -235,7 +242,11 @@ struct AnimationTestLabView: View {
 
     @ViewBuilder
     private func landPlayer(_ p: Playing) -> some View {
-        if p.isV2 {
+        if p.isBirthday {
+            // 🎂 — the special cake receipt (smoke wisps, no bucket).
+            BirthdayCakeReceipt(emoji: "🎂", fromName: "them",
+                                onRevealed: {}, onFinished: { autoDismiss(p, after: 0.1) })
+        } else if p.isV2 {
             switch p.style {
             case .bowArrow:    BowReceiptAnimationV2(senderBearing: 120, emoji: p.emoji,
                                                      message: nil, tagline: nil, fromName: "",

@@ -230,29 +230,43 @@ struct CompassView: View {
                     Group {
                         switch instrumentStore.selected {
                         case .compass:
-                            compassFace
+                            // [birthday] When 🎂 is the selected emoji, the
+                            // compass face becomes the special tap-the-candles
+                            // birthday send mechanic; otherwise the normal face.
+                            if (selectedToken.map { sendRemoteEmoji(for: $0) }) == "🎂" {
+                                BirthdayCakeCompassFace(
+                                    bearingDegrees: compass.state.bearingDegrees,
+                                    personName: compass.state.personName,
+                                    onSend: { if let token = selectedToken { sendThought(token) } }
+                                )
                                 .frame(width: 240, height: 240)
                                 .scaleEffect(370.0 / 240.0)
                                 .frame(width: 370, height: 370)
-                                // [4/4] SEND — the face pulses once on launch
-                                .scaleEffect(faceSendPulse ? 1.05 : 1.0)
-                                .animation(.easeInOut(duration: 0.18), value: faceSendPulse)
-                                // Where they are — marker · arc · hint
-                                .overlay(
-                                    DirectionIndicator(
-                                        bearingDegrees: compass.state.bearingDegrees,
-                                        personName: compass.state.personName,
-                                        personEmoji: compass.state.personEmoji,
-                                        ringRadius: 180,
-                                        distanceText: compass.state.formattedDistance   // [3/5]
+                            } else {
+                                compassFace
+                                    .frame(width: 240, height: 240)
+                                    .scaleEffect(370.0 / 240.0)
+                                    .frame(width: 370, height: 370)
+                                    // [4/4] SEND — the face pulses once on launch
+                                    .scaleEffect(faceSendPulse ? 1.05 : 1.0)
+                                    .animation(.easeInOut(duration: 0.18), value: faceSendPulse)
+                                    // Where they are — marker · arc · hint
+                                    .overlay(
+                                        DirectionIndicator(
+                                            bearingDegrees: compass.state.bearingDegrees,
+                                            personName: compass.state.personName,
+                                            personEmoji: compass.state.personEmoji,
+                                            ringRadius: 180,
+                                            distanceText: compass.state.formattedDistance   // [3/5]
+                                        )
                                     )
-                                )
-                                // Full-compass send styles dim the skin
-                                .opacity(faceDimmedForInstrument ? 0.2 : 1.0)
-                                .animation(faceDimmedForInstrument
-                                           ? .easeOut(duration: 0.3)
-                                           : .easeIn(duration: 0.4),
-                                           value: faceDimmedForInstrument)
+                                    // Full-compass send styles dim the skin
+                                    .opacity(faceDimmedForInstrument ? 0.2 : 1.0)
+                                    .animation(faceDimmedForInstrument
+                                               ? .easeOut(duration: 0.3)
+                                               : .easeIn(duration: 0.4),
+                                               value: faceDimmedForInstrument)
+                            }
                         case .bow:
                             BowInstrumentView(
                                 loadedToken: selectedToken,

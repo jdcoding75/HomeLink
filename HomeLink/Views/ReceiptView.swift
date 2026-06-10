@@ -98,13 +98,31 @@ struct ReceiptView: View {
         // Wind + Rocket keep their dedicated, approved full receipts. The today's
         // V2 receipts (BowReceiptAnimationV2 / FlickReceiptAnimationV2 /
         // PlaneReceiptAnimationV2) are parked for the Animation Test Lab only.
-        if style == .firefly {
+        if ping.emoji == "🎂" {
+            // [birthday] 🎂 is a SPECIAL emoji receipt — the cake is the vessel,
+            // there is NO bucket. Intercepted by emoji (not style) above every
+            // instrument so a birthday always arrives as a cake.
+            birthdayReceipt
+        } else if style == .firefly {
             windReceipt
         } else if style == .rocket {
             rocketReceipt
         } else {
             standardReceipt
         }
+    }
+
+    // ── BIRTHDAY 🎂 — the special cake receipt (no bucket) ──────────────────
+
+    private var birthdayReceipt: some View {
+        BirthdayCakeReceipt(
+            emoji: ping.emoji,
+            message: ping.message,
+            tagline: ping.tagline,
+            fromName: ping.fromName,
+            onRevealed: { revealHandoff() },
+            onFinished: onFinished
+        )
     }
 
     // ── PLANE / BOW / FLICK — V2 dedicated receipts (PARKED) ───────────────
