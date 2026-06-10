@@ -301,7 +301,8 @@ struct PlaneInstrumentView: View {
     private func launch() {
         launching = true
         withAnimation { showRelease = false }
-        SoundEngine.shared.play(for: "rocket.blast")
+        // The gentle plane launch whoosh (was rocket.blast — wrong instrument).
+        InstrumentSoundPlayer.shared.playCue(file: PlaneSounds.launchFile, duration: 0.6)
         HapticEngine.rocketLaunch()
         withAnimation(.easeIn(duration: 2.0)) { liftoff = 1 }
         onLaunch()

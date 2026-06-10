@@ -101,9 +101,25 @@ struct ReceiptView: View {
             bowReceipt
         } else if style == .fingerFlick {
             flickReceipt
+        } else if style == .plane {
+            planeReceipt
         } else {
             standardReceipt
         }
+    }
+
+    // ── PLANE — the dedicated receipt (fly-in → drop → catch in bucket) ─────
+
+    private var planeReceipt: some View {
+        PlaneReceiptAnimation(
+            senderBearing: compass.rawBearingToTarget ?? 120,
+            emoji: ping.emoji,
+            message: ping.message,
+            tagline: ping.tagline,
+            fromName: ping.fromName,
+            onRevealed: { revealHandoff() },
+            onFinished: onFinished
+        )
     }
 
     // ── BOW — the dedicated Gemini receipt (arrow → dissolve → bucket) ──────

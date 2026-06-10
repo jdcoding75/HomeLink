@@ -534,6 +534,21 @@ struct CompassView: View {
                                 flightFly   = false
                                 finishSend(emoji: previewEmoji, style: previewStyle)
                             })
+                    } else if previewStyle == .plane {
+                        PlaneSendAnimation(
+                            transition: InstrumentTransition(
+                                exitBearing: compass.state.bearingDegrees,
+                                exitPoint: .zero,
+                                instrument: .plane,
+                                emoji: previewEmoji,
+                                message: sentMessage,
+                                tagline: sentTagline),
+                            personName: compass.state.personName,
+                            onComplete: {
+                                flightToken = nil
+                                flightFly   = false
+                                finishSend(emoji: previewEmoji, style: previewStyle)
+                            })
                     } else {
                         SenderAnimationView(
                             style: previewStyle,

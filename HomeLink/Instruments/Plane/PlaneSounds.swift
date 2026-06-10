@@ -1,33 +1,28 @@
-// PlaneSounds.swift
+// PlaneSounds.swift — FINAL
 // Pointward › Instruments › Plane
 //
-// STATUS:
-// plane_send.wav     5.0s  ⏳ placeholder (silent) — pending approval
-// plane_receipt.wav  5.0s  ⏳ placeholder (silent) — pending approval
+// All soft, gentle, minimal — like a distant toy plane. Pure filtered noise.
 //
-// CHARACTER:
-// Send: toy propeller winding up — light mechanical
-//       whir getting faster, then full speed fading
-//       as the plane flies away.
-// Receipt: propeller approaching and growing louder,
-//       a loud flyover pass, then engine slowing,
-//       wheels touching, propeller winding down.
+// COMPASS FACE: plane_prop_idle (loop) → plane_prop_spinup (winding)
+// SEND:    plane_flight.wav  5.0s ✅  (+ plane_launch.wav cue at launch)
+// RECEIPT: plane_flight.wav  5.0s ✅  (+ plane_drop.wav, plane_catch.wav cues)
+// EMOJI:   handled by EmojiRevealSound
 //
+// All sounds generated and durations match InstrumentBoundaries.
 // TO REGENERATE: python3 PlaneSoundGenerator.py
-//
-// ElevenLabs prompt (send):
-// "Small toy airplane propeller sound, starts slow
-//  winding up to full speed, light and charming,
-//  5 seconds total"
-//
-// ElevenLabs prompt (receipt):
-// "Small toy airplane landing sound, propeller
-//  slowing down, gentle touchdown, charming and
-//  light, 5 seconds total"
 
 enum PlaneSounds {
-  static let sendFile = "plane_send"
-  static let receiptFile = "plane_receipt"
+  // The full send/receipt voice (the gentle 5s flight ambient).
+  static let sendFile = "plane_flight"
+  static let receiptFile = "plane_flight"
   static let sendDuration: Double = 5.0
   static let receiptDuration: Double = 5.0
+
+  // Per-phase one-shot cues (layered via InstrumentSoundPlayer.playCue).
+  static let propIdleFile   = "plane_prop_idle"
+  static let propSpinupFile = "plane_prop_spinup"
+  static let launchFile     = "plane_launch"
+  static let flightFile     = "plane_flight"
+  static let dropFile       = "plane_drop"
+  static let catchFile      = "plane_catch"
 }

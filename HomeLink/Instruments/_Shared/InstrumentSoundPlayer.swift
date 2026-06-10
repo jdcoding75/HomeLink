@@ -122,6 +122,7 @@ final class InstrumentSoundPlayer {
     case .rocket:  return (RocketSounds.sendFile, RocketSounds.sendDuration)
     case .bow:     return (BowSounds.sendFile, BowSounds.sendDuration)
     case .flick:   return (FlickSounds.sendFile, FlickSounds.sendDuration)
+    case .plane:   return (PlaneSounds.sendFile, PlaneSounds.sendDuration)
     default:       return nil
     }
   }
@@ -134,6 +135,7 @@ final class InstrumentSoundPlayer {
     case .rocket:  return (RocketSounds.receiptFile, RocketSounds.receiptDuration)
     case .bow:     return (BowSounds.receiptFile, BowSounds.receiptDuration)
     case .flick:   return (FlickSounds.receiptFile, FlickSounds.receiptDuration)
+    case .plane:   return (PlaneSounds.receiptFile, PlaneSounds.receiptDuration)
     default:       return nil
     }
   }
