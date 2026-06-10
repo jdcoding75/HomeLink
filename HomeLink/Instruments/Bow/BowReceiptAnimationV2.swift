@@ -1,4 +1,4 @@
-// BowReceiptAnimation.swift
+// BowReceiptAnimationV2.swift
 // Pointward › Instruments › Bow
 //
 // ACT 3 of 3 — the full-screen BOW receipt journey + emoji reveal.
@@ -23,7 +23,7 @@
 
 import SwiftUI
 
-struct BowReceiptAnimation: View {
+struct BowReceiptAnimationV2: View {
 
   // ── Receives (matches WindReceiptAnimation's signature) ────────────────
   let senderBearing: Double      // degrees the thought arrives FROM

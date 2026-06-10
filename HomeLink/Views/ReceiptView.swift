@@ -93,62 +93,48 @@ struct ReceiptView: View {
         // This intercepts at the receipt layer (the only place that carries
         // senderBearing/from/message/tagline) so no dispatcher signature
         // changes and no existing call site is affected.
+        // [instrument versioning] V1 receipts are active: bow/flick/plane route to
+        // the shared spin-to-catch `standardReceipt` (their proven original path).
+        // Wind + Rocket keep their dedicated, approved full receipts. The today's
+        // V2 receipts (BowReceiptAnimationV2 / FlickReceiptAnimationV2 /
+        // PlaneReceiptAnimationV2) are parked for the Animation Test Lab only.
         if style == .firefly {
             windReceipt
         } else if style == .rocket {
             rocketReceipt
-        } else if style == .bowArrow {
-            bowReceipt
-        } else if style == .fingerFlick {
-            flickReceipt
-        } else if style == .plane {
-            planeReceipt
         } else {
             standardReceipt
         }
     }
 
-    // ── PLANE — the dedicated receipt (fly-in → drop → catch in bucket) ─────
-
-    private var planeReceipt: some View {
-        PlaneReceiptAnimation(
-            senderBearing: compass.rawBearingToTarget ?? 120,
-            emoji: ping.emoji,
-            message: ping.message,
-            tagline: ping.tagline,
-            fromName: ping.fromName,
-            onRevealed: { revealHandoff() },
-            onFinished: onFinished
-        )
-    }
-
-    // ── BOW — the dedicated Gemini receipt (arrow → dissolve → bucket) ──────
-
-    private var bowReceipt: some View {
-        BowReceiptAnimation(
-            senderBearing: compass.rawBearingToTarget ?? 120,
-            emoji: ping.emoji,
-            message: ping.message,
-            tagline: ping.tagline,
-            fromName: ping.fromName,
-            onRevealed: { revealHandoff() },
-            onFinished: onFinished
-        )
-    }
-
-    // ── FLICK — the dedicated receipt (paper ball arc → wooden bucket) ─────
-
-    private var flickReceipt: some View {
-        FlickReceiptAnimation(
-            senderBearing: compass.rawBearingToTarget ?? 120,
-            emoji: ping.emoji,
-            message: ping.message,
-            tagline: ping.tagline,
-            fromName: ping.fromName,
-            onRevealed: { revealHandoff() },
-            onFinished: onFinished
-        )
-    }
+    // ── PLANE / BOW / FLICK — V2 dedicated receipts (PARKED) ───────────────
+    // These three full-screen receipts (the today's redesigns) are no longer
+    // wired into the live path — bow/flick/plane receive via the shared
+    // `standardReceipt` (V1) above. The V2 structs live in the instrument folders
+    // (…ReceiptAnimationV2) and are exercised only from the Animation Test Lab.
+    // Kept here (commented) so the live wiring is trivial to restore on promotion.
+    //
+    // private var planeReceipt: some View {
+    //     PlaneReceiptAnimationV2(
+    //         senderBearing: compass.rawBearingToTarget ?? 120,
+    //         emoji: ping.emoji, message: ping.message, tagline: ping.tagline,
+    //         fromName: ping.fromName,
+    //         onRevealed: { revealHandoff() }, onFinished: onFinished)
+    // }
+    // private var bowReceipt: some View {
+    //     BowReceiptAnimationV2(
+    //         senderBearing: compass.rawBearingToTarget ?? 120,
+    //         emoji: ping.emoji, message: ping.message, tagline: ping.tagline,
+    //         fromName: ping.fromName,
+    //         onRevealed: { revealHandoff() }, onFinished: onFinished)
+    // }
+    // private var flickReceipt: some View {
+    //     FlickReceiptAnimationV2(
+    //         senderBearing: compass.rawBearingToTarget ?? 120,
+    //         emoji: ping.emoji, message: ping.message, tagline: ping.tagline,
+    //         fromName: ping.fromName,
+    //         onRevealed: { revealHandoff() }, onFinished: onFinished)
+    // }
 
     // ── WIND — the dedicated full receipt ──────────────────────────────────
 

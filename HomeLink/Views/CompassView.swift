@@ -498,48 +498,24 @@ struct CompassView: View {
             if let token = flightToken {
                 let previewEmoji = sendRemoteEmoji(for: token)
                 let previewStyle = instrumentStore.selected.senderStyle
-                // [bow/flick] These two instruments now own dedicated full-screen
-                // send journeys (the Gemini redesign), intercepted here — the same
-                // pattern wind/rocket use on the receipt side. Every other style
-                // keeps the shared SenderAnimationView, untouched. All three paths
-                // call the SAME completion, so the send pipeline is unchanged.
+                // [instrument versioning] V1 is the active send path: every style
+                // routes through the shared SenderAnimationView (its proven inline
+                // journeys: bowArrowSend · fingerFlickSend · planeSend · wandSend …).
+                // The today's full-screen ACT redesigns (BowSendAnimationV2 /
+                // FlickSendAnimationV2 / PlaneSendAnimationV2) are parked for the
+                // Animation Test Lab and NOT wired live until explicitly promoted.
+                //
+                // [wand] EXCEPTION — Wand owns a dedicated full-screen magical send
+                // cut scene (the previously-missing blaze across the screen). It is
+                // approved and wired live here, the same way the rocket v2 parachute
+                // receipt is. All paths call the SAME completion → pipeline unchanged.
                 Group {
-                    if previewStyle == .bowArrow {
-                        BowSendAnimation(
+                    if previewStyle == .wand {
+                        WandSendAnimation(
                             transition: InstrumentTransition(
                                 exitBearing: compass.state.bearingDegrees,
                                 exitPoint: .zero,
-                                instrument: .bow,
-                                emoji: previewEmoji,
-                                message: sentMessage,
-                                tagline: sentTagline),
-                            personName: compass.state.personName,
-                            onComplete: {
-                                flightToken = nil
-                                flightFly   = false
-                                finishSend(emoji: previewEmoji, style: previewStyle)
-                            })
-                    } else if previewStyle == .fingerFlick {
-                        FlickSendAnimation(
-                            transition: InstrumentTransition(
-                                exitBearing: compass.state.bearingDegrees,
-                                exitPoint: .zero,
-                                instrument: .flick,
-                                emoji: previewEmoji,
-                                message: sentMessage,
-                                tagline: sentTagline),
-                            personName: compass.state.personName,
-                            onComplete: {
-                                flightToken = nil
-                                flightFly   = false
-                                finishSend(emoji: previewEmoji, style: previewStyle)
-                            })
-                    } else if previewStyle == .plane {
-                        PlaneSendAnimation(
-                            transition: InstrumentTransition(
-                                exitBearing: compass.state.bearingDegrees,
-                                exitPoint: .zero,
-                                instrument: .plane,
+                                instrument: .wand,
                                 emoji: previewEmoji,
                                 message: sentMessage,
                                 tagline: sentTagline),

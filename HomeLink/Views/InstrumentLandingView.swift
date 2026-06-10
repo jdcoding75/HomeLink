@@ -45,18 +45,10 @@ struct InstrumentLandingView: View {
                 case .fingerFlick:  PostItLanding(emoji: emoji, size: geo.size, onComplete: onComplete)
                 case .bowArrow:     ArrowLanding(emoji: emoji, size: geo.size, onComplete: onComplete)
                 case .wand:         WandLanding(emoji: emoji, size: geo.size, onComplete: onComplete)
-                // PLANE now uses the full PlaneReceiptAnimation (fly-in → drop →
-                // catch). The live receive already routes .plane →
-                // PlaneReceiptAnimation at the ReceiptView layer; this aligns the
-                // test-lab / replay preview paths. (Old PlaneLanding kept, unused.)
-                case .plane:        PlaneReceiptAnimation(
-                                        senderBearing: 0,
-                                        emoji: emoji,
-                                        message: nil,
-                                        tagline: nil,
-                                        fromName: "",
-                                        onRevealed: {},
-                                        onFinished: onComplete)
+                // PLANE — reverted to the V1 inline landing (PlaneLanding). The
+                // today's full-screen PlaneReceiptAnimationV2 is parked for the
+                // Animation Test Lab and not wired into the live land path.
+                case .plane:        PlaneLanding(emoji: emoji, size: geo.size, onComplete: onComplete)
                 default:            OrbLanding(emoji: emoji, size: geo.size, onComplete: onComplete)
                 }
             }

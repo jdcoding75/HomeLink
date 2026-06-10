@@ -1,4 +1,4 @@
-// FlickSendAnimation.swift
+// FlickSendAnimationV2.swift
 // Pointward › Instruments › Flick
 //
 // ACT 2 of 3 — the full-screen FLICK send journey.
@@ -18,7 +18,7 @@
 
 import SwiftUI
 
-struct FlickSendAnimation: View {
+struct FlickSendAnimationV2: View {
 
   let transition: InstrumentTransition
   var personName: String = ""

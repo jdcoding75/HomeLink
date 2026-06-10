@@ -5,8 +5,15 @@
 // animation in isolation, with no thought queue, no pairing, no compass: just
 // the pure send and land animations on demand.
 //
-//   SEND ANIMATIONS     compass · bow · flick · rocket · wind · wand · plane
-//   RECEIVE ANIMATIONS  compass · bow · flick · rocket · wind · wand · plane
+//   SEND ANIMATIONS     compass · bow (V1/V2) · flick (V1/V2) · rocket · wind ·
+//                       wand · plane (V1/V2)
+//   RECEIVE ANIMATIONS  compass · bow (V1/V2) · flick (V1/V2) · rocket · wind ·
+//                       wand · plane (V1/V2)
+//
+// V1 is the live/active animation (the shared dispatcher path: SenderAnimationView
+// for sends, InstrumentLandingView for lands). V2 is today's extracted full-screen
+// ACT struct (…SendAnimationV2 / …ReceiptAnimationV2), shown here ONLY for
+// comparison — it is NOT wired into the live app until explicitly promoted.
 //
 // Tapping a tile plays that animation full-screen over a clean backdrop; it
 // auto-dismisses when the animation completes, or tap anywhere to dismiss.
@@ -19,25 +26,41 @@ struct AnimationTestLabView: View {
 
     @Environment(\.dismiss) private var dismiss
 
-    /// One animation playing full screen — send or land, a style, an emoji.
+    /// One catalogued animation: an instrument personality, optionally versioned.
+    struct LabEntry: Identifiable {
+        let icon: String
+        let name: String
+        let style: SenderStyle
+        let version: String?     // nil = single · "V1" = active inline · "V2" = extracted ACT
+        var id: String { "\(name)-\(version ?? "single")" }
+        /// "Bow V2" · "Wand V1" · "Compass"
+        var displayName: String { version.map { "\(name) \($0)" } ?? name }
+    }
+
+    /// One animation playing full screen — send or land, an entry, an emoji.
     private struct Playing: Identifiable {
         let id = UUID()
         let isSend: Bool
-        let style: SenderStyle
+        let entry: LabEntry
         let emoji: String
+        var style: SenderStyle { entry.style }
+        var isV2: Bool { entry.version == "V2" }
     }
     @State private var playing: Playing?
 
-    // The 🧭🏹👆🚀🌬️🪄✈️ lineup, in the user-facing order. Both sends and
-    // lands route through SenderStyle (the animation personality).
-    private let entries: [(icon: String, name: String, style: SenderStyle)] = [
-        ("🧭", "Compass", .glow),
-        ("🏹", "Bow",     .bowArrow),
-        ("👆", "Flick",   .fingerFlick),
-        ("🚀", "Rocket",  .rocket),
-        ("🌬️", "Wind",    .firefly),
-        ("🪄", "Wand",    .wand),
-        ("✈️", "Plane",   .plane),
+    // The 🧭🏹👆🚀🌬️🪄✈️ lineup. Bow/Flick/Plane carry both V1 (active inline) and
+    // V2 (today's extracted full-screen redesign) so the two can be compared.
+    private let entries: [LabEntry] = [
+        LabEntry(icon: "🧭", name: "Compass", style: .glow,        version: nil),
+        LabEntry(icon: "🏹", name: "Bow",     style: .bowArrow,    version: "V1"),
+        LabEntry(icon: "🏹", name: "Bow",     style: .bowArrow,    version: "V2"),
+        LabEntry(icon: "👆", name: "Flick",   style: .fingerFlick, version: "V1"),
+        LabEntry(icon: "👆", name: "Flick",   style: .fingerFlick, version: "V2"),
+        LabEntry(icon: "🚀", name: "Rocket",  style: .rocket,      version: nil),
+        LabEntry(icon: "🌬️", name: "Wind",    style: .firefly,     version: nil),
+        LabEntry(icon: "🪄", name: "Wand",    style: .wand,        version: "V1"),
+        LabEntry(icon: "✈️", name: "Plane",   style: .plane,       version: "V1"),
+        LabEntry(icon: "✈️", name: "Plane",   style: .plane,       version: "V2"),
     ]
 
     private let columns = [GridItem(.flexible(), spacing: 12),
@@ -57,14 +80,14 @@ struct AnimationTestLabView: View {
                     VStack(alignment: .leading, spacing: 24) {
                         sectionHeader("send animations")
                         LazyVGrid(columns: columns, spacing: 12) {
-                            ForEach(entries, id: \.style) { entry in
+                            ForEach(entries) { entry in
                                 tile(entry, isSend: true)
                             }
                         }
 
                         sectionHeader("receive animations")
                         LazyVGrid(columns: columns, spacing: 12) {
-                            ForEach(entries, id: \.style) { entry in
+                            ForEach(entries) { entry in
                                 tile(entry, isSend: false)
                             }
                         }
@@ -92,15 +115,14 @@ struct AnimationTestLabView: View {
 
     // ── A single animation tile ───────────────────────────────────────────
 
-    private func tile(_ entry: (icon: String, name: String, style: SenderStyle),
-                      isSend: Bool) -> some View {
+    private func tile(_ entry: LabEntry, isSend: Bool) -> some View {
         Button {
-            playing = Playing(isSend: isSend, style: entry.style, emoji: randomEmoji)
+            playing = Playing(isSend: isSend, entry: entry, emoji: randomEmoji)
         } label: {
             VStack(spacing: 8) {
                 Text(entry.icon)
                     .font(.system(size: 34))
-                Text("\(entry.name) \(isSend ? "Send" : "Land")")
+                Text("\(entry.displayName) \(isSend ? "Send" : "Land")")
                     .font(.system(size: 13, weight: .medium, design: .serif))
                     .foregroundColor(DesignTokens.Color.textPrimary)
                     .lineLimit(1)
@@ -112,11 +134,16 @@ struct AnimationTestLabView: View {
             .cornerRadius(DesignTokens.Radius.card)
             .overlay(
                 RoundedRectangle(cornerRadius: DesignTokens.Radius.card)
-                    .stroke(isSend ? Self.lavender.opacity(0.4)
-                                   : Color(hex: "#5dcaa5").opacity(0.4), lineWidth: 1)
+                    .stroke(tileStroke(entry: entry, isSend: isSend), lineWidth: 1)
             )
         }
         .buttonStyle(.plain)
+    }
+
+    /// V2 tiles get a gold edge so they read as the experimental version.
+    private func tileStroke(entry: LabEntry, isSend: Bool) -> Color {
+        if entry.version == "V2" { return Color(hex: "#e0a85a").opacity(0.55) }
+        return isSend ? Self.lavender.opacity(0.4) : Color(hex: "#5dcaa5").opacity(0.4)
     }
 
     private func sectionHeader(_ title: String) -> some View {
@@ -138,25 +165,9 @@ struct AnimationTestLabView: View {
             CatchWorldBackground(style: p.style).ignoresSafeArea()
 
             if p.isSend {
-                // Straight up (bearing 0) so the flight is centred and visible.
-                SenderAnimationView(
-                    style: p.style,
-                    emoji: p.emoji,
-                    bearingDegrees: 0,
-                    symbol: Text(p.emoji).font(.system(size: 45))
-                ) {
-                    // Auto-dismiss a beat after the send completes.
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                        if playing?.id == p.id { playing = nil }
-                    }
-                }
+                sendPlayer(p)
             } else {
-                InstrumentLandingView(style: p.style, emoji: p.emoji) {
-                    // Let the emerged emoji breathe, then dismiss.
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.4) {
-                        if playing?.id == p.id { playing = nil }
-                    }
-                }
+                landPlayer(p)
             }
 
             // Tap-anywhere-to-dismiss + a quiet hint. Topmost so it always
@@ -190,10 +201,84 @@ struct AnimationTestLabView: View {
         .preferredColorScheme(.dark)
     }
 
+    // ── Send: V1 = shared SenderAnimationView · V2 = extracted ACT struct ──
+
+    @ViewBuilder
+    private func sendPlayer(_ p: Playing) -> some View {
+        if p.isV2 {
+            let t = InstrumentTransition(exitBearing: 0, exitPoint: .zero,
+                                         instrument: instrumentKind(p.style),
+                                         emoji: p.emoji, message: nil, tagline: nil)
+            switch p.style {
+            case .bowArrow:    BowSendAnimationV2(transition: t, personName: "them",
+                                                  onComplete: { autoDismiss(p, after: 0.1) })
+            case .fingerFlick: FlickSendAnimationV2(transition: t, personName: "them",
+                                                    onComplete: { autoDismiss(p, after: 0.1) })
+            case .plane:       PlaneSendAnimationV2(transition: t, personName: "them",
+                                                    onComplete: { autoDismiss(p, after: 0.1) })
+            default:           EmptyView()
+            }
+        } else {
+            // Straight up (bearing 0) so the flight is centred and visible.
+            SenderAnimationView(
+                style: p.style,
+                emoji: p.emoji,
+                bearingDegrees: 0,
+                symbol: Text(p.emoji).font(.system(size: 45))
+            ) {
+                autoDismiss(p, after: 0.3)
+            }
+        }
+    }
+
+    // ── Land: V1 = shared InstrumentLandingView · V2 = extracted ACT struct ─
+
+    @ViewBuilder
+    private func landPlayer(_ p: Playing) -> some View {
+        if p.isV2 {
+            switch p.style {
+            case .bowArrow:    BowReceiptAnimationV2(senderBearing: 120, emoji: p.emoji,
+                                                     message: nil, tagline: nil, fromName: "",
+                                                     onRevealed: {}, onFinished: { autoDismiss(p, after: 0.1) })
+            case .fingerFlick: FlickReceiptAnimationV2(senderBearing: 120, emoji: p.emoji,
+                                                       message: nil, tagline: nil, fromName: "",
+                                                       onRevealed: {}, onFinished: { autoDismiss(p, after: 0.1) })
+            case .plane:       PlaneReceiptAnimationV2(senderBearing: 120, emoji: p.emoji,
+                                                       message: nil, tagline: nil, fromName: "",
+                                                       onRevealed: {}, onFinished: { autoDismiss(p, after: 0.1) })
+            default:           EmptyView()
+            }
+        } else {
+            InstrumentLandingView(style: p.style, emoji: p.emoji) {
+                // Let the emerged emoji breathe, then dismiss.
+                autoDismiss(p, after: 1.4)
+            }
+        }
+    }
+
+    private func autoDismiss(_ p: Playing, after: Double) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + after) {
+            if playing?.id == p.id { playing = nil }
+        }
+    }
+
+    /// SenderStyle → Instrument kind, for the V2 ACT structs' transition context.
+    private func instrumentKind(_ style: SenderStyle) -> Instrument {
+        switch style {
+        case .bowArrow:     return .bow
+        case .fingerFlick:  return .flick
+        case .plane:        return .plane
+        case .rocket:       return .rocket
+        case .wand:         return .wand
+        case .firefly:      return .wind
+        default:            return .compass
+        }
+    }
+
     /// ✅ approved / ✏️ needs work — records the verdict for this exact
-    /// animation (style + send/land), then dismisses.
+    /// animation (style + send/land + version), then dismisses.
     private func verdictButtons(for p: Playing) -> some View {
-        let key = AnimationFeedbackStore.key(style: p.style, isSend: p.isSend)
+        let key = AnimationFeedbackStore.key(style: p.style, isSend: p.isSend, version: p.entry.version)
         let current = AnimationFeedbackStore.verdict(for: key)
         return HStack(spacing: 12) {
             verdictButton("✅ approved", tint: Color(hex: "#5dcaa5"),
@@ -228,8 +313,7 @@ struct AnimationTestLabView: View {
     }
 
     private func animationLabel(_ p: Playing) -> String {
-        let name = entries.first { $0.style == p.style }?.name ?? p.style.displayName
-        return "\(name) \(p.isSend ? "send" : "land")"
+        "\(p.entry.displayName) \(p.isSend ? "send" : "land")"
     }
 }
 
@@ -245,14 +329,15 @@ enum AnimationVerdict: String {
 }
 
 /// DEBUG-only persistence for animation ratings made in the Animation Test
-/// Lab. Keyed by "<senderStyle>-<send|land>" and stored in UserDefaults so the
-/// "📋 View animation feedback" summary survives relaunches.
+/// Lab. Keyed by "<senderStyle>-<send|land>[-<version>]" and stored in
+/// UserDefaults so the "📋 View animation feedback" summary survives relaunches.
 enum AnimationFeedbackStore {
 
     private static let defaultsKey = "animationFeedbackVerdicts"
 
-    static func key(style: SenderStyle, isSend: Bool) -> String {
-        "\(style.rawValue)-\(isSend ? "send" : "land")"
+    static func key(style: SenderStyle, isSend: Bool, version: String? = nil) -> String {
+        let base = "\(style.rawValue)-\(isSend ? "send" : "land")"
+        return version.map { "\(base)-\($0)" } ?? base
     }
 
     static func all() -> [String: String] {
@@ -283,14 +368,17 @@ struct AnimationFeedbackView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var verdicts = AnimationFeedbackStore.all()
 
-    private let entries: [(icon: String, name: String, style: SenderStyle)] = [
-        ("🧭", "Compass", .glow),
-        ("🏹", "Bow",     .bowArrow),
-        ("👆", "Flick",   .fingerFlick),
-        ("🚀", "Rocket",  .rocket),
-        ("🌬️", "Wind",    .firefly),
-        ("🪄", "Wand",    .wand),
-        ("✈️", "Plane",   .plane),
+    private let entries: [AnimationTestLabView.LabEntry] = [
+        .init(icon: "🧭", name: "Compass", style: .glow,        version: nil),
+        .init(icon: "🏹", name: "Bow",     style: .bowArrow,    version: "V1"),
+        .init(icon: "🏹", name: "Bow",     style: .bowArrow,    version: "V2"),
+        .init(icon: "👆", name: "Flick",   style: .fingerFlick, version: "V1"),
+        .init(icon: "👆", name: "Flick",   style: .fingerFlick, version: "V2"),
+        .init(icon: "🚀", name: "Rocket",  style: .rocket,      version: nil),
+        .init(icon: "🌬️", name: "Wind",    style: .firefly,     version: nil),
+        .init(icon: "🪄", name: "Wand",    style: .wand,        version: "V1"),
+        .init(icon: "✈️", name: "Plane",   style: .plane,       version: "V1"),
+        .init(icon: "✈️", name: "Plane",   style: .plane,       version: "V2"),
     ]
 
     private static let lavender = Color(hex: "#c4a8d4")
@@ -354,15 +442,15 @@ struct AnimationFeedbackView: View {
                 .font(DesignTokens.Font.overline)
                 .foregroundColor(DesignTokens.Color.textMuted)
             VStack(spacing: 0) {
-                ForEach(Array(entries.enumerated()), id: \.element.style) { idx, entry in
-                    let key = AnimationFeedbackStore.key(style: entry.style, isSend: isSend)
+                ForEach(Array(entries.enumerated()), id: \.element.id) { idx, entry in
+                    let key = AnimationFeedbackStore.key(style: entry.style, isSend: isSend, version: entry.version)
                     let verdict = verdicts[key].flatMap(AnimationVerdict.init)
                     if idx > 0 {
                         Divider().background(DesignTokens.Color.border).padding(.leading, 44)
                     }
                     HStack(spacing: 12) {
                         Text(entry.icon).font(.system(size: 20)).frame(width: 28)
-                        Text(entry.name)
+                        Text(entry.displayName)
                             .font(DesignTokens.Font.label)
                             .foregroundColor(DesignTokens.Color.textPrimary)
                         Spacer()

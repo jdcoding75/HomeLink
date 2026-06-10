@@ -1,4 +1,4 @@
-// BowSendAnimation.swift
+// BowSendAnimationV2.swift
 // Pointward › Instruments › Bow
 //
 // ACT 2 of 3 — the full-screen BOW send journey.
@@ -23,7 +23,7 @@
 
 import SwiftUI
 
-struct BowSendAnimation: View {
+struct BowSendAnimationV2: View {
 
   let transition: InstrumentTransition
   var personName: String = ""

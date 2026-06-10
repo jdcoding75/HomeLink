@@ -1,4 +1,4 @@
-// PlaneSendAnimation.swift
+// PlaneSendAnimationV2.swift
 // Pointward › Instruments › Plane
 //
 // ACT 2 of 3 — the full-screen PLANE send journey.
@@ -17,7 +17,7 @@
 
 import SwiftUI
 
-struct PlaneSendAnimation: View {
+struct PlaneSendAnimationV2: View {
 
     let transition: InstrumentTransition
     var personName: String = ""

@@ -1,4 +1,4 @@
-// PlaneReceiptAnimation.swift
+// PlaneReceiptAnimationV2.swift
 // Pointward › Instruments › Plane
 //
 // ACT 3 of 3 — the full-screen PLANE receipt + emoji reveal.
@@ -18,7 +18,7 @@
 
 import SwiftUI
 
-struct PlaneReceiptAnimation: View {
+struct PlaneReceiptAnimationV2: View {
 
     let senderBearing: Double            // unused — the plane flies in from the left
     let emoji: String

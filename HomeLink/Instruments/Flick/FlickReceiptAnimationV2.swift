@@ -1,4 +1,4 @@
-// FlickReceiptAnimation.swift
+// FlickReceiptAnimationV2.swift
 // Pointward › Instruments › Flick
 //
 // ACT 3 of 3 — the full-screen FLICK receipt journey + emoji reveal.
@@ -19,7 +19,7 @@
 
 import SwiftUI
 
-struct FlickReceiptAnimation: View {
+struct FlickReceiptAnimationV2: View {
 
   // ── Receives (matches the dedicated-receipt signature) ─────────────────
   let senderBearing: Double
