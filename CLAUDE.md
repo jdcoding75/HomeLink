@@ -130,23 +130,64 @@ xcodebuild -scheme HomeLink \
 - WindSounds.swift
 - Sounds: wind_send.wav ✅ · wind_receipt.wav ✅ · emoji_hug_v2.wav ✅
 
+### Rocket receipt: v2 PARACHUTE COMPLETE ✅
+- RocketReceiptAnimation.swift — LIVE via ReceiptView interception of .rocket.
+- Capsule falls into a deep-space starfield over a curved Earth horizon, the
+  parachute DEPLOYS (whoosh), it FLOATS down on a lazy sway, then LANDS softly
+  into the bucket — AUTO-CATCH — and hands off to EmojiRevealView (.rocket).
+- 7.75s: fall 1.5 · deploy 0.8 · float 4.55 · land 0.9.
+- Sound: rocket_receipt.wav (7.75s).
+- Rocket SEND + compass face still use the OLD structure (not yet migrated).
+
+### Fist bump reveal: COMPLETE ✅
+- 👊 in EmojiRevealView: punches IN from the left (scale 0, x −120 → slam),
+  then 3 pump cycles. Sound (emoji_fistbump) fires ONLY on the 3rd pump's
+  punch-forward — never the 1st/2nd, and not at bloom.
+
+### Bow receipt: APPROVED (spec only — temporary, not yet built) ⏳
+- Approved design: giant bucket with a bullseye target; the arrow lands in the
+  bullseye centre; the emoji rides the arrowhead tip; screen shake on impact;
+  thud sound. NOT yet implemented — bow send + compass face also pending.
+
 ### Other instruments: NOT YET MIGRATED
-- Bow / Flick / Rocket / Wand / Plane still use the OLD structure
+- Flick / Wand / Plane (and Bow, Rocket-send) still use the OLD structure
   (the *InstrumentView struct in each *CompassFace.swift, rendered by
-  CompassView; sends via SenderAnimationView; receipts via InstrumentLandingView)
-- The per-instrument ACT files (*CompassFace / *SendAnimation /
-  *ReceiptAnimation / *Sounds) are additive scaffold — typed integration points,
+  CompassView; sends via SenderAnimationView; receipts via InstrumentLandingView).
+- The per-instrument ACT files are additive scaffold — typed integration points,
   not yet wired into the live pipeline.
 - DO NOT modify another instrument until its turn.
 
 ### EmojiReveal system: COMPLETE ✅
 - ONE component for ALL reveals — no separate sent/received screens.
-  - EmojiRevealView.swift   — the single reveal screen
+  - EmojiRevealView.swift   — the single reveal screen (🤗 hug squeeze, 👊 fist
+    bump; every other emoji blooms + breathes)
   - EmojiRevealContext.swift — RevealContext (.sent / .received → copy) +
-    RevealAmbient (per-instrument background + ambient layer)
-  - EmojiRevealSound.swift   — emoji .wav, plays ONLY at the bloom
+    RevealAmbient (per-instrument background + ambient layer; forStyle/forInstrument)
+  - EmojiRevealSound.swift   — emoji .wav, plays ONLY at the bloom (👊 on 3rd pump)
   - HugRevealModifier.swift  — the 🤗 hug squeeze + presentation helper
-- Live receipt, the wind sent confirmation, and HISTORY REPLAY all use it.
+- Live receipt (ALL instruments via ReceiptView), the sent confirmation (ALL
+  instruments via CompassView), and HISTORY REPLAY all use it.
+
+### Screen coordinate rules (InstrumentBoundaries) ✅
+- Every instrument animation: GeometryReader root · .ignoresSafeArea() on the
+  background · all positions from geo.size · no UIScreen.main.bounds · no
+  hardcoded dimensions. ScreenCoordinates enum holds the shared constants
+  (entryReach 0.75, exitReach 1.15, swirl amplitudes 0.36/0.15, bucket margin
+  0.06). Full INSTRUMENT GENERATION SPEC lives in InstrumentBoundaries.swift.
+
+### Approved sounds
+- Instruments (Sounds/Instruments/): compass · bow · flick · rocket · wind ·
+  wand · plane — each _send.wav + _receipt.wav, durations matching boundaries
+  (rocket_receipt 7.75s is the v2 parachute).
+- Emoji: emoji_hug_v2.wav (2.8s); curated set in Sounds/ (fistbump, kiss,
+  highfive, hearthands, clap).
+
+### Housekeeping
+- AudioRecorder.meterTimer retain cycle FIXED (added [weak self]).
+- ArrivalPreviewView is now an ORPHAN (0 references) — it was superseded by the
+  shared EmojiRevealView (.sent) confirmation. Kept (not deleted) pending a
+  human decision on whether to restore the arrival-preview feature.
+- Tests: ~194 (162 core + the overnight AuditCoverageTests + PeopleManager gate).
 
 ### Next instrument: Flick or Wand (Joshua's choice)
 

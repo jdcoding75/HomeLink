@@ -22,6 +22,9 @@ final class SubscriptionManager: ObservableObject {
     @Published private(set) var tier: SubscriptionTier = .free {
         didSet {
             UserDefaults.standard.set(tier.rawValue, forKey: "subscriptionTier")
+            // Also mirror to the explicit "subscription_tier" key so tier
+            // persistence is restorable from either name.
+            UserDefaults.standard.set(tier.rawValue, forKey: "subscription_tier")
             if tier == .pro {
                 // Pro gating checks BOTH tier and the ProFeatures flag, so a real
                 // purchase must enable features too (the DEBUG default did this).
@@ -45,7 +48,10 @@ final class SubscriptionManager: ObservableObject {
         self.skinStore = skinStore
         // Seed from the persisted value (in DEBUG a testing default may set this
         // to "unlocked"); StoreKit entitlements then confirm/upgrade below.
-        let saved = UserDefaults.standard.string(forKey: "subscriptionTier") ?? ""
+        // Restore the persisted tier on launch — from the legacy key first
+        // (existing purchasers), falling back to "subscription_tier".
+        let saved = UserDefaults.standard.string(forKey: "subscriptionTier")
+            ?? UserDefaults.standard.string(forKey: "subscription_tier") ?? ""
         tier = SubscriptionTier(rawValue: saved) ?? .free
 
         transactionListener = listenForTransactions()

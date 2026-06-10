@@ -196,10 +196,12 @@ final class AudioRecorder: NSObject, ObservableObject, AVAudioRecorderDelegate {
         hasRecording = false
         isRecording  = rec.record(forDuration: maxDuration)   // auto-stops at 3 s
 
-        meterTimer = Timer.scheduledTimer(withTimeInterval: 0.05, repeats: true) { _ in
-            // Timer fires on the main run loop
+        meterTimer = Timer.scheduledTimer(withTimeInterval: 0.05, repeats: true) { [weak self] _ in
+            // Timer fires on the main run loop. [weak self] breaks the
+            // self → meterTimer → closure → self retain cycle, so an in-flight
+            // meter timer never pins the recorder alive after the view is gone.
             MainActor.assumeIsolated {
-                guard let rec = self.recorder, rec.isRecording else { return }
+                guard let self, let rec = self.recorder, rec.isRecording else { return }
                 rec.updateMeters()
                 let power = rec.averagePower(forChannel: 0)        // −160…0 dB
                 let norm  = max(0, min(1, (power + 50) / 50))      // usable window
