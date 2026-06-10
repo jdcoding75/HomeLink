@@ -97,9 +97,41 @@ struct ReceiptView: View {
             windReceipt
         } else if style == .rocket {
             rocketReceipt
+        } else if style == .bowArrow {
+            bowReceipt
+        } else if style == .fingerFlick {
+            flickReceipt
         } else {
             standardReceipt
         }
+    }
+
+    // ── BOW — the dedicated Gemini receipt (arrow → dissolve → bucket) ──────
+
+    private var bowReceipt: some View {
+        BowReceiptAnimation(
+            senderBearing: compass.rawBearingToTarget ?? 120,
+            emoji: ping.emoji,
+            message: ping.message,
+            tagline: ping.tagline,
+            fromName: ping.fromName,
+            onRevealed: { revealHandoff() },
+            onFinished: onFinished
+        )
+    }
+
+    // ── FLICK — the dedicated receipt (paper ball arc → wooden bucket) ─────
+
+    private var flickReceipt: some View {
+        FlickReceiptAnimation(
+            senderBearing: compass.rawBearingToTarget ?? 120,
+            emoji: ping.emoji,
+            message: ping.message,
+            tagline: ping.tagline,
+            fromName: ping.fromName,
+            onRevealed: { revealHandoff() },
+            onFinished: onFinished
+        )
     }
 
     // ── WIND — the dedicated full receipt ──────────────────────────────────

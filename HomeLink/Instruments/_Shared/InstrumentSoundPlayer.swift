@@ -120,6 +120,8 @@ final class InstrumentSoundPlayer {
     switch instrument {
     case .firefly: return (WindSounds.sendFile, WindSounds.sendDuration)
     case .rocket:  return (RocketSounds.sendFile, RocketSounds.sendDuration)
+    case .bow:     return (BowSounds.sendFile, BowSounds.sendDuration)
+    case .flick:   return (FlickSounds.sendFile, FlickSounds.sendDuration)
     default:       return nil
     }
   }
@@ -130,7 +132,28 @@ final class InstrumentSoundPlayer {
     switch instrument {
     case .firefly: return (WindSounds.receiptFile, WindSounds.receiptDuration)
     case .rocket:  return (RocketSounds.receiptFile, RocketSounds.receiptDuration)
+    case .bow:     return (BowSounds.receiptFile, BowSounds.receiptDuration)
+    case .flick:   return (FlickSounds.receiptFile, FlickSounds.receiptDuration)
     default:       return nil
+    }
+  }
+
+  // MARK: - One-off cue files (not phase-exclusive)
+
+  /// Play a short cue file directly (e.g. the bow arrow whistle during flight,
+  /// or the sparkle-dissolve at the receipt's dissolve moment). These layer on
+  /// top of the current phase rather than replacing it, so they do NOT change
+  /// `currentPhase` or stop the send/receipt voice.
+  func playCue(file: String, duration: Double, proIntensity: Float = 1.0) {
+    guard let player = player(for: file) else { return }
+    let peak = min(1.0, 0.8 * proIntensity)
+    player.volume = 0
+    player.currentTime = 0
+    player.play()
+    player.setVolume(peak, fadeDuration: max(0.01, duration * 0.05))
+    let fadeOutLead = duration * 0.1
+    DispatchQueue.main.asyncAfter(deadline: .now() + max(0, duration - fadeOutLead)) { [weak player] in
+      player?.setVolume(0, fadeDuration: fadeOutLead)
     }
   }
 

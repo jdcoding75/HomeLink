@@ -118,6 +118,20 @@ struct BowInstrumentView: View {
                 .ignoresSafeArea()
                 .allowsHitTesting(false)
 
+            // ── [Gemini] ETHEREAL LIGHT — the bow is the one instrument whose
+            // face is luminous, not dark: a soft radial from white at the centre
+            // to #E7ECF8 at the rim, clipped to the compass circle. Sits behind
+            // everything; purely visual, no effect on the aim/draw mechanic. ──
+            Circle()
+                .fill(RadialGradient(
+                    colors: [.white, Color(hex: "#EEF2FB"), Color(hex: "#E7ECF8")],
+                    center: .center, startRadius: 0, endRadius: 178))
+                .frame(width: 344, height: 344)
+                .clipShape(Circle())
+                .overlay(Circle().stroke(Color(hex: "#cdd6ea").opacity(0.7), lineWidth: 2))
+                .shadow(color: Color(hex: "#4488cc").opacity(0.18), radius: 12)
+                .allowsHitTesting(false)
+
             // ── Where they are — the person-initial marker rides the ring at
             // their bearing; it brightens as the FINGER-SPIN aim closes in
             // (approachError = the bow-vs-person angle, not the phone). ──

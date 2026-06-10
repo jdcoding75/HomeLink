@@ -41,8 +41,8 @@ enum InstrumentBoundaries {
     static let maximum: Double = 7.75  // rocket v2 parachute (longest receipt)
 
     static let compass: Double = 1.5
-    static let bow:     Double = 1.1
-    static let flick:   Double = 1.0
+    static let bow:     Double = 3.5   // Gemini receipt: entry·approach·dissolve·land·bloom
+    static let flick:   Double = 2.8   // single bezier arc into the bucket, then bloom
     static let rocket:  Double = 7.75  // v2 parachute: fall · chute · float · land
     static let wind:    Double = 7.2
     static let wand:    Double = 1.1
