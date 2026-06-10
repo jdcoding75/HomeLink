@@ -107,7 +107,7 @@ struct WindSendAnimation: View {
     .onAppear {
       start = Date()
       // The approved wind send sound (6.5s, matches the journey).
-      InstrumentSoundPlayer.shared.playSend(.firefly)
+      InstrumentSoundPlayer.shared.playSend(.wind)
       withAnimation(.easeInOut(duration: 0.3)) { skyIn = true }   // crossfade
       // After the leaf departs → the sent confirmation reveal.
       DispatchQueue.main.asyncAfter(deadline: .now() + Self.total) {

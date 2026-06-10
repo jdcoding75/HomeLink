@@ -406,9 +406,14 @@ struct SenderAnimationView<Symbol: View>: View {
 
     @ViewBuilder
     private func fireflySend(end: CGSize) -> some View {
-        // [4/5] FIX B — the leaf lifts from the BOTTOM of the screen (not the
-        // ring), for maximum visual impact and the longest travel.
-        let start = CGSize(width: 0, height: 340)
+        // [WIND FIX] The leaf swirls around the TRUE screen centre (offset 0,0
+        // from the centred ZStack — see `.position(geo.size/2)` below). During
+        // the 8 s float phase `progress` stays 0, so `start` IS where the leaf
+        // lives while it wanders — it MUST be centre, not the bottom.
+        // (Was height: 340 → that pinned the leaf in the bottom ~10 % for the
+        //  entire swirl; the promised "lift" never animated. RULE 4: swirl
+        //  centre is geo.size/2.)
+        let start = CGSize(width: 0, height: 0)
         let c1 = CGSize(width: start.width + (end.width - start.width) * 0.30 + wander1.width,
                         height: start.height + (end.height - start.height) * 0.30 + wander1.height)
         let c2 = CGSize(width: start.width + (end.width - start.width) * 0.70 + wander2.width,
@@ -439,12 +444,13 @@ struct SenderAnimationView<Symbol: View>: View {
             symbol
                 .scaleEffect(1.25)   // emoji riding the leaf, ~56 pt
         }
-        // [4/5] Bigger wander during the FLOAT phase (±40/±20/±10°), settling
-        // to the alive sway (±15/±8/±8°) once it gathers to fly.
+        // [WIND FIX] Wide wander during the FLOAT phase so the leaf visibly
+        // travels through the screen centre (±130/±90/±10°), settling to the
+        // alive sway (±15/±8/±8°) once it gathers to fly.
         .rotationEffect(.degrees(orbPulse ? (windFloating ? 10 : 8)
                                           : (windFloating ? -10 : -8)))
-        .offset(x: orbPulse ? (windFloating ? 40 : 15) : (windFloating ? -40 : -15),
-                y: orbPulse ? (windFloating ? -20 : -8) : (windFloating ? 20 : 8))
+        .offset(x: orbPulse ? (windFloating ? 130 : 15) : (windFloating ? -130 : -15),
+                y: orbPulse ? (windFloating ? -90 : -8) : (windFloating ? 90 : 8))
         .animation(AnimationSystem.easeInOutSine(windFloating ? 1.5 : 0.6)
                     .repeatForever(autoreverses: true), value: orbPulse)
         .scaleEffect(flightScale)
@@ -1170,7 +1176,7 @@ struct SenderAnimationView<Symbol: View>: View {
             // [5/5] WIND SEND SOUND — the approved wind_send.wav (6.5s, matches
             // the send duration) plays alongside the chime for the live wind
             // send. (The extracted full-screen prototype is WindSendAnimation.)
-            InstrumentSoundPlayer.shared.playSend(.firefly)
+            InstrumentSoundPlayer.shared.playSend(.wind)
             chargeGlow = true
             windSky = true                                   // full-screen sky in
             windFloating = true                              // big, lazy swirl

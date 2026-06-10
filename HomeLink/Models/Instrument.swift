@@ -88,4 +88,11 @@ enum Instrument: String, CaseIterable, Codable, Identifiable {
     /// Wind/wand/plane don't aim at all. This is the invariant the alignment
     /// audit enforces and the alignment tests pin.
     var alignsByPhoneRotation: Bool { self == .compass }
+
+    /// The wind instrument is backed by the `.firefly` case (the case name is
+    /// kept for wire-format stability — see `displayName`). `.wind` is a clear,
+    /// self-documenting alias so call sites can say what they mean
+    /// (`playSend(.wind)`) without a new enum case that would break the wire
+    /// format or switch exhaustiveness. `Instrument.wind == .firefly`.
+    static let wind = Instrument.firefly
 }
