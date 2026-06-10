@@ -868,14 +868,25 @@ private struct OrbLanding: View {
     @State private var flash = false
     @State private var dissolve: CGFloat = 0     // 0 orb → 1 dissolved
     @State private var emojiScale: CGFloat = 0
+    // [compass bucket] the drop into the bucket after the orb delivers, pre-reveal.
+    @State private var bucketIn = false
+    @State private var drop: CGFloat = 0         // 0 at centre → 1 in bucket
+    @State private var bucketGlow = false
 
     private static let lavender = Color(hex: "#c4a8d4")
+    private static let bucketW: CGFloat = 96
+    private static let bucketH: CGFloat = 104    // mouth bucketH/2 = 52 above centre
 
     var body: some View {
         let startX = size.width * 0.8, startY = size.height * 0.2
         let endX = size.width / 2, endY = size.height * 0.5
         let x = startX + (endX - startX) * travel
         let y = startY + (endY - startY) * travel
+        // [compass bucket] bottom-right bucket; emoji drops to its mouth.
+        let bx = size.width - 80, by = size.height - 95
+        let mouth = CGPoint(x: bx, y: by - 52)
+        let emojiPos = CGPoint(x: endX + (mouth.x - endX) * drop,
+                               y: endY + (mouth.y - endY) * drop)
         ZStack {
             Self.lavender.opacity(flash ? 0.15 : 0).ignoresSafeArea().allowsHitTesting(false)
             // soft light trail
@@ -894,10 +905,53 @@ private struct OrbLanding: View {
                 .opacity(1 - Double(dissolve))
                 .position(x: x, y: y)
 
+            // [compass bucket] the wooden bucket (wood/brass · 3 stave lines).
+            compassBucket.position(x: bx, y: by).opacity(bucketIn ? 1 : 0)
+
+            // [compass bucket] soft lavender glow trail behind the falling emoji.
+            if drop > 0.01 && drop < 0.99 {
+                Capsule()
+                    .fill(LinearGradient(colors: [Self.lavender.opacity(0.4), .clear],
+                                         startPoint: .bottom, endPoint: .top))
+                    .frame(width: 20, height: 80)
+                    .blur(radius: 3)
+                    .position(x: emojiPos.x, y: emojiPos.y - 48)
+                    .allowsHitTesting(false)
+            }
+
             EmergingEmoji(emoji: emoji, hue: hueFor(emoji), scale: emojiScale)
-                .position(x: endX, y: endY)
+                .position(emojiPos)
         }
         .onAppear { run() }
+    }
+
+    /// The bottom-right wooden bucket (wood + brass, 3 stave lines) with a
+    /// lavender catch glow on landing.
+    private var compassBucket: some View {
+        let wood = Color(hex: "#8B4513"); let woodDark = Color(hex: "#6E3A1E")
+        let brass = Color(hex: "#C9A86A")
+        return ZStack {
+            Circle().fill(Self.lavender.opacity(bucketGlow ? 0.2 : 0))
+                .frame(width: 120, height: 120).blur(radius: 28).offset(y: -8)
+            BucketHandleShape()
+                .stroke(brass, style: StrokeStyle(lineWidth: 3.5, lineCap: .round))
+                .frame(width: Self.bucketW * 0.9, height: 40)
+                .offset(y: -Self.bucketH / 2 - 12)
+            BucketShape()
+                .fill(LinearGradient(colors: [wood, woodDark], startPoint: .top, endPoint: .bottom))
+                .frame(width: Self.bucketW, height: Self.bucketH)
+                .overlay(
+                    VStack(spacing: 0) {
+                        Capsule().fill(brass).frame(height: 5).padding(.top, 14)
+                        Spacer()
+                        Capsule().fill(brass).frame(height: 5)
+                        Spacer()
+                        Capsule().fill(brass).frame(height: 5).padding(.bottom, 14)
+                    }
+                    .frame(width: Self.bucketW, height: Self.bucketH).opacity(0.85)
+                )
+                .shadow(color: .black.opacity(0.4), radius: 8, y: 5)
+        }
     }
 
     private func run() {
@@ -918,7 +972,21 @@ private struct OrbLanding: View {
             withAnimation(.easeOut(duration: 0.6)) { dissolve = 1 }
             HapticEngine.catchReveal()
             withAnimation(AnimationSystem.easeOutBack(0.6)) { emojiScale = 1 }
+            // [compass bucket] the bucket fades in once the emoji is revealed.
+            withAnimation(.easeOut(duration: 0.3)) { bucketIn = true }
         }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 3.2) { onComplete() }
+        // [compass bucket] the emoji drops from centre into the bucket
+        // (0.6s, easeIn = gravity feel), shrinking to settle inside.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.7) {
+            withAnimation(.easeIn(duration: 0.6)) { drop = 1; emojiScale = 0.5 }
+        }
+        // [compass bucket] landing: soft thud + lavender bucket glow.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3.3) {
+            InstrumentSoundPlayer.shared.playCue(file: PlaneSounds.catchFile, duration: 0.45)
+            HapticPattern.singleSoft.fire()
+            withAnimation(.easeOut(duration: 0.4)) { bucketGlow = true }
+        }
+        // [compass bucket] emoji visible in the bucket ~0.5s, then the reveal fires.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3.8) { onComplete() }
     }
 }
