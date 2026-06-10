@@ -239,3 +239,6 @@ history of decisions and approvals.
 
 ## Session Log
 See SESSION_LOG.md for approved decisions and pending work.
+
+## Animation Framework
+Read ANIMATION_FRAMEWORK.md before touching any animation file.
