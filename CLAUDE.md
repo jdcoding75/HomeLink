@@ -120,6 +120,36 @@ xcodebuild -scheme HomeLink \
 - Pro setup screen
 - Giving back screen
 
+## Current State (Instrument Restructure)
+
+### Wind instrument: COMPLETE ✅
+- WindCompassFace.swift  (ACT 1 — sky circle, leaf + emoji, state machine)
+- WindSendAnimation.swift (ACT 2 — centered leaf swirl, sent confirmation)
+- WindReceiptAnimation.swift (ACT 3 — auto-catch into bucket → reveal; LIVE via
+  ReceiptView interception of .firefly)
+- WindSounds.swift
+- Sounds: wind_send.wav ✅ · wind_receipt.wav ✅ · emoji_hug_v2.wav ✅
+
+### Other instruments: NOT YET MIGRATED
+- Bow / Flick / Rocket / Wand / Plane still use the OLD structure
+  (the *InstrumentView struct in each *CompassFace.swift, rendered by
+  CompassView; sends via SenderAnimationView; receipts via InstrumentLandingView)
+- The per-instrument ACT files (*CompassFace / *SendAnimation /
+  *ReceiptAnimation / *Sounds) are additive scaffold — typed integration points,
+  not yet wired into the live pipeline.
+- DO NOT modify another instrument until its turn.
+
+### EmojiReveal system: COMPLETE ✅
+- ONE component for ALL reveals — no separate sent/received screens.
+  - EmojiRevealView.swift   — the single reveal screen
+  - EmojiRevealContext.swift — RevealContext (.sent / .received → copy) +
+    RevealAmbient (per-instrument background + ambient layer)
+  - EmojiRevealSound.swift   — emoji .wav, plays ONLY at the bloom
+  - HugRevealModifier.swift  — the 🤗 hug squeeze + presentation helper
+- Live receipt, the wind sent confirmation, and HISTORY REPLAY all use it.
+
+### Next instrument: Flick or Wand (Joshua's choice)
+
 ## Known Issues / In Progress
 - Pairing links wrong person sometimes
 - Recipient animation needs direction fix
