@@ -232,3 +232,10 @@ Est. completion: [X] minutes remaining
 
 This is mandatory on every task.
 Never go silent for more than 2 minutes.
+
+## Session Log
+See SESSION_LOG.md for running
+history of decisions and approvals.
+
+## Session Log
+See SESSION_LOG.md for approved decisions and pending work.
