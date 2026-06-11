@@ -77,8 +77,15 @@ struct EmojiRevealView: View {
 
           // The centred emoji — hidden for 🤜🤛 (its fists live in the effects).
           if kind != .fistBump {
-            Text(emoji)
-              .font(.system(size: 156))
+            Group {
+              if emoji == "🎂" {
+                // [phase3] Custom cake ART at the reveal hero (not the 🎂 glyph),
+                // matching the bucket + compass/send/receipt screens. Data stays 🎂.
+                BirthdayCakeGlyph(height: 156)
+              } else {
+                Text(emoji).font(.system(size: 156))
+              }
+            }
               .scaleEffect(x: hugOpen ? 1.45 : hugClose ? 0.82 : 1.0,
                            y: hugOpen ? 0.75 : hugClose ? 1.15 : 1.0)
               .scaleEffect(bloomed ? 1.0 : 0.8)

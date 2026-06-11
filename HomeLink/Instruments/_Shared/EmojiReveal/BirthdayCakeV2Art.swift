@@ -177,3 +177,32 @@ struct BirthdayFlame: View {
         .offset(x: lean * 6 * s)
     }
 }
+
+/// A self-contained lit birthday cake — the cake body + 5 lit candles — drawn to
+/// fit a box of the given `height`. Used anywhere a 🎂 glyph would otherwise
+/// render (the reveal hero + the bucket drift) so the cake art matches the
+/// compass/send/receipt screens. The underlying thought data stays 🎂.
+struct BirthdayCakeGlyph: View {
+    /// Approximate visual height in points (≈ the emoji font size it replaces).
+    var height: CGFloat = 120
+
+    var body: some View {
+        let scale = height / 150
+        let box = CGSize(width: height * 1.18, height: height)
+        let center = CGPoint(x: box.width / 2, y: box.height * 0.64)
+        return ZStack {
+            BirthdayCakeBody(center: center, scale: scale)
+            ForEach(0..<BirthdayCakeV2.candleCount, id: \.self) { i in
+                let c = BirthdayCakeV2.candle(i, center: center, scale: scale)
+                // candle stick
+                Capsule().fill(c.color)
+                    .frame(width: c.width, height: max(2, c.bottomY - c.wickY))
+                    .position(x: c.x, y: (c.bottomY + c.wickY) / 2)
+                // lit flame on the wick
+                BirthdayFlame(lit: 1, scale: scale * 0.7)
+                    .position(x: c.x, y: c.wickY - 3 * scale)
+            }
+        }
+        .frame(width: box.width, height: box.height)
+    }
+}

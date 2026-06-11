@@ -230,8 +230,9 @@ struct BirthdayCakeReceiptV2: View {
             let drifting = since >= Self.driftAt
             let driftScale = CGFloat((since - Self.driftAt) / (Self.landAt - Self.driftAt))
             let scale = drifting ? max(0.6, 1.0 - driftScale * 0.4) : bloom
-            Text(emoji)
-                .font(.system(size: 92))
+            // [phase3] Custom cake ART (not the 🎂 glyph) emerges from the smoke
+            // and drifts into the bucket — matching the cake on every screen.
+            BirthdayCakeGlyph(height: 92)
                 .scaleEffect(scale)
                 .shadow(color: BirthdayCakeV2.warmGold.opacity(0.5), radius: 16)
                 .position(emojiPos(center: center, w: w, h: h, since: since))
@@ -269,7 +270,7 @@ struct BirthdayCakeReceiptV2: View {
                         .offset(x: CGFloat(cos(a)) * CGFloat(settle) * 48,
                                 y: -Self.bucketH * 0.3 + CGFloat(sin(a)) * CGFloat(settle) * 28)
                 }
-                Text(emoji).font(.system(size: 42))
+                BirthdayCakeGlyph(height: 42)
                     .scaleEffect(0.6 + 0.4 * CGFloat(settle))
                     .offset(y: -Self.bucketH * 0.16)
                     .opacity(settle)
