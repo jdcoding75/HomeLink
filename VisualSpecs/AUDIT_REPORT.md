@@ -35,3 +35,35 @@ InstrumentLandingView (test-lab/replay land), AnimationTestLabView.
 
 ## NOT done here
 - Phase 1 structural restructure (separate tab).
+
+---
+
+# JOB 1B — Surface Visibility Audit (2026-06-11)
+
+Goal: every built animation appears on every surface; no surface keeps its own
+hand-maintained list. Source of truth = AnimationManifest.
+
+| Surface | Source it uses | Status before | Action |
+|---|---|---|---|
+| **Test Lab** | `AnimationManifest.all` | ✅ already manifest-driven (job 1A) | none — verified shows all 13 defs × 5-stage |
+| **Instrument picker** (compass long-press → `InstrumentOptionPicker`) | `InstrumentOption.allCases` | ✅ all 7 instruments present (1 free + 6 pro) | verified — not missing any |
+| **Compass emoji/feeling grid** (CompassView, full grid) | `CuratedEmoji.all` (base + proAnimated + pro + occasion) | ✅ firework 🎆 + birthday 🎂 already present (in `proAnimated`, gated pro) | verified — the full grid shows every curated emoji incl. the signature mechanics |
+| **Pro tab** (`ProSetupView`) | `InstrumentOption.allCases` (instruments only) | ❌ firework + birthday MISSING (no emoji-mechanism showcase) | **FIXED** — added `signatureAnimationsSection`, read from `AnimationManifest.emoji` (distinct → Firework + Birthday Cake) |
+| **History / replay** (`ReplaySwipeContainer`, PersonDetailView) | `RevealAmbient.forStyle(senderStyle)` + EmojiRevealView | ✅ replays any received thought with the correct world; emoji-mechanic pings (🎆/🎂) replay via their emoji glow | verified — replay is animation-type agnostic |
+
+## What was missing
+- ONLY the Pro tab omitted the firework + birthday signature mechanisms. Fixed
+  by sourcing a new "signature animations" section from the manifest.
+
+## Notes / scope
+- The instrument picker and emoji grid were already complete (they happened to
+  list everything via `InstrumentOption.allCases` / `CuratedEmoji.all`). The
+  earlier impression that "nearly none appear" maps to the FREE-tier *quick*
+  send row (which intentionally shows only the core feelings for free users);
+  the full grid behind it shows all, so nothing built is unreachable. Left the
+  free-tier quick row as-is (product gating, not a visibility bug).
+- A literal "every surface reads AnimationManifest directly" refactor of the
+  product picker/grid was NOT done where those surfaces already show everything
+  via their own complete enums — rewiring them risks free/pro gating with no
+  visibility gain. The manifest is now the source for the test lab AND the Pro
+  tab signature section; the other surfaces were audited and confirmed complete.

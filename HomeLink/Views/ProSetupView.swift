@@ -46,6 +46,7 @@ struct ProSetupView: View {
                     VStack(alignment: .leading, spacing: 22) {
                         statusSection
                         yourStyleSection
+                        signatureAnimationsSection   // [job1B] firework + birthday (from manifest)
                         // (instrument + skin selections unified above)
                         // instrumentSection
                         // if instrumentStore.selected == .compass { skinSection }
@@ -158,6 +159,52 @@ struct ProSetupView: View {
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 6)
+        }
+    }
+
+    // MARK: - Signature animations (firework + birthday) — read from the manifest
+
+    /// The distinct emoji that ship their own full mechanic, straight from
+    /// AnimationManifest so this surface can never miss one.
+    private var signatureEmoji: [AnimationDefinition] {
+        var seen = Set<String>()
+        return AnimationManifest.emoji.filter { seen.insert($0.name).inserted }
+    }
+
+    private var signatureAnimationsSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            sectionLabel("signature animations")
+            Text("special emoji that ship their own full mechanic — pick them on the compass send row")
+                .font(.system(size: 12, design: .serif).italic())
+                .foregroundColor(DesignTokens.Color.textMuted)
+                .padding(.bottom, 2)
+
+            VStack(spacing: 8) {
+                ForEach(signatureEmoji) { def in
+                    HStack(spacing: 12) {
+                        Text(def.icon).font(.system(size: 30))
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(def.name)
+                                .font(.system(size: 15, weight: .semibold, design: .serif))
+                                .foregroundColor(DesignTokens.Color.textPrimary)
+                            Text("compass · send · approach · target")
+                                .font(.system(size: 11, design: .serif).italic())
+                                .foregroundColor(DesignTokens.Color.textMuted)
+                        }
+                        Spacer()
+                        Text("pro")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundColor(DesignTokens.Color.accentSoft)
+                            .padding(.horizontal, 10).padding(.vertical, 4)
+                            .background(Capsule().fill(DesignTokens.Color.accentSoft.opacity(0.15)))
+                    }
+                    .padding(.horizontal, 14).padding(.vertical, 12)
+                    .background(DesignTokens.Color.backgroundCard)
+                    .cornerRadius(DesignTokens.Radius.card)
+                    .overlay(RoundedRectangle(cornerRadius: DesignTokens.Radius.card)
+                        .stroke(DesignTokens.Color.border, lineWidth: 1))
+                }
+            }
         }
     }
 
