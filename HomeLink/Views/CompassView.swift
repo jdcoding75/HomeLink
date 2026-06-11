@@ -539,6 +539,22 @@ struct CompassView: View {
                                 flightFly   = false
                                 finishSend(emoji: previewEmoji, style: previewStyle)
                             })
+                    } else if previewStyle == .bowArrow {
+                        // [bow] The approved visual-bible rebuild — promoted live.
+                        BowSendAnimationV2(
+                            transition: InstrumentTransition(
+                                exitBearing: compass.state.bearingDegrees,
+                                exitPoint: .zero,
+                                instrument: .bow,
+                                emoji: previewEmoji,
+                                message: sentMessage,
+                                tagline: sentTagline),
+                            personName: compass.state.personName,
+                            onComplete: {
+                                flightToken = nil
+                                flightFly   = false
+                                finishSend(emoji: previewEmoji, style: previewStyle)
+                            })
                     } else {
                         SenderAnimationView(
                             style: previewStyle,

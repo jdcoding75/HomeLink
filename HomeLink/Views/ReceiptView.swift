@@ -107,9 +107,25 @@ struct ReceiptView: View {
             windReceipt
         } else if style == .rocket {
             rocketReceipt
+        } else if style == .bowArrow {
+            bowReceipt
         } else {
             standardReceipt
         }
+    }
+
+    // ── BOW — the approved visual-bible receipt (arrow → bucket → reveal) ───
+
+    private var bowReceipt: some View {
+        BowReceiptAnimationV2(
+            senderBearing: compass.rawBearingToTarget ?? 120,
+            emoji: ping.emoji,
+            message: ping.message,
+            tagline: ping.tagline,
+            fromName: ping.fromName,
+            onRevealed: { revealHandoff() },
+            onFinished: onFinished
+        )
     }
 
     // ── BIRTHDAY 🎂 — the special cake receipt (no bucket) ──────────────────

@@ -111,6 +111,26 @@ struct BowInstrumentView: View {
     // (previous band-tinted string/arrow colors superseded by the
     //  handcrafted wood + steel palette; see stringBrightness/arrowGlow)
 
+    /// [bow rebuild] Tiny stars scattered inside the dark sky ring (Screens 1 & 2).
+    private var starsInRing: some View {
+        // (xFrac, yFrac of the 344 circle, radius, lavender?)
+        let specs: [(CGFloat, CGFloat, CGFloat, Bool)] = [
+            (0.34, 0.30, 1.4, false), (0.62, 0.26, 1.1, true), (0.46, 0.62, 1.3, false),
+            (0.70, 0.58, 1.1, true), (0.30, 0.52, 1.2, false), (0.58, 0.42, 1.0, true)
+        ]
+        return ZStack {
+            ForEach(0..<specs.count, id: \.self) { i in
+                let s = specs[i]
+                Circle()
+                    .fill(s.3 ? Self.lavender.opacity(0.5) : Color.white.opacity(0.45))
+                    .frame(width: s.2 * 2, height: s.2 * 2)
+                    .position(x: 344 * s.0, y: 344 * s.1)
+            }
+        }
+        .frame(width: 344, height: 344)
+        .allowsHitTesting(false)
+    }
+
     var body: some View {
         ZStack {
             // Tension dims the world as the string comes back
@@ -118,18 +138,18 @@ struct BowInstrumentView: View {
                 .ignoresSafeArea()
                 .allowsHitTesting(false)
 
-            // ── [Gemini] ETHEREAL LIGHT — the bow is the one instrument whose
-            // face is luminous, not dark: a soft radial from white at the centre
-            // to #E7ECF8 at the rim, clipped to the compass circle. Sits behind
-            // everything; purely visual, no effect on the aim/draw mechanic. ──
+            // ── [bow rebuild] DARK NIGHT SKY — the visual-bible world (Screens
+            // 1 & 2): a dark radial inside the ring with a scatter of tiny
+            // stars. Purely visual; no effect on the aim/draw mechanic. ──
             Circle()
                 .fill(RadialGradient(
-                    colors: [.white, Color(hex: "#EEF2FB"), Color(hex: "#E7ECF8")],
+                    colors: [Color(hex: "#1a2d4a"), Color(hex: "#0e1e38"), Color(hex: "#080e1e")],
                     center: .center, startRadius: 0, endRadius: 178))
                 .frame(width: 344, height: 344)
                 .clipShape(Circle())
-                .overlay(Circle().stroke(Color(hex: "#cdd6ea").opacity(0.7), lineWidth: 2))
-                .shadow(color: Color(hex: "#4488cc").opacity(0.18), radius: 12)
+                .overlay(starsInRing)
+                .overlay(Circle().stroke(Color(hex: "#c4a030").opacity(0.55), lineWidth: 2))
+                .shadow(color: Color(hex: "#1a2d4a").opacity(0.4), radius: 12)
                 .allowsHitTesting(false)
 
             // ── Where they are — the person-initial marker rides the ring at
