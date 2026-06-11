@@ -104,8 +104,11 @@ enum AnimationManifest {
 
     // The full catalog. ORDER MATTERS — surfaces present in this order.
     //
-    // Instruments first (live V1 carries Compass + Reveal, which are shared/
-    // version-agnostic; the extracted V2 rows carry only Send + Receipt).
+    // Instruments first. Every version (V1 AND V2) declares its FULL stage set
+    // so each is a complete, selectable workflow in the test lab. The compass
+    // (Idle + Charging) is the instrument's single shared face — version-
+    // agnostic — so both V1 and V2 reference it; their Send + Approach + Target
+    // differ (V1 = inline dispatcher path, V2 = the extracted ACT structs).
     // Then the emoji mechanisms.
     static let all: [AnimationDefinition] = [
         // ── Instruments ──────────────────────────────────────────────────
@@ -121,7 +124,7 @@ enum AnimationManifest {
         AnimationDefinition(
             icon: "🏹", name: "Bow", version: "V2", style: .bowArrow,
             instrument: .bow, kind: .instrument,
-            stages: [.send, .approach, .target], fixedEmoji: nil),
+            stages: [.compassIdle, .compassCharging, .send, .approach, .target], fixedEmoji: nil),
 
         AnimationDefinition(
             icon: "👆", name: "Flick", version: "V1", style: .fingerFlick,
@@ -130,7 +133,7 @@ enum AnimationManifest {
         AnimationDefinition(
             icon: "👆", name: "Flick", version: "V2", style: .fingerFlick,
             instrument: .flick, kind: .instrument,
-            stages: [.send, .approach, .target], fixedEmoji: nil),
+            stages: [.compassIdle, .compassCharging, .send, .approach, .target], fixedEmoji: nil),
 
         AnimationDefinition(
             icon: "🚀", name: "Rocket", version: nil, style: .rocket,
@@ -154,7 +157,7 @@ enum AnimationManifest {
         AnimationDefinition(
             icon: "✈️", name: "Plane", version: "V2", style: .plane,
             instrument: .plane, kind: .instrument,
-            stages: [.send, .approach, .target], fixedEmoji: nil),
+            stages: [.compassIdle, .compassCharging, .send, .approach, .target], fixedEmoji: nil),
 
         // ── Emoji mechanisms (ship their own full mechanic) ───────────────
         AnimationDefinition(
