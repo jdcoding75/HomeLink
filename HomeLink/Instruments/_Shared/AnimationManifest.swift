@@ -30,29 +30,20 @@ import SwiftUI
 
 // MARK: - Stage
 
-/// The FIVE canonical stages of any Pointward animation (the new spec standard).
-/// These names are the ONLY stage labels allowed anywhere in the UI. The old
-/// "Reveal" stage is dropped — the reveal is the tail of Target, not a stage.
+/// The THREE canonical stages of any Pointward animation. These names are the
+/// ONLY stage labels allowed anywhere in the UI.
+///
+/// Collapsed from the old five (Compass Idle/Charging, Send, Approach, Target):
+/// the compass mechanic plays rest→action as ONE watchable performance (no
+/// idle/charging double-step), and the receipt plays approach→landing as ONE
+/// continuous beat (no Approach/Target double-play). "Reveal" stays retired —
+/// the reveal is the tail of Receipt, not a stage.
 enum AnimationStage: String, CaseIterable, Identifiable {
-    case compassIdle     = "Compass Idle"      // resting mechanism
-    case compassCharging = "Compass Charging"  // mechanism IN ACTION (drawing, lighting, fuse)
-    case send            = "Send"              // launch / the big moment
-    case approach        = "Approach"          // payload travelling in
-    case target          = "Target"            // payload landing in the bucket / settling
+    case compass = "Compass"   // the interactive mechanic, rest → action, ONCE
+    case send    = "Send"      // launch / the big moment
+    case receipt = "Receipt"   // approach → landing, ONE continuous beat
 
     var id: String { rawValue }
-
-    /// Which underlying animation renders this stage. Idle+Charging share the
-    /// compass face; Approach+Target share the receipt animation. Surfaces use
-    /// this to play each underlying animation once in a full workflow.
-    enum Source { case compass, send, receipt }
-    var source: Source {
-        switch self {
-        case .compassIdle, .compassCharging: return .compass
-        case .send:                          return .send
-        case .approach, .target:             return .receipt
-        }
-    }
 }
 
 // MARK: - Kind
@@ -115,64 +106,71 @@ enum AnimationManifest {
         AnimationDefinition(
             icon: "🧭", name: "Compass", version: nil, style: .glow,
             instrument: .compass, kind: .instrument,
-            stages: [.compassIdle, .compassCharging, .send, .approach, .target], fixedEmoji: nil),
+            stages: [.compass, .send, .receipt], fixedEmoji: nil),
 
         AnimationDefinition(
             icon: "🏹", name: "Bow", version: "V1", style: .bowArrow,
             instrument: .bow, kind: .instrument,
-            stages: [.compassIdle, .compassCharging, .send, .approach, .target], fixedEmoji: nil),
+            stages: [.compass, .send, .receipt], fixedEmoji: nil),
         AnimationDefinition(
             icon: "🏹", name: "Bow", version: "V2", style: .bowArrow,
             instrument: .bow, kind: .instrument,
-            stages: [.compassIdle, .compassCharging, .send, .approach, .target], fixedEmoji: nil),
+            stages: [.compass, .send, .receipt], fixedEmoji: nil),
 
         AnimationDefinition(
             icon: "👆", name: "Flick", version: "V1", style: .fingerFlick,
             instrument: .flick, kind: .instrument,
-            stages: [.compassIdle, .compassCharging, .send, .approach, .target], fixedEmoji: nil),
+            stages: [.compass, .send, .receipt], fixedEmoji: nil),
         AnimationDefinition(
             icon: "👆", name: "Flick", version: "V2", style: .fingerFlick,
             instrument: .flick, kind: .instrument,
-            stages: [.compassIdle, .compassCharging, .send, .approach, .target], fixedEmoji: nil),
+            stages: [.compass, .send, .receipt], fixedEmoji: nil),
 
+        // Rocket has TWO genuinely-distinct receipts — both selectable + labeled.
+        // "Parachute" = the live RocketReceiptAnimation (full compass→send→receipt);
+        // "Legs-down" = the original RocketLanding lander (a receipt-only entry).
         AnimationDefinition(
-            icon: "🚀", name: "Rocket", version: nil, style: .rocket,
+            icon: "🚀", name: "Rocket", version: "Parachute", style: .rocket,
             instrument: .rocket, kind: .instrument,
-            stages: [.compassIdle, .compassCharging, .send, .approach, .target], fixedEmoji: nil),
+            stages: [.compass, .send, .receipt], fixedEmoji: nil),
+        AnimationDefinition(
+            icon: "🚀", name: "Rocket", version: "Legs-down", style: .rocket,
+            instrument: .rocket, kind: .instrument,
+            stages: [.receipt], fixedEmoji: nil),
 
         AnimationDefinition(
             icon: "🌬️", name: "Wind", version: nil, style: .firefly,
             instrument: .firefly, kind: .instrument,
-            stages: [.compassIdle, .compassCharging, .send, .approach, .target], fixedEmoji: nil),
+            stages: [.compass, .send, .receipt], fixedEmoji: nil),
 
         AnimationDefinition(
             icon: "🪄", name: "Wand", version: "V1", style: .wand,
             instrument: .wand, kind: .instrument,
-            stages: [.compassIdle, .compassCharging, .send, .approach, .target], fixedEmoji: nil),
+            stages: [.compass, .send, .receipt], fixedEmoji: nil),
 
         AnimationDefinition(
             icon: "✈️", name: "Plane", version: "V1", style: .plane,
             instrument: .plane, kind: .instrument,
-            stages: [.compassIdle, .compassCharging, .send, .approach, .target], fixedEmoji: nil),
+            stages: [.compass, .send, .receipt], fixedEmoji: nil),
         AnimationDefinition(
             icon: "✈️", name: "Plane", version: "V2", style: .plane,
             instrument: .plane, kind: .instrument,
-            stages: [.compassIdle, .compassCharging, .send, .approach, .target], fixedEmoji: nil),
+            stages: [.compass, .send, .receipt], fixedEmoji: nil),
 
         // ── Emoji mechanisms (ship their own full mechanic) ───────────────
         AnimationDefinition(
             icon: "🎆", name: "Firework", version: nil, style: .glow,
             instrument: nil, kind: .emoji,
-            stages: [.compassIdle, .compassCharging, .send, .approach, .target], fixedEmoji: "🎆"),
+            stages: [.compass, .send, .receipt], fixedEmoji: "🎆"),
 
         AnimationDefinition(
             icon: "🎂", name: "Birthday Cake", version: "V1", style: .glow,
             instrument: nil, kind: .emoji,
-            stages: [.compassIdle, .compassCharging, .approach, .target], fixedEmoji: "🎂"),
+            stages: [.compass, .receipt], fixedEmoji: "🎂"),
         AnimationDefinition(
             icon: "🎂", name: "Birthday Cake", version: "V2", style: .glow,
             instrument: nil, kind: .emoji,
-            stages: [.compassIdle, .compassCharging, .send, .approach, .target], fixedEmoji: "🎂"),
+            stages: [.compass, .send, .receipt], fixedEmoji: "🎂"),
     ]
 
     // ── Derived views of the catalog ─────────────────────────────────────
@@ -183,11 +181,15 @@ enum AnimationManifest {
     /// All emoji-kind definitions, in catalog order.
     static var emoji: [AnimationDefinition] { all.filter { $0.kind == .emoji } }
 
-    /// The single live (V1 / nil-version) instrument row per instrument, in the
-    /// user-facing order — the source for the "test all" runner and any place
-    /// that wants "one of each instrument".
+    /// One live row per instrument, in the user-facing order — the source for
+    /// any place that wants "one of each instrument". Skips the secondary
+    /// variants (V2, the rocket "Legs-down" alternate) and dedups by style, so
+    /// rocket's primary "Parachute" row wins.
     static var liveInstruments: [AnimationDefinition] {
-        instruments.filter { $0.version == nil || $0.version == "V1" }
+        var seen = Set<SenderStyle>()
+        return instruments
+            .filter { $0.version != "V2" && $0.version != "Legs-down" }
+            .filter { seen.insert($0.style).inserted }
     }
 
     static func definition(id: String) -> AnimationDefinition? { all.first { $0.id == id } }

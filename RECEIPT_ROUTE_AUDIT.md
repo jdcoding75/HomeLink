@@ -85,3 +85,27 @@ send; optionally loosen the 42pt hit radius.
    exposed (bow/flick: lander V1 + live V2; plane: two live versions).
 4. Firework → guaranteed burn→`fire()` timer in `ignite()`.
 5. Re-verify all surfaces read the manifest.
+
+---
+
+# JOB 2 — BEFORE / AFTER (proof per item)
+
+| Item | BEFORE | AFTER |
+|---|---|---|
+| **1. Stage model** | 5 stages: Compass Idle · Compass Charging · Send · Approach · Target. Compass shown as TWO interactive chips (perform twice); Approach+Target as TWO chips replaying the same receipt motion. | **3 stages: Compass · Send · Receipt.** One Compass chip (rest→action ONCE), one Receipt chip (approach→landing as ONE continuous beat). Full Workflow chains Compass → Send → [interstitial] → Receipt. |
+| **2. Rocket — both receipts** | Only `RocketReceiptAnimation` (parachute) selectable; `RocketLanding` (legs-down) unreachable in the lab. | **Two manifest rows:** "Rocket Parachute" (compass·send·receipt → `RocketReceiptAnimation`) AND "Rocket Legs-down" (receipt → `RocketLanding` via `InstrumentLandingView`). Both selectable + clearly labeled. |
+| **3. Bow/Flick/Plane V1+V2** | Registered (V1 + V2). | Still registered, now 3-stage each. Bow V1=ArrowLanding(lander)/inline send · V2=`BowReceiptAnimationV2`/`BowSendAnimationV2`. Flick V1=PostItLanding · V2=`Flick…V2`. Plane V1=`PlaneReceiptAnimation`/`PlaneSendAnimation` · V2=`Plane…V2`. All selectable. |
+| **4. Firework match-to-fuse** | Dragging the match lit the fuse (visually) but `.onChange(of: burn)` inside the TimelineView missed the 1.0 crossing → `onSend()` never fired → send never initiated. | `ignite()` now drives `fire()` off a guaranteed `asyncAfter(burnDuration)` timer (fire() still guarded by `!sent`, no double-send), and the hit radius loosened 42→52pt. Drag → light → burn → **send initiates**. |
+| **5. Manifest readership** | Test lab manifest-driven; Pro tab/selector/history per-instrument (complete). | Unchanged + verified: test lab reads `AnimationManifest.all` (all 14 rows incl. both rockets, bow/flick/plane V1+V2); `liveInstruments` updated to pick rocket "Parachute" as the one-per-instrument live row and skip "Legs-down"/V2. |
+
+VERIFY: build SUCCEEDED, 197 tests pass, app launches clean. Manifest emits 14
+defs (Compass, Bow V1/V2, Flick V1/V2, Rocket Parachute/Legs-down, Wind, Wand,
+Plane V1/V2, Firework, Birthday V1/V2), each with its 3-stage subset.
+
+## Not done (scope note)
+- Plane's lander `PlaneLanding` and Wand/Leaf landers remain hidden behind their
+  live receipts in the lab (the audit table flags them). The task's explicit
+  two-route requirement was Rocket (done) + Bow/Flick/Plane V1+V2 (done);
+  exposing the remaining wand/leaf/plane landers would be the same rocket-style
+  pattern if wanted next. No animation visual content was modified (only the
+  firework mechanic per #4).

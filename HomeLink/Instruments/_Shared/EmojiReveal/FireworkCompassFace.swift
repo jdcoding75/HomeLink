@@ -213,7 +213,7 @@ struct FireworkCompassFace: View {
                 matchDrag = v.translation
                 let mp = CGPoint(x: matchRest.x + v.translation.width,
                                  y: matchRest.y + v.translation.height)
-                if hypot(mp.x - fuseTip.x, mp.y - fuseTip.y) < 42 {
+                if hypot(mp.x - fuseTip.x, mp.y - fuseTip.y) < 52 {   // forgiving hit radius
                     ignite()
                 }
             }
@@ -231,6 +231,12 @@ struct FireworkCompassFace: View {
         litAt = Date()
         HapticEngine.personSelected()
         InstrumentSoundPlayer.shared.playCue(file: "firework_fuse_burn", duration: Self.burnDuration)
+        // [fix] GUARANTEE the send fires when the fuse finishes burning. The
+        // `.onChange(of: burn)` inside the TimelineView misses the 1.0 crossing
+        // (burn is a per-tick local), so the fuse used to burn but never
+        // initiate the send. Drive fire() off a real timer; fire() is guarded
+        // by `!sent`, so the onChange path (if it ever fires) can't double-send.
+        DispatchQueue.main.asyncAfter(deadline: .now() + Self.burnDuration) { fire() }
     }
 
     private func fire() {
