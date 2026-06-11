@@ -23,6 +23,7 @@ enum PlaneSounds {
   static let propSpinupFile = "plane_prop_spinup"
   static let launchFile     = "plane_launch"
   static let flightFile     = "plane_flight"
+  static let approachFile   = "plane_approach"   // receipt: plane growing toward the viewer
   static let dropFile       = "plane_drop"
   static let catchFile      = "plane_catch"
 }

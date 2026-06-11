@@ -1,26 +1,29 @@
 // PlaneReceiptAnimationV2.swift
 // Pointward › Instruments › Plane
 //
-// ACT 3 of 3 — the full-screen PLANE receipt + emoji reveal.
+// ACT 3 of 3 — the V2 PLANE receipt (visual bible: Screen 4, parachute descent).
 //
-// A paper plane flies in from the left across the sky, banks nose-up, the
-// cockpit opens and the emoji DROPS — falling gently into the wooden bucket
-// waiting lower-right — then blooms into the shared EmojiRevealView.
+// A white parachute canopy drifts down out of the dark night sky, the emoji
+// slung below it on suspension lines, swaying gently like a pendulum as it
+// settles. It drifts toward the wooden bucket lower-right, the canopy collapses
+// at touchdown, and the emoji catches in the bucket — then blooms into the
+// shared EmojiRevealView.
 //
-//   FLIGHT (0.0–3.0s)  enters left, crosses at y≈0.28h, sparkle trail
-//   DROP   (3.0–3.5s)  banks up, cockpit opens, emoji separates
-//   FALL   (3.5–4.5s)  emoji falls toward the bucket, gold glow trail
-//   CATCH  (4.5–5.0s)  bounces into the bucket, bucket glows cyan
+//   DEPLOY (0.0–0.6s)  canopy opens at the top of the sky
+//   DESCEND (0.6–4.4s) slow drift down toward the bucket, ±4° pendulum sway,
+//                      plane_flight ambient
+//   LAND   (4.4–5.0s)  canopy collapses, emoji settles into the bucket,
+//                      cyan catch glow, plane_catch.wav
 //   → EmojiRevealView (.received, .plane)                                = 5.0s
 //
-// Screen-coordinate rules: GeometryReader root, daySky.ignoresSafeArea(), every
-// position from geo.size.
+// Screen-coordinate rules (all 6): GeometryReader root, dark sky
+// .ignoresSafeArea(), positions from geo.size, bucket bx=width-80·by=height-95.
 
 import SwiftUI
 
 struct PlaneReceiptAnimationV2: View {
 
-    let senderBearing: Double            // unused — the plane flies in from the left
+    let senderBearing: Double            // unused — the chute drifts straight down
     let emoji: String
     var message: String? = nil
     var tagline: String? = nil
@@ -30,23 +33,24 @@ struct PlaneReceiptAnimationV2: View {
 
     static let duration: Double = InstrumentBoundaries.Receipt.plane   // 5.0
 
-    private static let flightEnd: Double = 3.0
-    private static let dropEnd:   Double = 3.5
-    private static let fallEnd:   Double = 4.5
-    private static let total:     Double = InstrumentBoundaries.Receipt.plane   // 5.0
+    private static let deployEnd:  Double = 0.6
+    private static let descendEnd: Double = 4.4
+    private static let total:      Double = InstrumentBoundaries.Receipt.plane   // 5.0
 
-    private static let planeW: CGFloat = 132
-    private static let planeH: CGFloat = 70
+    private static let skyTop    = Color(hex: "#1a2d4a")
+    private static let skyBottom = Color(hex: "#080e1e")
+    private static let gold      = Color(hex: "#d4a030")
+    private static let canopy    = Color(hex: "#e8e0f0")
+    private static let canopyHi  = Color(hex: "#ffffff")
+    private static let canopyLo  = Color(hex: "#b6aecb")
+    private static let line      = Color(hex: "#cfc6e0")
     private static let bucketW: CGFloat = 150
     private static let bucketH: CGFloat = 128
-    private static let gold = Color(hex: "#f0d060")
 
     @State private var start: Date? = nil
     @State private var skyIn = false
     @State private var revealing = false
     @State private var bucketGlow = false
-    @State private var droppedSound = false
-    @State private var caughtSound = false
 
     var body: some View {
         GeometryReader { geo in
@@ -61,21 +65,20 @@ struct PlaneReceiptAnimationV2: View {
                     TimelineView(.animation) { timeline in
                         let e = clampedElapsed(now: timeline.date)
                         ZStack {
-                            Color(hex: "#0d0d14").ignoresSafeArea()
-                            InstrumentBackground.daySky.ignoresSafeArea().opacity(skyIn ? 1 : 0)
+                            LinearGradient(colors: [Self.skyTop, Self.skyBottom],
+                                           startPoint: .top, endPoint: .bottom)
+                                .ignoresSafeArea()
+                                .opacity(skyIn ? 1 : 0)
 
                             bucket(geo: geo)
-                            sparkleTrail(geo: geo, elapsed: e)
-                            emojiFallGlow(geo: geo, elapsed: e)
-                            plane(geo: geo, elapsed: e)
-                            fallingEmoji(geo: geo, elapsed: e)
+                            parachute(geo: geo, elapsed: e)
 
                             VStack {
                                 Spacer()
                                 Text(message(e))
                                     .font(.system(size: 20, design: .serif).italic())
-                                    .foregroundColor(InstrumentBackground.accentText)
-                                    .shadow(color: .black.opacity(0.4), radius: 6)
+                                    .foregroundColor(Color(hex: "#c4a8d4"))
+                                    .shadow(color: .black.opacity(0.5), radius: 6)
                                     .padding(.bottom, geo.size.height * 0.06)
                                     .contentTransition(.opacity)
                                     .animation(.easeInOut(duration: 0.5), value: message(e))
@@ -94,13 +97,11 @@ struct PlaneReceiptAnimationV2: View {
     private func begin() {
         start = Date()
         InstrumentSoundPlayer.shared.playReceipt(.plane)               // gentle flight ambient
+        InstrumentSoundPlayer.shared.playCue(file: PlaneSounds.dropFile, duration: 0.35)
         withAnimation(.easeInOut(duration: 0.3)) { skyIn = true }
         HapticPattern.singleSoft.fire()
 
-        DispatchQueue.main.asyncAfter(deadline: .now() + Self.dropEnd) {
-            InstrumentSoundPlayer.shared.playCue(file: PlaneSounds.dropFile, duration: 0.35)
-        }
-        DispatchQueue.main.asyncAfter(deadline: .now() + Self.fallEnd) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + Self.descendEnd) {
             InstrumentSoundPlayer.shared.playCue(file: PlaneSounds.catchFile, duration: 0.45)
             HapticPattern.doubleSoft.fire()
             withAnimation(.easeOut(duration: 0.5)) { bucketGlow = true }
@@ -117,110 +118,64 @@ struct PlaneReceiptAnimationV2: View {
     }
 
     private func bucketPoint(_ size: CGSize) -> CGPoint {
-        CGPoint(x: size.width * 0.68, y: size.height - 105)
+        CGPoint(x: size.width - 80, y: size.height - 95)
     }
 
-    // ── The plane (flight + bank) ────────────────────────────────────────────
+    // ── The parachute rig (canopy + lines + emoji), swaying as it descends ────
 
     @ViewBuilder
-    private func plane(geo: GeometryProxy, elapsed e: Double) -> some View {
-        if e <= Self.dropEnd {
-            let pos = planePos(geo.size, e)
-            let banking = e > Self.flightEnd
-            PlaneGlyph(emoji: planeCarriesEmoji(e) ? emoji : nil)
-                .frame(width: Self.planeW, height: Self.planeH)
-                .rotationEffect(.degrees(banking ? -14 : sin(e * 2.2) * 2))
-                .position(pos)
-                .opacity(e > Self.dropEnd - 0.1 ? 0.7 : 1)
+    private func parachute(geo: GeometryProxy, elapsed e: Double) -> some View {
+        let pos = rigPos(geo.size, e)
+        let sway = sin(e * 1.6) * 4 * (e < Self.descendEnd ? 1 : 0)      // ±4° pendulum
+        let collapse = e > Self.descendEnd
+            ? CGFloat(min((e - Self.descendEnd) / (Self.total - Self.descendEnd), 1)) : 0
+        let deploy = min(e / Self.deployEnd, 1)
+
+        ZStack {
+            // Canopy — white dome, collapses at landing
+            CanopyDome()
+                .fill(LinearGradient(colors: [Self.canopyHi, Self.canopy, Self.canopyLo],
+                                     startPoint: .top, endPoint: .bottom))
+                .overlay(CanopyDome().stroke(Self.canopyLo.opacity(0.6), lineWidth: 1))
+                .frame(width: 132 * (1 - collapse * 0.7), height: 66 * (1 - collapse * 0.5))
+                .scaleEffect(CGFloat(deploy), anchor: .bottom)
+                .offset(y: -64)
+
+            // Suspension lines converging from the canopy edge to the emoji
+            CanopyLines()
+                .stroke(Self.line.opacity(0.8), lineWidth: 1)
+                .frame(width: 132 * (1 - collapse * 0.7), height: 64)
+                .offset(y: -30)
+                .opacity(deploy)
+
+            // The emoji slung below
+            Text(emoji).font(.system(size: 52)).offset(y: 18)
         }
+        .rotationEffect(.degrees(sway), anchor: .center)
+        .position(pos)
+        .allowsHitTesting(false)
     }
 
-    /// Plane carries the emoji until it separates at the drop.
-    private func planeCarriesEmoji(_ e: Double) -> Bool { e < Self.flightEnd + 0.15 }
-
-    private func planePos(_ size: CGSize, _ e: Double) -> CGPoint {
-        let y = size.height * 0.28
-        if e <= Self.flightEnd {
-            let p = e / Self.flightEnd
-            let x = -size.width * 0.1 + (size.width * 0.78) * CGFloat(p)
-            return CGPoint(x: x, y: y)
-        } else {
-            // BANK — eases to a stop, nose up, near the drop point.
-            let p = easeOut((e - Self.flightEnd) / (Self.dropEnd - Self.flightEnd))
-            let x = size.width * 0.68
-            return CGPoint(x: (size.width * 0.68) + (x - size.width * 0.68) * 0, y: y - CGFloat(p) * 8)
-        }
-    }
-
-    // ── Falling emoji ─────────────────────────────────────────────────────────
-
-    @ViewBuilder
-    private func fallingEmoji(geo: GeometryProxy, elapsed e: Double) -> some View {
-        if e > Self.flightEnd {
-            let pos = fallPos(geo.size, e)
-            Text(emoji).font(.system(size: 56)).position(pos)
-        }
-    }
-
-    private func fallPos(_ size: CGSize, _ e: Double) -> CGPoint {
-        let from = CGPoint(x: size.width * 0.68, y: size.height * 0.28)
+    /// Top of the sky → just above the bucket mouth; slow steady drift, easing
+    /// horizontally toward the bucket as it descends.
+    private func rigPos(_ size: CGSize, _ e: Double) -> CGPoint {
         let bucket = bucketPoint(size)
-        let landY = bucket.y - 28
-        if e <= Self.fallEnd {
-            let p = easeIn((e - Self.flightEnd) / (Self.fallEnd - Self.flightEnd))
-            return CGPoint(x: from.x, y: from.y + (landY - from.y) * CGFloat(p))
-        } else {
-            // CATCH — a small bounce settling into the bucket mouth.
-            let p = (e - Self.fallEnd) / (Self.total - Self.fallEnd)
-            let bounce = sin(p * .pi) * 14
-            return CGPoint(x: from.x, y: landY - CGFloat(bounce))
-        }
+        let topY = size.height * 0.12
+        let landY = bucket.y - 54
+        let p = min(e / Self.descendEnd, 1)
+        let xFrom = size.width * 0.42
+        let x = xFrom + (bucket.x - xFrom) * CGFloat(easeInOut(p))
+        let y = topY + (landY - topY) * CGFloat(p)
+        return CGPoint(x: x, y: y)
     }
 
-    @ViewBuilder
-    private func emojiFallGlow(geo: GeometryProxy, elapsed e: Double) -> some View {
-        if e > Self.flightEnd && e <= Self.fallEnd {
-            let pos = fallPos(geo.size, e)
-            Capsule()
-                .fill(LinearGradient(colors: [Self.gold.opacity(0.5), .clear],
-                                     startPoint: .bottom, endPoint: .top))
-                .frame(width: 18, height: 70)
-                .position(x: pos.x, y: pos.y - 40)
-                .blur(radius: 3)
-                .allowsHitTesting(false)
-        }
-    }
-
-    // ── Sparkle trail behind the plane ───────────────────────────────────────
-
-    @ViewBuilder
-    private func sparkleTrail(geo: GeometryProxy, elapsed e: Double) -> some View {
-        let count = 24
-        ForEach(0..<count, id: \.self) { k in
-            let tb = e - Double(k) * 0.05
-            if tb > 0 && tb <= Self.flightEnd {
-                let frac = Double(k) / Double(count)
-                let p = planePos(geo.size, tb)
-                let jy = CGFloat(sin(tb * 11 + Double(k))) * 10
-                let isGold = k % 2 == 0
-                Circle()
-                    .fill(isGold ? Self.gold : Color.white)
-                    .frame(width: 2.5 - CGFloat(frac) * 1.0, height: 2.5 - CGFloat(frac) * 1.0)
-                    .opacity((1 - frac) * 0.8)
-                    .position(x: p.x - Self.planeW * 0.4, y: p.y + jy)
-                    .allowsHitTesting(false)
-            }
-        }
-    }
-
-    // ── The bucket (shared wooden skin) + catch glow ─────────────────────────
+    // ── The bucket (shared wooden skin) + cyan catch glow ────────────────────
 
     private func bucket(geo: GeometryProxy) -> some View {
         let p = bucketPoint(geo.size)
         let wood = Color(hex: "#8B4513"); let woodDark = Color(hex: "#6E3A1E")
         let brass = Color(hex: "#C9A86A")
         return ZStack {
-            // cyan catch radiance inside
             Circle().fill(Color(hex: "#50B4F0").opacity(bucketGlow ? 0.2 : 0))
                 .frame(width: 130, height: 130).blur(radius: 30)
                 .offset(y: -10)
@@ -248,11 +203,52 @@ struct PlaneReceiptAnimationV2: View {
 
     private func message(_ e: Double) -> String {
         let name = fromName.isEmpty ? "someone" : fromName
-        if e < Self.flightEnd { return "\(name) sent something ✦" }
-        if e < Self.fallEnd   { return "here it comes ✦" }
+        if e < Self.deployEnd  { return "\(name) sent something ✦" }
+        if e < Self.descendEnd { return "drifting down ✦" }
         return "caught it ✦"
     }
 
-    private func easeIn(_ t: Double) -> Double  { let x = min(max(t, 0), 1); return x * x }
-    private func easeOut(_ t: Double) -> Double { let x = min(max(t, 0), 1); return 1 - pow(1 - x, 3) }
+    private func easeInOut(_ t: Double) -> Double {
+        let x = min(max(t, 0), 1)
+        return x < 0.5 ? 2 * x * x : 1 - pow(-2 * x + 2, 2) / 2
+    }
+}
+
+// MARK: - Parachute shapes
+
+/// A canopy dome — a half-ellipse top with a softly scalloped lower edge.
+struct CanopyDome: Shape {
+    func path(in rect: CGRect) -> Path {
+        var p = Path()
+        let w = rect.width, h = rect.height
+        p.move(to: CGPoint(x: 0, y: h))
+        p.addQuadCurve(to: CGPoint(x: w, y: h),
+                       control: CGPoint(x: w / 2, y: -h * 0.6))
+        // gentle scallops along the bottom edge
+        let scallops = 4
+        for i in stride(from: scallops, through: 1, by: -1) {
+            let x0 = w * CGFloat(i) / CGFloat(scallops)
+            let x1 = w * CGFloat(i - 1) / CGFloat(scallops)
+            p.addQuadCurve(to: CGPoint(x: x1, y: h),
+                           control: CGPoint(x: (x0 + x1) / 2, y: h + h * 0.14))
+        }
+        p.closeSubpath()
+        return p
+    }
+}
+
+/// Suspension lines fanning from the canopy edge down to a convergence point.
+struct CanopyLines: Shape {
+    func path(in rect: CGRect) -> Path {
+        var p = Path()
+        let w = rect.width, h = rect.height
+        let apex = CGPoint(x: w / 2, y: h)
+        let count = 5
+        for i in 0..<count {
+            let x = w * CGFloat(i) / CGFloat(count - 1)
+            p.move(to: CGPoint(x: x, y: 0))
+            p.addLine(to: apex)
+        }
+        return p
+    }
 }

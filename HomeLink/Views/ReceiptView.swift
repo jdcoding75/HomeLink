@@ -109,9 +109,25 @@ struct ReceiptView: View {
             rocketReceipt
         } else if style == .bowArrow {
             bowReceipt
+        } else if style == .plane {
+            planeReceipt
         } else {
             standardReceipt
         }
+    }
+
+    // ── PLANE — the V1 visual-bible receipt (plane flies toward you → bucket) ─
+
+    private var planeReceipt: some View {
+        PlaneReceiptAnimation(
+            senderBearing: compass.rawBearingToTarget ?? 120,
+            emoji: ping.emoji,
+            message: ping.message,
+            tagline: ping.tagline,
+            fromName: ping.fromName,
+            onRevealed: { revealHandoff() },
+            onFinished: onFinished
+        )
     }
 
     // ── BOW — the approved visual-bible receipt (arrow → bucket → reveal) ───

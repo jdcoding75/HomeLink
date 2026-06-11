@@ -555,6 +555,24 @@ struct CompassView: View {
                                 flightFly   = false
                                 finishSend(emoji: previewEmoji, style: previewStyle)
                             })
+                    } else if previewStyle == .plane {
+                        // [plane] The approved visual-bible send (Screen 3) — the
+                        // top-down plane climbs NE on a dark sky, then hands back
+                        // to the finishSend pipeline (no EmojiRevealView here).
+                        PlaneSendAnimation(
+                            transition: InstrumentTransition(
+                                exitBearing: compass.state.bearingDegrees,
+                                exitPoint: .zero,
+                                instrument: .plane,
+                                emoji: previewEmoji,
+                                message: sentMessage,
+                                tagline: sentTagline),
+                            personName: compass.state.personName,
+                            onComplete: {
+                                flightToken = nil
+                                flightFly   = false
+                                finishSend(emoji: previewEmoji, style: previewStyle)
+                            })
                     } else {
                         SenderAnimationView(
                             style: previewStyle,

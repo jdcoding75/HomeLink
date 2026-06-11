@@ -225,6 +225,13 @@ struct AnimationTestLabView: View {
                                                     onComplete: { autoDismiss(p, after: 0.1) })
             default:           EmptyView()
             }
+        } else if p.style == .plane {
+            // Plane V1 send = the dedicated full-screen PlaneSendAnimation (NE flight).
+            let t = InstrumentTransition(exitBearing: 0, exitPoint: .zero,
+                                         instrument: .plane,
+                                         emoji: p.emoji, message: nil, tagline: nil)
+            PlaneSendAnimation(transition: t, personName: "them",
+                               onComplete: { autoDismiss(p, after: 0.1) })
         } else {
             // Straight up (bearing 0) so the flight is centred and visible.
             SenderAnimationView(
@@ -259,6 +266,11 @@ struct AnimationTestLabView: View {
                                                        onRevealed: {}, onFinished: { autoDismiss(p, after: 0.1) })
             default:           EmptyView()
             }
+        } else if p.style == .plane {
+            // Plane V1 receipt = the dedicated "coming-at-you" PlaneReceiptAnimation.
+            PlaneReceiptAnimation(senderBearing: 120, emoji: p.emoji,
+                                  message: nil, tagline: nil, fromName: "",
+                                  onRevealed: {}, onFinished: { autoDismiss(p, after: 0.1) })
         } else {
             InstrumentLandingView(style: p.style, emoji: p.emoji) {
                 // Let the emerged emoji breathe, then dismiss.
