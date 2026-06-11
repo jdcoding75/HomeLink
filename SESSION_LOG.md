@@ -1,63 +1,69 @@
-# Pointward — Session Log
+# Pointward — Session Log (latest)
 
-## Approved & Shipped
-- Wind instrument — COMPLETE (all 4 acts)
-- Rocket receipt v2 — parachute, auto-catch, earth horizon
-- Fist bump → renamed PUNCH — shelved for future punch emoji
-- Bow receipt — bullseye landing, arrow tip emoji, approved
-- All 9 emoji reveals — placeholder quality, shipped for testing
-- EmojiRevealView registry refactor — complete
-- Screen coordinate rules — in InstrumentBoundaries
-- 197 tests passing
+## Shipped this session (built + pushed)
+- Bow — visual rebuild, send/receipt live
+- Plane — compass spin, NE send,
+  receipt V1 (toward-viewer) + V2 (parachute),
+  both in test lab, 7 sounds
+- Firework 🎆 — match-to-fuse compass,
+  spectacular send (small pops → 30-arm
+  supernova → embers), receipt to bucket,
+  5 sounds
+- Birthday 🎂 — full hero mechanic:
+  tap-to-light send, confetti, two-stage
+  MIC blow-out receipt (reuses wind mic),
+  emoji from smoke → bucket, 5 sounds
+  (V2; basic placeholder kept as fallback)
+- 197 tests passing throughout
 
-## Pending Approval (needs device test)
-- All 9 emoji reveals on device
-- Wind send leaf positioning fix
-- Bow compass face — not approved
-- Bow send animation — not approved
+## NOT YET SEEN ON DEVICE
+bow, plane, firework, birthday — all
+built but untested on hardware.
 
-## Real Fist Bump 🤜🤛
-- Animation: two fists from opposite
-  sides meeting in center
-- Different from punch (single fist)
-- Built as placeholder, needs refinement
+## DECISIONS PENDING DEVICE TEST
+1. Plane receipt: V1 toward-viewer vs
+   V2 parachute — pick live one
+2. Firework: keep built 30-arm explosion
+   OR rebuild screen 3 from
+   firework_4screens_v2.svg (nicer
+   screens 1/2/4, simpler explosion)
+3. Birthday: confirm hero quality,
+   esp. two-stage mic blow feel
+4. Then revert ROCKET to V1 legs landing
+   (parachute moved to plane — two
+   instruments can't share mechanic)
 
-## Kiss 😘
-- Multiple prototype attempts
-- Current version: placeholder only
-- Morph technique approved in principle
-- Sound: pure filtered noise pop only
-  NO sine waves, NO chimes
+## WORKFLOW LOCKED THIS SESSION
+- Gemini draws rich SVG → save here as
+  approved spec → build prompt → Claude Code
+- Mockups = static SVG only, never animated
+  JS widgets (they crash)
+- Build prompt skeleton: read files →
+  sounds → compass → send → receipt →
+  wire → build. Reuse for every instrument.
+- POLISH PASS (optional, after build):
+  give approved SVG back to Gemini,
+  "make it wow / signature screen," BUT
+  keep framework rules locked (canvas,
+  ring, palette, bucket) — only boost
+  expressive parts (explosion, confetti,
+  glow, particles)
+- Signature screens worth boosting:
+  firework explosion, birthday blow-out
+- Don't run full test suite on small
+  changes; build-only
+- One project per terminal block
 
-## Instruments Not Yet Built
-- Flick — Joshua's instrument
-- Wand — Joshua's instrument  
-- Plane — pending
-- Remaining bow acts (compass face, send)
+## VISUAL SPECS (in chat outputs, commit to repo)
+bow_4screens.svg, plane_4screens_APPROVED.svg,
+firework_4screens.svg, firework_4screens_v2.svg,
+birthday_4screens_APPROVED.svg,
+POINTWARD_ANIMATION_FRAMEWORK.md,
+BIRTHDAY_MECHANIC_SPEC.md
 
-## Sound Rules (NEVER VIOLATE)
-- Impact sounds: filtered noise ONLY
-- No sine waves in explosion/punch/fist
-- Chimes OK for: 💭 thought, 💌 envelope
-- All sounds via EmojiRevealSound only
-- Never legacy SoundEngine for reveals
-
-## Background Rules (NEVER VIOLATE)
-- Emoji reveals use instrument world
-- Wind → daySky
-- Rocket → deepSpace
-- Wand → magicalDark
-- Compass → deepPurple
-- Flick → corkBoard
-- Bow → archery
-- Plane → daySky
-- NEVER plain background
-
-## Next Actions
-1. Test all 9 emoji reveals on device
-2. Fix wind send leaf positioning
-3. Write SESSION_LOG for quick
-   cold-start context
-4. Holiday variants (🎁🎆🎓🎂) —
-   separate pass after base approved
-5. Joshua — Flick or Wand instrument
+## STILL TODO
+- Commit visual specs to VisualSpecs/ folder
+  (Claude Code couldn't find them — built
+  from inline specs all session)
+- Update framework: Plane = dark sky not daySky
+- Device test everything above
