@@ -242,6 +242,17 @@ struct CompassView: View {
                                 .frame(width: 240, height: 240)
                                 .scaleEffect(370.0 / 240.0)
                                 .frame(width: 370, height: 370)
+                            } else if (selectedToken.map { sendRemoteEmoji(for: $0) }) == "🎆" {
+                                // [firework] 🎆 — drag the lit match to the fuse;
+                                // the fuse burns down, then the send fires.
+                                FireworkCompassFace(
+                                    bearingDegrees: compass.state.bearingDegrees,
+                                    personName: compass.state.personName,
+                                    onSend: { if let token = selectedToken { sendThought(token) } }
+                                )
+                                .frame(width: 240, height: 240)
+                                .scaleEffect(370.0 / 240.0)
+                                .frame(width: 370, height: 370)
                             } else {
                                 compassFace
                                     .frame(width: 240, height: 240)
@@ -524,7 +535,18 @@ struct CompassView: View {
                 // approved and wired live here, the same way the rocket v2 parachute
                 // receipt is. All paths call the SAME completion → pipeline unchanged.
                 Group {
-                    if previewStyle == .wand {
+                    if previewEmoji == "🎆" {
+                        // [firework] 🎆 is a SPECIAL emoji send — the spectacular
+                        // deep-space launch → small pops → massive burst → embers,
+                        // shown for ANY instrument, then back to the pipeline.
+                        FireworkSendAnimation(
+                            emoji: previewEmoji,
+                            onComplete: {
+                                flightToken = nil
+                                flightFly   = false
+                                finishSend(emoji: previewEmoji, style: previewStyle)
+                            })
+                    } else if previewStyle == .wand {
                         WandSendAnimation(
                             transition: InstrumentTransition(
                                 exitBearing: compass.state.bearingDegrees,

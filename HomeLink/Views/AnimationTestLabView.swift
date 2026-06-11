@@ -63,6 +63,9 @@ struct AnimationTestLabView: View {
         LabEntry(icon: "✈️", name: "Plane",   style: .plane,       version: "V1"),
         LabEntry(icon: "✈️", name: "Plane",   style: .plane,       version: "V2"),
         LabEntry(icon: "🎂", name: "Birthday Cake", style: .glow,  version: nil),
+        LabEntry(icon: "🎆", name: "Firework Send",    style: .glow, version: nil),
+        LabEntry(icon: "🎆", name: "Firework Receipt", style: .glow, version: nil),
+        LabEntry(icon: "🎆", name: "Firework Compass", style: .glow, version: nil),
     ]
 
     private let columns = [GridItem(.flexible(), spacing: 12),
@@ -119,7 +122,8 @@ struct AnimationTestLabView: View {
 
     private func tile(_ entry: LabEntry, isSend: Bool) -> some View {
         Button {
-            let emoji = entry.name == "Birthday Cake" ? "🎂" : randomEmoji
+            let emoji = entry.name == "Birthday Cake" ? "🎂"
+                      : (entry.name.hasPrefix("Firework") ? "🎆" : randomEmoji)
             playing = Playing(isSend: isSend, entry: entry, emoji: emoji)
         } label: {
             VStack(spacing: 8) {
@@ -204,11 +208,30 @@ struct AnimationTestLabView: View {
         .preferredColorScheme(.dark)
     }
 
+    // ── 🎆 Firework — three named previews (send · receipt · compass) ───────
+
+    @ViewBuilder
+    private func fireworkPlayer(_ p: Playing) -> some View {
+        switch p.entry.name {
+        case "Firework Compass":
+            FireworkCompassFace(personName: "them",
+                                onSend: { autoDismiss(p, after: 0.3) })
+        case "Firework Receipt":
+            FireworkReceipt(emoji: "🎆", fromName: "them",
+                            onRevealed: {}, onFinished: { autoDismiss(p, after: 0.1) })
+        default: // "Firework Send"
+            FireworkSendAnimation(emoji: "🎆",
+                                  onComplete: { autoDismiss(p, after: 0.3) })
+        }
+    }
+
     // ── Send: V1 = shared SenderAnimationView · V2 = extracted ACT struct ──
 
     @ViewBuilder
     private func sendPlayer(_ p: Playing) -> some View {
-        if p.isBirthday {
+        if p.entry.name.hasPrefix("Firework") {
+            fireworkPlayer(p)
+        } else if p.isBirthday {
             // 🎂 — the special tap-the-candles compass-face send mechanic.
             BirthdayCakeCompassFace(personName: "them",
                                     onSend: { autoDismiss(p, after: 0.3) })
@@ -249,7 +272,9 @@ struct AnimationTestLabView: View {
 
     @ViewBuilder
     private func landPlayer(_ p: Playing) -> some View {
-        if p.isBirthday {
+        if p.entry.name.hasPrefix("Firework") {
+            fireworkPlayer(p)
+        } else if p.isBirthday {
             // 🎂 — the special cake receipt (smoke wisps, no bucket).
             BirthdayCakeReceipt(emoji: "🎂", fromName: "them",
                                 onRevealed: {}, onFinished: { autoDismiss(p, after: 0.1) })

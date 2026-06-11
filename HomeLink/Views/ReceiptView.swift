@@ -103,6 +103,10 @@ struct ReceiptView: View {
             // there is NO bucket. Intercepted by emoji (not style) above every
             // instrument so a birthday always arrives as a cake.
             birthdayReceipt
+        } else if ping.emoji == "🎆" {
+            // [firework] 🎆 is a SPECIAL emoji receipt — afterglow → bloom →
+            // drift into the bucket. Intercepted by emoji above every instrument.
+            fireworkReceipt
         } else if style == .firefly {
             windReceipt
         } else if style == .rocket {
@@ -148,6 +152,19 @@ struct ReceiptView: View {
 
     private var birthdayReceipt: some View {
         BirthdayCakeReceipt(
+            emoji: ping.emoji,
+            message: ping.message,
+            tagline: ping.tagline,
+            fromName: ping.fromName,
+            onRevealed: { revealHandoff() },
+            onFinished: onFinished
+        )
+    }
+
+    // ── FIREWORK 🎆 — the special afterglow → bloom → bucket receipt ────────
+
+    private var fireworkReceipt: some View {
+        FireworkReceipt(
             emoji: ping.emoji,
             message: ping.message,
             tagline: ping.tagline,
