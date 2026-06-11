@@ -49,9 +49,11 @@ struct FireworkCompassFace: View {
             let bodyW = R * 0.34, bodyH = R * 0.72
             let bodyCY = cy - R * 0.04
             let bodyTopY = bodyCY - bodyH / 2
-            let fuseTip = CGPoint(x: cx + R * 0.52, y: cy - R * 0.55)
-            // Match rest point (below the rocket)
-            let matchRest = CGPoint(x: cx, y: cy + R * 0.78)
+            // [phase3] SHORT fuse just above the rocket — the long non-functional
+            // "top fuse string" that ran to the corner is gone. The match now
+            // STARTS TOP-LEFT and the user drags it DOWN to the fuse.
+            let fuseTip = CGPoint(x: cx + bodyW * 0.55, y: bodyTopY - R * 0.10)
+            let matchRest = CGPoint(x: cx - R * 0.62, y: cy - R * 0.64)
             let matchPos = CGPoint(x: matchRest.x + matchDrag.width,
                                    y: matchRest.y + matchDrag.height)
 
@@ -101,7 +103,7 @@ struct FireworkCompassFace: View {
                         .gesture(matchGesture(fuseTip: fuseTip, matchRest: matchRest))
 
                     // ── Instruction ──
-                    Text(lit ? "fuse burning... ✦" : "drag the lit match to the fuse ✦")
+                    Text(lit ? "fuse burning... ✦" : "drag the match down to the fuse ✦")
                         .font(.system(size: 12, design: .serif).italic())
                         .foregroundColor(Self.lavender.opacity(0.85))
                         .shadow(color: .black.opacity(0.5), radius: 4)
