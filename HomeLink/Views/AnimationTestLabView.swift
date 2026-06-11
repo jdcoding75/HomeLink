@@ -35,7 +35,7 @@ struct AnimationTestLabView: View {
 
     private static let lavender = Color(hex: "#c4a8d4")
     private static let gold     = Color(hex: "#e0a85a")
-    private static let stageOrder: [AnimationStage] = [.compass, .send, .receipt, .reveal]
+    private static let stageOrder: [AnimationStage] = [.compassIdle, .compassCharging, .send, .approach, .target]
 
     private var randomEmoji: String { DevTools.testEmojis.randomElement() ?? "💜" }
     private func emoji(for def: AnimationDefinition) -> String { def.fixedEmoji ?? randomEmoji }
@@ -190,26 +190,16 @@ private struct AnimationStageView: View {
     let onDone: () -> Void
 
     var body: some View {
-        switch stage {
+        // Idle + Charging render the compass face; Approach + Target render the
+        // receipt animation (which carries the reveal as its tail).
+        switch stage.source {
         case .compass: compassStage
         case .send:    sendStage
         case .receipt: receiptStage
-        case .reveal:  revealStage
         }
     }
 
     private var sym: AnyView { AnyView(Text(emoji).font(.system(size: 22))) }
-
-    /// A receipt that ENDS in EmojiRevealView (so the workflow must NOT add a
-    /// separate Reveal stage after it). False only for the landing-beat path.
-    static func receiptAutoReveals(_ def: AnimationDefinition) -> Bool {
-        if def.kind == .emoji { return true }
-        if def.version == "V2" { return true }
-        switch def.style {
-        case .firefly, .rocket, .plane: return true   // dedicated V1 receipts
-        default:                         return false  // bow/flick/wand V1, compass
-        }
-    }
 
     private var instrumentKind: Instrument {
         switch def.style {
@@ -342,28 +332,23 @@ private struct AnimationStageView: View {
             RocketReceiptAnimation(senderBearing: 120, emoji: emoji, fromName: "",
                                    onRevealed: {}, onFinished: onDone)
         } else {
-            // bow V1 / flick V1 / wand V1 / compass — the landing beat (no reveal).
+            // bow V1 / flick V1 / wand V1 / compass — the landing beat. (Its
+            // tail IS the reveal for dedicated receipts — there is no separate
+            // Reveal stage in the 5-stage model.)
             InstrumentLandingView(style: def.style, emoji: emoji) { onDone() }
         }
-    }
-
-    // ── REVEAL ───────────────────────────────────────────────────────────────
-
-    private var revealStage: some View {
-        EmojiRevealView(emoji: emoji, message: nil, tagline: nil,
-                        context: .received(fromName: "them"),
-                        ambient: RevealAmbient.forStyle(def.style),
-                        onDismiss: onDone)
     }
 }
 
 // MARK: - Full workflow runner
 
-/// Plays a definition's stages start-to-finish — Compass → Send →
-/// [interstitial] → Receipt → Reveal — advancing as each stage completes. The
-/// interstitial is a brief transition, not a stage. A per-stage safety dwell
-/// auto-advances if a stage's completion callback never fires (and lets the
-/// interactive compass face advance on its own after a beat).
+/// Plays a definition's stages start-to-finish — Compass (Idle→Charging) → Send
+/// → [interstitial] → Approach → Target — as one continuous run. Idle+Charging
+/// share the compass face and Approach+Target share the receipt animation, so
+/// the runner plays each underlying SOURCE once (compass · send · receipt) in
+/// canonical order. The interstitial is a transition (between send and the
+/// arriving payload), not a stage. A per-source safety dwell auto-advances if a
+/// completion callback never fires (and lets the interactive compass advance).
 private struct AnimationWorkflowRunner: View {
     let def: AnimationDefinition
     let emoji: String
@@ -372,20 +357,30 @@ private struct AnimationWorkflowRunner: View {
     @State private var index = 0
     @State private var interstitial = false
 
-    /// Canonical-order stages this workflow plays. If the receipt carries its
-    /// own reveal, the trailing Reveal is dropped (no double reveal).
-    private var stages: [AnimationStage] {
-        var s: [AnimationStage] = [.compass, .send, .receipt, .reveal].filter { def.provides($0) }
-        if s.contains(.receipt) && AnimationStageView.receiptAutoReveals(def) {
-            s.removeAll { $0 == .reveal }
+    /// The distinct underlying animations to play, in canonical stage order.
+    private var sources: [AnimationStage.Source] {
+        var seen: [AnimationStage.Source] = []
+        for stage in [AnimationStage.compassIdle, .compassCharging, .send, .approach, .target]
+        where def.provides(stage) {
+            if !seen.contains(stage.source) { seen.append(stage.source) }
         }
-        return s
+        return seen
+    }
+
+    /// A representative stage for a source, so AnimationStageView renders it.
+    private func stage(for source: AnimationStage.Source) -> AnimationStage {
+        switch source {
+        case .compass:  return .compassCharging
+        case .send:     return .send
+        case .receipt:  return .approach
+        }
     }
 
     var body: some View {
         ZStack {
-            if index < stages.count {
-                AnimationStageView(def: def, stage: stages[index], emoji: emoji, onDone: advance)
+            if index < sources.count {
+                AnimationStageView(def: def, stage: stage(for: sources[index]),
+                                   emoji: emoji, onDone: advance)
                     .id(index)
             }
             if interstitial {
@@ -404,11 +399,11 @@ private struct AnimationWorkflowRunner: View {
     }
 
     private func advance() {
-        guard index < stages.count else { onDone(); return }
-        let current = stages[index]
+        guard index < sources.count else { onDone(); return }
+        let current = sources[index]
         let next = index + 1
-        // Interstitial transition only between SEND and RECEIPT.
-        if current == .send && next < stages.count && stages[next] == .receipt {
+        // Interstitial transition only between SEND and the arriving RECEIPT.
+        if current == .send && next < sources.count && sources[next] == .receipt {
             withAnimation(.easeInOut(duration: 0.3)) { interstitial = true }
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
                 withAnimation(.easeInOut(duration: 0.3)) { interstitial = false }
@@ -420,7 +415,7 @@ private struct AnimationWorkflowRunner: View {
     }
 
     private func step(to next: Int) {
-        if next >= stages.count {
+        if next >= sources.count {
             onDone()
         } else {
             index = next
@@ -428,16 +423,15 @@ private struct AnimationWorkflowRunner: View {
         }
     }
 
-    /// Safety / pacing dwell: auto-advances a stage if its callback is missed,
+    /// Safety / pacing dwell: auto-advances if a source's callback is missed,
     /// and gives the interactive compass face a beat before moving on.
     private func scheduleDwell(for i: Int) {
-        guard i < stages.count else { return }
+        guard i < sources.count else { return }
         let timeout: Double
-        switch stages[i] {
+        switch sources[i] {
         case .compass: timeout = 3.5
         case .send:    timeout = 8.0
         case .receipt: timeout = 9.0
-        case .reveal:  timeout = 8.0
         }
         DispatchQueue.main.asyncAfter(deadline: .now() + timeout) {
             if index == i && !interstitial { advance() }

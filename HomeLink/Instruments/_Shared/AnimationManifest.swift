@@ -13,8 +13,8 @@
 // is registered HERE (with its version + the stages it provides + ONE canonical
 // label) or it appears nowhere. Consistency by construction.
 //
-// CANONICAL STAGE NAMES (the only four, ever):
-//   Compass · Send · Receipt · Reveal
+// CANONICAL STAGE NAMES (the only five, ever):
+//   Compass Idle · Compass Charging · Send · Approach · Target
 //
 // CANONICAL LABEL FORMAT:
 //   "<Instrument> <Version> — <Stage>"   e.g. "Bow V2 — Receipt"
@@ -30,15 +30,29 @@ import SwiftUI
 
 // MARK: - Stage
 
-/// The four canonical stages of any Pointward animation. These names are the
-/// ONLY stage labels allowed anywhere in the UI.
+/// The FIVE canonical stages of any Pointward animation (the new spec standard).
+/// These names are the ONLY stage labels allowed anywhere in the UI. The old
+/// "Reveal" stage is dropped — the reveal is the tail of Target, not a stage.
 enum AnimationStage: String, CaseIterable, Identifiable {
-    case compass = "Compass"   // the interactive face mechanic (ACT 1)
-    case send    = "Send"      // the full-screen send journey (ACT 2)
-    case receipt = "Receipt"   // the full-screen arrival into the bucket (ACT 3)
-    case reveal  = "Reveal"    // the shared EmojiRevealView bloom (ACT 4)
+    case compassIdle     = "Compass Idle"      // resting mechanism
+    case compassCharging = "Compass Charging"  // mechanism IN ACTION (drawing, lighting, fuse)
+    case send            = "Send"              // launch / the big moment
+    case approach        = "Approach"          // payload travelling in
+    case target          = "Target"            // payload landing in the bucket / settling
 
     var id: String { rawValue }
+
+    /// Which underlying animation renders this stage. Idle+Charging share the
+    /// compass face; Approach+Target share the receipt animation. Surfaces use
+    /// this to play each underlying animation once in a full workflow.
+    enum Source { case compass, send, receipt }
+    var source: Source {
+        switch self {
+        case .compassIdle, .compassCharging: return .compass
+        case .send:                          return .send
+        case .approach, .target:             return .receipt
+        }
+    }
 }
 
 // MARK: - Kind
@@ -98,64 +112,64 @@ enum AnimationManifest {
         AnimationDefinition(
             icon: "🧭", name: "Compass", version: nil, style: .glow,
             instrument: .compass, kind: .instrument,
-            stages: [.compass, .send, .receipt, .reveal], fixedEmoji: nil),
+            stages: [.compassIdle, .compassCharging, .send, .approach, .target], fixedEmoji: nil),
 
         AnimationDefinition(
             icon: "🏹", name: "Bow", version: "V1", style: .bowArrow,
             instrument: .bow, kind: .instrument,
-            stages: [.compass, .send, .receipt, .reveal], fixedEmoji: nil),
+            stages: [.compassIdle, .compassCharging, .send, .approach, .target], fixedEmoji: nil),
         AnimationDefinition(
             icon: "🏹", name: "Bow", version: "V2", style: .bowArrow,
             instrument: .bow, kind: .instrument,
-            stages: [.send, .receipt], fixedEmoji: nil),
+            stages: [.send, .approach, .target], fixedEmoji: nil),
 
         AnimationDefinition(
             icon: "👆", name: "Flick", version: "V1", style: .fingerFlick,
             instrument: .flick, kind: .instrument,
-            stages: [.compass, .send, .receipt, .reveal], fixedEmoji: nil),
+            stages: [.compassIdle, .compassCharging, .send, .approach, .target], fixedEmoji: nil),
         AnimationDefinition(
             icon: "👆", name: "Flick", version: "V2", style: .fingerFlick,
             instrument: .flick, kind: .instrument,
-            stages: [.send, .receipt], fixedEmoji: nil),
+            stages: [.send, .approach, .target], fixedEmoji: nil),
 
         AnimationDefinition(
             icon: "🚀", name: "Rocket", version: nil, style: .rocket,
             instrument: .rocket, kind: .instrument,
-            stages: [.compass, .send, .receipt, .reveal], fixedEmoji: nil),
+            stages: [.compassIdle, .compassCharging, .send, .approach, .target], fixedEmoji: nil),
 
         AnimationDefinition(
             icon: "🌬️", name: "Wind", version: nil, style: .firefly,
             instrument: .firefly, kind: .instrument,
-            stages: [.compass, .send, .receipt, .reveal], fixedEmoji: nil),
+            stages: [.compassIdle, .compassCharging, .send, .approach, .target], fixedEmoji: nil),
 
         AnimationDefinition(
             icon: "🪄", name: "Wand", version: "V1", style: .wand,
             instrument: .wand, kind: .instrument,
-            stages: [.compass, .send, .receipt, .reveal], fixedEmoji: nil),
+            stages: [.compassIdle, .compassCharging, .send, .approach, .target], fixedEmoji: nil),
 
         AnimationDefinition(
             icon: "✈️", name: "Plane", version: "V1", style: .plane,
             instrument: .plane, kind: .instrument,
-            stages: [.compass, .send, .receipt, .reveal], fixedEmoji: nil),
+            stages: [.compassIdle, .compassCharging, .send, .approach, .target], fixedEmoji: nil),
         AnimationDefinition(
             icon: "✈️", name: "Plane", version: "V2", style: .plane,
             instrument: .plane, kind: .instrument,
-            stages: [.send, .receipt], fixedEmoji: nil),
+            stages: [.send, .approach, .target], fixedEmoji: nil),
 
         // ── Emoji mechanisms (ship their own full mechanic) ───────────────
         AnimationDefinition(
             icon: "🎆", name: "Firework", version: nil, style: .glow,
             instrument: nil, kind: .emoji,
-            stages: [.compass, .send, .receipt, .reveal], fixedEmoji: "🎆"),
+            stages: [.compassIdle, .compassCharging, .send, .approach, .target], fixedEmoji: "🎆"),
 
         AnimationDefinition(
             icon: "🎂", name: "Birthday Cake", version: "V1", style: .glow,
             instrument: nil, kind: .emoji,
-            stages: [.compass, .receipt, .reveal], fixedEmoji: "🎂"),
+            stages: [.compassIdle, .compassCharging, .approach, .target], fixedEmoji: "🎂"),
         AnimationDefinition(
             icon: "🎂", name: "Birthday Cake", version: "V2", style: .glow,
             instrument: nil, kind: .emoji,
-            stages: [.compass, .send, .receipt, .reveal], fixedEmoji: "🎂"),
+            stages: [.compassIdle, .compassCharging, .send, .approach, .target], fixedEmoji: "🎂"),
     ]
 
     // ── Derived views of the catalog ─────────────────────────────────────
