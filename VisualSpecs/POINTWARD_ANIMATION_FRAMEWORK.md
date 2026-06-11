@@ -412,3 +412,30 @@ The RECEIVER gets a simple, predictable reveal. Do not build receiver-side
 game/catch mechanics that require synchronous interaction. (Exception kept on
 purpose: birthday candle blow-out, as an OPTIONAL native enhancement over a
 simple baseline reveal.)
+
+---
+
+## ANIMATION SPEC STANDARD (required for all NEW animation builds)
+
+### 1. Canonical stages (5) — the single stage vocabulary everywhere
+1. Compass Idle — the resting mechanism (unlit candles, undrawn bow)
+2. Compass Charging — the mechanism IN ACTION (candles lighting, fuse burning, bow drawing)
+3. Send — the send-off / launch / the big moment
+4. Approach — the payload travelling in (arrow flying, plane approaching, parachute descending)
+5. Target — the payload arriving/landing (into the bucket, settling)
+An animation only declares the stages it actually has; not all have all five. The manifest, test lab, compass selector, Pro tab, and history ALL use these names. No "Reveal" stage — retired.
+
+### 2. Motion timeline is part of the spec (not left to interpretation)
+Every animation stage must specify: phase breakdown with timing in seconds; what moves from where to where; easing/feel per phase; what fades in/out and when. Prefer explicit timeline-driven motion over emergent physics — it generates more reliably and avoids "expression too complex."
+
+### 3. Each animation declares its REVEAL METAPHOR
+Reveal is abstracted, not fixed. Each animation names how the message is revealed (envelope, glow, card slide, spark, lantern, bucket-catch). The delivery object is a flexible component, not a hardcoded asset.
+
+### 4. Modular + composable
+Build from small reusable pieces (flame, particle emitter, shared compass ring, shared bucket) composed together — never one monolithic view. Shared graphics have ONE source of truth.
+
+### 5. Web-safe-able by default (forward-looking)
+NEW animations should be designed to later render in web tech (Lottie/CSS/light WebGL): simple metaphors, lightweight assets, predictable timing. Native-only effects (haptics, mic, device-motion) are OPTIONAL ENHANCEMENTS over a web-safe baseline — never the core mechanic. Existing native animations are grandfathered.
+
+### 6. Sender-rich, receiver-simple (asymmetry is intentional)
+The SENDER performs the ritual. The RECEIVER gets a simple, predictable reveal. No receiver-side game/catch mechanics requiring synchronous interaction. Exception kept on purpose: birthday candle blow-out, as an optional native enhancement over a simple baseline.
