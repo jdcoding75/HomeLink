@@ -182,13 +182,12 @@ struct PlaneInstrumentView: View {
             // Propeller on the front with the brass hub
             propeller.offset(y: -60)
 
-            // The carried emoji rides just below the plane (bible: 🤗 below)
-            Text(loadedEmoji ?? "🤗")
-                .font(.system(size: 26))
-                .offset(y: 92)
-                .opacity(launching ? 0 : 0.95)
+            // [phase3] The duplicate "carried emoji below the plane" is removed —
+            // the cockpit emoji (loadedSymbol, above) is the only one. The plane
+            // body+prop is symmetric around y:0, so it now reads centred in the
+            // ring without the bottom-heavy emoji pulling it down.
         }
-        .frame(width: 160, height: 200)
+        .frame(width: 160, height: 170)
     }
 
     /// A two-blade propeller with a brass hub: 2 crisp blades when idle, a

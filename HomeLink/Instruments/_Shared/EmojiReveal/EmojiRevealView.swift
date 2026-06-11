@@ -281,11 +281,13 @@ struct EmojiRevealView: View {
   private func startFistBump(_ size: CGSize) {
     leftFistX  = -size.width * 0.6   // entry from the left edge
     rightFistX =  size.width * 0.6   // entry from the right edge
-    after(0.3)  { withAnimation(.easeIn(duration: 0.45)) { leftFistX = -30; rightFistX = 30 } }
+    // [phase3] The fists TOUCH but NEVER cross: leftFistX stays negative,
+    // rightFistX positive, closest at ∓42 (knuckles meet, no overlap past centre).
+    after(0.3)  { withAnimation(.easeIn(duration: 0.45)) { leftFistX = -70; rightFistX = 70 } }
     after(0.78) { EmojiRevealSound.play("🤜🤛")
-                  withAnimation(.easeOut(duration: 0.1)) { leftFistX = -8; rightFistX = 8; fistFlash = 0.7 } }
+                  withAnimation(.easeOut(duration: 0.1)) { leftFistX = -42; rightFistX = 42; fistFlash = 0.7 } }
     after(0.9)  { withAnimation(.easeOut(duration: 0.25)) { fistFlash = 0 } }
-    after(0.95) { withAnimation(.spring(response: 0.45, dampingFraction: 0.5)) { leftFistX = -44; rightFistX = 44 } }
+    after(0.95) { withAnimation(.spring(response: 0.45, dampingFraction: 0.5)) { leftFistX = -56; rightFistX = 56 } }
   }
 
   // MARK: - 💭 Thought bubble — rises from the bottom

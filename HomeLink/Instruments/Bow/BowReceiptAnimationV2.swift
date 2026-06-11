@@ -4,15 +4,16 @@
 // ACT 3 of 3 — the full-screen BOW receipt + emoji reveal (visual bible Screen 4).
 //
 // A luminous gold arrow arcs in from the upper-left across a dark navy NIGHT sky
-// and homes on a warm wooden bucket (brass band + rim + handle). On landing the
-// shaft DISSOLVES into a burst of gold sparkles, the bucket glows LAVENDER (the
-// bow world's colour — not cyan), the emoji settles visible inside the mouth,
-// then it blooms into the shared EmojiRevealView.
+// and STICKS into the wooden bucket at impact — it does NOT dissolve and does
+// NOT reposition. The emoji then DROPS off the stuck shaft down into the bucket
+// mouth; the bucket glows LAVENDER (the bow world's colour, not cyan); the emoji
+// settles visible inside, then blooms into the shared EmojiRevealView.
 //
-//   FLIGHT   (0.0–2.6s)  arrow arcs in (single bezier), emoji on the shaft
-//   DISSOLVE (2.6–3.0s)  shaft fades → gold sparkles burst; dissolve plays
-//   LAND     (3.0–3.5s)  lavender glow; emoji visible in the bucket
-//   BLOOM    (3.5s+)     → EmojiRevealView (.received, .bow)             = 3.5s
+//   FLIGHT (0.0–2.4s)  arrow arcs in (single bezier), emoji on the shaft
+//   STICK  (2.4s)      arrow embeds in the bucket and FREEZES (thunk)
+//   DROP   (2.4–3.0s)  the emoji falls off the shaft into the bucket mouth
+//   LAND   (3.0–3.5s)  lavender glow; emoji visible in the bucket
+//   BLOOM  (3.5s+)     → EmojiRevealView (.received, .bow)             = 3.5s
 
 import SwiftUI
 
@@ -28,8 +29,8 @@ struct BowReceiptAnimationV2: View {
 
     static let duration: Double = InstrumentBoundaries.Receipt.bow   // 3.5
 
-    private static let arriveT: Double = 2.6
-    private static let dissolveEnd: Double = 3.0
+    private static let arriveT: Double = 2.4     // arrow sticks
+    private static let dropEnd: Double = 3.0     // emoji finishes dropping in
     private static let total: Double = InstrumentBoundaries.Receipt.bow
 
     private static let skyTop = Color(hex: "#1a2d4a")
@@ -44,7 +45,8 @@ struct BowReceiptAnimationV2: View {
 
     @State private var start: Date? = nil
     @State private var revealing = false
-    @State private var solidity: Double = 1.0
+    @State private var stuck = false             // arrow embedded + frozen
+    @State private var emojiDrop: CGFloat = 0    // 0 on shaft → 1 in bucket
     @State private var burst = false
     @State private var glow = false
     @State private var emojiInBucket = false
@@ -67,11 +69,10 @@ struct BowReceiptAnimationV2: View {
                             stars(geo: geo)
                             bucket(geo: geo)
                             sparkleBurst(geo: geo)
+                            arrow(geo: geo, elapsed: e)        // sticks + freezes
+                            fallingEmoji(geo: geo)
                             if emojiInBucket {
                                 Text(emoji).font(.system(size: 40)).position(bucketMouth(geo.size))
-                            }
-                            if e < Self.dissolveEnd {
-                                arrow(geo: geo, elapsed: e)
                             }
                         }
                     }
@@ -87,15 +88,18 @@ struct BowReceiptAnimationV2: View {
         InstrumentSoundPlayer.shared.playCue(file: BowSounds.arrowWhistleFile,
                                              duration: BowSounds.arrowWhistleDuration)
         HapticPattern.singleSoft.fire()
+        // STICK — the arrow embeds (thunk) and freezes; the emoji starts dropping.
         DispatchQueue.main.asyncAfter(deadline: .now() + Self.arriveT) {
-            InstrumentSoundPlayer.shared.playCue(file: BowSounds.sparkleDissolveFile,
-                                                 duration: BowSounds.sparkleDissolveDuration)
-            withAnimation(.easeOut(duration: 0.4)) { solidity = 0 }       // shaft dissolves
-            withAnimation(.easeOut(duration: 0.8)) { burst = true }       // gold particles
+            stuck = true
+            InstrumentSoundPlayer.shared.playCue(file: BowSounds.receiptFile,
+                                                 duration: BowSounds.receiptDuration)
+            HapticPattern.singleSoft.fire()
+            withAnimation(.easeOut(duration: 0.4)) { burst = true }      // small gold spark
+            withAnimation(.easeIn(duration: Self.dropEnd - Self.arriveT)) { emojiDrop = 1 }
         }
-        DispatchQueue.main.asyncAfter(deadline: .now() + Self.dissolveEnd) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + Self.dropEnd) {
             HapticPattern.doubleSoft.fire()
-            withAnimation(.easeOut(duration: 0.4)) { glow = true }        // lavender bucket glow
+            withAnimation(.easeOut(duration: 0.4)) { glow = true }       // lavender glow
             emojiInBucket = true
         }
         DispatchQueue.main.asyncAfter(deadline: .now() + Self.total) {
@@ -113,59 +117,80 @@ struct BowReceiptAnimationV2: View {
         CGPoint(x: size.width * 0.73, y: size.height - 145)
     }
     private func bucketMouth(_ size: CGSize) -> CGPoint {
-        let p = bucketPoint(size); return CGPoint(x: p.x, y: p.y - Self.bucketH * 0.34)
+        let p = bucketPoint(size); return CGPoint(x: p.x, y: p.y - Self.bucketH * 0.30)
+    }
+    /// Where the arrow's centre comes to rest (up-left of the bucket so the tip
+    /// embeds in the rim and the shaft sticks out — the emoji rides this point).
+    private func stickPoint(_ size: CGSize) -> CGPoint {
+        let p = bucketPoint(size); return CGPoint(x: p.x - 24, y: p.y - Self.bucketH * 0.66)
     }
 
-    // ── The arrow (arcs into the bucket via a single bezier) ─────────────────
+    // ── The arrow (arcs in, then STICKS frozen) ──────────────────────────────
 
     @ViewBuilder
     private func arrow(geo: GeometryProxy, elapsed e: Double) -> some View {
-        let p = min(1, e / Self.arriveT)
+        let p = stuck ? 1 : min(1, e / Self.arriveT)
         let pos = bezier(geo.size, p)
         let ahead = bezier(geo.size, min(1, p + 0.02))
-        let angle = atan2(ahead.y - pos.y, ahead.x - pos.x) * 180 / .pi
+        let behind = bezier(geo.size, max(0, p - 0.02))
+        let angle = atan2(ahead.y - behind.y, ahead.x - behind.x) * 180 / .pi
         ZStack {
-            // short gold trail (4 dots increasing opacity)
-            ForEach(0..<4, id: \.self) { i in
-                let f = Double(i) / 3
-                let bp = bezier(geo.size, max(0, p - CGFloat(1 - f) * 0.06))
-                Circle().fill(Self.gold).frame(width: 2 + CGFloat(f) * 2, height: 2 + CGFloat(f) * 2)
-                    .opacity((0.15 + f * 0.5) * solidity).position(bp)
+            if !stuck {
+                // short gold trail (4 dots increasing opacity) — flight only
+                ForEach(0..<4, id: \.self) { i in
+                    let f = Double(i) / 3
+                    let bp = bezier(geo.size, max(0, p - CGFloat(1 - f) * 0.06))
+                    Circle().fill(Self.gold).frame(width: 2 + CGFloat(f) * 2, height: 2 + CGFloat(f) * 2)
+                        .opacity(0.15 + f * 0.5).position(bp)
+                }
             }
-            BowArrowGlyph(emoji: emoji, solidity: solidity)
+            // The arrow itself: carries the emoji in flight; once stuck it stays
+            // solid (NO dissolve) and drops the emoji separately.
+            BowArrowGlyph(emoji: stuck ? nil : emoji)
                 .frame(width: Self.arrowW, height: Self.arrowH)
                 .rotationEffect(.degrees(angle))
-                .position(pos)
+                .position(stuck ? stickPoint(geo.size) : pos)
         }
         .allowsHitTesting(false)
     }
 
-    /// start: left edge 35% height · control: centre 20% height · end: bucket mouth.
+    /// start: left edge 35% height · control: centre 20% height · end: stickPoint.
     private func bezier(_ size: CGSize, _ p: CGFloat) -> CGPoint {
         let s = CGPoint(x: -size.width * 0.05, y: size.height * 0.35)
         let c = CGPoint(x: size.width * 0.5, y: size.height * 0.20)
-        let mouth = bucketMouth(size)
+        let end = stickPoint(size)
         let mp = 1 - p
-        let x = mp * mp * s.x + 2 * mp * p * c.x + p * p * mouth.x
-        let y = mp * mp * s.y + 2 * mp * p * c.y + p * p * mouth.y
-        return CGPoint(x: x, y: y)
+        return CGPoint(x: mp * mp * s.x + 2 * mp * p * c.x + p * p * end.x,
+                       y: mp * mp * s.y + 2 * mp * p * c.y + p * p * end.y)
     }
 
-    // ── Gold sparkle burst from the bucket on dissolve ───────────────────────
+    // ── The emoji dropping off the stuck shaft into the bucket ───────────────
+
+    @ViewBuilder
+    private func fallingEmoji(geo: GeometryProxy) -> some View {
+        if stuck && !emojiInBucket {
+            let from = stickPoint(geo.size)
+            let to = bucketMouth(geo.size)
+            let p = easeIn(Double(emojiDrop))
+            let pos = CGPoint(x: from.x + (to.x - from.x) * CGFloat(p),
+                              y: from.y + (to.y - from.y) * CGFloat(p))
+            Text(emoji).font(.system(size: 40)).position(pos)
+        }
+    }
 
     @ViewBuilder
     private func sparkleBurst(geo: GeometryProxy) -> some View {
         if burst {
-            let m = bucketMouth(geo.size)
-            ForEach(0..<9, id: \.self) { i in
-                let a = (Double(i) / 9) * 2 * .pi - .pi / 2
+            let m = stickPoint(geo.size)
+            ForEach(0..<7, id: \.self) { i in
+                let a = (Double(i) / 7) * 2 * .pi - .pi / 2
                 Circle().fill(i % 2 == 0 ? Self.gold : Self.goldHi)
-                    .frame(width: 4, height: 4)
+                    .frame(width: 3.5, height: 3.5)
                     .position(m)
-                    .offset(x: burst ? CGFloat(cos(a)) * 70 : 0,
-                            y: burst ? CGFloat(sin(a)) * 80 - 20 : 0)
+                    .offset(x: burst ? CGFloat(cos(a)) * 44 : 0,
+                            y: burst ? CGFloat(sin(a)) * 44 : 0)
                     .opacity(burst ? 0 : 0.9)
-                    .animation(.easeOut(duration: 0.9), value: burst)
+                    .animation(.easeOut(duration: 0.7), value: burst)
             }
             .allowsHitTesting(false)
         }
@@ -219,4 +244,6 @@ struct BowReceiptAnimationV2: View {
         }
         .allowsHitTesting(false)
     }
+
+    private func easeIn(_ t: Double) -> Double { let x = min(max(t, 0), 1); return x * x }
 }

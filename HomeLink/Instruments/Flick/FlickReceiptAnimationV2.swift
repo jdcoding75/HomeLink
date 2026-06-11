@@ -136,7 +136,10 @@ struct FlickReceiptAnimationV2: View {
     // Linear progress to the land, with an easeOutBounce settle right at the end.
     var p = min(1, elapsed / Self.landAt)
     if elapsed >= Self.landAt { p = 1 }
-    let bp = easeOutBounce(Double(p))
+    // [phase3] Bounce magnitude reduced 30%: blend 70% easeOutBounce with 30% of
+    // a smooth easeOut so the overshoot amplitude is gentler (both end at 1).
+    let smooth = 1 - pow(1 - Double(p), 2)
+    let bp = 0.7 * easeOutBounce(Double(p)) + 0.3 * smooth
     let q = CGFloat(bp)
     let mx = (1 - q) * (1 - q) * s.x + 2 * (1 - q) * q * c.x + q * q * e.x
     let my = (1 - q) * (1 - q) * s.y + 2 * (1 - q) * q * c.y + q * q * e.y
