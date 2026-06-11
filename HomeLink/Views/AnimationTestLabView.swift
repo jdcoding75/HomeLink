@@ -1,23 +1,18 @@
 // AnimationTestLabView.swift
 // Pointward › Views
 //
-// [1/3] THE ANIMATION TEST LAB — DEBUG ONLY. A dedicated space to fire every
-// animation in isolation, with no thought queue, no pairing, no compass: just
-// the pure send and land animations on demand.
+// THE ANIMATION TEST LAB — DEBUG ONLY. Stage-driven and fed entirely by
+// AnimationManifest (the single source of truth). For every catalogued
+// animation (instrument · version · emoji mechanism) the lab offers:
 //
-//   SEND ANIMATIONS     compass · bow (V1/V2) · flick (V1/V2) · rocket · wind ·
-//                       wand · plane (V1/V2)
-//   RECEIVE ANIMATIONS  compass · bow (V1/V2) · flick (V1/V2) · rocket · wind ·
-//                       wand · plane (V1/V2)
+//   • FULL WORKFLOW — Compass → Send → [interstitial] → Receipt → Reveal, played
+//     as one continuous run. The interstitial ("sent… → arriving") is a
+//     transition, NOT a selectable stage.
+//   • Each STAGE alone — Compass / Send / Receipt / Reveal (only the stages the
+//     manifest says that animation provides).
 //
-// V1 is the live/active animation (the shared dispatcher path: SenderAnimationView
-// for sends, InstrumentLandingView for lands). V2 is today's extracted full-screen
-// ACT struct (…SendAnimationV2 / …ReceiptAnimationV2), shown here ONLY for
-// comparison — it is NOT wired into the live app until explicitly promoted.
-//
-// Tapping a tile plays that animation full-screen over a clean backdrop; it
-// auto-dismisses when the animation completes, or tap anywhere to dismiss.
-// Each run uses a random test emoji so the hue-driven glows vary.
+// Labels come straight from the manifest: "<Instrument> <Version> — <Stage>"
+// and "<Instrument> <Version> — Full Workflow". Nothing is hand-maintained here.
 
 #if DEBUG
 import SwiftUI
@@ -26,386 +21,431 @@ struct AnimationTestLabView: View {
 
     @Environment(\.dismiss) private var dismiss
 
-    /// One catalogued animation: an instrument personality, optionally versioned.
-    struct LabEntry: Identifiable {
-        let icon: String
-        let name: String
-        let style: SenderStyle
-        let version: String?     // nil = single · "V1" = active inline · "V2" = extracted ACT
-        var id: String { "\(name)-\(version ?? "single")" }
-        /// "Bow V2" · "Wand V1" · "Compass"
-        var displayName: String { version.map { "\(name) \($0)" } ?? name }
+    enum Mode: Equatable {
+        case workflow
+        case stage(AnimationStage)
     }
-
-    /// One animation playing full screen — send or land, an entry, an emoji.
-    private struct Playing: Identifiable {
+    struct Run: Identifiable {
         let id = UUID()
-        let isSend: Bool
-        let entry: LabEntry
+        let def: AnimationDefinition
+        let mode: Mode
         let emoji: String
-        var style: SenderStyle { entry.style }
-        var isV2: Bool { entry.version == "V2" }
-        var isBirthday: Bool { entry.name == "Birthday Cake" }
     }
-    @State private var playing: Playing?
-
-    // The 🧭🏹👆🚀🌬️🪄✈️ lineup. Bow/Flick/Plane carry both V1 (active inline) and
-    // V2 (today's extracted full-screen redesign) so the two can be compared.
-    private let entries: [LabEntry] = [
-        LabEntry(icon: "🧭", name: "Compass", style: .glow,        version: nil),
-        // [bow] V1 RETIRED — bow is V2-only live now; the V1 entry is removed
-        // from the lab (files kept, unreferenced). See Phase 2 version decision.
-        // LabEntry(icon: "🏹", name: "Bow",     style: .bowArrow,    version: "V1"),
-        LabEntry(icon: "🏹", name: "Bow",     style: .bowArrow,    version: "V2"),
-        LabEntry(icon: "👆", name: "Flick",   style: .fingerFlick, version: "V1"),
-        LabEntry(icon: "👆", name: "Flick",   style: .fingerFlick, version: "V2"),
-        // [rocket] BOTH landings kept: V1 = legs (InstrumentLandingView), V2 =
-        // parachute (RocketReceiptAnimation, the live receipt). Send is shared.
-        LabEntry(icon: "🚀", name: "Rocket",  style: .rocket,      version: "V1"),
-        LabEntry(icon: "🚀", name: "Rocket",  style: .rocket,      version: "V2"),
-        LabEntry(icon: "🌬️", name: "Wind",    style: .firefly,     version: nil),
-        LabEntry(icon: "🪄", name: "Wand",    style: .wand,        version: "V1"),
-        LabEntry(icon: "✈️", name: "Plane",   style: .plane,       version: "V1"),
-        LabEntry(icon: "✈️", name: "Plane",   style: .plane,       version: "V2"),
-        LabEntry(icon: "🎂", name: "Birthday Cake", style: .glow,  version: nil),
-        LabEntry(icon: "🎆", name: "Firework Send",    style: .glow, version: nil),
-        LabEntry(icon: "🎆", name: "Firework Receipt", style: .glow, version: nil),
-        LabEntry(icon: "🎆", name: "Firework Compass", style: .glow, version: nil),
-        LabEntry(icon: "🎂", name: "Birthday Send",    style: .glow, version: nil),
-        LabEntry(icon: "🎂", name: "Birthday Receipt", style: .glow, version: nil),
-        LabEntry(icon: "🎂", name: "Birthday Compass", style: .glow, version: nil),
-    ]
-
-    private let columns = [GridItem(.flexible(), spacing: 12),
-                           GridItem(.flexible(), spacing: 12)]
+    @State private var run: Run?
 
     private static let lavender = Color(hex: "#c4a8d4")
+    private static let gold     = Color(hex: "#e0a85a")
+    private static let stageOrder: [AnimationStage] = [.compass, .send, .receipt, .reveal]
 
-    private var randomEmoji: String {
-        DevTools.testEmojis.randomElement() ?? "💜"
-    }
+    private var randomEmoji: String { DevTools.testEmojis.randomElement() ?? "💜" }
+    private func emoji(for def: AnimationDefinition) -> String { def.fixedEmoji ?? randomEmoji }
+
+    private let cols = [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)]
 
     var body: some View {
         NavigationStack {
             ZStack {
                 DesignTokens.Color.background.ignoresSafeArea()
                 ScrollView {
-                    VStack(alignment: .leading, spacing: 24) {
-                        sectionHeader("send animations")
-                        LazyVGrid(columns: columns, spacing: 12) {
-                            ForEach(entries) { entry in
-                                tile(entry, isSend: true)
-                            }
+                    LazyVStack(alignment: .leading, spacing: 22) {
+                        ForEach(AnimationManifest.all) { def in
+                            section(for: def)
                         }
-
-                        sectionHeader("receive animations")
-                        LazyVGrid(columns: columns, spacing: 12) {
-                            ForEach(entries) { entry in
-                                tile(entry, isSend: false)
-                            }
-                        }
-
                         Spacer(minLength: 30)
                     }
-                    .padding(.horizontal, 20)
-                    .padding(.top, 10)
+                    .padding(.horizontal, 20).padding(.top, 10)
                 }
             }
             .navigationTitle("Animation Test Lab")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    Button("done") { dismiss() }
-                        .foregroundColor(Self.lavender)
+                    Button("done") { dismiss() }.foregroundColor(Self.lavender)
                 }
             }
         }
         .preferredColorScheme(.dark)
-        .fullScreenCover(item: $playing) { p in
-            playerOverlay(p)
-        }
+        .fullScreenCover(item: $run) { playerOverlay($0) }
     }
 
-    // ── A single animation tile ───────────────────────────────────────────
+    // ── A section per manifest definition ──────────────────────────────────
 
-    private func tile(_ entry: LabEntry, isSend: Bool) -> some View {
-        Button {
-            let emoji = entry.name.hasPrefix("Birthday") ? "🎂"
-                      : (entry.name.hasPrefix("Firework") ? "🎆" : randomEmoji)
-            playing = Playing(isSend: isSend, entry: entry, emoji: emoji)
-        } label: {
-            VStack(spacing: 8) {
-                Text(entry.icon)
-                    .font(.system(size: 34))
-                Text("\(entry.displayName) \(isSend ? "Send" : "Land")")
-                    .font(.system(size: 13, weight: .medium, design: .serif))
+    private func section(for def: AnimationDefinition) -> some View {
+        let stages = Self.stageOrder.filter { def.provides($0) }
+        return VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 8) {
+                Text(def.icon).font(.system(size: 22))
+                Text(def.displayName)
+                    .font(.system(size: 15, weight: .semibold, design: .serif))
                     .foregroundColor(DesignTokens.Color.textPrimary)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
             }
+            workflowButton(def)
+            LazyVGrid(columns: cols, spacing: 10) {
+                ForEach(stages) { stage in stageChip(def, stage) }
+            }
+        }
+    }
+
+    private func workflowButton(_ def: AnimationDefinition) -> some View {
+        Button { start(def, .workflow) } label: {
+            HStack {
+                Text("Full Workflow")
+                    .font(.system(size: 13, weight: .semibold, design: .serif))
+                    .foregroundColor(.black)
+                Spacer()
+                Text("Compass → Send → Receipt → Reveal")
+                    .font(.system(size: 10, design: .serif).italic())
+                    .foregroundColor(.black.opacity(0.6))
+            }
+            .padding(.horizontal, 14).padding(.vertical, 11)
             .frame(maxWidth: .infinity)
-            .padding(.vertical, 18)
-            .background(DesignTokens.Color.backgroundCard)
+            .background(Self.gold.opacity(0.9))
             .cornerRadius(DesignTokens.Radius.card)
-            .overlay(
-                RoundedRectangle(cornerRadius: DesignTokens.Radius.card)
-                    .stroke(tileStroke(entry: entry, isSend: isSend), lineWidth: 1)
-            )
         }
         .buttonStyle(.plain)
     }
 
-    /// V2 tiles get a gold edge so they read as the experimental version.
-    private func tileStroke(entry: LabEntry, isSend: Bool) -> Color {
-        if entry.version == "V2" { return Color(hex: "#e0a85a").opacity(0.55) }
-        return isSend ? Self.lavender.opacity(0.4) : Color(hex: "#5dcaa5").opacity(0.4)
+    private func stageChip(_ def: AnimationDefinition, _ stage: AnimationStage) -> some View {
+        Button { start(def, .stage(stage)) } label: {
+            Text(stage.rawValue)
+                .font(.system(size: 13, weight: .medium, design: .serif))
+                .foregroundColor(DesignTokens.Color.textPrimary)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 12)
+                .background(DesignTokens.Color.backgroundCard)
+                .cornerRadius(DesignTokens.Radius.card)
+                .overlay(RoundedRectangle(cornerRadius: DesignTokens.Radius.card)
+                    .stroke(Self.lavender.opacity(0.4), lineWidth: 1))
+        }
+        .buttonStyle(.plain)
     }
 
-    private func sectionHeader(_ title: String) -> some View {
-        Text(title)
-            .font(DesignTokens.Font.overline)
-            .foregroundColor(DesignTokens.Color.textMuted)
+    private func start(_ def: AnimationDefinition, _ mode: Mode) {
+        run = Run(def: def, mode: mode, emoji: emoji(for: def))
     }
 
-    // ── The full-screen player ────────────────────────────────────────────
+    // ── The full-screen player ──────────────────────────────────────────────
 
     @ViewBuilder
-    private func playerOverlay(_ p: Playing) -> some View {
+    private func playerOverlay(_ r: Run) -> some View {
         ZStack {
-            // [2/8] The same themed world the real app shows, so the test lab
-            // looks identical — deep space for rocket, sky for wind/plane, cork
-            // for flick, archery range for bow, magic for wand, purple glow for
-            // compass. Shown for BOTH send and receive.
             DesignTokens.Color.background.ignoresSafeArea()
-            CatchWorldBackground(style: p.style).ignoresSafeArea()
+            CatchWorldBackground(style: r.def.style).ignoresSafeArea()
 
-            if p.isSend {
-                sendPlayer(p)
-            } else {
-                landPlayer(p)
+            switch r.mode {
+            case .workflow:
+                AnimationWorkflowRunner(def: r.def, emoji: r.emoji, onDone: { run = nil })
+            case .stage(let stage):
+                AnimationStageView(def: r.def, stage: stage, emoji: r.emoji, onDone: { run = nil })
             }
 
-            // Tap-anywhere-to-dismiss + a quiet hint. Topmost so it always
-            // catches the tap regardless of what the animation does.
-            VStack {
-                HStack {
-                    Spacer()
-                    Text("\(p.emoji) \(animationLabel(p))")
-                        .font(.system(size: 11, design: .serif).italic())
-                        .foregroundColor(Self.lavender.opacity(0.8))
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 6)
-                        .background(Capsule().fill(DesignTokens.Color.background.opacity(0.7)))
-                        .padding(.top, 50)
-                        .padding(.trailing, 18)
-                }
-                Spacer()
-                // [2/6] RATE THIS ANIMATION — the verdict feeds the "View
-                // animation feedback" summary in Developer Tools. Tapping
-                // either button records it and dismisses; the buttons capture
-                // their own taps so they never trigger tap-to-dismiss.
-                verdictButtons(for: p)
-                Text("tap elsewhere to dismiss")
-                    .font(.system(size: 11, design: .serif).italic())
-                    .foregroundColor(DesignTokens.Color.textDim)
-                    .padding(.bottom, 30)
-            }
+            chrome(for: r)
         }
-        .contentShape(Rectangle())
-        .onTapGesture { playing = nil }
         .preferredColorScheme(.dark)
     }
 
-    // ── 🎆 Firework — three named previews (send · receipt · compass) ───────
-
-    @ViewBuilder
-    private func fireworkPlayer(_ p: Playing) -> some View {
-        switch p.entry.name {
-        case "Firework Compass":
-            FireworkCompassFace(personName: "them",
-                                onSend: { autoDismiss(p, after: 0.3) })
-        case "Firework Receipt":
-            FireworkReceipt(emoji: "🎆", fromName: "them",
-                            onRevealed: {}, onFinished: { autoDismiss(p, after: 0.1) })
-        default: // "Firework Send"
-            FireworkSendAnimation(emoji: "🎆",
-                                  onComplete: { autoDismiss(p, after: 0.3) })
-        }
-    }
-
-    /// 🎂 Birthday Cake V2 — three named previews (send · receipt · compass).
-    private var birthdayV2Names: Set<String> { ["Birthday Send", "Birthday Receipt", "Birthday Compass"] }
-
-    @ViewBuilder
-    private func birthdayV2Player(_ p: Playing) -> some View {
-        switch p.entry.name {
-        case "Birthday Compass":
-            BirthdayCakeCompassFaceV2(personName: "them",
-                                      onSend: { autoDismiss(p, after: 0.3) })
-        case "Birthday Receipt":
-            BirthdayCakeReceiptV2(emoji: "🎂", fromName: "them",
-                                  onRevealed: {}, onFinished: { autoDismiss(p, after: 0.1) })
-        default: // "Birthday Send"
-            BirthdayCakeSendAnimationV2(emoji: "🎂",
-                                        onComplete: { autoDismiss(p, after: 0.3) })
-        }
-    }
-
-    // ── Send: V1 = shared SenderAnimationView · V2 = extracted ACT struct ──
-
-    @ViewBuilder
-    private func sendPlayer(_ p: Playing) -> some View {
-        if p.entry.name.hasPrefix("Firework") {
-            fireworkPlayer(p)
-        } else if birthdayV2Names.contains(p.entry.name) {
-            birthdayV2Player(p)
-        } else if p.isBirthday {
-            // 🎂 — the special tap-the-candles compass-face send mechanic.
-            BirthdayCakeCompassFace(personName: "them",
-                                    onSend: { autoDismiss(p, after: 0.3) })
-        } else if p.style == .rocket {
-            // Rocket send is shared (one launch) — both V1 (legs) and V2
-            // (parachute) tiles fire the same SenderAnimationView blast off.
-            SenderAnimationView(style: .rocket, emoji: p.emoji, bearingDegrees: 0,
-                                symbol: Text(p.emoji).font(.system(size: 45))) {
-                autoDismiss(p, after: 0.3)
+    private func chrome(for r: Run) -> some View {
+        ZStack(alignment: .top) {
+            // Close button — top-left, always tappable (interactive faces own
+            // the rest of the screen, so there is no tap-to-dismiss backdrop).
+            HStack {
+                Button { run = nil } label: {
+                    Text("✕ close")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundColor(Self.lavender)
+                        .padding(.horizontal, 12).padding(.vertical, 7)
+                        .background(Capsule().fill(DesignTokens.Color.background.opacity(0.8)))
+                }
+                .buttonStyle(.plain)
+                Spacer()
+                Text(labelText(for: r))
+                    .font(.system(size: 11, design: .serif).italic())
+                    .foregroundColor(Self.lavender.opacity(0.85))
+                    .padding(.horizontal, 12).padding(.vertical, 6)
+                    .background(Capsule().fill(DesignTokens.Color.background.opacity(0.7)))
+                    .allowsHitTesting(false)
             }
-        } else if p.isV2 {
-            let t = InstrumentTransition(exitBearing: 0, exitPoint: .zero,
-                                         instrument: instrumentKind(p.style),
-                                         emoji: p.emoji, message: nil, tagline: nil)
-            switch p.style {
-            case .bowArrow:    BowSendAnimationV2(transition: t, personName: "them",
-                                                  onComplete: { autoDismiss(p, after: 0.1) })
-            case .fingerFlick: FlickSendAnimationV2(transition: t, personName: "them",
-                                                    onComplete: { autoDismiss(p, after: 0.1) })
-            case .plane:       PlaneSendAnimationV2(transition: t, personName: "them",
-                                                    onComplete: { autoDismiss(p, after: 0.1) })
-            default:           EmptyView()
-            }
-        } else if p.style == .plane {
-            // Plane V1 send = the dedicated full-screen PlaneSendAnimation (NE flight).
-            let t = InstrumentTransition(exitBearing: 0, exitPoint: .zero,
-                                         instrument: .plane,
-                                         emoji: p.emoji, message: nil, tagline: nil)
-            PlaneSendAnimation(transition: t, personName: "them",
-                               onComplete: { autoDismiss(p, after: 0.1) })
-        } else {
-            // Straight up (bearing 0) so the flight is centred and visible.
-            SenderAnimationView(
-                style: p.style,
-                emoji: p.emoji,
-                bearingDegrees: 0,
-                symbol: Text(p.emoji).font(.system(size: 45))
-            ) {
-                autoDismiss(p, after: 0.3)
-            }
+            .padding(.top, 50).padding(.horizontal, 18)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
     }
 
-    // ── Land: V1 = shared InstrumentLandingView · V2 = extracted ACT struct ─
-
-    @ViewBuilder
-    private func landPlayer(_ p: Playing) -> some View {
-        if p.entry.name.hasPrefix("Firework") {
-            fireworkPlayer(p)
-        } else if birthdayV2Names.contains(p.entry.name) {
-            birthdayV2Player(p)
-        } else if p.isBirthday {
-            // 🎂 — the special cake receipt (smoke wisps, no bucket).
-            BirthdayCakeReceipt(emoji: "🎂", fromName: "them",
-                                onRevealed: {}, onFinished: { autoDismiss(p, after: 0.1) })
-        } else if p.isV2 {
-            switch p.style {
-            case .bowArrow:    BowReceiptAnimationV2(senderBearing: 120, emoji: p.emoji,
-                                                     message: nil, tagline: nil, fromName: "",
-                                                     onRevealed: {}, onFinished: { autoDismiss(p, after: 0.1) })
-            case .fingerFlick: FlickReceiptAnimationV2(senderBearing: 120, emoji: p.emoji,
-                                                       message: nil, tagline: nil, fromName: "",
-                                                       onRevealed: {}, onFinished: { autoDismiss(p, after: 0.1) })
-            case .plane:       PlaneReceiptAnimationV2(senderBearing: 120, emoji: p.emoji,
-                                                       message: nil, tagline: nil, fromName: "",
-                                                       onRevealed: {}, onFinished: { autoDismiss(p, after: 0.1) })
-            case .rocket:      RocketReceiptAnimation(senderBearing: 120, emoji: p.emoji,
-                                                      message: nil, tagline: nil, fromName: "",
-                                                      onRevealed: {}, onFinished: { autoDismiss(p, after: 0.1) })
-            default:           EmptyView()
-            }
-        } else if p.style == .plane {
-            // Plane V1 receipt = the dedicated "coming-at-you" PlaneReceiptAnimation.
-            PlaneReceiptAnimation(senderBearing: 120, emoji: p.emoji,
-                                  message: nil, tagline: nil, fromName: "",
-                                  onRevealed: {}, onFinished: { autoDismiss(p, after: 0.1) })
-        } else {
-            InstrumentLandingView(style: p.style, emoji: p.emoji) {
-                // Let the emerged emoji breathe, then dismiss.
-                autoDismiss(p, after: 1.4)
-            }
+    private func labelText(for r: Run) -> String {
+        switch r.mode {
+        case .workflow:     return "\(r.emoji) \(r.def.displayName) — Full Workflow"
+        case .stage(let s): return "\(r.emoji) \(r.def.label(for: s))"
         }
-    }
-
-    private func autoDismiss(_ p: Playing, after: Double) {
-        DispatchQueue.main.asyncAfter(deadline: .now() + after) {
-            if playing?.id == p.id { playing = nil }
-        }
-    }
-
-    /// SenderStyle → Instrument kind, for the V2 ACT structs' transition context.
-    private func instrumentKind(_ style: SenderStyle) -> Instrument {
-        switch style {
-        case .bowArrow:     return .bow
-        case .fingerFlick:  return .flick
-        case .plane:        return .plane
-        case .rocket:       return .rocket
-        case .wand:         return .wand
-        case .firefly:      return .wind
-        default:            return .compass
-        }
-    }
-
-    /// ✅ approved / ✏️ needs work — records the verdict for this exact
-    /// animation (style + send/land + version), then dismisses.
-    private func verdictButtons(for p: Playing) -> some View {
-        let key = AnimationFeedbackStore.key(style: p.style, isSend: p.isSend, version: p.entry.version)
-        let current = AnimationFeedbackStore.verdict(for: key)
-        return HStack(spacing: 12) {
-            verdictButton("✅ approved", tint: Color(hex: "#5dcaa5"),
-                          isOn: current == .approved) {
-                AnimationFeedbackStore.set(.approved, for: key)
-                HapticEngine.saved()
-                playing = nil
-            }
-            verdictButton("✏️ needs work", tint: Color(hex: "#e0a85a"),
-                          isOn: current == .needsWork) {
-                AnimationFeedbackStore.set(.needsWork, for: key)
-                HapticEngine.saved()
-                playing = nil
-            }
-        }
-        .padding(.bottom, 10)
-    }
-
-    private func verdictButton(_ title: String, tint: Color, isOn: Bool,
-                               action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Text(title)
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundColor(isOn ? .black : tint)
-                .padding(.horizontal, 16)
-                .padding(.vertical, 9)
-                .background(isOn ? tint : tint.opacity(0.14))
-                .clipShape(Capsule())
-                .overlay(Capsule().stroke(tint, lineWidth: 1))
-        }
-        .buttonStyle(.plain)
-    }
-
-    private func animationLabel(_ p: Playing) -> String {
-        "\(p.entry.displayName) \(p.isSend ? "send" : "land")"
     }
 }
 
-// MARK: - [2/6] Animation feedback store
+// MARK: - One stage, rendered
+
+/// Renders a single stage (Compass / Send / Receipt / Reveal) for a manifest
+/// definition. Used both for a standalone stage run and as the building block of
+/// the full-workflow runner. `onDone` fires when the stage completes.
+private struct AnimationStageView: View {
+    let def: AnimationDefinition
+    let stage: AnimationStage
+    let emoji: String
+    let onDone: () -> Void
+
+    var body: some View {
+        switch stage {
+        case .compass: compassStage
+        case .send:    sendStage
+        case .receipt: receiptStage
+        case .reveal:  revealStage
+        }
+    }
+
+    private var sym: AnyView { AnyView(Text(emoji).font(.system(size: 22))) }
+
+    /// A receipt that ENDS in EmojiRevealView (so the workflow must NOT add a
+    /// separate Reveal stage after it). False only for the landing-beat path.
+    static func receiptAutoReveals(_ def: AnimationDefinition) -> Bool {
+        if def.kind == .emoji { return true }
+        if def.version == "V2" { return true }
+        switch def.style {
+        case .firefly, .rocket, .plane: return true   // dedicated V1 receipts
+        default:                         return false  // bow/flick/wand V1, compass
+        }
+    }
+
+    private var instrumentKind: Instrument {
+        switch def.style {
+        case .bowArrow:    return .bow
+        case .fingerFlick: return .flick
+        case .plane:       return .plane
+        case .rocket:      return .rocket
+        case .wand:        return .wand
+        case .firefly:     return .wind
+        default:           return .compass
+        }
+    }
+
+    // ── COMPASS ──────────────────────────────────────────────────────────────
+
+    @ViewBuilder private var compassStage: some View {
+        if def.name == "Firework" {
+            FireworkCompassFace(personName: "them", onSend: onDone)
+        } else if def.name == "Birthday Cake" {
+            if def.version == "V2" {
+                BirthdayCakeCompassFaceV2(personName: "them", onSend: onDone)
+            } else {
+                BirthdayCakeCompassFace(personName: "them", onSend: onDone)
+            }
+        } else {
+            instrumentCompass
+        }
+    }
+
+    @ViewBuilder private var instrumentCompass: some View {
+        let t = "test-token"
+        switch def.style {
+        case .bowArrow:
+            BowInstrumentView(loadedToken: t, loadedSymbol: sym, bearingDegrees: 0,
+                              personName: "them", onSend: onDone)
+        case .fingerFlick:
+            FlickInstrumentView(loadedToken: t, loadedSymbol: sym, bearingDegrees: 0,
+                                personName: "them", onSend: { _ in onDone() })
+        case .plane:
+            PlaneInstrumentView(loadedToken: t, loadedSymbol: sym, bearingDegrees: 0,
+                                personName: "them", onLaunch: onDone)
+        case .wand:
+            WandInstrumentView(loadedToken: t, loadedSymbol: sym, bearingDegrees: 0,
+                               personName: "them", onSend: onDone)
+        case .rocket:
+            RocketInstrumentView(loadedToken: t, loadedSymbol: sym, bearingDegrees: 0,
+                                 personName: "them", onLaunch: onDone)
+        case .firefly:
+            WindInstrumentView(loadedToken: t, loadedSymbol: sym, bearingDegrees: 0,
+                               personName: "them", onSend: onDone)
+        default:
+            // Compass / glow — the aim mechanic is in-app only (no standalone face).
+            VStack(spacing: 10) {
+                Text("🧭").font(.system(size: 64))
+                Text("the compass aim mechanic runs in the app")
+                    .font(.system(size: 13, design: .serif).italic())
+                    .foregroundColor(.white.opacity(0.7))
+            }
+        }
+    }
+
+    // ── SEND ─────────────────────────────────────────────────────────────────
+
+    @ViewBuilder private var sendStage: some View {
+        if def.name == "Firework" {
+            FireworkSendAnimation(emoji: "🎆", onComplete: onDone)
+        } else if def.name == "Birthday Cake" {
+            BirthdayCakeSendAnimationV2(emoji: "🎂", onComplete: onDone)
+        } else {
+            instrumentSend
+        }
+    }
+
+    @ViewBuilder private var instrumentSend: some View {
+        let t = InstrumentTransition(exitBearing: 0, exitPoint: .zero,
+                                     instrument: instrumentKind, emoji: emoji,
+                                     message: nil, tagline: nil)
+        if def.style == .rocket {
+            SenderAnimationView(style: .rocket, emoji: emoji, bearingDegrees: 0,
+                                symbol: Text(emoji).font(.system(size: 45))) { onDone() }
+        } else if def.version == "V2" {
+            switch def.style {
+            case .bowArrow:    BowSendAnimationV2(transition: t, personName: "them", onComplete: onDone)
+            case .fingerFlick: FlickSendAnimationV2(transition: t, personName: "them", onComplete: onDone)
+            case .plane:       PlaneSendAnimationV2(transition: t, personName: "them", onComplete: onDone)
+            default:           EmptyView()
+            }
+        } else if def.style == .plane {
+            PlaneSendAnimation(transition: t, personName: "them", onComplete: onDone)
+        } else {
+            SenderAnimationView(style: def.style, emoji: emoji, bearingDegrees: 0,
+                                symbol: Text(emoji).font(.system(size: 45))) { onDone() }
+        }
+    }
+
+    // ── RECEIPT ──────────────────────────────────────────────────────────────
+
+    @ViewBuilder private var receiptStage: some View {
+        if def.name == "Firework" {
+            FireworkReceipt(emoji: "🎆", fromName: "them", onRevealed: {}, onFinished: onDone)
+        } else if def.name == "Birthday Cake" {
+            if def.version == "V2" {
+                BirthdayCakeReceiptV2(emoji: "🎂", fromName: "them", onRevealed: {}, onFinished: onDone)
+            } else {
+                BirthdayCakeReceipt(emoji: "🎂", fromName: "them", onRevealed: {}, onFinished: onDone)
+            }
+        } else {
+            instrumentReceipt
+        }
+    }
+
+    @ViewBuilder private var instrumentReceipt: some View {
+        if def.version == "V2" {
+            switch def.style {
+            case .bowArrow:    BowReceiptAnimationV2(senderBearing: 120, emoji: emoji, fromName: "",
+                                                     onRevealed: {}, onFinished: onDone)
+            case .fingerFlick: FlickReceiptAnimationV2(senderBearing: 120, emoji: emoji, fromName: "",
+                                                       onRevealed: {}, onFinished: onDone)
+            case .plane:       PlaneReceiptAnimationV2(senderBearing: 120, emoji: emoji, fromName: "",
+                                                       onRevealed: {}, onFinished: onDone)
+            default:           EmptyView()
+            }
+        } else if def.style == .plane {
+            PlaneReceiptAnimation(senderBearing: 120, emoji: emoji, fromName: "",
+                                  onRevealed: {}, onFinished: onDone)
+        } else if def.style == .firefly {
+            WindReceiptAnimation(senderBearing: 120, emoji: emoji, fromName: "",
+                                 onRevealed: {}, onFinished: onDone)
+        } else if def.style == .rocket {
+            RocketReceiptAnimation(senderBearing: 120, emoji: emoji, fromName: "",
+                                   onRevealed: {}, onFinished: onDone)
+        } else {
+            // bow V1 / flick V1 / wand V1 / compass — the landing beat (no reveal).
+            InstrumentLandingView(style: def.style, emoji: emoji) { onDone() }
+        }
+    }
+
+    // ── REVEAL ───────────────────────────────────────────────────────────────
+
+    private var revealStage: some View {
+        EmojiRevealView(emoji: emoji, message: nil, tagline: nil,
+                        context: .received(fromName: "them"),
+                        ambient: RevealAmbient.forStyle(def.style),
+                        onDismiss: onDone)
+    }
+}
+
+// MARK: - Full workflow runner
+
+/// Plays a definition's stages start-to-finish — Compass → Send →
+/// [interstitial] → Receipt → Reveal — advancing as each stage completes. The
+/// interstitial is a brief transition, not a stage. A per-stage safety dwell
+/// auto-advances if a stage's completion callback never fires (and lets the
+/// interactive compass face advance on its own after a beat).
+private struct AnimationWorkflowRunner: View {
+    let def: AnimationDefinition
+    let emoji: String
+    let onDone: () -> Void
+
+    @State private var index = 0
+    @State private var interstitial = false
+
+    /// Canonical-order stages this workflow plays. If the receipt carries its
+    /// own reveal, the trailing Reveal is dropped (no double reveal).
+    private var stages: [AnimationStage] {
+        var s: [AnimationStage] = [.compass, .send, .receipt, .reveal].filter { def.provides($0) }
+        if s.contains(.receipt) && AnimationStageView.receiptAutoReveals(def) {
+            s.removeAll { $0 == .reveal }
+        }
+        return s
+    }
+
+    var body: some View {
+        ZStack {
+            if index < stages.count {
+                AnimationStageView(def: def, stage: stages[index], emoji: emoji, onDone: advance)
+                    .id(index)
+            }
+            if interstitial {
+                VStack(spacing: 8) {
+                    Text("sent…")
+                        .font(.system(size: 24, design: .serif).italic())
+                        .foregroundColor(.white.opacity(0.85))
+                    Text("arriving ✦")
+                        .font(.system(size: 16, design: .serif).italic())
+                        .foregroundColor(Color(hex: "#c4a8d4"))
+                }
+                .transition(.opacity)
+            }
+        }
+        .onAppear { scheduleDwell(for: index) }
+    }
+
+    private func advance() {
+        guard index < stages.count else { onDone(); return }
+        let current = stages[index]
+        let next = index + 1
+        // Interstitial transition only between SEND and RECEIPT.
+        if current == .send && next < stages.count && stages[next] == .receipt {
+            withAnimation(.easeInOut(duration: 0.3)) { interstitial = true }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
+                withAnimation(.easeInOut(duration: 0.3)) { interstitial = false }
+                step(to: next)
+            }
+        } else {
+            step(to: next)
+        }
+    }
+
+    private func step(to next: Int) {
+        if next >= stages.count {
+            onDone()
+        } else {
+            index = next
+            scheduleDwell(for: next)
+        }
+    }
+
+    /// Safety / pacing dwell: auto-advances a stage if its callback is missed,
+    /// and gives the interactive compass face a beat before moving on.
+    private func scheduleDwell(for i: Int) {
+        guard i < stages.count else { return }
+        let timeout: Double
+        switch stages[i] {
+        case .compass: timeout = 3.5
+        case .send:    timeout = 8.0
+        case .receipt: timeout = 9.0
+        case .reveal:  timeout = 8.0
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + timeout) {
+            if index == i && !interstitial { advance() }
+        }
+    }
+}
+
+// MARK: - Animation feedback store
 
 /// A developer's verdict on a single animation.
 enum AnimationVerdict: String {
@@ -416,9 +456,8 @@ enum AnimationVerdict: String {
     var label:  String { self == .approved ? "approved" : "needs work" }
 }
 
-/// DEBUG-only persistence for animation ratings made in the Animation Test
-/// Lab. Keyed by "<senderStyle>-<send|land>[-<version>]" and stored in
-/// UserDefaults so the "📋 View animation feedback" summary survives relaunches.
+/// DEBUG-only persistence for animation ratings made in the Animation Test Lab.
+/// Keyed by "<senderStyle>-<send|land>[-<version>]" in UserDefaults.
 enum AnimationFeedbackStore {
 
     private static let defaultsKey = "animationFeedbackVerdicts"
@@ -447,29 +486,16 @@ enum AnimationFeedbackStore {
     }
 }
 
-// MARK: - [2/6] Animation feedback summary
+// MARK: - Animation feedback summary
 
-/// A read-only summary of every animation's verdict — approved / needs work /
-/// not yet rated — grouped by send and land. Reached from Developer Tools.
+/// A read-only summary of every animation's verdict, grouped by send and land.
+/// Reads its instrument list from AnimationManifest so it can't drift.
 struct AnimationFeedbackView: View {
 
     @Environment(\.dismiss) private var dismiss
     @State private var verdicts = AnimationFeedbackStore.all()
 
-    private let entries: [AnimationTestLabView.LabEntry] = [
-        .init(icon: "🧭", name: "Compass", style: .glow,        version: nil),
-        // [bow] V1 retired (see main lab list).
-        // .init(icon: "🏹", name: "Bow",     style: .bowArrow,    version: "V1"),
-        .init(icon: "🏹", name: "Bow",     style: .bowArrow,    version: "V2"),
-        .init(icon: "👆", name: "Flick",   style: .fingerFlick, version: "V1"),
-        .init(icon: "👆", name: "Flick",   style: .fingerFlick, version: "V2"),
-        .init(icon: "🚀", name: "Rocket",  style: .rocket,      version: "V1"),
-        .init(icon: "🚀", name: "Rocket",  style: .rocket,      version: "V2"),
-        .init(icon: "🌬️", name: "Wind",    style: .firefly,     version: nil),
-        .init(icon: "🪄", name: "Wand",    style: .wand,        version: "V1"),
-        .init(icon: "✈️", name: "Plane",   style: .plane,       version: "V1"),
-        .init(icon: "✈️", name: "Plane",   style: .plane,       version: "V2"),
-    ]
+    private let entries: [AnimationDefinition] = AnimationManifest.instruments
 
     private static let lavender = Color(hex: "#c4a8d4")
 
@@ -479,7 +505,7 @@ struct AnimationFeedbackView: View {
     private var needsWorkCount: Int {
         verdicts.values.filter { $0 == AnimationVerdict.needsWork.rawValue }.count
     }
-    private var totalSlots: Int { entries.count * 2 }   // send + land each
+    private var totalSlots: Int { entries.count * 2 }
 
     var body: some View {
         NavigationStack {
@@ -492,8 +518,7 @@ struct AnimationFeedbackView: View {
                         section("receive animations", isSend: false)
                         Spacer(minLength: 30)
                     }
-                    .padding(.horizontal, 20)
-                    .padding(.top, 12)
+                    .padding(.horizontal, 20).padding(.top, 12)
                 }
             }
             .navigationTitle("Animation Feedback")
@@ -517,7 +542,7 @@ struct AnimationFeedbackView: View {
     private var summaryHeader: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text("\(approvedCount) approved · \(needsWorkCount) need work · "
-                 + "\(totalSlots - approvedCount - needsWorkCount) unrated")
+                 + "\(max(0, totalSlots - approvedCount - needsWorkCount)) unrated")
                 .font(.system(size: 15, weight: .semibold, design: .serif))
                 .foregroundColor(DesignTokens.Color.textPrimary)
             Text("rate animations in the Animation Test Lab")
