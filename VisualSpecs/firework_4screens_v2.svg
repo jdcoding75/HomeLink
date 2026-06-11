@@ -1,0 +1,204 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 453 3778" width="100%" role="img" font-family="Georgia">
+  <defs>
+    <linearGradient id="sky-inside" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#141d30" />
+      <stop offset="60%" stop-color="#1a2d4a" />
+      <stop offset="100%" stop-color="#050914" />
+    </linearGradient>
+    <linearGradient id="sky-full-s3" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#080911" />
+      <stop offset="40%" stop-color="#11162b" />
+      <stop offset="75%" stop-color="#1f1826" />
+      <stop offset="100%" stop-color="#080911" />
+    </linearGradient>
+    <linearGradient id="wood-grad" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#4a2e10" />
+      <stop offset="50%" stop-color="#7a4e28" />
+      <stop offset="100%" stop-color="#4a2e10" />
+    </linearGradient>
+    <linearGradient id="brass-grad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#9a7320" />
+      <stop offset="50%" stop-color="#e8c060" />
+      <stop offset="100%" stop-color="#9a7320" />
+    </linearGradient>
+    <linearGradient id="rocket-body" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#d32f2f" />
+      <stop offset="100%" stop-color="#f44336" />
+    </linearGradient>
+    <linearGradient id="rocket-cone" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#fbc02d" />
+      <stop offset="100%" stop-color="#ffeb3b" />
+    </linearGradient>
+    <filter id="soft-glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="12" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+    <filter id="intense-glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="4" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+    <filter id="core-glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="7" result="blur"/>
+      <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+    </filter>
+    <filter id="glint-blur" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="1.5" result="blur"/>
+      <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+    </filter>
+    <clipPath id="compass-clip">
+      <circle cx="196" cy="392" r="148" />
+    </clipPath>
+  </defs>
+
+  <g id="screen-1-idle" transform="translate(30, 40)">
+    <text x="0" y="-15" font-family="Georgia" font-size="15" fill="#c4a8d4" letter-spacing="1.5">SCREEN 1: COMPASS FACE IDLE</text>
+    <rect x="0" y="0" width="393" height="852" fill="#0d0d14" />
+    <text x="196" y="115" font-family="Georgia" font-style="italic" font-size="13" fill="#e8c060" fill-opacity="0.38" text-anchor="middle">pointing toward Sarah</text>
+    <g clip-path="url(#compass-clip)">
+      <rect x="48" y="244" width="296" height="296" fill="url(#sky-inside)" />
+    </g>
+    <circle cx="196" cy="392" r="148" fill="none" stroke="#5a4870" stroke-width="1.8" />
+    <g stroke="#5a4870" stroke-width="1" opacity="0.6">
+      <line x1="196" y1="244" x2="196" y2="251" /><line x1="196" y1="533" x2="196" y2="540" />
+      <line x1="48" y1="392" x2="54" y2="392" /><line x1="337" y1="392" x2="344" y2="392" />
+    </g>
+    <circle cx="196" cy="392" r="60" fill="#fbc02d" opacity="0.08" filter="url(#soft-glow)" />
+    <g transform="translate(196, 392)">
+      <path d="M 0,25 C -15,40 -25,25 -20,55 C -18,65 -5,60 -10,75" fill="none" stroke="#9b8fa8" stroke-width="2.2" stroke-linecap="round" />
+      <line x1="4" y1="15" x2="4" y2="90" stroke="#9a7320" stroke-width="1.8" opacity="0.8" />
+      <rect x="-11" y="-25" width="22" height="50" fill="url(#rocket-body)" rx="1.5" />
+      <path d="M -11,-12 L 0,-17 L 11,-12 M -11,3 L 0,-2 L 11,3 M -11,18 L 0,13 L 11,18" stroke="#ffeb3b" stroke-width="2" opacity="0.5" fill="none" />
+      <polygon points="-13,-25 13,-25 0,-48" fill="url(#rocket-cone)" />
+      <g transform="translate(0, 105)">
+        <rect x="-1.5" y="0" width="3" height="32" fill="#e8c060" rx="0.5" />
+        <circle cx="0" cy="-2" r="14" fill="#f0d060" opacity="0.2" filter="url(#soft-glow)" />
+        <ellipse cx="0" cy="0" rx="4" ry="5" fill="#d32f2f" />
+        <path d="M -4.5,-2 C -4.5,-8 0,-15 0,-15 C 0,-15 4.5,-8 4.5,-2 C 4.5,1.5 2.5,3.5 0,3.5 C -2.5,3.5 -4.5,1.5 -4.5,-2 Z" fill="#ffe9a0" filter="url(#intense-glow)" />
+        <path d="M -2,-2 C -2,-5 0,-10 0,-10 C 0,-10 2,-5 2,-2 C 2,0.5 1,1.5 0,1.5 C -1,1.5 -2,0.5 -2,-2 Z" fill="#f44336" />
+        <circle cx="0" cy="-3" r="1.5" fill="#ffffff" />
+      </g>
+      <text x="0" y="48" font-size="15" text-anchor="middle">🎆</text>
+    </g>
+    <text x="196" y="610" font-family="Georgia" font-size="20" fill="#e8e0f0" text-anchor="middle">Sarah</text>
+    <text x="196" y="638" font-family="Georgia" font-size="13" fill="#9b8fa8" text-anchor="middle">142 km away</text>
+    <text x="196" y="745" font-family="Georgia" font-style="italic" font-size="12" fill="#c4a8d4" fill-opacity="0.28" text-anchor="middle">drag the lit match to the fuse ✦</text>
+  </g>
+
+  <g id="screen-2-charging" transform="translate(30, 982)">
+    <text x="0" y="-15" font-family="Georgia" font-size="15" fill="#c4a8d4" letter-spacing="1.5">SCREEN 2: COMPASS FACE CHARGING</text>
+    <rect x="0" y="0" width="393" height="852" fill="#0d0d14" />
+    <text x="196" y="115" font-family="Georgia" font-style="italic" font-size="13" fill="#e8c060" fill-opacity="0.38" text-anchor="middle">pointing toward Sarah</text>
+    <g clip-path="url(#compass-clip)">
+      <rect x="48" y="244" width="296" height="296" fill="url(#sky-inside)" />
+    </g>
+    <circle cx="196" cy="392" r="148" fill="none" stroke="#5a4870" stroke-width="1.8" />
+    <g id="s2-charging-glow">
+      <circle cx="196" cy="392" r="70" fill="#f44336" opacity="0.14" filter="url(#soft-glow)" />
+      <circle cx="186" cy="467" r="30" fill="#ffeb3b" opacity="0.25" filter="url(#soft-glow)" />
+    </g>
+    <g transform="translate(196, 392) rotate(14)">
+      <path d="M 0,25 C -15,40 -25,25 -20,55 C -18,65 -5,60 -10,75" fill="none" stroke="#3d3347" stroke-width="2.2" stroke-linecap="round" />
+      <g fill="#ffeb3b" filter="url(#glint-blur)">
+        <circle cx="-12" cy="33" r="2" />
+        <circle cx="-21" cy="42" r="1.5" fill="#ffffff" />
+        <circle cx="-17" cy="58" r="2.5" />
+        <circle cx="-7" cy="66" r="1.8" fill="#ffffff" />
+      </g>
+      <line x1="4" y1="15" x2="4" y2="90" stroke="#9a7320" stroke-width="1.8" opacity="0.8" />
+      <rect x="-11" y="-25" width="22" height="50" fill="url(#rocket-body)" rx="1.5" />
+      <path d="M -11,-12 L 0,-17 L 11,-12 M -11,3 L 0,-2 L 11,3 M -11,18 L 0,13 L 11,18" stroke="#ffeb3b" stroke-width="2" opacity="0.5" fill="none" />
+      <polygon points="-13,-25 13,-25 0,-48" fill="url(#rocket-cone)" />
+      <g transform="translate(-10, 75)">
+        <path d="M -6,0 C -6,-10 0,-15 0,-15 C 0,-15 6,-10 6,0 C 6,5 3.5,7.5 0,7.5 C -3.5,7.5 -6,5 -6,0 Z" fill="#ffe9a0" filter="url(#intense-glow)" />
+        <path d="M -3,0 C -3,-5 0,-10 0,-10 C 0,-10 3,-5 3,0 C 3,3 1.5,4.5 0,4.5 C -1.5,4.5 -3,3 -3,0 Z" fill="#d32f2f" />
+        <circle cx="-8" cy="-8" r="1.2" fill="#ffffff" />
+        <circle cx="5" cy="-12" r="1.5" fill="#ffeb3b" />
+      </g>
+      <text x="0" y="48" font-size="15" text-anchor="middle" transform="rotate(-14)">🎆</text>
+    </g>
+    <text x="196" y="610" font-family="Georgia" font-size="20" fill="#e8e0f0" text-anchor="middle">Sarah</text>
+    <text x="196" y="638" font-family="Georgia" font-size="13" fill="#9b8fa8" text-anchor="middle">142 km away</text>
+    <text x="196" y="745" font-family="Georgia" font-style="italic" font-size="12" fill="#ffeb3b" text-anchor="middle" filter="url(#intense-glow)">fuse burning... ✦</text>
+  </g>
+
+  <g id="screen-3-midflight" transform="translate(30, 1924)">
+    <text x="0" y="-15" font-family="Georgia" font-size="15" fill="#c4a8d4" letter-spacing="1.5">SCREEN 3: SEND — THE BIG MOMENT</text>
+    <rect x="0" y="0" width="393" height="852" fill="url(#sky-full-s3)" />
+    <text x="196" y="115" font-family="Georgia" font-style="italic" font-size="13" fill="#e8c060" fill-opacity="0.38" text-anchor="middle">pointing toward Sarah</text>
+    <g filter="url(#core-glow)" opacity="0.4">
+      <circle cx="196" cy="410" r="145" fill="#d32f2f"/>
+      <circle cx="196" cy="410" r="90" fill="#fbc02d"/>
+      <circle cx="196" cy="410" r="45" fill="#ffffff"/>
+    </g>
+    <g transform="translate(65, 230)" filter="url(#core-glow)">
+      <polygon points="0,-18 3.5,-3.5 18,0 3.5,3.5 0,18 -3.5,3.5 -18,0 -3.5,-3.5" fill="#ffffff"/>
+      <polygon points="0,-10 2,-2 10,0 2,2 0,10 -2,2 -10,0 -2,-2" fill="#ffeb3b"/>
+    </g>
+    <g transform="translate(325, 560)" filter="url(#glint-blur)">
+      <circle cx="0" cy="0" r="20" fill="#ffeb3b" opacity="0.12" filter="url(#core-glow)"/>
+      <circle cx="-12" cy="-8" r="2.5" fill="#ffeb3b"/>
+      <circle cx="8" cy="-16" r="1.5" fill="#ffffff"/>
+      <circle cx="-18" cy="12" r="2" fill="#ffeb3b"/>
+      <circle cx="15" cy="10" r="2.5" fill="#ffffff"/>
+    </g>
+    <g stroke-width="0.75" fill="none" opacity="0.5" filter="url(#glint-blur)">
+      <circle cx="196" cy="410" r="155" stroke="#ffeb3b" stroke-dasharray="2, 22"/>
+      <circle cx="196" cy="390" r="125" stroke="#ffffff" stroke-dasharray="1, 14"/>
+      <circle cx="196" cy="410" r="95" stroke="#f44336" stroke-dasharray="4, 10"/>
+    </g>
+    <g fill="#ffeb3b" filter="url(#glint-blur)">
+      <circle cx="196" cy="350" r="3.5" fill="#ffffff"/><circle cx="196" cy="310" r="3"/><circle cx="196" cy="275" r="2.2"/><circle cx="196" cy="245" r="1.5"/>
+      <circle cx="196" cy="470" r="3.5"/><circle cx="196" cy="510" r="2.5" fill="#ffffff"/><circle cx="196" cy="545" r="2"/><circle cx="196" cy="575" r="1.2"/>
+      <circle cx="136" cy="410" r="3.2"/><circle cx="96" cy="410" r="2.8" fill="#ffffff"/><circle cx="66" cy="410" r="2"/><circle cx="40" cy="410" r="1"/>
+      <circle cx="256" cy="410" r="3.5"/><circle cx="296" cy="410" r="3" fill="#ffffff"/><circle cx="326" cy="410" r="2.2"/><circle cx="350" cy="410" r="1.5"/>
+      <circle cx="154" cy="368" r="3" fill="#ffffff"/><circle cx="125" cy="339" r="2.5"/><circle cx="100" cy="314" r="1.8"/>
+      <circle cx="238" cy="368" r="3"/><circle cx="267" cy="339" r="2.2" fill="#ffffff"/><circle cx="292" cy="314" r="1.5"/>
+      <circle cx="154" cy="452" r="3"/><circle cx="125" cy="481" r="2.2"/><circle cx="100" cy="506" r="1.5" fill="#ffffff"/>
+      <circle cx="238" cy="452" r="3.5" fill="#ffffff"/><circle cx="267" cy="481" r="2.5"/><circle cx="292" cy="506" r="1.8"/>
+    </g>
+    <g fill="#ffffff" filter="url(#core-glow)">
+      <polygon points="196,230 199,236 205,236 200,240 202,246 196,242 190,246 192,240 187,236 193,236"/>
+      <polygon points="196,590 199,596 205,596 200,600 202,606 196,602 190,606 192,600 187,596 193,596" fill="#ffeb3b"/>
+      <polygon points="26,410 32,413 32,419 36,415 42,417 39,410 42,403 36,405 32,401 32,407" fill="#ffeb3b"/>
+      <polygon points="366,410 360,413 360,419 356,415 350,417 353,410 350,403 356,405 360,401 360,407"/>
+    </g>
+    <g transform="translate(196, 410)" filter="url(#core-glow)">
+      <polygon points="0,-32 6,-8 32,0 6,8 0,32 -6,8 -32,0 -6,-8" fill="#ffffff"/>
+      <polygon points="-20,-20 0,-7 20,-20 7,0 20,20 0,7 -20,20 -7,0" fill="#ffeb3b"/>
+      <circle cx="0" cy="0" r="5" fill="#ffffff"/>
+    </g>
+    <text x="196" y="730" font-family="Georgia" font-style="italic" font-size="16" fill="#c4a8d4" text-anchor="middle" filter="url(#core-glow)">on its way ✦</text>
+  </g>
+
+  <g id="screen-4-receipt" transform="translate(30, 2866)">
+    <text x="0" y="-15" font-family="Georgia" font-size="15" fill="#c4a8d4" letter-spacing="1.5">SCREEN 4: RECEIPT APPROACH &amp; TARGET</text>
+    <rect x="0" y="0" width="393" height="852" fill="#0d0d14" />
+    <rect x="3" y="3" width="387" height="846" fill="url(#sky-inside)" opacity="0.85" />
+    <text x="196" y="120" font-family="Georgia" font-style="italic" font-size="16" fill="#9b8fa8" text-anchor="middle">incoming thought...</text>
+    <g filter="url(#soft-glow)">
+      <circle cx="196" cy="360" r="55" fill="#f44336" opacity="0.1" />
+      <circle cx="196" cy="360" r="28" fill="#ffeb3b" opacity="0.14" />
+    </g>
+    <g transform="translate(196, 360)">
+      <circle cx="0" cy="0" r="28" fill="#ffeb3b" filter="url(#soft-glow)" opacity="0.15" />
+      <text x="0" y="14" font-size="40" text-anchor="middle">🎆</text>
+    </g>
+    <g fill="#ffffff" filter="url(#soft-glow)">
+      <polygon points="196,315 198,320 203,320 199,323 200,328 196,325 192,328 193,323 189,320 194,320" fill="#ffeb3b" />
+      <polygon points="150,370 151.5,374 156,374 152.5,376.5 153.5,381 150,378.5 146.5,381 147.5,376.5 144,374 148.5,374" />
+      <polygon points="240,350 241.5,354 246,354 242.5,356.5 243.5,361 240,358.5 236.5,361 237.5,356.5 234,354 238.5,354" fill="#ffeb3b" />
+      <circle cx="170" cy="330" r="1.5" /><circle cx="220" cy="390" r="1.2" />
+    </g>
+    <g transform="translate(245, 665)">
+      <ellipse cx="60" cy="15" rx="55" ry="18" fill="none" stroke="#50b4f0" stroke-width="4" opacity="0.2" filter="url(#glint-blur)" />
+      <path d="M 10,15 L 110,15 L 98,95 C 98,95 85,100 60,100 C 35,100 22,95 22,95 Z" fill="url(#wood-grad)" stroke="#2d1a08" stroke-width="0.8" />
+      <line x1="40" y1="16" x2="44" y2="97" stroke="#2a1f12" stroke-width="1.8" opacity="0.85" />
+      <line x1="60" y1="17" x2="60" y2="100" stroke="#2a1f12" stroke-width="1.8" opacity="0.95" />
+      <line x1="80" y1="16" x2="76" y2="97" stroke="#2a1f12" stroke-width="1.8" opacity="0.85" />
+      <path d="M 14,56 C 40,62 80,62 106,56 L 105,62 C 80,68 40,68 15,62 Z" fill="#d4a030" />
+      <ellipse cx="60" cy="15" rx="50" ry="12" fill="#3d230a" stroke="#d4a030" stroke-width="2" />
+      <path d="M 10,15 C 10,-15 110,-15 110,15" fill="none" stroke="#d4a030" stroke-width="2.2" opacity="0.8" />
+    </g>
+    <text x="196" y="790" font-family="Georgia" font-style="italic" font-size="14" fill="#c4a8d4" text-anchor="middle">drifting down to you ✦</text>
+  </g>
+</svg>

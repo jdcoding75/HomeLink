@@ -1,0 +1,272 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 453 3778" width="100%" role="img" font-family="Georgia">
+  <defs>
+    <linearGradient id="sky-inside" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#141d30" />
+      <stop offset="60%" stop-color="#1a2d4a" />
+      <stop offset="100%" stop-color="#050914" />
+    </linearGradient>
+    <linearGradient id="sky-full-s3" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#06070c" />
+      <stop offset="40%" stop-color="#111526" />
+      <stop offset="80%" stop-color="#181324" />
+      <stop offset="100%" stop-color="#06070c" />
+    </linearGradient>
+    <linearGradient id="sky-full-s4" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#06070c" />
+      <stop offset="35%" stop-color="#0f1429" />
+      <stop offset="70%" stop-color="#1f162b" />
+      <stop offset="100%" stop-color="#120c1c" />
+    </linearGradient>
+    <linearGradient id="brass-platter" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#5a4010" />
+      <stop offset="30%" stop-color="#d4a030" />
+      <stop offset="50%" stop-color="#ffe9a0" />
+      <stop offset="70%" stop-color="#d4a030" />
+      <stop offset="100%" stop-color="#5a4010" />
+    </linearGradient>
+    <linearGradient id="wood-bucket" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#4a2e10" />
+      <stop offset="50%" stop-color="#7a4e28" />
+      <stop offset="100%" stop-color="#4a2e10" />
+    </linearGradient>
+    <linearGradient id="frost-base-1" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#ca658b" />
+      <stop offset="50%" stop-color="#e87aa0" />
+      <stop offset="100%" stop-color="#b05273" />
+    </linearGradient>
+    <linearGradient id="frost-base-2" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#b295c2" />
+      <stop offset="50%" stop-color="#c4a8d4" />
+      <stop offset="100%" stop-color="#9a7eb0" />
+    </linearGradient>
+    <linearGradient id="cream-drip" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#ffffff" />
+      <stop offset="100%" stop-color="#ffe9a0" />
+    </linearGradient>
+    <filter id="aurora-glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="14" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+    <filter id="flame-flare" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="6" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+    <filter id="shimmer-sparkle" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="1.5" result="blur"/>
+      <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+    </filter>
+    <clipPath id="compass-clip">
+      <circle cx="196" cy="392" r="148" />
+    </clipPath>
+  </defs>
+
+  <g id="screen-1-idle" transform="translate(30, 40)">
+    <text x="0" y="-15" font-family="Georgia" font-size="15" fill="#c4a8d4" letter-spacing="1.5">SCREEN 1: COMPASS FACE IDLE</text>
+    <rect x="0" y="0" width="393" height="852" fill="#0d0d14" />
+    <text x="196" y="115" font-family="Georgia" font-style="italic" font-size="13" fill="#e8c060" fill-opacity="0.38" text-anchor="middle">pointing toward Sarah</text>
+    <g id="s1-compass-world" clip-path="url(#compass-clip)">
+      <rect x="48" y="244" width="296" height="296" fill="url(#sky-inside)" />
+    </g>
+    <g id="s1-compass-ring">
+      <circle cx="196" cy="392" r="148" fill="none" stroke="#5a4870" stroke-width="1.8" />
+      <g stroke="#5a4870" stroke-width="1" opacity="0.5">
+        <line x1="196" y1="244" x2="196" y2="251" /><line x1="196" y1="533" x2="196" y2="540" />
+        <line x1="48" y1="392" x2="54" y2="392" /><line x1="337" y1="392" x2="344" y2="392" />
+      </g>
+    </g>
+    <circle cx="196" cy="410" r="70" fill="#c4a8d4" opacity="0.08" filter="url(#aurora-glow)" />
+    <g id="s1-cake-assembly" transform="translate(196, 420)">
+      <path d="M -64,48 L 64,48 L 56,54 C 56,54 38,57 0,57 C -38,57 -56,54 -56,54 Z" fill="url(#brass-platter)" />
+      <path d="M -56,12 L 56,12 L 50,48 C 50,48 35,52 0,52 C -35,52 -50,48 -50,48 Z" fill="url(#frost-base-1)" />
+      <path d="M -56,12 Q -42,24 -28,12 Q -14,26 0,12 Q 14,26 28,12 Q 42,24 56,12 L 54,18 Q 42,29 28,18 Q 14,31 0,18 Q -14,31 -28,18 Q -42,29 -54,18 Z" fill="url(#cream-drip)" opacity="0.85" />
+      <path d="M -40,-16 L 40,-16 L 36,12 C 36,12 26,15 0,15 C -25,15 -36,12 -36,12 Z" fill="url(#frost-base-2)" />
+      <path d="M -40,-16 Q -28,-7 -16,-16 Q 0,-5 16,-16 Q 28,-7 40,-16 L 39,-12 Q 28,-3 16,-12 Q 0,-1 16,-12 Q -28,-3 -39,-12 Z" fill="#ffffff" opacity="0.9" />
+      <g transform="translate(-28, -16)">
+        <rect x="-2.5" y="-22" width="5" height="22" fill="#c4a8d4" rx="1.5" />
+        <line x1="0" y1="-22" x2="0" y2="-26" stroke="#332211" stroke-width="1.5" stroke-linecap="round" />
+      </g>
+      <g transform="translate(-14, -21)">
+        <rect x="-2.5" y="-22" width="5" height="22" fill="#ffe9a0" rx="1.5" />
+        <line x1="0" y1="-22" x2="0" y2="-26" stroke="#332211" stroke-width="1.5" stroke-linecap="round" />
+      </g>
+      <g transform="translate(0, -23)">
+        <rect x="-2.5" y="-22" width="5" height="22" fill="#e87aa0" rx="1.5" />
+        <line x1="0" y1="-22" x2="0" y2="-26" stroke="#332211" stroke-width="1.5" stroke-linecap="round" />
+      </g>
+      <g transform="translate(14, -21)">
+        <rect x="-2.5" y="-22" width="5" height="22" fill="#ffe9a0" rx="1.5" />
+        <line x1="0" y1="-22" x2="0" y2="-26" stroke="#332211" stroke-width="1.5" stroke-linecap="round" />
+      </g>
+      <g transform="translate(28, -16)">
+        <rect x="-2.5" y="-22" width="5" height="22" fill="#c4a8d4" rx="1.5" />
+        <line x1="0" y1="-22" x2="0" y2="-26" stroke="#332211" stroke-width="1.5" stroke-linecap="round" />
+      </g>
+    </g>
+    <text x="196" y="615" font-family="Georgia" font-size="20" fill="#e8e0f0" text-anchor="middle">Sarah</text>
+    <text x="196" y="643" font-family="Georgia" font-size="13" fill="#9b8fa8" text-anchor="middle">142 km away</text>
+    <text x="196" y="750" font-family="Georgia" font-style="italic" font-size="12" fill="#c4a8d4" fill-opacity="0.28" text-anchor="middle">tap each candle to light it ✦</text>
+  </g>
+
+  <g id="screen-2-charging" transform="translate(30, 982)">
+    <text x="0" y="-15" font-family="Georgia" font-size="15" fill="#c4a8d4" letter-spacing="1.5">SCREEN 2: COMPASS FACE CHARGING</text>
+    <rect x="0" y="0" width="393" height="852" fill="#0d0d14" />
+    <text x="196" y="115" font-family="Georgia" font-style="italic" font-size="13" fill="#e8c060" fill-opacity="0.38" text-anchor="middle">pointing toward Sarah</text>
+    <g clip-path="url(#compass-clip)">
+      <rect x="48" y="244" width="296" height="296" fill="url(#sky-inside)" />
+    </g>
+    <circle cx="196" cy="392" r="148" fill="none" stroke="#5a4870" stroke-width="1.8" />
+    <g id="s2-charging-glow">
+      <circle cx="196" cy="400" r="85" fill="#d4a030" opacity="0.16" filter="url(#aurora-glow)" />
+      <circle cx="196" cy="370" r="40" fill="#ffe9a0" opacity="0.2" filter="url(#aurora-glow)" />
+    </g>
+    <g id="s2-cake-assembly" transform="translate(196, 420)">
+      <path d="M -64,48 L 64,48 L 56,54 C 56,54 38,57 0,57 C -38,57 -56,54 -56,54 Z" fill="url(#brass-platter)" />
+      <path d="M -56,12 L 56,12 L 50,48 C 50,48 35,52 0,52 C -35,52 -50,48 -50,48 Z" fill="url(#frost-base-1)" />
+      <path d="M -56,12 Q -42,24 -28,12 Q -14,26 0,12 Q 14,26 28,12 Q 42,24 56,12 L 54,18 Q 42,29 28,18 Q 14,31 0,18 Q -14,31 -28,18 Q -42,29 -54,18 Z" fill="url(#cream-drip)" opacity="0.85" />
+      <path d="M -40,-16 L 40,-16 L 36,12 C 36,12 26,15 0,15 C -25,15 -36,12 -36,12 Z" fill="url(#frost-base-2)" />
+      <path d="M -40,-16 Q -28,-7 -16,-16 Q 0,-5 16,-16 Q 28,-7 40,-16 L 39,-12 Q 28,-3 16,-12 Q 0,-1 16,-12 Q -28,-3 -39,-12 Z" fill="#ffffff" opacity="0.9" />
+      <g transform="translate(-28, -16)">
+        <rect x="-2.5" y="-22" width="5" height="22" fill="#c4a8d4" rx="1.5" />
+        <line x1="0" y1="-22" x2="0" y2="-24" stroke="#221100" stroke-width="1.5" />
+        <path d="M -4,-24 C -4,-30 0,-37 0,-37 C 0,-37 4,-30 4,-24 C 4,-20 2,-19 0,-19 C -2,-19 -4,-20 -4,-24 Z" fill="#ffe9a0" filter="url(#flame-flare)" />
+        <path d="M -2,-24 C -2,-28 0,-33 0,-33 C 0,-33 2,-28 2,-24 C 2,-21 1.5,-20 0,-20 C -1.5,-20 -2,-21 -2,-24 Z" fill="#f0d060" />
+        <circle cx="0" cy="-23" r="1.2" fill="#ffffff" />
+      </g>
+      <g transform="translate(-14, -21)">
+        <rect x="-2.5" y="-22" width="5" height="22" fill="#ffe9a0" rx="1.5" />
+        <line x1="0" y1="-22" x2="0" y2="-26" stroke="#332211" stroke-width="1.5" stroke-linecap="round" />
+      </g>
+      <g transform="translate(0, -23)">
+        <rect x="-2.5" y="-22" width="5" height="22" fill="#e87aa0" rx="1.5" />
+        <line x1="0" y1="-22" x2="0" y2="-24" stroke="#221100" stroke-width="1.5" />
+        <path d="M -4,-24 C -4,-30 0,-37 0,-37 C 0,-37 4,-30 4,-24 C 4,-20 2,-19 0,-19 C -2,-19 -4,-20 -4,-24 Z" fill="#ffe9a0" filter="url(#flame-flare)" />
+        <path d="M -2,-24 C -2,-28 0,-33 0,-33 C 0,-33 2,-28 2,-24 C 2,-21 1.5,-20 0,-20 C -1.5,-20 -2,-21 -2,-24 Z" fill="#f0d060" />
+        <circle cx="0" cy="-23" r="1.2" fill="#ffffff" />
+      </g>
+      <g transform="translate(14, -21)">
+        <rect x="-2.5" y="-22" width="5" height="22" fill="#ffe9a0" rx="1.5" />
+        <line x1="0" y1="-22" x2="0" y2="-26" stroke="#332211" stroke-width="1.5" stroke-linecap="round" />
+      </g>
+      <g transform="translate(28, -16)">
+        <rect x="-2.5" y="-22" width="5" height="22" fill="#c4a8d4" rx="1.5" />
+        <line x1="0" y1="-22" x2="0" y2="-24" stroke="#221100" stroke-width="1.5" />
+        <path d="M -4,-24 C -4,-30 0,-37 0,-37 C 0,-37 4,-30 4,-24 C 4,-20 2,-19 0,-19 C -2,-19 -4,-20 -4,-24 Z" fill="#ffe9a0" filter="url(#flame-flare)" />
+        <path d="M -2,-24 C -2,-28 0,-33 0,-33 C 0,-33 2,-28 2,-24 C 2,-21 1.5,-20 0,-20 C -1.5,-20 -2,-21 -2,-24 Z" fill="#f0d060" />
+        <circle cx="0" cy="-23" r="1.2" fill="#ffffff" />
+      </g>
+      <g fill="#ffe9a0" filter="url(#shimmer-sparkle)" opacity="0.85">
+        <circle cx="5" cy="-64" r="1.2" />
+        <circle cx="-24" cy="-58" r="1" />
+        <circle cx="34" cy="-56" r="1.5" />
+      </g>
+    </g>
+    <text x="196" y="615" font-family="Georgia" font-size="20" fill="#e8e0f0" text-anchor="middle">Sarah</text>
+    <text x="196" y="643" font-family="Georgia" font-size="13" fill="#9b8fa8" text-anchor="middle">142 km away</text>
+    <text x="196" y="750" font-family="Georgia" font-style="italic" font-size="12" fill="#d4a030" text-anchor="middle" filter="url(#flame-flare)">make a wish ✦</text>
+  </g>
+
+  <g id="screen-3-midflight" transform="translate(30, 1924)">
+    <text x="0" y="-15" font-family="Georgia" font-size="15" fill="#c4a8d4" letter-spacing="1.5">SCREEN 3: SEND (FULL SCREEN)</text>
+    <rect x="0" y="0" width="393" height="852" fill="url(#sky-full-s3)" />
+    <text x="196" y="115" font-family="Georgia" font-style="italic" font-size="13" fill="#e8c060" fill-opacity="0.38" text-anchor="middle">pointing toward Sarah</text>
+    <g id="s3-nebula-afterglow" filter="url(#aurora-glow)">
+      <circle cx="196" cy="410" r="130" fill="#e87aa0" opacity="0.05" />
+      <circle cx="196" cy="390" r="85" fill="#c4a8d4" opacity="0.06" />
+      <circle cx="196" cy="420" r="60" fill="#ffe9a0" opacity="0.1" />
+    </g>
+    <g id="s3-premium-confetti" filter="url(#shimmer-sparkle)">
+      <ellipse cx="105" cy="310" rx="6" ry="2.5" fill="#f0d060" transform="rotate(25, 105, 310)" />
+      <ellipse cx="285" cy="335" rx="5" ry="2" fill="#d4a030" transform="rotate(-40, 285, 335)" />
+      <ellipse cx="120" cy="490" rx="7" ry="3" fill="#f0d060" transform="rotate(70, 120, 490)" />
+      <rect x="275" y="475" width="8" height="4" rx="1.5" fill="#ffe9a0" transform="rotate(15, 275, 475)" />
+      <rect x="85" y="375" width="9" height="5" rx="2" fill="#e87aa0" transform="rotate(-60, 85, 375)" />
+      <rect x="295" y="420" width="8" height="4" rx="1.8" fill="#e87aa0" transform="rotate(35, 295, 420)" />
+      <ellipse cx="150" cy="285" rx="5" ry="2" fill="#e87aa0" transform="rotate(12, 150, 285)" />
+      <circle cx="250" cy="520" r="3.5" fill="#e87aa0" opacity="0.8" />
+      <rect x="115" y="530" width="7" height="4" rx="1.5" fill="#c4a8d4" transform="rotate(45, 115, 530)" />
+      <ellipse cx="265" cy="290" rx="6" ry="2.5" fill="#c4a8d4" transform="rotate(-15, 265, 290)" />
+      <circle cx="80" cy="440" r="4" fill="#ffffff" opacity="0.9" />
+      <circle cx="315" cy="470" r="3" fill="#ffffff" opacity="0.85" />
+    </g>
+    <g id="s3-cake-body" transform="translate(196, 410) scale(1.15)">
+      <path d="M -64,48 L 64,48 L 56,54 C 56,54 38,57 0,57 C -38,57 -56,54 -56,54 Z" fill="url(#brass-platter)" />
+      <path d="M -56,12 L 56,12 L 50,48 C 50,48 35,52 0,52 C -35,52 -50,48 -50,48 Z" fill="url(#frost-base-1)" />
+      <path d="M -56,12 Q -42,24 -28,12 Q -14,26 0,12 Q 14,26 28,12 Q 42,24 56,12 L 54,18 Q 42,29 28,18 Q 14,31 0,18 Q -14,31 -28,18 Q -42,29 -54,18 Z" fill="url(#cream-drip)" opacity="0.85" />
+      <path d="M -40,-16 L 40,-16 L 36,12 C 36,12 26,15 0,15 C -25,15 -36,12 -36,12 Z" fill="url(#frost-base-2)" />
+      <path d="M -40,-16 Q -28,-7 -16,-16 Q 0,-5 16,-16 Q 28,-7 40,-16 L 39,-12 Q 28,-3 16,-12 Q 0,-1 16,-12 Q -28,-3 -39,-12 Z" fill="#ffffff" opacity="0.9" />
+      <g transform="translate(-28, -16)">
+        <rect x="-2.5" y="-22" width="5" height="22" fill="#c4a8d4" rx="1.5" />
+        <path d="M -5,-24 C -5,-32 0,-40 0,-40 C 0,-40 5,-32 5,-24 C 5,-20 3,-19 0,-19 C -3,-19 -5,-20 -5,-24 Z" fill="#ffe9a0" filter="url(#flame-flare)" />
+        <path d="M -2.5,-24 C -2.5,-29 0,-35 0,-35 C 0,-35 2.5,-29 2.5,-24 C 2.5,-21 1.5,-20 0,-20 C -1.5,-20 -2.5,-21 -2.5,-24 Z" fill="#f0d060" />
+      </g>
+      <g transform="translate(-14, -21)">
+        <rect x="-2.5" y="-22" width="5" height="22" fill="#ffe9a0" rx="1.5" />
+        <path d="M -5,-24 C -5,-32 0,-40 0,-40 C 0,-40 5,-32 5,-24 C 5,-20 3,-19 0,-19 C -3,-19 -5,-20 -5,-24 Z" fill="#ffe9a0" filter="url(#flame-flare)" />
+        <path d="M -2.5,-24 C -2.5,-29 0,-35 0,-35 C 0,-35 2.5,-29 2.5,-24 C 2.5,-21 1.5,-20 0,-20 C -1.5,-20 -2.5,-21 -2.5,-24 Z" fill="#f0d060" />
+      </g>
+      <g transform="translate(0, -23)">
+        <rect x="-2.5" y="-22" width="5" height="22" fill="#e87aa0" rx="1.5" />
+        <path d="M -5,-24 C -5,-32 0,-40 0,-40 C 0,-40 5,-32 5,-24 C 5,-20 3,-19 0,-19 C -3,-19 -5,-20 -5,-24 Z" fill="#ffe9a0" filter="url(#flame-flare)" />
+        <path d="M -2.5,-24 C -2.5,-29 0,-35 0,-35 C 0,-35 2.5,-29 2.5,-24 C 2.5,-21 1.5,-20 0,-20 C -1.5,-20 -2.5,-21 -2.5,-24 Z" fill="#f0d060" />
+      </g>
+      <g transform="translate(14, -21)">
+        <rect x="-2.5" y="-22" width="5" height="22" fill="#ffe9a0" rx="1.5" />
+        <path d="M -5,-24 C -5,-32 0,-40 0,-40 C 0,-40 5,-32 5,-24 C 5,-20 3,-19 0,-19 C -3,-19 -5,-20 -5,-24 Z" fill="#ffe9a0" filter="url(#flame-flare)" />
+        <path d="M -2.5,-24 C -2.5,-29 0,-35 0,-35 C 0,-35 2.5,-29 2.5,-24 C 2.5,-21 1.5,-20 0,-20 C -1.5,-20 -2.5,-21 -2.5,-24 Z" fill="#f0d060" />
+      </g>
+      <g transform="translate(28, -16)">
+        <rect x="-2.5" y="-22" width="5" height="22" fill="#c4a8d4" rx="1.5" />
+        <path d="M -5,-24 C -5,-32 0,-40 0,-40 C 0,-40 5,-32 5,-24 C 5,-20 3,-19 0,-19 C -3,-19 -5,-20 -5,-24 Z" fill="#ffe9a0" filter="url(#flame-flare)" />
+        <path d="M -2.5,-24 C -2.5,-29 0,-35 0,-35 C 0,-35 2.5,-29 2.5,-24 C 2.5,-21 1.5,-20 0,-20 C -1.5,-20 -2.5,-21 -2.5,-24 Z" fill="#f0d060" />
+      </g>
+    </g>
+    <text x="196" y="730" font-family="Georgia" font-style="italic" font-size="16" fill="#c4a8d4" text-anchor="middle" filter="url(#flame-flare)">on its way ✦</text>
+  </g>
+
+  <g id="screen-4-receipt" transform="translate(30, 2866)">
+    <text x="0" y="-15" font-family="Georgia" font-size="15" fill="#c4a8d4" letter-spacing="1.5">SCREEN 4: RECEIPT: BLOW-OUT</text>
+    <rect x="0" y="0" width="393" height="852" fill="#0d0d14" />
+    <rect x="3" y="3" width="387" height="846" fill="url(#sky-full-s4)" opacity="0.95" />
+    <text x="196" y="115" font-family="Georgia" font-style="italic" font-size="13" fill="#9b8fa8" text-anchor="middle">incoming thought...</text>
+    <g id="s4-payload-spotlight" filter="url(#aurora-glow)">
+      <circle cx="155" cy="260" r="45" fill="#ffffff" opacity="0.12" />
+    </g>
+    <g id="s4-cake-body" transform="translate(150, 375) scale(0.92)">
+      <path d="M -64,48 L 64,48 L 56,54 C 56,54 38,57 0,57 C -38,57 -56,54 -56,54 Z" fill="url(#brass-platter)" />
+      <path d="M -56,12 L 56,12 L 50,48 C 50,48 35,52 0,52 C -35,52 -50,48 -50,48 Z" fill="url(#frost-base-1)" />
+      <path d="M -56,12 Q -42,24 -28,12 Q -14,26 0,12 Q 14,26 28,12 Q 42,24 56,12 L 54,18 Q 42,29 28,18 Q 14,31 0,18 Q -14,31 -28,18 Q -42,29 -54,18 Z" fill="url(#cream-drip)" opacity="0.85" />
+      <path d="M -40,-16 L 40,-16 L 36,12 C 36,12 26,15 0,15 C -25,15 -36,12 -36,12 Z" fill="url(#frost-base-2)" />
+      <path d="M -40,-16 Q -28,-7 -16,-16 Q 0,-5 16,-16 Q 28,-7 40,-16 L 39,-12 Q 28,-3 16,-12 Q 0,-1 16,-12 Q -28,-3 -39,-12 Z" fill="#ffffff" opacity="0.9" />
+      <g transform="translate(-28, -16)">
+        <rect x="-2.5" y="-22" width="5" height="22" fill="#c4a8d4" rx="1.5" />
+        <path d="M -3,-24 C -8,-25 -14,-19 -14,-19 C -14,-19 -7,-16 -3,-20 C -0.5,-22 -1,-23 -3,-24 Z" fill="#f0d060" opacity="0.85" filter="url(#flame-flare)" />
+      </g>
+      <g transform="translate(-14, -21)">
+        <rect x="-2.5" y="-22" width="5" height="22" fill="#ffe9a0" rx="1.5" />
+        <path d="M -1,-24 Q -8,-32 -2,-41 Q 6,-50 -6,-60 T -15,-80" fill="none" stroke="#c4a8d4" stroke-width="2" stroke-linecap="round" opacity="0.45" />
+      </g>
+      <g transform="translate(0, -23)">
+        <rect x="-2.5" y="-22" width="5" height="22" fill="#e87aa0" rx="1.5" />
+        <path d="M -3,-24 C -8,-25 -14,-19 -14,-19 C -14,-19 -7,-16 -3,-20 C -0.5,-22 -1,-23 -3,-24 Z" fill="#f0d060" opacity="0.85" filter="url(#flame-flare)" />
+      </g>
+      <g transform="translate(14, -21)">
+        <rect x="-2.5" y="-22" width="5" height="22" fill="#ffe9a0" rx="1.5" />
+        <path d="M -1,-24 Q -5,-34 -1,-42 Q 4,-50 -4,-59 T -8,-76" fill="none" stroke="#c4a8d4" stroke-width="1.8" stroke-linecap="round" opacity="0.45" />
+      </g>
+      <g transform="translate(28, -16)">
+        <rect x="-2.5" y="-22" width="5" height="22" fill="#c4a8d4" rx="1.5" />
+        <path d="M -3,-24 C -8,-25 -14,-19 -14,-19 C -14,-19 -7,-16 -3,-20 C -0.5,-22 -1,-23 -3,-24 Z" fill="#f0d060" opacity="0.85" filter="url(#flame-flare)" />
+      </g>
+    </g>
+    <g id="s4-bucket-anchor" transform="translate(245, 665)">
+      <path d="M 10,15 L 110,15 L 98,95 C 98,95 85,100 60,100 C 35,100 22,95 22,95 Z" fill="url(#wood-bucket)" stroke="#261505" stroke-width="0.8" />
+      <line x1="40" y1="16" x2="44" y2="97" stroke="#211304" stroke-width="1.8" opacity="0.85" />
+      <line x1="60" y1="17" x2="60" y2="100" stroke="#211304" stroke-width="2.0" opacity="0.95" />
+      <line x1="80" y1="16" x2="76" y2="97" stroke="#211304" stroke-width="1.8" opacity="0.85" />
+      <path d="M 14,56 C 40,62 80,62 106,56 L 105,62 C 80,68 40,68 15,62 Z" fill="url(#brass-platter)" />
+      <ellipse cx="60" cy="15" rx="50" ry="12" fill="#331c07" stroke="url(#brass-platter)" stroke-width="2" />
+      <path d="M 10,15 C 10,-15 110,-15 110,15" fill="none" stroke="url(#brass-platter)" stroke-width="2.2" opacity="0.85" />
+    </g>
+    <text x="196" y="785" font-family="Georgia" font-style="italic" font-size="12" fill="#c4a8d4" fill-opacity="0.4" text-anchor="middle">blow out the candles 🎂</text>
+  </g>
+</svg>

@@ -1,0 +1,388 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 453 3778" width="100%" role="img" font-family="Georgia">
+  <defs>
+    <linearGradient id="sky-inside" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#1a2d4a" />
+      <stop offset="100%" stop-color="#080e1e" />
+    </linearGradient>
+    <linearGradient id="sky-full" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#080911" />
+      <stop offset="40%" stop-color="#11162b" />
+      <stop offset="75%" stop-color="#1f1826" />
+      <stop offset="100%" stop-color="#080911" />
+    </linearGradient>
+    <linearGradient id="wood-grad" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#4a2e10" />
+      <stop offset="50%" stop-color="#7a4e28" />
+      <stop offset="100%" stop-color="#4a2e10" />
+    </linearGradient>
+    <linearGradient id="brass-grad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#9a7320" />
+      <stop offset="50%" stop-color="#e8c060" />
+      <stop offset="100%" stop-color="#9a7320" />
+    </linearGradient>
+    <linearGradient id="rocket-body" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#d32f2f" />
+      <stop offset="100%" stop-color="#f44336" />
+    </linearGradient>
+    <linearGradient id="rocket-cone" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#fbc02d" />
+      <stop offset="100%" stop-color="#ffeb3b" />
+    </linearGradient>
+    <filter id="soft-glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="8" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+    <filter id="intense-glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="4" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+    <filter id="core-glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="7" result="blur"/>
+      <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+    </filter>
+    <filter id="glint-blur" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="1.8" result="blur"/>
+      <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+    </filter>
+    <clipPath id="compass-clip">
+      <circle cx="196" cy="392" r="148" />
+    </clipPath>
+  </defs>
+
+  <!-- SCREEN 1 — COMPASS FACE IDLE -->
+  <g id="screen-1-idle" transform="translate(30, 40)">
+    <text x="0" y="-15" font-family="Georgia" font-size="15" fill="#c4a8d4" letter-spacing="1.5">SCREEN 1: COMPASS FACE IDLE</text>
+    <rect x="0" y="0" width="393" height="852" fill="#0d0d14" />
+    <text x="196" y="115" font-family="Georgia" font-style="italic" font-size="13" fill="#e8c060" fill-opacity="0.38" text-anchor="middle">pointing toward Sarah</text>
+    <g clip-path="url(#compass-clip)">
+      <rect x="48" y="244" width="296" height="296" fill="url(#sky-inside)" />
+    </g>
+    <circle cx="196" cy="392" r="148" fill="none" stroke="#5a4870" stroke-width="1.8" />
+    <g stroke="#5a4870" stroke-width="1" opacity="0.6">
+      <line x1="196" y1="244" x2="196" y2="251" />
+      <line x1="196" y1="533" x2="196" y2="540" />
+      <line x1="48" y1="392" x2="54" y2="392" />
+      <line x1="337" y1="392" x2="344" y2="392" />
+    </g>
+    <circle cx="196" cy="392" r="50" fill="#fbc02d" opacity="0.08" filter="url(#soft-glow)" />
+    <!-- Rocket assembly -->
+    <g transform="translate(196, 392)">
+      <!-- Fuse -->
+      <path d="M 0,25 C -15,40 -25,25 -20,55 C -18,65 -5,60 -10,75" fill="none" stroke="#9b8fa8" stroke-width="2" stroke-linecap="round" />
+      <!-- Rocket body -->
+      <rect x="-10" y="-25" width="20" height="50" fill="url(#rocket-body)" rx="1" />
+      <path d="M -10,-10 L 10,-5 M -10,5 L 10,10" stroke="#ffeb3b" stroke-width="2" opacity="0.6" />
+      <polygon points="-12,-25 12,-25 0,-45" fill="url(#rocket-cone)" />
+      <!-- Match unlit -->
+      <g transform="translate(0, 95)">
+        <rect x="-1.5" y="0" width="3" height="30" fill="#e8c060" rx="0.5" />
+        <ellipse cx="0" cy="0" rx="3.5" ry="4.5" fill="#d32f2f" />
+        <path d="M -4,-2 C -4,-7 0,-13 0,-13 C 0,-13 4,-7 4,-2 C 4,1 2,3 0,3 C -2,3 -4,1 -4,-2 Z" fill="#ffeb3b" filter="url(#intense-glow)" />
+        <path d="M -2,-2 C -2,-5 0,-9 0,-9 C 0,-9 2,-5 2,-2 C 2,0 1,1 0,1 C -1,1 -2,0 -2,-2 Z" fill="#f44336" />
+        <circle cx="0" cy="-3" r="1.5" fill="#ffffff" />
+      </g>
+      <!-- Emoji -->
+      <text x="0" y="35" font-size="16" text-anchor="middle">🎆</text>
+    </g>
+    <text x="196" y="610" font-family="Georgia" font-size="20" fill="#e8e0f0" text-anchor="middle">Sarah</text>
+    <text x="196" y="638" font-family="Georgia" font-size="13" fill="#9b8fa8" text-anchor="middle">1.2 miles away</text>
+    <text x="196" y="745" font-family="Georgia" font-style="italic" font-size="12" fill="#c4a8d4" fill-opacity="0.28" text-anchor="middle">drag the lit match to the fuse ✦</text>
+    <text x="196" y="825" font-family="Georgia" font-style="italic" font-size="10" fill="rgba(196,168,212,0.22)" text-anchor="middle">compass face — idle</text>
+  </g>
+
+  <!-- SCREEN 2 — COMPASS FACE CHARGING -->
+  <g id="screen-2-charging" transform="translate(30, 982)">
+    <text x="0" y="-15" font-family="Georgia" font-size="15" fill="#c4a8d4" letter-spacing="1.5">SCREEN 2: COMPASS FACE CHARGING</text>
+    <rect x="0" y="0" width="393" height="852" fill="#0d0d14" />
+    <text x="196" y="115" font-family="Georgia" font-style="italic" font-size="13" fill="#e8c060" fill-opacity="0.38" text-anchor="middle">pointing toward Sarah</text>
+    <g clip-path="url(#compass-clip)">
+      <rect x="48" y="244" width="296" height="296" fill="url(#sky-inside)" />
+    </g>
+    <circle cx="196" cy="392" r="148" fill="none" stroke="#5a4870" stroke-width="1.8" />
+    <circle cx="196" cy="392" r="60" fill="#f44336" opacity="0.12" filter="url(#soft-glow)" />
+    <circle cx="186" cy="467" r="25" fill="#ffeb3b" opacity="0.25" filter="url(#soft-glow)" />
+    <!-- Rocket charging -->
+    <g transform="translate(196, 392) rotate(12)">
+      <!-- Fuse with sparks -->
+      <path d="M 0,25 C -15,40 -25,25 -20,55 C -18,65 -5,60 -10,75" fill="none" stroke="#50455c" stroke-width="2" stroke-linecap="round" />
+      <g fill="#ffeb3b" filter="url(#soft-glow)">
+        <circle cx="-12" cy="33" r="2" />
+        <circle cx="-21" cy="42" r="1.5" />
+        <circle cx="-17" cy="58" r="2.2" />
+        <circle cx="-7" cy="66" r="1.8" />
+      </g>
+      <!-- Body -->
+      <rect x="-10" y="-25" width="20" height="50" fill="url(#rocket-body)" rx="1" />
+      <path d="M -10,-10 L 10,-5 M -10,5 L 10,10" stroke="#ffeb3b" stroke-width="2" opacity="0.6" />
+      <polygon points="-12,-25 12,-25 0,-45" fill="url(#rocket-cone)" />
+      <!-- Flame at fuse tip -->
+      <g transform="translate(-10, 75)">
+        <path d="M -5,0 C -5,-8 0,-12 0,-12 C 0,-12 5,-8 5,0 C 5,4 3,6 0,6 C -3,6 -5,4 -5,0 Z" fill="#ffeb3b" filter="url(#soft-glow)" />
+        <path d="M -2.5,0 C -2.5,-4 0,-7 0,-7 C 0,-7 2.5,-4 2.5,0 C 2.5,2 1.5,3 0,3 C -1.5,3 -2.5,2 -2.5,0 Z" fill="#d32f2f" />
+      </g>
+      <!-- Emoji -->
+      <text x="0" y="35" font-size="16" text-anchor="middle" transform="rotate(-12)">🎆</text>
+    </g>
+    <text x="196" y="610" font-family="Georgia" font-size="20" fill="#e8e0f0" text-anchor="middle">Sarah</text>
+    <text x="196" y="638" font-family="Georgia" font-size="13" fill="#9b8fa8" text-anchor="middle">1.2 miles away</text>
+    <text x="196" y="745" font-family="Georgia" font-style="italic" font-size="12" fill="#ffeb3b" text-anchor="middle">fuse burning... ✦</text>
+    <text x="196" y="825" font-family="Georgia" font-style="italic" font-size="10" fill="rgba(196,168,212,0.22)" text-anchor="middle">compass face — charging</text>
+  </g>
+
+  <!-- SCREEN 3 — THE BIG EXPLOSION — FULL CREATIVE LATITUDE -->
+  <g id="screen-3-explosion" transform="translate(30, 1924)">
+    <text x="0" y="-15" font-family="Georgia" font-size="15" fill="#c4a8d4" letter-spacing="1.5">SCREEN 3: SEND — THE BIG MOMENT</text>
+    <rect x="0" y="0" width="393" height="852" fill="#080911" />
+
+    <!-- Deep space background stars -->
+    <g fill="#ffffff">
+      <circle cx="45" cy="80" r="0.8" opacity="0.4"/>
+      <circle cx="88" cy="45" r="1.1" opacity="0.5"/>
+      <circle cx="155" cy="62" r="0.7" opacity="0.35"/>
+      <circle cx="230" cy="38" r="0.9" opacity="0.45"/>
+      <circle cx="298" cy="71" r="0.8" opacity="0.4"/>
+      <circle cx="352" cy="48" r="1.2" opacity="0.5"/>
+      <circle cx="32" cy="180" r="0.7" opacity="0.3"/>
+      <circle cx="370" cy="155" r="0.9" opacity="0.4"/>
+      <circle cx="62" cy="650" r="0.8" opacity="0.35"/>
+      <circle cx="338" cy="700" r="1" opacity="0.4"/>
+      <circle cx="18" cy="420" r="0.7" opacity="0.3"/>
+      <circle cx="375" cy="380" r="0.8" opacity="0.35"/>
+    </g>
+
+    <!-- SMALL EXPLOSION 1 — upper left -->
+    <g transform="translate(85, 185)">
+      <!-- Core burst -->
+      <circle cx="0" cy="0" r="18" fill="#ffeb3b" opacity="0.25" filter="url(#soft-glow)"/>
+      <circle cx="0" cy="0" r="8" fill="#ffffff" opacity="0.6" filter="url(#intense-glow)"/>
+      <!-- Radial streaks -->
+      <g stroke="#ffeb3b" stroke-linecap="round" opacity="0.85">
+        <line x1="0" y1="-8" x2="0" y2="-28" stroke-width="1.8"/>
+        <line x1="0" y1="8" x2="0" y2="28" stroke-width="1.5"/>
+        <line x1="-8" y1="0" x2="-28" y2="0" stroke-width="1.5"/>
+        <line x1="8" y1="0" x2="28" y2="0" stroke-width="1.8"/>
+        <line x1="-6" y1="-6" x2="-20" y2="-20" stroke-width="1.2"/>
+        <line x1="6" y1="-6" x2="20" y2="-20" stroke-width="1.2"/>
+        <line x1="-6" y1="6" x2="-20" y2="20" stroke-width="1.2"/>
+        <line x1="6" y1="6" x2="20" y2="20" stroke-width="1.2"/>
+      </g>
+      <!-- Spark dots -->
+      <g fill="#ffffff" opacity="0.9">
+        <circle cx="0" cy="-32" r="1.5"/>
+        <circle cx="23" cy="-23" r="1.2"/>
+        <circle cx="32" cy="0" r="1.5"/>
+        <circle cx="23" cy="23" r="1.2"/>
+        <circle cx="0" cy="32" r="1.5"/>
+        <circle cx="-23" cy="23" r="1.2"/>
+        <circle cx="-32" cy="0" r="1.5"/>
+        <circle cx="-23" cy="-23" r="1.2"/>
+      </g>
+    </g>
+
+    <!-- SMALL EXPLOSION 2 — upper right, different color -->
+    <g transform="translate(308, 220)">
+      <circle cx="0" cy="0" r="15" fill="#c4a8d4" opacity="0.3" filter="url(#soft-glow)"/>
+      <circle cx="0" cy="0" r="7" fill="#ffffff" opacity="0.55" filter="url(#intense-glow)"/>
+      <g stroke="#c4a8d4" stroke-linecap="round" opacity="0.8">
+        <line x1="0" y1="-7" x2="0" y2="-24" stroke-width="1.5"/>
+        <line x1="0" y1="7" x2="0" y2="24" stroke-width="1.5"/>
+        <line x1="-7" y1="0" x2="-24" y2="0" stroke-width="1.5"/>
+        <line x1="7" y1="0" x2="24" y2="0" stroke-width="1.5"/>
+        <line x1="-5" y1="-5" x2="-17" y2="-17" stroke-width="1"/>
+        <line x1="5" y1="-5" x2="17" y2="-17" stroke-width="1"/>
+        <line x1="-5" y1="5" x2="-17" y2="17" stroke-width="1"/>
+        <line x1="5" y1="5" x2="17" y2="17" stroke-width="1"/>
+      </g>
+      <g fill="#e8e0f0" opacity="0.85">
+        <circle cx="0" cy="-27" r="1.2"/>
+        <circle cx="19" cy="-19" r="1"/>
+        <circle cx="27" cy="0" r="1.2"/>
+        <circle cx="19" cy="19" r="1"/>
+        <circle cx="0" cy="27" r="1.2"/>
+        <circle cx="-19" cy="19" r="1"/>
+        <circle cx="-27" cy="0" r="1.2"/>
+        <circle cx="-19" cy="-19" r="1"/>
+      </g>
+    </g>
+
+    <!-- SMALL EXPLOSION 3 — mid left -->
+    <g transform="translate(62, 420)">
+      <circle cx="0" cy="0" r="12" fill="#f44336" opacity="0.3" filter="url(#soft-glow)"/>
+      <circle cx="0" cy="0" r="5" fill="#ffffff" opacity="0.5" filter="url(#intense-glow)"/>
+      <g stroke="#f44336" stroke-linecap="round" opacity="0.75">
+        <line x1="0" y1="-5" x2="0" y2="-20" stroke-width="1.5"/>
+        <line x1="0" y1="5" x2="0" y2="20" stroke-width="1.5"/>
+        <line x1="-5" y1="0" x2="-20" y2="0" stroke-width="1.5"/>
+        <line x1="5" y1="0" x2="20" y2="0" stroke-width="1.5"/>
+        <line x1="-4" y1="-4" x2="-14" y2="-14" stroke-width="1"/>
+        <line x1="4" y1="-4" x2="14" y2="-14" stroke-width="1"/>
+        <line x1="-4" y1="4" x2="-14" y2="14" stroke-width="1"/>
+        <line x1="4" y1="4" x2="14" y2="14" stroke-width="1"/>
+      </g>
+    </g>
+
+    <!-- SMALL EXPLOSION 4 — mid right -->
+    <g transform="translate(330, 380)">
+      <circle cx="0" cy="0" r="14" fill="#fbc02d" opacity="0.28" filter="url(#soft-glow)"/>
+      <circle cx="0" cy="0" r="6" fill="#ffffff" opacity="0.5" filter="url(#intense-glow)"/>
+      <g stroke="#fbc02d" stroke-linecap="round" opacity="0.8">
+        <line x1="0" y1="-6" x2="0" y2="-22" stroke-width="1.5"/>
+        <line x1="0" y1="6" x2="0" y2="22" stroke-width="1.5"/>
+        <line x1="-6" y1="0" x2="-22" y2="0" stroke-width="1.5"/>
+        <line x1="6" y1="0" x2="22" y2="0" stroke-width="1.5"/>
+        <line x1="-4" y1="-4" x2="-16" y2="-16" stroke-width="1"/>
+        <line x1="4" y1="-4" x2="16" y2="-16" stroke-width="1"/>
+        <line x1="-4" y1="4" x2="-16" y2="16" stroke-width="1"/>
+        <line x1="4" y1="4" x2="16" y2="16" stroke-width="1"/>
+      </g>
+    </g>
+
+    <!-- THE MASSIVE CENTRAL EXPLOSION -->
+    <!-- Outer atmosphere glow -->
+    <circle cx="196" cy="400" r="180" fill="#d32f2f" opacity="0.08" filter="url(#soft-glow)"/>
+    <circle cx="196" cy="400" r="140" fill="#fbc02d" opacity="0.1" filter="url(#soft-glow)"/>
+
+    <!-- Expanding rings -->
+    <circle cx="196" cy="400" r="155" fill="none" stroke="#ffeb3b" stroke-width="0.8" opacity="0.25" stroke-dasharray="3,18"/>
+    <circle cx="196" cy="400" r="125" fill="none" stroke="#ffffff" stroke-width="0.6" opacity="0.2" stroke-dasharray="2,12"/>
+    <circle cx="196" cy="400" r="98" fill="none" stroke="#f44336" stroke-width="0.8" opacity="0.3" stroke-dasharray="4,8"/>
+
+    <!-- Long radial explosion arms — the wow factor -->
+    <g stroke-linecap="round">
+      <!-- Gold primary arms -->
+      <line x1="196" y1="400" x2="196" y2="210" stroke="#ffeb3b" stroke-width="2.5" opacity="0.9"/>
+      <line x1="196" y1="400" x2="196" y2="590" stroke="#ffeb3b" stroke-width="2.5" opacity="0.9"/>
+      <line x1="196" y1="400" x2="6" y2="400" stroke="#ffeb3b" stroke-width="2.5" opacity="0.9"/>
+      <line x1="196" y1="400" x2="386" y2="400" stroke="#ffeb3b" stroke-width="2.5" opacity="0.9"/>
+      <!-- Diagonal gold arms -->
+      <line x1="196" y1="400" x2="62" y2="266" stroke="#ffeb3b" stroke-width="2" opacity="0.85"/>
+      <line x1="196" y1="400" x2="330" y2="266" stroke="#ffeb3b" stroke-width="2" opacity="0.85"/>
+      <line x1="196" y1="400" x2="62" y2="534" stroke="#ffeb3b" stroke-width="2" opacity="0.85"/>
+      <line x1="196" y1="400" x2="330" y2="534" stroke="#ffeb3b" stroke-width="2" opacity="0.85"/>
+      <!-- White secondary arms -->
+      <line x1="196" y1="400" x2="196" y2="258" stroke="#ffffff" stroke-width="1.5" opacity="0.7"/>
+      <line x1="196" y1="400" x2="196" y2="542" stroke="#ffffff" stroke-width="1.5" opacity="0.7"/>
+      <line x1="196" y1="400" x2="54" y2="400" stroke="#ffffff" stroke-width="1.5" opacity="0.7"/>
+      <line x1="196" y1="400" x2="338" y2="400" stroke="#ffffff" stroke-width="1.5" opacity="0.7"/>
+      <!-- Red tertiary arms between gold -->
+      <line x1="196" y1="400" x2="102" y2="236" stroke="#f44336" stroke-width="1.2" opacity="0.6"/>
+      <line x1="196" y1="400" x2="290" y2="236" stroke="#f44336" stroke-width="1.2" opacity="0.6"/>
+      <line x1="196" y1="400" x2="360" y2="306" stroke="#f44336" stroke-width="1.2" opacity="0.6"/>
+      <line x1="196" y1="400" x2="360" y2="494" stroke="#f44336" stroke-width="1.2" opacity="0.6"/>
+      <line x1="196" y1="400" x2="290" y2="564" stroke="#f44336" stroke-width="1.2" opacity="0.6"/>
+      <line x1="196" y1="400" x2="102" y2="564" stroke="#f44336" stroke-width="1.2" opacity="0.6"/>
+      <line x1="196" y1="400" x2="32" y2="306" stroke="#f44336" stroke-width="1.2" opacity="0.6"/>
+      <line x1="196" y1="400" x2="32" y2="494" stroke="#f44336" stroke-width="1.2" opacity="0.6"/>
+      <!-- Lavender thin arms -->
+      <line x1="196" y1="400" x2="148" y2="220" stroke="#c4a8d4" stroke-width="1" opacity="0.5"/>
+      <line x1="196" y1="400" x2="244" y2="220" stroke="#c4a8d4" stroke-width="1" opacity="0.5"/>
+      <line x1="196" y1="400" x2="340" y2="352" stroke="#c4a8d4" stroke-width="1" opacity="0.5"/>
+      <line x1="196" y1="400" x2="340" y2="448" stroke="#c4a8d4" stroke-width="1" opacity="0.5"/>
+      <line x1="196" y1="400" x2="244" y2="580" stroke="#c4a8d4" stroke-width="1" opacity="0.5"/>
+      <line x1="196" y1="400" x2="148" y2="580" stroke="#c4a8d4" stroke-width="1" opacity="0.5"/>
+      <line x1="196" y1="400" x2="52" y2="448" stroke="#c4a8d4" stroke-width="1" opacity="0.5"/>
+      <line x1="196" y1="400" x2="52" y2="352" stroke="#c4a8d4" stroke-width="1" opacity="0.5"/>
+    </g>
+
+    <!-- Spark dots at arm tips -->
+    <g fill="#ffffff" opacity="0.9">
+      <circle cx="196" cy="206" r="2.5"/>
+      <circle cx="196" cy="594" r="2.5"/>
+      <circle cx="2" cy="400" r="2.5"/>
+      <circle cx="390" cy="400" r="2.5"/>
+      <circle cx="58" cy="262" r="2"/>
+      <circle cx="334" cy="262" r="2"/>
+      <circle cx="58" cy="538" r="2"/>
+      <circle cx="334" cy="538" r="2"/>
+    </g>
+    <g fill="#ffeb3b" opacity="0.85">
+      <circle cx="196" cy="254" r="2"/>
+      <circle cx="196" cy="546" r="2"/>
+      <circle cx="50" cy="400" r="2"/>
+      <circle cx="342" cy="400" r="2"/>
+      <circle cx="98" cy="232" r="1.8"/>
+      <circle cx="294" cy="232" r="1.8"/>
+      <circle cx="356" cy="302" r="1.8"/>
+      <circle cx="356" cy="498" r="1.8"/>
+      <circle cx="294" cy="568" r="1.8"/>
+      <circle cx="98" cy="568" r="1.8"/>
+      <circle cx="36" cy="302" r="1.8"/>
+      <circle cx="36" cy="498" r="1.8"/>
+    </g>
+
+    <!-- Central supernova core -->
+    <circle cx="196" cy="400" r="45" fill="#fbc02d" opacity="0.4" filter="url(#core-glow)"/>
+    <circle cx="196" cy="400" r="28" fill="#ffeb3b" opacity="0.6" filter="url(#intense-glow)"/>
+    <circle cx="196" cy="400" r="14" fill="#ffffff" opacity="0.9" filter="url(#intense-glow)"/>
+
+    <!-- 4-point star at very center -->
+    <g transform="translate(196, 400)" filter="url(#core-glow)">
+      <polygon points="0,-22 4,-4 22,0 4,4 0,22 -4,4 -22,0 -4,-4" fill="#ffffff"/>
+      <polygon points="0,-14 3,-3 14,0 3,3 0,14 -3,3 -14,0 -3,-3" fill="#ffeb3b"/>
+      <circle cx="0" cy="0" r="4" fill="#ffffff"/>
+    </g>
+
+    <!-- Falling ember trails from central burst -->
+    <g opacity="0.7">
+      <path d="M 196,400 Q 170,480 155,560" fill="none" stroke="#f44336" stroke-width="1.2" stroke-linecap="round"/>
+      <path d="M 196,400 Q 220,475 240,555" fill="none" stroke="#ffeb3b" stroke-width="1.2" stroke-linecap="round"/>
+      <path d="M 196,400 Q 145,470 120,540" fill="none" stroke="#fbc02d" stroke-width="1" stroke-linecap="round"/>
+      <path d="M 196,400 Q 248,468 272,538" fill="none" stroke="#f44336" stroke-width="1" stroke-linecap="round"/>
+      <path d="M 196,400 Q 136,460 105,520" fill="none" stroke="#c4a8d4" stroke-width="0.8" stroke-linecap="round"/>
+      <path d="M 196,400 Q 256,458 285,518" fill="none" stroke="#c4a8d4" stroke-width="0.8" stroke-linecap="round"/>
+    </g>
+    <!-- Ember dots at trail ends -->
+    <g fill="#ffeb3b" opacity="0.65">
+      <circle cx="155" cy="562" r="2"/>
+      <circle cx="240" cy="557" r="2"/>
+      <circle cx="120" cy="542" r="1.5"/>
+      <circle cx="272" cy="540" r="1.5"/>
+      <circle cx="105" cy="522" r="1.2"/>
+      <circle cx="285" cy="520" r="1.2"/>
+    </g>
+
+    <text x="196" y="760" font-family="Georgia" font-style="italic" font-size="16" fill="#c4a8d4" text-anchor="middle">on its way ✦</text>
+    <text x="196" y="825" font-family="Georgia" font-style="italic" font-size="10" fill="rgba(196,168,212,0.22)" text-anchor="middle">send — the big moment</text>
+  </g>
+
+  <!-- SCREEN 4 — RECEIPT -->
+  <g transform="translate(30, 2866)">
+    <text x="0" y="-15" font-family="Georgia" font-size="15" fill="#c4a8d4" letter-spacing="1.5">SCREEN 4: RECEIPT APPROACH &amp; TARGET</text>
+    <rect x="0" y="0" width="393" height="852" fill="#0d0d14" />
+    <rect x="3" y="3" width="387" height="846" rx="4" fill="url(#sky-full)" opacity="0.85" />
+    <text x="196" y="120" font-family="Georgia" font-style="italic" font-size="16" fill="#9b8fa8" text-anchor="middle">incoming thought...</text>
+    <!-- Afterglow from explosion -->
+    <circle cx="196" cy="320" r="80" fill="#f44336" opacity="0.06" filter="url(#soft-glow)" />
+    <circle cx="196" cy="320" r="45" fill="#ffeb3b" opacity="0.08" filter="url(#soft-glow)" />
+    <!-- Residual sparkle dots -->
+    <g fill="#ffffff" filter="url(#soft-glow)">
+      <polygon points="196,265 198,270 203,270 199,273 200,278 196,275 192,278 193,273 189,270 194,270" fill="#ffeb3b"/>
+      <polygon points="148,335 149.5,339 154,339 150.5,341.5 151.5,346 148,343.5 144.5,346 145.5,341.5 142,339 146.5,339"/>
+      <polygon points="244,310 245.5,314 250,314 246.5,316.5 247.5,321 244,318.5 240.5,321 241.5,316.5 238,314 242.5,314" fill="#ffeb3b"/>
+    </g>
+    <!-- Emoji drifting down -->
+    <g transform="translate(196, 380)">
+      <circle cx="0" cy="0" r="28" fill="#ffeb3b" filter="url(#soft-glow)" opacity="0.18"/>
+      <text x="0" y="12" font-size="36" text-anchor="middle">🎆</text>
+    </g>
+    <!-- Sparkle trail above emoji -->
+    <g fill="#ffeb3b" opacity="0.5">
+      <circle cx="192" cy="340" r="1.5"/>
+      <circle cx="200" cy="352" r="1.2"/>
+      <circle cx="188" cy="360" r="1"/>
+      <circle cx="204" cy="368" r="1.3"/>
+    </g>
+    <!-- Wooden bucket lower right -->
+    <g transform="translate(245, 665)">
+      <path d="M 10,15 L 110,15 L 98,95 C 98,95 85,100 60,100 C 35,100 22,95 22,95 Z" fill="url(#wood-grad)" stroke="#2d1a08" stroke-width="1" />
+      <path d="M 40,16 L 44,97" fill="none" stroke="#2a1f12" stroke-width="1.8" opacity="0.8" />
+      <path d="M 60,17 L 60,100" fill="none" stroke="#2a1f12" stroke-width="1.8" opacity="0.9" />
+      <path d="M 80,16 L 76,97" fill="none" stroke="#2a1f12" stroke-width="1.8" opacity="0.8" />
+      <path d="M 14,56 C 40,62 80,62 106,56 L 105,62 C 80,68 40,68 15,62 Z" fill="#d4a030" />
+      <ellipse cx="60" cy="15" rx="50" ry="12" fill="#3d230a" stroke="#d4a030" stroke-width="2" />
+      <path d="M 10,15 C 10,-15 110,-15 110,15" fill="none" stroke="#d4a030" stroke-width="2.5" opacity="0.85" />
+    </g>
+    <text x="196" y="790" font-family="Georgia" font-style="italic" font-size="14" fill="#c4a8d4" text-anchor="middle">drifting down to you ✦</text>
+    <text x="196" y="825" font-family="Georgia" font-style="italic" font-size="10" fill="rgba(196,168,212,0.22)" text-anchor="middle">receipt — emoji drifts to bucket</text>
+  </g>
+</svg>

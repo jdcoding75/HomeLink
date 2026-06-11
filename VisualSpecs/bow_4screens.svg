@@ -1,0 +1,300 @@
+<svg width="100%" viewBox="0 0 453 3778" xmlns="http://www.w3.org/2000/svg" role="img" font-family="Georgia">
+<title>Pointward — bow instrument, 4 screens</title>
+<desc>Vertical storyboard: idle compass, drawn compass, send animation, and receipt with bucket</desc>
+<defs>
+  <radialGradient id="purplebg" cx="50%" cy="46%" r="70%">
+    <stop offset="0%" stop-color="#1a1630"/>
+    <stop offset="100%" stop-color="#0d0d14"/>
+  </radialGradient>
+  <radialGradient id="skyring" cx="50%" cy="45%" r="70%">
+    <stop offset="0%" stop-color="#1a2d4a"/>
+    <stop offset="60%" stop-color="#0e1e38"/>
+    <stop offset="100%" stop-color="#080e1e"/>
+  </radialGradient>
+  <radialGradient id="skyfull" cx="50%" cy="42%" r="78%">
+    <stop offset="0%" stop-color="#1a2d4a"/>
+    <stop offset="100%" stop-color="#0e1e38"/>
+  </radialGradient>
+  <radialGradient id="bowglow" cx="50%" cy="50%" r="50%">
+    <stop offset="0%" stop-color="#4a7ab5" stop-opacity="0.28"/>
+    <stop offset="100%" stop-color="#0e1e38" stop-opacity="0"/>
+  </radialGradient>
+  <radialGradient id="tipglow" cx="50%" cy="50%" r="50%">
+    <stop offset="0%" stop-color="#ffffff" stop-opacity="0.9"/>
+    <stop offset="50%" stop-color="#f0d060" stop-opacity="0.4"/>
+    <stop offset="100%" stop-color="#0e1e38" stop-opacity="0"/>
+  </radialGradient>
+  <radialGradient id="tensionglow" cx="50%" cy="50%" r="50%">
+    <stop offset="0%" stop-color="#e8c060" stop-opacity="0.45"/>
+    <stop offset="55%" stop-color="#c4a030" stop-opacity="0.18"/>
+    <stop offset="100%" stop-color="#e8c060" stop-opacity="0"/>
+  </radialGradient>
+  <radialGradient id="camglow" cx="50%" cy="50%" r="50%">
+    <stop offset="0%" stop-color="#ffe9a0" stop-opacity="0.8"/>
+    <stop offset="40%" stop-color="#e8c060" stop-opacity="0.45"/>
+    <stop offset="100%" stop-color="#e8c060" stop-opacity="0"/>
+  </radialGradient>
+  <linearGradient id="limb" x1="0%" y1="0%" x2="100%" y2="0%">
+    <stop offset="0%" stop-color="#2255a0" stop-opacity="0.5"/>
+    <stop offset="40%" stop-color="#c4a030" stop-opacity="0.95"/>
+    <stop offset="70%" stop-color="#e8c060" stop-opacity="0.9"/>
+    <stop offset="100%" stop-color="#2255a0" stop-opacity="0.5"/>
+  </linearGradient>
+  <linearGradient id="shaft" x1="0%" y1="0%" x2="100%" y2="0%">
+    <stop offset="0%" stop-color="#a07820" stop-opacity="0.5"/>
+    <stop offset="40%" stop-color="#d4a030" stop-opacity="0.9"/>
+    <stop offset="85%" stop-color="#f0d060" stop-opacity="1"/>
+    <stop offset="100%" stop-color="#ffffff" stop-opacity="0.95"/>
+  </linearGradient>
+  <linearGradient id="goldtrail" x1="0%" y1="0%" x2="100%" y2="0%">
+    <stop offset="0%" stop-color="#f0d060" stop-opacity="0"/>
+    <stop offset="100%" stop-color="#f0d060" stop-opacity="0.5"/>
+  </linearGradient>
+  <linearGradient id="bucketwood" x1="0%" y1="0%" x2="100%" y2="0%">
+    <stop offset="0%" stop-color="#5a3a1f"/>
+    <stop offset="35%" stop-color="#8a5a30"/>
+    <stop offset="65%" stop-color="#7a4e2a"/>
+    <stop offset="100%" stop-color="#4f3219"/>
+  </linearGradient>
+  <linearGradient id="brass" x1="0%" y1="0%" x2="100%" y2="0%">
+    <stop offset="0%" stop-color="#9a7320"/>
+    <stop offset="45%" stop-color="#e8c060"/>
+    <stop offset="55%" stop-color="#f5da80"/>
+    <stop offset="100%" stop-color="#8a6418"/>
+  </linearGradient>
+  <clipPath id="rc">
+    <circle cx="196" cy="392" r="148"/>
+  </clipPath>
+</defs>
+
+<rect width="453" height="3778" fill="#0d0d14"/>
+
+<!-- SCREEN 1 — COMPASS FACE (IDLE) -->
+<text x="30" y="36" font-size="15" letter-spacing="1.5" fill="#c4a8d4" font-family="sans-serif">SCREEN 1 · COMPASS FACE (IDLE)</text>
+<g transform="translate(30,50)">
+  <rect width="393" height="852" fill="url(#purplebg)"/>
+  <circle cx="45" cy="95" r="0.9" fill="rgba(255,255,255,0.35)"/>
+  <circle cx="115" cy="65" r="1.1" fill="rgba(255,255,255,0.4)"/>
+  <circle cx="285" cy="78" r="0.8" fill="rgba(255,255,255,0.3)"/>
+  <circle cx="355" cy="105" r="1" fill="rgba(255,255,255,0.38)"/>
+  <circle cx="55" cy="690" r="0.8" fill="rgba(196,168,212,0.3)"/>
+  <circle cx="338" cy="715" r="0.9" fill="rgba(255,255,255,0.25)"/>
+  <circle cx="196" cy="392" r="148" fill="url(#skyring)"/>
+  <g clip-path="url(#rc)">
+    <circle cx="138" cy="298" r="1" fill="rgba(255,255,255,0.5)"/>
+    <circle cx="248" cy="285" r="1.1" fill="rgba(255,255,255,0.4)"/>
+    <circle cx="125" cy="345" r="0.9" fill="rgba(196,168,212,0.5)"/>
+    <circle cx="262" cy="460" r="0.8" fill="rgba(255,255,255,0.4)"/>
+    <circle cx="225" cy="488" r="0.7" fill="rgba(255,255,255,0.35)"/>
+    <ellipse cx="188" cy="392" rx="62" ry="98" fill="url(#bowglow)"/>
+    <path d="M150 300 Q184 320 193 350 Q199 372 197 392" fill="none" stroke="url(#limb)" stroke-width="8" stroke-linecap="round"/>
+    <path d="M150 300 Q182 320 190 350 Q196 372 194 392" fill="none" stroke="rgba(255,255,255,0.22)" stroke-width="3" stroke-linecap="round"/>
+    <path d="M150 484 Q184 464 193 434 Q199 412 197 392" fill="none" stroke="url(#limb)" stroke-width="8" stroke-linecap="round"/>
+    <path d="M150 484 Q182 464 190 434 Q196 412 194 392" fill="none" stroke="rgba(255,255,255,0.22)" stroke-width="3" stroke-linecap="round"/>
+    <rect x="197" y="375" width="13" height="34" rx="4" fill="#c4a030" opacity="0.85"/>
+    <rect x="203" y="377" width="5" height="30" rx="3" fill="rgba(255,255,255,0.32)"/>
+    <line x1="198" y1="383" x2="209" y2="383" stroke="rgba(160,110,15,0.6)" stroke-width="1"/>
+    <line x1="198" y1="389" x2="209" y2="389" stroke="rgba(160,110,15,0.6)" stroke-width="1"/>
+    <line x1="198" y1="395" x2="209" y2="395" stroke="rgba(160,110,15,0.6)" stroke-width="1"/>
+    <line x1="198" y1="401" x2="209" y2="401" stroke="rgba(160,110,15,0.6)" stroke-width="1"/>
+    <circle cx="150" cy="300" r="10" fill="rgba(18,38,75,0.75)" stroke="#c4a030" stroke-width="1.5"/>
+    <circle cx="150" cy="300" r="6" fill="rgba(28,52,105,0.65)" stroke="#d4b040" stroke-width="1"/>
+    <circle cx="150" cy="300" r="3" fill="#c4a030" opacity="0.9"/>
+    <circle cx="150" cy="484" r="10" fill="rgba(18,38,75,0.75)" stroke="#c4a030" stroke-width="1.5"/>
+    <circle cx="150" cy="484" r="6" fill="rgba(28,52,105,0.65)" stroke="#d4b040" stroke-width="1"/>
+    <circle cx="150" cy="484" r="3" fill="#c4a030" opacity="0.9"/>
+    <line x1="150" y1="308" x2="196" y2="378" stroke="rgba(196,168,212,0.32)" stroke-width="0.8"/>
+    <line x1="150" y1="476" x2="196" y2="406" stroke="rgba(196,168,212,0.32)" stroke-width="0.8"/>
+    <path d="M150 300 Q160 392 150 484" fill="none" stroke="rgba(255,255,255,0.18)" stroke-width="4"/>
+    <path d="M150 300 Q160 392 150 484" fill="none" stroke="rgba(196,210,255,0.72)" stroke-width="1.4"/>
+    <line x1="160" y1="392" x2="290" y2="386" stroke="rgba(240,200,60,0.15)" stroke-width="10" stroke-linecap="round"/>
+    <line x1="160" y1="392" x2="290" y2="386" stroke="url(#shaft)" stroke-width="2.5" stroke-linecap="round"/>
+    <path d="M165,390 Q157,382 155,384 Q156,388 165,390Z" fill="rgba(196,168,212,0.78)"/>
+    <path d="M165,392 Q157,400 155,398 Q156,394 165,392Z" fill="rgba(196,168,212,0.55)"/>
+    <circle cx="160" cy="391" r="3.5" fill="rgba(196,168,212,0.65)"/>
+    <ellipse cx="292" cy="386" rx="11" ry="11" fill="url(#tipglow)"/>
+    <polygon points="296,386 286,382 288,386 286,390" fill="rgba(255,255,255,0.92)"/>
+    <ellipse cx="225" cy="389" rx="10" ry="4" fill="rgba(240,200,60,0.15)"/>
+    <text x="225" y="394" font-size="15" text-anchor="middle">🤗</text>
+  </g>
+  <circle cx="196" cy="392" r="162" fill="none" stroke="rgba(90,72,112,0.07)" stroke-width="1"/>
+  <circle cx="196" cy="392" r="148" fill="none" stroke="#5a4870" stroke-width="1.8"/>
+  <circle cx="196" cy="392" r="107" fill="none" stroke="rgba(90,72,112,0.14)" stroke-width="0.5" stroke-dasharray="1.5,2.5"/>
+  <g stroke="#5a4870" stroke-width="0.8" opacity="0.55">
+    <line x1="196" y1="244" x2="196" y2="253"/>
+    <line x1="196" y1="531" x2="196" y2="540"/>
+    <line x1="48" y1="392" x2="57" y2="392"/>
+    <line x1="335" y1="392" x2="344" y2="392"/>
+    <line x1="121" y1="265" x2="126" y2="273"/>
+    <line x1="271" y1="265" x2="266" y2="273"/>
+    <line x1="121" y1="519" x2="126" y2="511"/>
+    <line x1="271" y1="519" x2="266" y2="511"/>
+  </g>
+  <circle cx="294" cy="282" r="14" fill="rgba(8,5,20,0.72)" stroke="rgba(196,168,212,0.75)" stroke-width="1.4"/>
+  <line x1="286" y1="282" x2="302" y2="282" stroke="rgba(196,168,212,0.45)" stroke-width="1"/>
+  <line x1="294" y1="274" x2="294" y2="290" stroke="rgba(196,168,212,0.45)" stroke-width="1"/>
+  <text x="294" y="286" text-anchor="middle" font-size="9" fill="rgba(196,168,212,0.9)" font-family="sans-serif">S</text>
+  <text x="196" y="220" text-anchor="middle" font-size="13" fill="rgba(232,208,176,0.38)" font-style="italic">pointing toward Sarah</text>
+  <text x="196" y="568" text-anchor="middle" font-size="12" fill="rgba(196,168,212,0.28)" font-style="italic">draw the bow to send ✦</text>
+  <text x="196" y="625" text-anchor="middle" font-size="20" fill="#e8e0f0">Sarah</text>
+  <text x="196" y="650" text-anchor="middle" font-size="13" fill="#9b8fa8">142 km away</text>
+  <text x="196" y="825" text-anchor="middle" font-size="10" fill="rgba(196,168,212,0.22)" font-style="italic">bow compass face — idle</text>
+</g>
+
+<!-- SCREEN 2 — COMPASS FACE (DRAWN) -->
+<text x="30" y="978" font-size="15" letter-spacing="1.5" fill="#c4a8d4" font-family="sans-serif">SCREEN 2 · COMPASS FACE (DRAWN)</text>
+<g transform="translate(30,992)">
+  <rect width="393" height="852" fill="url(#purplebg)"/>
+  <circle cx="45" cy="95" r="0.9" fill="rgba(255,255,255,0.35)"/>
+  <circle cx="115" cy="65" r="1.1" fill="rgba(255,255,255,0.4)"/>
+  <circle cx="285" cy="78" r="0.8" fill="rgba(255,255,255,0.3)"/>
+  <circle cx="355" cy="105" r="1" fill="rgba(255,255,255,0.38)"/>
+  <circle cx="55" cy="690" r="0.8" fill="rgba(196,168,212,0.3)"/>
+  <circle cx="338" cy="715" r="0.9" fill="rgba(255,255,255,0.25)"/>
+  <circle cx="196" cy="392" r="148" fill="url(#skyring)"/>
+  <g clip-path="url(#rc)">
+    <circle cx="138" cy="298" r="1" fill="rgba(255,255,255,0.5)"/>
+    <circle cx="248" cy="285" r="1.1" fill="rgba(255,255,255,0.4)"/>
+    <circle cx="125" cy="345" r="0.9" fill="rgba(196,168,212,0.5)"/>
+    <circle cx="262" cy="460" r="0.8" fill="rgba(255,255,255,0.4)"/>
+    <circle cx="225" cy="488" r="0.7" fill="rgba(255,255,255,0.35)"/>
+    <ellipse cx="160" cy="392" rx="92" ry="122" fill="url(#tensionglow)"/>
+    <ellipse cx="145" cy="392" rx="46" ry="80" fill="url(#tensionglow)"/>
+    <ellipse cx="180" cy="392" rx="58" ry="98" fill="url(#bowglow)"/>
+    <path d="M150 300 Q184 320 193 350 Q199 372 197 392" fill="none" stroke="url(#limb)" stroke-width="8" stroke-linecap="round"/>
+    <path d="M150 300 Q182 320 190 350 Q196 372 194 392" fill="none" stroke="rgba(255,255,255,0.22)" stroke-width="3" stroke-linecap="round"/>
+    <path d="M150 484 Q184 464 193 434 Q199 412 197 392" fill="none" stroke="url(#limb)" stroke-width="8" stroke-linecap="round"/>
+    <path d="M150 484 Q182 464 190 434 Q196 412 194 392" fill="none" stroke="rgba(255,255,255,0.22)" stroke-width="3" stroke-linecap="round"/>
+    <rect x="197" y="375" width="13" height="34" rx="4" fill="#c4a030" opacity="0.85"/>
+    <rect x="203" y="377" width="5" height="30" rx="3" fill="rgba(255,255,255,0.32)"/>
+    <line x1="198" y1="383" x2="209" y2="383" stroke="rgba(160,110,15,0.6)" stroke-width="1"/>
+    <line x1="198" y1="389" x2="209" y2="389" stroke="rgba(160,110,15,0.6)" stroke-width="1"/>
+    <line x1="198" y1="395" x2="209" y2="395" stroke="rgba(160,110,15,0.6)" stroke-width="1"/>
+    <line x1="198" y1="401" x2="209" y2="401" stroke="rgba(160,110,15,0.6)" stroke-width="1"/>
+    <line x1="150" y1="308" x2="196" y2="378" stroke="rgba(196,168,212,0.32)" stroke-width="0.8"/>
+    <line x1="150" y1="476" x2="196" y2="406" stroke="rgba(196,168,212,0.32)" stroke-width="0.8"/>
+    <path d="M150 300 L115 392 L150 484" fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="4"/>
+    <path d="M150 300 L115 392 L150 484" fill="none" stroke="rgba(210,222,255,0.92)" stroke-width="1.6"/>
+    <circle cx="150" cy="300" r="18" fill="url(#camglow)"/>
+    <circle cx="150" cy="300" r="10" fill="rgba(28,52,105,0.85)" stroke="#e8c060" stroke-width="1.9"/>
+    <circle cx="150" cy="300" r="6" fill="rgba(40,70,130,0.7)" stroke="#f0d060" stroke-width="1.2"/>
+    <circle cx="150" cy="300" r="3" fill="#f0d060"/>
+    <circle cx="150" cy="484" r="18" fill="url(#camglow)"/>
+    <circle cx="150" cy="484" r="10" fill="rgba(28,52,105,0.85)" stroke="#e8c060" stroke-width="1.9"/>
+    <circle cx="150" cy="484" r="6" fill="rgba(40,70,130,0.7)" stroke="#f0d060" stroke-width="1.2"/>
+    <circle cx="150" cy="484" r="3" fill="#f0d060"/>
+    <line x1="115" y1="392" x2="245" y2="386" stroke="rgba(240,200,60,0.24)" stroke-width="12" stroke-linecap="round"/>
+    <line x1="115" y1="392" x2="245" y2="386" stroke="url(#shaft)" stroke-width="2.6" stroke-linecap="round"/>
+    <path d="M120,390 Q112,382 110,384 Q111,388 120,390Z" fill="rgba(196,168,212,0.85)"/>
+    <path d="M120,392 Q112,400 110,398 Q111,394 120,392Z" fill="rgba(196,168,212,0.6)"/>
+    <circle cx="115" cy="391" r="3.5" fill="rgba(196,168,212,0.7)"/>
+    <ellipse cx="247" cy="386" rx="11" ry="11" fill="url(#tipglow)"/>
+    <polygon points="251,386 241,382 243,386 241,390" fill="rgba(255,255,255,0.92)"/>
+    <ellipse cx="180" cy="389" rx="10" ry="4" fill="rgba(240,200,60,0.18)"/>
+    <text x="180" y="394" font-size="15" text-anchor="middle">🤗</text>
+    <circle cx="208" cy="378" r="1.8" fill="#f0d060" opacity="0.65"/>
+    <circle cx="232" cy="380" r="1.5" fill="#ffe9a0" opacity="0.7"/>
+  </g>
+  <circle cx="196" cy="392" r="162" fill="none" stroke="rgba(90,72,112,0.07)" stroke-width="1"/>
+  <circle cx="196" cy="392" r="148" fill="none" stroke="#5a4870" stroke-width="1.8"/>
+  <circle cx="196" cy="392" r="107" fill="none" stroke="rgba(90,72,112,0.14)" stroke-width="0.5" stroke-dasharray="1.5,2.5"/>
+  <g stroke="#5a4870" stroke-width="0.8" opacity="0.55">
+    <line x1="196" y1="244" x2="196" y2="253"/>
+    <line x1="196" y1="531" x2="196" y2="540"/>
+    <line x1="48" y1="392" x2="57" y2="392"/>
+    <line x1="335" y1="392" x2="344" y2="392"/>
+    <line x1="121" y1="265" x2="126" y2="273"/>
+    <line x1="271" y1="265" x2="266" y2="273"/>
+    <line x1="121" y1="519" x2="126" y2="511"/>
+    <line x1="271" y1="519" x2="266" y2="511"/>
+  </g>
+  <circle cx="294" cy="282" r="14" fill="rgba(8,5,20,0.72)" stroke="rgba(196,168,212,0.75)" stroke-width="1.4"/>
+  <line x1="286" y1="282" x2="302" y2="282" stroke="rgba(196,168,212,0.45)" stroke-width="1"/>
+  <line x1="294" y1="274" x2="294" y2="290" stroke="rgba(196,168,212,0.45)" stroke-width="1"/>
+  <text x="294" y="286" text-anchor="middle" font-size="9" fill="rgba(196,168,212,0.9)" font-family="sans-serif">S</text>
+  <text x="196" y="220" text-anchor="middle" font-size="13" fill="rgba(232,208,176,0.38)" font-style="italic">pointing toward Sarah</text>
+  <text x="196" y="568" text-anchor="middle" font-size="12" fill="rgba(232,208,160,0.6)" font-style="italic">release to send ✦</text>
+  <text x="196" y="625" text-anchor="middle" font-size="20" fill="#e8e0f0">Sarah</text>
+  <text x="196" y="650" text-anchor="middle" font-size="13" fill="#9b8fa8">142 km away</text>
+  <text x="196" y="825" text-anchor="middle" font-size="10" fill="rgba(196,168,212,0.22)" font-style="italic">bow compass face — drawn</text>
+</g>
+
+<!-- SCREEN 3 — SEND ANIMATION -->
+<text x="30" y="1920" font-size="15" letter-spacing="1.5" fill="#c4a8d4" font-family="sans-serif">SCREEN 3 · SEND ANIMATION</text>
+<g transform="translate(30,1934)">
+  <rect width="393" height="852" fill="url(#skyfull)"/>
+  <circle cx="60" cy="150" r="1" fill="rgba(255,255,255,0.35)"/>
+  <circle cx="150" cy="110" r="0.9" fill="rgba(255,255,255,0.3)"/>
+  <circle cx="300" cy="160" r="1.1" fill="rgba(255,255,255,0.32)"/>
+  <circle cx="340" cy="300" r="0.8" fill="rgba(196,168,212,0.35)"/>
+  <circle cx="70" cy="640" r="0.9" fill="rgba(255,255,255,0.28)"/>
+  <circle cx="320" cy="700" r="1" fill="rgba(196,168,212,0.3)"/>
+  <line x1="40" y1="472" x2="156" y2="471" stroke="url(#goldtrail)" stroke-width="6" stroke-linecap="round" opacity="0.8"/>
+  <circle cx="40" cy="470" r="1.2" fill="#f0d060" opacity="0.12"/>
+  <circle cx="58" cy="469" r="1.1" fill="#ffe9a0" opacity="0.14"/>
+  <circle cx="76" cy="476" r="1.3" fill="#f0d060" opacity="0.18"/>
+  <circle cx="94" cy="472" r="1.5" fill="#f0d060" opacity="0.28"/>
+  <circle cx="112" cy="469" r="1.7" fill="#ffe9a0" opacity="0.34"/>
+  <circle cx="128" cy="471" r="1.9" fill="#f0d060" opacity="0.42"/>
+  <circle cx="144" cy="470" r="2.2" fill="#f0d060" opacity="0.55"/>
+  <circle cx="151" cy="472" r="3" fill="#ffe9a0" opacity="0.65"/>
+  <line x1="158" y1="473" x2="283" y2="465" stroke="rgba(240,200,60,0.16)" stroke-width="11" stroke-linecap="round"/>
+  <line x1="158" y1="473" x2="283" y2="465" stroke="url(#shaft)" stroke-width="2.8" stroke-linecap="round"/>
+  <path d="M163,471 Q154,463 151,465 Q153,470 163,471Z" fill="rgba(196,168,212,0.8)"/>
+  <path d="M163,474 Q154,482 151,480 Q153,475 163,474Z" fill="rgba(196,168,212,0.58)"/>
+  <circle cx="158" cy="472.5" r="3.6" fill="rgba(196,168,212,0.68)"/>
+  <ellipse cx="285" cy="465" rx="12" ry="12" fill="url(#tipglow)"/>
+  <polygon points="288,465 278,460 281,465 278,470" fill="rgba(255,255,255,0.92)"/>
+  <circle cx="287" cy="465" r="3.8" fill="rgba(255,255,255,0.95)"/>
+  <ellipse cx="220" cy="470" rx="11" ry="4.5" fill="rgba(240,200,60,0.16)"/>
+  <text x="220" y="463" font-size="16" text-anchor="middle">🤗</text>
+  <circle cx="268" cy="456" r="1.6" fill="#ffffff" opacity="0.6"/>
+  <circle cx="278" cy="475" r="1.3" fill="#f0d060" opacity="0.5"/>
+  <text x="196" y="825" text-anchor="middle" font-size="10" fill="rgba(196,168,212,0.22)" font-style="italic">send animation — in flight</text>
+</g>
+
+<!-- SCREEN 4 — RECEIPT + BUCKET -->
+<text x="30" y="2862" font-size="15" letter-spacing="1.5" fill="#c4a8d4" font-family="sans-serif">SCREEN 4 · RECEIPT + BUCKET</text>
+<g transform="translate(30,2876)">
+  <rect width="393" height="852" fill="url(#skyfull)"/>
+  <circle cx="60" cy="150" r="1" fill="rgba(255,255,255,0.35)"/>
+  <circle cx="150" cy="110" r="0.9" fill="rgba(255,255,255,0.3)"/>
+  <circle cx="300" cy="160" r="1.1" fill="rgba(255,255,255,0.32)"/>
+  <circle cx="90" cy="320" r="0.8" fill="rgba(196,168,212,0.35)"/>
+  <circle cx="340" cy="430" r="0.9" fill="rgba(255,255,255,0.28)"/>
+  <circle cx="70" cy="700" r="1" fill="rgba(196,168,212,0.3)"/>
+  <ellipse cx="288" cy="600" rx="52" ry="24" fill="url(#tensionglow)" opacity="0.55"/>
+  <path d="M252,600 C251,635 256,672 262,687 Q288,697 314,687 C320,672 325,635 324,600 Z" fill="url(#bucketwood)"/>
+  <line x1="272" y1="603" x2="270" y2="686" stroke="rgba(40,25,12,0.55)" stroke-width="1.3"/>
+  <line x1="288" y1="602" x2="288" y2="690" stroke="rgba(40,25,12,0.55)" stroke-width="1.3"/>
+  <line x1="304" y1="603" x2="306" y2="686" stroke="rgba(40,25,12,0.55)" stroke-width="1.3"/>
+  <path d="M255,638 Q288,643 321,638 L321,650 Q288,655 255,650 Z" fill="url(#brass)" stroke="rgba(90,70,20,0.5)" stroke-width="0.6"/>
+  <path d="M257,641 Q288,645 319,641" fill="none" stroke="rgba(255,240,180,0.45)" stroke-width="0.7"/>
+  <ellipse cx="288" cy="600" rx="36" ry="8.5" fill="rgba(12,9,22,0.9)" stroke="url(#brass)" stroke-width="3"/>
+  <ellipse cx="288" cy="600" rx="29" ry="6" fill="none" stroke="rgba(26,45,74,0.55)" stroke-width="1"/>
+  <path d="M256,598 Q288,548 320,598" fill="none" stroke="url(#brass)" stroke-width="3.2" stroke-linecap="round"/>
+  <path d="M256,598 Q288,550 320,598" fill="none" stroke="rgba(255,240,180,0.4)" stroke-width="1" stroke-linecap="round"/>
+  <circle cx="256" cy="598" r="3" fill="url(#brass)"/>
+  <circle cx="320" cy="598" r="3" fill="url(#brass)"/>
+  <circle cx="120" cy="512" r="1.6" fill="#f0d060" opacity="0.2"/>
+  <circle cx="135" cy="519" r="2" fill="#f0d060" opacity="0.3"/>
+  <circle cx="152" cy="527" r="2.4" fill="#ffe9a0" opacity="0.42"/>
+  <circle cx="168" cy="534" r="2.7" fill="#f0d060" opacity="0.55"/>
+  <line x1="178" y1="537" x2="310" y2="597" stroke="rgba(240,200,60,0.16)" stroke-width="11" stroke-linecap="round"/>
+  <line x1="178" y1="537" x2="310" y2="597" stroke="url(#shaft)" stroke-width="2.8" stroke-linecap="round"/>
+  <path d="M185,534 Q175,529 172,531 Q176,535 184,538Z" fill="rgba(196,168,212,0.8)"/>
+  <path d="M182,541 Q172,540 170,544 Q177,545 187,541Z" fill="rgba(196,168,212,0.56)"/>
+  <circle cx="178" cy="537" r="3.6" fill="rgba(196,168,212,0.66)"/>
+  <ellipse cx="310" cy="597" rx="11" ry="11" fill="url(#tipglow)"/>
+  <g transform="translate(310,597) rotate(24)">
+    <polygon points="0,0 -10,-4 -7,0 -10,4" fill="rgba(255,255,255,0.92)"/>
+  </g>
+  <circle cx="255" cy="574" r="1.1" fill="#f0d060" opacity="0.35"/>
+  <circle cx="272" cy="588" r="1.3" fill="#ffe9a0" opacity="0.4"/>
+  <ellipse cx="289" cy="603" rx="9" ry="3.5" fill="rgba(240,200,60,0.16)"/>
+  <text x="289" y="607" font-size="14" text-anchor="middle">🤗</text>
+  <text x="196" y="700" text-anchor="middle" font-size="20" fill="#e8e0f0">a hug from Sarah</text>
+  <text x="196" y="725" text-anchor="middle" font-size="13" fill="#9b8fa8">just landed in your bucket</text>
+  <text x="196" y="825" text-anchor="middle" font-size="10" fill="rgba(196,168,212,0.22)" font-style="italic">receipt — incoming</text>
+</g>
+</svg>
