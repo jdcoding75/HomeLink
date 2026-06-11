@@ -1,20 +1,15 @@
 // BowReceiptAnimationV1.swift
 // Pointward › Instruments › Bow
 //
-// V1 MARKER — the ORIGINAL, ACTIVE bow receipt.
-//
-// The live V1 bow receipt is the shared spin-to-catch `standardReceipt` in
-// ReceiptView (with the `ArrowLanding` landing beat in InstrumentLandingView).
-// It is intentionally NOT extracted into a standalone View — the safety rule is
-// zero behaviour change. This marker records that V1 is the active version.
-//
-// V2 — the full-screen Gemini redesign — lives in BowReceiptAnimationV2.swift
-// and is wired ONLY into the Animation Test Lab until explicitly promoted.
+// ⛔️ RETIRED (2026-06-11). The bow was rebuilt to the approved visual bible and
+// V2 (BowReceiptAnimationV2) is now the LIVE receipt — ReceiptView intercepts
+// .bowArrow → BowReceiptAnimationV2. The old V1 path (standardReceipt +
+// ArrowLanding) is no longer the active bow receipt. This marker is kept (not
+// deleted) per the framework's "V1 always kept" rule; body commented out.
 
 import SwiftUI
 
-enum BowReceiptAnimationV1 {
-    /// Live implementation: ReceiptView.standardReceipt + InstrumentLandingView.ArrowLanding.
-    static let duration: Double = InstrumentBoundaries.Receipt.bow
-    static let isActive = true
-}
+// enum BowReceiptAnimationV1 {
+//     static let duration: Double = InstrumentBoundaries.Receipt.bow
+//     static let isActive = false   // RETIRED — V2 is live
+// }
