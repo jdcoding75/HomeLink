@@ -148,10 +148,11 @@ struct ReceiptView: View {
         )
     }
 
-    // ── BIRTHDAY 🎂 — the special cake receipt (no bucket) ──────────────────
+    // ── BIRTHDAY 🎂 V2 — the HERO mic blow-out receipt (cake + bucket) ──────
+    // (V1 BirthdayCakeReceipt kept as the fallback per framework versioning.)
 
     private var birthdayReceipt: some View {
-        BirthdayCakeReceipt(
+        BirthdayCakeReceiptV2(
             emoji: ping.emoji,
             message: ping.message,
             tagline: ping.tagline,

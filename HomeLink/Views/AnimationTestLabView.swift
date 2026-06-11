@@ -66,6 +66,9 @@ struct AnimationTestLabView: View {
         LabEntry(icon: "🎆", name: "Firework Send",    style: .glow, version: nil),
         LabEntry(icon: "🎆", name: "Firework Receipt", style: .glow, version: nil),
         LabEntry(icon: "🎆", name: "Firework Compass", style: .glow, version: nil),
+        LabEntry(icon: "🎂", name: "Birthday Send",    style: .glow, version: nil),
+        LabEntry(icon: "🎂", name: "Birthday Receipt", style: .glow, version: nil),
+        LabEntry(icon: "🎂", name: "Birthday Compass", style: .glow, version: nil),
     ]
 
     private let columns = [GridItem(.flexible(), spacing: 12),
@@ -122,7 +125,7 @@ struct AnimationTestLabView: View {
 
     private func tile(_ entry: LabEntry, isSend: Bool) -> some View {
         Button {
-            let emoji = entry.name == "Birthday Cake" ? "🎂"
+            let emoji = entry.name.hasPrefix("Birthday") ? "🎂"
                       : (entry.name.hasPrefix("Firework") ? "🎆" : randomEmoji)
             playing = Playing(isSend: isSend, entry: entry, emoji: emoji)
         } label: {
@@ -225,12 +228,32 @@ struct AnimationTestLabView: View {
         }
     }
 
+    /// 🎂 Birthday Cake V2 — three named previews (send · receipt · compass).
+    private var birthdayV2Names: Set<String> { ["Birthday Send", "Birthday Receipt", "Birthday Compass"] }
+
+    @ViewBuilder
+    private func birthdayV2Player(_ p: Playing) -> some View {
+        switch p.entry.name {
+        case "Birthday Compass":
+            BirthdayCakeCompassFaceV2(personName: "them",
+                                      onSend: { autoDismiss(p, after: 0.3) })
+        case "Birthday Receipt":
+            BirthdayCakeReceiptV2(emoji: "🎂", fromName: "them",
+                                  onRevealed: {}, onFinished: { autoDismiss(p, after: 0.1) })
+        default: // "Birthday Send"
+            BirthdayCakeSendAnimationV2(emoji: "🎂",
+                                        onComplete: { autoDismiss(p, after: 0.3) })
+        }
+    }
+
     // ── Send: V1 = shared SenderAnimationView · V2 = extracted ACT struct ──
 
     @ViewBuilder
     private func sendPlayer(_ p: Playing) -> some View {
         if p.entry.name.hasPrefix("Firework") {
             fireworkPlayer(p)
+        } else if birthdayV2Names.contains(p.entry.name) {
+            birthdayV2Player(p)
         } else if p.isBirthday {
             // 🎂 — the special tap-the-candles compass-face send mechanic.
             BirthdayCakeCompassFace(personName: "them",
@@ -274,6 +297,8 @@ struct AnimationTestLabView: View {
     private func landPlayer(_ p: Playing) -> some View {
         if p.entry.name.hasPrefix("Firework") {
             fireworkPlayer(p)
+        } else if birthdayV2Names.contains(p.entry.name) {
+            birthdayV2Player(p)
         } else if p.isBirthday {
             // 🎂 — the special cake receipt (smoke wisps, no bucket).
             BirthdayCakeReceipt(emoji: "🎂", fromName: "them",

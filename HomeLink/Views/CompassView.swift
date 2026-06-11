@@ -234,7 +234,9 @@ struct CompassView: View {
                             // compass face becomes the special tap-the-candles
                             // birthday send mechanic; otherwise the normal face.
                             if (selectedToken.map { sendRemoteEmoji(for: $0) }) == "🎂" {
-                                BirthdayCakeCompassFace(
+                                // [birthday V2] HERO — tap each candle to LIGHT it.
+                                // (V1 BirthdayCakeCompassFace kept as fallback.)
+                                BirthdayCakeCompassFaceV2(
                                     bearingDegrees: compass.state.bearingDegrees,
                                     personName: compass.state.personName,
                                     onSend: { if let token = selectedToken { sendThought(token) } }
@@ -540,6 +542,17 @@ struct CompassView: View {
                         // deep-space launch → small pops → massive burst → embers,
                         // shown for ANY instrument, then back to the pipeline.
                         FireworkSendAnimation(
+                            emoji: previewEmoji,
+                            onComplete: {
+                                flightToken = nil
+                                flightFly   = false
+                                finishSend(emoji: previewEmoji, style: previewStyle)
+                            })
+                    } else if previewEmoji == "🎂" {
+                        // [birthday V2] 🎂 is a SPECIAL emoji send — the cake +
+                        // confetti burst, shown for ANY instrument, then back to
+                        // the pipeline (no EmojiRevealView here).
+                        BirthdayCakeSendAnimationV2(
                             emoji: previewEmoji,
                             onComplete: {
                                 flightToken = nil
