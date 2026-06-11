@@ -53,11 +53,16 @@ struct AnimationTestLabView: View {
     // V2 (today's extracted full-screen redesign) so the two can be compared.
     private let entries: [LabEntry] = [
         LabEntry(icon: "🧭", name: "Compass", style: .glow,        version: nil),
-        LabEntry(icon: "🏹", name: "Bow",     style: .bowArrow,    version: "V1"),
+        // [bow] V1 RETIRED — bow is V2-only live now; the V1 entry is removed
+        // from the lab (files kept, unreferenced). See Phase 2 version decision.
+        // LabEntry(icon: "🏹", name: "Bow",     style: .bowArrow,    version: "V1"),
         LabEntry(icon: "🏹", name: "Bow",     style: .bowArrow,    version: "V2"),
         LabEntry(icon: "👆", name: "Flick",   style: .fingerFlick, version: "V1"),
         LabEntry(icon: "👆", name: "Flick",   style: .fingerFlick, version: "V2"),
-        LabEntry(icon: "🚀", name: "Rocket",  style: .rocket,      version: nil),
+        // [rocket] BOTH landings kept: V1 = legs (InstrumentLandingView), V2 =
+        // parachute (RocketReceiptAnimation, the live receipt). Send is shared.
+        LabEntry(icon: "🚀", name: "Rocket",  style: .rocket,      version: "V1"),
+        LabEntry(icon: "🚀", name: "Rocket",  style: .rocket,      version: "V2"),
         LabEntry(icon: "🌬️", name: "Wind",    style: .firefly,     version: nil),
         LabEntry(icon: "🪄", name: "Wand",    style: .wand,        version: "V1"),
         LabEntry(icon: "✈️", name: "Plane",   style: .plane,       version: "V1"),
@@ -258,6 +263,13 @@ struct AnimationTestLabView: View {
             // 🎂 — the special tap-the-candles compass-face send mechanic.
             BirthdayCakeCompassFace(personName: "them",
                                     onSend: { autoDismiss(p, after: 0.3) })
+        } else if p.style == .rocket {
+            // Rocket send is shared (one launch) — both V1 (legs) and V2
+            // (parachute) tiles fire the same SenderAnimationView blast off.
+            SenderAnimationView(style: .rocket, emoji: p.emoji, bearingDegrees: 0,
+                                symbol: Text(p.emoji).font(.system(size: 45))) {
+                autoDismiss(p, after: 0.3)
+            }
         } else if p.isV2 {
             let t = InstrumentTransition(exitBearing: 0, exitPoint: .zero,
                                          instrument: instrumentKind(p.style),
@@ -314,6 +326,9 @@ struct AnimationTestLabView: View {
             case .plane:       PlaneReceiptAnimationV2(senderBearing: 120, emoji: p.emoji,
                                                        message: nil, tagline: nil, fromName: "",
                                                        onRevealed: {}, onFinished: { autoDismiss(p, after: 0.1) })
+            case .rocket:      RocketReceiptAnimation(senderBearing: 120, emoji: p.emoji,
+                                                      message: nil, tagline: nil, fromName: "",
+                                                      onRevealed: {}, onFinished: { autoDismiss(p, after: 0.1) })
             default:           EmptyView()
             }
         } else if p.style == .plane {
@@ -443,11 +458,13 @@ struct AnimationFeedbackView: View {
 
     private let entries: [AnimationTestLabView.LabEntry] = [
         .init(icon: "🧭", name: "Compass", style: .glow,        version: nil),
-        .init(icon: "🏹", name: "Bow",     style: .bowArrow,    version: "V1"),
+        // [bow] V1 retired (see main lab list).
+        // .init(icon: "🏹", name: "Bow",     style: .bowArrow,    version: "V1"),
         .init(icon: "🏹", name: "Bow",     style: .bowArrow,    version: "V2"),
         .init(icon: "👆", name: "Flick",   style: .fingerFlick, version: "V1"),
         .init(icon: "👆", name: "Flick",   style: .fingerFlick, version: "V2"),
-        .init(icon: "🚀", name: "Rocket",  style: .rocket,      version: nil),
+        .init(icon: "🚀", name: "Rocket",  style: .rocket,      version: "V1"),
+        .init(icon: "🚀", name: "Rocket",  style: .rocket,      version: "V2"),
         .init(icon: "🌬️", name: "Wind",    style: .firefly,     version: nil),
         .init(icon: "🪄", name: "Wand",    style: .wand,        version: "V1"),
         .init(icon: "✈️", name: "Plane",   style: .plane,       version: "V1"),
