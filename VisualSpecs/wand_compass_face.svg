@@ -1,0 +1,65 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 800" width="100%" height="100%">
+  <defs>
+    <filter id="core-glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="6" result="blur1" />
+      <feGaussianBlur stdDeviation="12" result="blur2" />
+      <feMerge><feMergeNode in="blur2" /><feMergeNode in="blur1" /><feMergeNode in="SourceGraphic" /></feMerge>
+    </filter>
+    <filter id="star-glow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="4" result="blur" />
+      <feComponentTransfer in="blur" result="boost"><feFuncA type="linear" slope="1.5"/></feComponentTransfer>
+      <feMerge><feMergeNode in="boost" /><feMergeNode in="SourceGraphic" /></feMerge>
+    </filter>
+    <linearGradient id="crystal-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff" /><stop offset="30%" stop-color="#7bf0ff" /><stop offset="70%" stop-color="#b64eff" /><stop offset="100%" stop-color="#ff2a85" />
+    </linearGradient>
+    <linearGradient id="crystal-edge" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.8" /><stop offset="100%" stop-color="#ffffff" stop-opacity="0" />
+    </linearGradient>
+    <linearGradient id="metal-shaft" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#1a1326" /><stop offset="35%" stop-color="#4d3969" /><stop offset="50%" stop-color="#8a6ca8" /><stop offset="65%" stop-color="#4d3969" /><stop offset="100%" stop-color="#1a1326" />
+    </linearGradient>
+    <linearGradient id="gold-trim" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#61460b" /><stop offset="30%" stop-color="#e6b84a" /><stop offset="50%" stop-color="#fff1bd" /><stop offset="70%" stop-color="#e6b84a" /><stop offset="100%" stop-color="#61460b" />
+    </linearGradient>
+    <radialGradient id="flare" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="1" /><stop offset="20%" stop-color="#99f5ff" stop-opacity="0.8" /><stop offset="60%" stop-color="#ca73ff" stop-opacity="0.2" /><stop offset="100%" stop-color="#000000" stop-opacity="0" />
+    </radialGradient>
+  </defs>
+  <g id="magical-wand">
+    <circle cx="200" cy="180" r="90" fill="url(#flare)" opacity="0.6" />
+    <circle cx="200" cy="140" r="40" fill="#ffffff" filter="url(#core-glow)" opacity="0.4" />
+    <path d="M 194,360 L 206,360 L 202,680 L 198,680 Z" fill="url(#metal-shaft)" />
+    <path d="M 194,390 Q 200,385 205,395 Q 200,420 195,430 Q 201,435 205,445 T 196,495 T 205,545 T 197,595 T 203,645" fill="none" stroke="url(#gold-trim)" stroke-width="2.5" opacity="0.85" />
+    <path d="M 197,680 L 203,680 L 204,695 Q 200,702 196,695 Z" fill="url(#gold-trim)" />
+    <circle cx="200" cy="700" r="5" fill="url(#crystal-grad)" filter="url(#star-glow)" />
+    <ellipse cx="200" cy="360" rx="10" ry="4" fill="url(#gold-trim)" />
+    <path d="M 190,360 Q 185,320 200,300 Q 215,320 210,360 Z" fill="url(#gold-trim)" />
+    <circle cx="200" cy="335" r="4" fill="url(#crystal-grad)" />
+    <path d="M 188,305 C 180,270 185,240 192,225 C 190,250 193,280 200,295" fill="url(#gold-trim)" />
+    <path d="M 212,305 C 220,270 215,240 208,225 C 210,250 207,280 200,295" fill="url(#gold-trim)" />
+    <g id="crystal-top" filter="url(#core-glow)">
+      <path d="M 200,100 L 222,170 L 214,245 L 186,245 L 178,170 Z" fill="url(#crystal-grad)" />
+      <path d="M 200,100 L 200,245" stroke="url(#crystal-edge)" stroke-width="1.5" fill="none" />
+      <path d="M 200,100 L 186,245" stroke="url(#crystal-edge)" stroke-width="1" opacity="0.6" fill="none" />
+      <path d="M 200,100 L 222,170 L 200,185 L 178,170 Z" fill="#ffffff" opacity="0.15" />
+      <path d="M 200,185 L 214,245 L 186,245 Z" fill="#000000" opacity="0.1" />
+      <path d="M 200,100 L 214,245" stroke="url(#crystal-edge)" stroke-width="1" opacity="0.6" fill="none" />
+      <path d="M 195,130 Q 205,160 190,190 T 205,230" fill="none" stroke="#ffffff" stroke-width="1.5" opacity="0.7" />
+      <path d="M 203,120 Q 192,155 208,180 T 197,225" fill="none" stroke="#7bf0ff" stroke-width="1" opacity="0.8" />
+    </g>
+    <path d="M 200,75 Q 200,100 175,100 Q 200,100 200,125 Q 200,100 225,100 Q 200,100 200,75 Z" fill="#ffffff" filter="url(#star-glow)" />
+    <path d="M 200,85 Q 200,100 185,100 Q 200,100 200,115 Q 200,100 215,100 Q 200,100 200,85 Z" fill="#99f5ff" />
+    <ellipse cx="200" cy="120" rx="45" ry="12" fill="none" stroke="#7bf0ff" stroke-width="1.5" stroke-dasharray="15 10 5 10" transform="rotate(-15 200 120)" opacity="0.8" filter="url(#star-glow)"/>
+    <ellipse cx="200" cy="170" rx="55" ry="14" fill="none" stroke="#ff80df" stroke-width="1.5" stroke-dasharray="30 15" transform="rotate(10 200 170)" opacity="0.6" filter="url(#star-glow)"/>
+    <circle cx="150" cy="140" r="3" fill="#ffffff" filter="url(#star-glow)" />
+    <circle cx="245" cy="110" r="2" fill="#7bf0ff" filter="url(#star-glow)" />
+    <circle cx="165" cy="95" r="1.5" fill="#ffb3ff" />
+    <circle cx="235" cy="180" r="3.5" fill="#ffffff" filter="url(#star-glow)" />
+    <circle cx="140" cy="210" r="2" fill="#7bf0ff" />
+    <circle cx="250" cy="230" r="2.5" fill="#ff80df" filter="url(#star-glow)" />
+    <path d="M 155,175 H 165 M 160,170 V 180" stroke="#ffffff" stroke-width="1" />
+    <path d="M 230,85 H 236 M 233,82 V 88" stroke="#7bf0ff" stroke-width="1" />
+    <path d="M 180,130 H 184 M 182,128 V 132" stroke="#ffffff" stroke-width="1" />
+  </g>
+</svg>
