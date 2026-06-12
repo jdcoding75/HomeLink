@@ -9,7 +9,7 @@
 // wind finds you). The bucket land hands off to the shared EmojiRevealView, the
 // emotional peak, where the emoji's own sound + reveal haptic fire.
 //
-//   ENTER    (0.8s)  edge → centre, grows 0.5 → 1.0, easeOut
+//   ENTER    (0.8s)  TOP → centre — a full fall, grows 0.5 → 1.0, easeOut
 //   DRIFT    (4.0s)  lazy S-curve (W*0.36 / H*0.15), seeds stream, messages
 //   APPROACH (1.5s)  toward the bucket, scale 1.0 → 0.65, easeInOut
 //   LAND     (0.9s)  tips in: rotate −85°, scale 0.65 → 0.25, fade, seed burst
@@ -167,11 +167,12 @@ struct WindReceiptAnimation: View {
         .position(pos)
     }
 
-    /// The entry edge — FROM the sender's bearing.
+    /// The entry point — the leaf falls from the TOP of the screen.
     private func entryPoint(_ size: CGSize) -> CGPoint {
-        // Enters FROM the sender's bearing, off-screen (RULE 5 entryReach 0.75).
-        CGPoint(x: size.width / 2 + CGFloat(cos(rad)) * size.width * 0.75,
-                y: size.height / 2 + CGFloat(sin(rad)) * size.height * 0.75)
+        // [tweak] Start at TOP-centre, above the screen edge, so the leaf does a
+        // FULL fall straight down to centre (was: in from the sender's bearing
+        // edge, which for many bearings started from a low/below-screen point).
+        CGPoint(x: size.width / 2, y: -size.height * 0.15)
     }
 
     private func bucketPoint(_ size: CGSize) -> CGPoint {

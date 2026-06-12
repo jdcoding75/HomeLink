@@ -183,10 +183,13 @@ struct WindSendAnimation: View {
   private func swirlPos(localT: Double, size: CGSize) -> CGPoint {
     // [1/5] Centre on the TRUE full-screen middle (GeometryReader size) so the
     // leaf swirls through the centre and never touches the bottom.
-    //   x = cx + sin(t·0.72) · width  · 0.36
-    //   y = cy + sin(t·0.45 + 1.0) · height · 0.15
-    let sx = sin(localT * 0.72)
-    let sy = sin(localT * 0.45 + 1.0)
+    // [tweak] Frequencies scaled ×2/3 (0.72→0.48, 0.45→0.30) so the leaf makes
+    // TWO round-turns instead of three (one up-down = one turn); same lazy-S
+    // shape, same entry (localT 0 → centre), still drifts off as before.
+    //   x = cx + sin(t·0.48) · width  · 0.36
+    //   y = cy + sin(t·0.30 + 1.0) · height · 0.15
+    let sx = sin(localT * 0.48)
+    let sy = sin(localT * 0.30 + 1.0)
     return CGPoint(x: size.width  / 2 + CGFloat(sx) * size.width  * Self.swirlWidthAmp,
                    y: size.height / 2 + CGFloat(sy) * size.height * Self.swirlHeightAmp)
   }
