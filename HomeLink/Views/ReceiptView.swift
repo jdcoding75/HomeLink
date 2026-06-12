@@ -115,9 +115,29 @@ struct ReceiptView: View {
             bowReceipt
         } else if style == .plane {
             planeReceipt
+        } else if style == .glow {
+            // [compass] COMPASS — its own SIMPLE-REVEAL receipt: the orb drifts
+            // in at an angle and settles into the receiver's own compass face,
+            // then the reveal. No bucket, no spin-to-catch. (Flick/wand still use
+            // the shared standardReceipt below — only compass is intercepted.)
+            compassReceipt
         } else {
             standardReceipt
         }
+    }
+
+    // ── COMPASS — the dedicated simple-reveal receipt (orb → compass face) ──
+
+    private var compassReceipt: some View {
+        CompassReceiptAnimation(
+            senderBearing: compass.rawBearingToTarget ?? 120,
+            emoji: ping.emoji,
+            message: ping.message,
+            tagline: ping.tagline,
+            fromName: ping.fromName,
+            onRevealed: { revealHandoff() },
+            onFinished: onFinished
+        )
     }
 
     // ── PLANE — the V1 visual-bible receipt (plane flies toward you → bucket) ─

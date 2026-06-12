@@ -342,10 +342,15 @@ private struct AnimationStageView: View {
                 RocketLandingReceiptAnimation(senderBearing: 120, emoji: emoji, fromName: "",
                                               onRevealed: {}, onFinished: onDone)
             }
+        } else if def.style == .glow {
+            // COMPASS — its own SIMPLE-REVEAL receipt: the orb drifts in at an
+            // angle and settles into the (minimal-skin) compass face, then the
+            // reveal. No bucket, no spin-to-catch.
+            CompassReceiptAnimation(senderBearing: 120, emoji: emoji, fromName: "",
+                                    onRevealed: {}, onFinished: onDone)
         } else {
-            // bow V1 / flick V1 / wand V1 / compass — the landing beat. (Its
-            // tail IS the reveal for dedicated receipts — there is no separate
-            // Reveal stage in the 5-stage model.)
+            // bow V1 / flick V1 / wand V1 — the landing beat. (Its tail IS the
+            // reveal for dedicated receipts — there is no separate Reveal stage.)
             InstrumentLandingView(style: def.style, emoji: emoji) { onDone() }
         }
     }
