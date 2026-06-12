@@ -8,11 +8,17 @@
 // particle trail and exits off the right edge. The shared send pipeline then
 // shows the sent confirmation (this view never shows EmojiRevealView).
 //
-//   LAUNCH (0.0–0.3s)  arrow appears at the edge, hard accel (easeIn)
-//   FLIGHT (0.3–0.5s)  travels at y≈0.55h with a slight arc; whistle plays
-//   EXIT   (0.5–0.8s)  exits right (geo.size.width × 1.15); trail fades
+//   LAUNCH (0.0–0.30s)  arrow appears LOW-left, the release accel (easeIn)
+//   FLIGHT (0.30–1.95s) a long, graceful rising ARC across the whole screen on a
+//                       true bezier curve; whistle plays
+//   EXIT   (1.95–2.30s) exits the right edge HIGH (≈0.30h) — continuing into
+//                       BowReceiptAnimationV2's upper-left arrival, so the send's
+//                       exit and the receipt's entry read as one continuous flight.
 //
-// Total: InstrumentBoundaries.Send.bow (0.8s).
+// Total: 2.30s — a noticeably more unhurried lob, lengthened by PATH not just
+// speed, sitting comfortably under the 3.5s receipt. Trajectory/timing only —
+// the arrow art, draw/release, and sounds are unchanged. V2 only; the live bow
+// timing constant InstrumentBoundaries.Send.bow is deliberately NOT touched.
 
 import SwiftUI
 
@@ -22,11 +28,12 @@ struct BowSendAnimationV2: View {
     var personName: String = ""
     var onComplete: () -> Void = {}
 
-    static let duration: Double = InstrumentBoundaries.Send.bow   // 0.8
-
-    private static let launchEnd: Double = 0.3
-    private static let flightEnd: Double = 0.5
-    private static let total:     Double = 0.8
+    // The lengthened, graceful flight lives HERE (V2 only) — decoupled from the
+    // live InstrumentBoundaries.Send.bow (0.8s) so V1 and the boundary are untouched.
+    private static let total:     Double = 2.30
+    private static let launchEnd: Double = 0.30
+    private static let flightEnd: Double = 1.95
+    static let duration: Double = total
 
     private static let skyTop = Color(hex: "#1a2d4a")
     private static let skyBot = Color(hex: "#0e1e38")
@@ -71,26 +78,45 @@ struct BowSendAnimationV2: View {
 
     @ViewBuilder
     private func arrow(geo: GeometryProxy, elapsed e: Double) -> some View {
+        // Aim the arrow along its flight tangent so the long arc reads naturally
+        // (the glyph art is unchanged — only its heading follows the path).
+        let t0 = max(0, min(Self.total - 0.03, e))
+        let a = arrowPos(geo.size, t0)
+        let b = arrowPos(geo.size, t0 + 0.03)
+        let angle = atan2(Double(b.y - a.y), Double(b.x - a.x)) * 180 / .pi
         BowArrowGlyph(emoji: transition.emoji)
             .frame(width: Self.arrowW, height: Self.arrowH)
+            .rotationEffect(.degrees(angle))
             .position(arrowPos(geo.size, e))
     }
 
-    /// Left → right at y ≈ 0.55h with a slight upward arc at centre.
+    /// A long, graceful LOB: from low-left, up over the whole screen on a true
+    /// quadratic-bezier arc, exiting the right edge HIGH (≈0.30h) so the flight
+    /// continues straight into BowReceiptAnimationV2's upper-left arrival.
     private func arrowPos(_ size: CGSize, _ e: Double) -> CGPoint {
-        let entryX = -size.width * 0.15
-        let exitX  =  size.width * 1.15
-        let p: Double
+        let s   = CGPoint(x: -size.width * 0.15, y: size.height * 0.82)   // low-left start
+        let c   = CGPoint(x:  size.width * 0.52, y: size.height * 0.06)   // high control → real arc
+        let end = CGPoint(x:  size.width * 1.15, y: size.height * 0.30)   // exit high-right (receipt entry band)
+        return bezier(s, c, end, CGFloat(pathProgress(e)))
+    }
+
+    /// Maps elapsed time → 0…1 along the path: a snappy release, then a long
+    /// unhurried glide, then a soft easing out through the exit.
+    private func pathProgress(_ e: Double) -> Double {
         if e <= Self.launchEnd {
-            p = easeIn(e / Self.launchEnd) * 0.18
+            return easeIn(e / Self.launchEnd) * 0.14
         } else if e <= Self.flightEnd {
-            p = 0.18 + ((e - Self.launchEnd) / (Self.flightEnd - Self.launchEnd)) * 0.62
+            return 0.14 + ((e - Self.launchEnd) / (Self.flightEnd - Self.launchEnd)) * 0.78
         } else {
-            p = 0.80 + easeOut((e - Self.flightEnd) / (Self.total - Self.flightEnd)) * 0.20
+            return 0.92 + easeOut((e - Self.flightEnd) / (Self.total - Self.flightEnd)) * 0.08
         }
-        let x = entryX + (exitX - entryX) * CGFloat(p)
-        let arc = -sin(p * .pi) * size.height * 0.08
-        return CGPoint(x: x, y: size.height * 0.55 + arc)
+    }
+
+    /// Quadratic bezier point at p (0…1).
+    private func bezier(_ s: CGPoint, _ c: CGPoint, _ end: CGPoint, _ p: CGFloat) -> CGPoint {
+        let mp = 1 - p
+        return CGPoint(x: mp * mp * s.x + 2 * mp * p * c.x + p * p * end.x,
+                       y: mp * mp * s.y + 2 * mp * p * c.y + p * p * end.y)
     }
 
     @ViewBuilder
