@@ -9,11 +9,16 @@
 // at touchdown, and the emoji catches in the bucket — then blooms into the
 // shared EmojiRevealView.
 //
-//   DEPLOY (0.0–0.6s)  canopy opens at the top of the sky
-//   DESCEND (0.6–4.4s) slow drift down toward the bucket, ±4° pendulum sway,
-//                      plane_flight ambient
-//   LAND   (4.4–5.0s)  canopy collapses, emoji settles into the bucket,
-//                      cyan catch glow, plane_catch.wav
+//   FLY-OVER (0.0–0.9s) the paper plane from the send streaks ACROSS THE TOP,
+//                       already in motion — the send→receipt hand-off as one
+//                       continuous flight; it drops its payload and exits right
+//   RELEASE (0.0–0.45s) OVERLAPPING the fly-over, the parachute pops open from
+//                       the TOP-LEFT and begins its drop (visible overlap, not a
+//                       second separate beat)
+//   DESCEND (…–4.4s)    slow drift down toward the bucket, ±4° pendulum sway,
+//                       plane_flight ambient
+//   LAND   (4.4–5.0s)   canopy collapses, emoji settles into the bucket,
+//                       cyan catch glow, plane_catch.wav
 //   → EmojiRevealView (.received, .plane)                                = 5.0s
 //
 // Screen-coordinate rules (all 6): GeometryReader root, dark sky
@@ -33,7 +38,10 @@ struct PlaneReceiptAnimationV2: View {
 
     static let duration: Double = InstrumentBoundaries.Receipt.plane   // 5.0
 
-    private static let deployEnd:  Double = 0.6
+    // [continuity] The send's plane streaks across the top during this window,
+    // overlapping the parachute's quick top-left release.
+    private static let planeFlyEnd: Double = 0.9
+    private static let deployEnd:  Double = 0.45   // quicker pop — releases overlapping the fly-over
     private static let descendEnd: Double = 4.4
     private static let total:      Double = InstrumentBoundaries.Receipt.plane   // 5.0
 
@@ -71,6 +79,7 @@ struct PlaneReceiptAnimationV2: View {
                                 .opacity(skyIn ? 1 : 0)
 
                             bucket(geo: geo)
+                            flyoverPlane(geo: geo, elapsed: e)
                             parachute(geo: geo, elapsed: e)
 
                             VStack {
@@ -121,6 +130,39 @@ struct PlaneReceiptAnimationV2: View {
         CGPoint(x: size.width - 80, y: size.height - 95)
     }
 
+    // ── The fly-over plane — continues the send's flight across the TOP ──────
+    //
+    // The same PlaneGlyph that exited the send re-enters here already in motion,
+    // crossing the top of the sky left→right and exiting the right edge. It
+    // carries no emoji — the payload is now under the parachute it just dropped.
+
+    @ViewBuilder
+    private func flyoverPlane(geo: GeometryProxy, elapsed e: Double) -> some View {
+        if e <= Self.planeFlyEnd {
+            let pos: CGPoint = planePos(geo.size, e)
+            let bank: Double = sin(e * 2.2) * 3                 // gentle banking, like the send
+            let fade: Double = e > Self.planeFlyEnd - 0.25
+                ? max(0, (Self.planeFlyEnd - e) / 0.25) : 1     // fade out as it leaves
+            PlaneGlyph(emoji: nil)                              // payload already released
+                .frame(width: 120, height: 64)
+                .rotationEffect(.degrees(bank))
+                .position(pos)
+                .opacity(fade)
+                .allowsHitTesting(false)
+        }
+    }
+
+    /// Steady left → right pass across the TOP band (already in motion — no slow
+    /// accel), exiting off the right edge by planeFlyEnd.
+    private func planePos(_ size: CGSize, _ e: Double) -> CGPoint {
+        let p: Double = min(e / Self.planeFlyEnd, 1)            // linear → constant speed
+        let entryX: CGFloat = -size.width * 0.15
+        let exitX:  CGFloat =  size.width * 1.15
+        let x = entryX + (exitX - entryX) * CGFloat(p)
+        let arc = -sin(p * .pi) * size.height * 0.015          // a whisper of lift
+        return CGPoint(x: x, y: size.height * 0.12 + arc)
+    }
+
     // ── The parachute rig (canopy + lines + emoji), swaying as it descends ────
 
     @ViewBuilder
@@ -163,7 +205,9 @@ struct PlaneReceiptAnimationV2: View {
         let topY = size.height * 0.12
         let landY = bucket.y - 54
         let p = min(e / Self.descendEnd, 1)
-        let xFrom = size.width * 0.42
+        // [continuity] Release from the TOP-LEFT (under the plane's pass), then
+        // drift across to the bucket as before.
+        let xFrom = size.width * 0.18
         let x = xFrom + (bucket.x - xFrom) * CGFloat(easeInOut(p))
         let y = topY + (landY - topY) * CGFloat(p)
         return CGPoint(x: x, y: y)
