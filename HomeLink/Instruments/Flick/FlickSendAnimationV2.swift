@@ -1,16 +1,12 @@
 // FlickSendAnimationV2.swift
 // Pointward › Instruments › Flick
 //
-// ACT 2 of 3 — the full-screen FLICK send journey.
+// ACT 2 of 3 — the full-screen FLICK V2 (DESK) send journey.
 //
-// A crumpled paper ball, flicked into the dusk, spins through a twilight sky
-// of sparse dim stars. It enters from the screen edge (the bearing it left the
-// compass circle), arcs across ~58% height peaking above the midline, then
-// drifts off toward that same bearing — cream paper flecks in its wake, not
-// gold; this is paper, not magic.
-//
-//   Enter from transition.sendEntryPoint → arc across → exit toward exitBearing
-//   Total: InstrumentBoundaries.Send.flick (0.7s).
+// The crumpled paper ball, flicked off the desk, spins across a TWILIGHT SKY
+// (#1a2d4a→#243d5c→#1e3550→#0e1e30) of faint stars in ONE smooth continuous arc
+// — no hesitation: left edge → right edge, a gentle arc peaking ~18% up, a faint
+// cream dust trail in its wake. ~3.5s.
 //
 // HANDOFF: receives InstrumentTransition from the compass face (ACT 1).
 // On completion it calls onComplete; the shared send pipeline (CompassView)
@@ -24,17 +20,15 @@ struct FlickSendAnimationV2: View {
   var personName: String = ""
   var onComplete: () -> Void = {}
 
-  static let duration: Double = InstrumentBoundaries.Send.flick   // 0.7
-  private static let total: Double = 0.7
+  static let duration: Double = 3.5
+  private static let total: Double = 3.5
 
-  private static let paper     = Color(hex: "#F8F8F0")
-  private static let paperEdge = Color(hex: "#D9D4C2")
-  private static let crease    = Color(hex: "#C9C2AC")
-  private static let skyTop     = Color(hex: "#1a2d4a")
-  private static let skyMid     = Color(hex: "#243d5c")
-  private static let skyLow     = Color(hex: "#1e3550")
+  private static let skyTop = Color(hex: "#1a2d4a")
+  private static let skyMid = Color(hex: "#243d5c")
+  private static let skyLow = Color(hex: "#1e3550")
+  private static let skyBot = Color(hex: "#0e1e30")
 
-  // Sparse dim stars — index-derived positions (no render-time random).
+  // Sparse faint stars — index-derived positions (no render-time random).
   private static let starCount = 60
   private static let starSeeds: [(x: CGFloat, y: CGFloat, sz: CGFloat, o: Double)] = {
     (0..<starCount).map { i in
@@ -53,7 +47,7 @@ struct FlickSendAnimationV2: View {
     GeometryReader { geo in
       ZStack {
         Color(hex: "#0d0d14").ignoresSafeArea()
-        LinearGradient(colors: [Self.skyTop, Self.skyMid, Self.skyLow],
+        LinearGradient(colors: [Self.skyTop, Self.skyMid, Self.skyLow, Self.skyBot],
                        startPoint: .top, endPoint: .bottom)
           .ignoresSafeArea()
           .opacity(skyIn ? 1 : 0)
@@ -72,8 +66,8 @@ struct FlickSendAnimationV2: View {
     .onAppear {
       start = Date()
       withAnimation(.easeInOut(duration: 0.3)) { skyIn = true }
-      InstrumentSoundPlayer.shared.playSend(.flick)
-      HapticPattern.sharpSnap.fire()
+      InstrumentSoundPlayer.shared.playSend(.flick)   // gentle paper snap+whoosh
+      HapticPattern.singleSoft.fire()                 // soft — NOT sharp
       DispatchQueue.main.asyncAfter(deadline: .now() + Self.total) { onComplete() }
     }
   }
@@ -83,66 +77,47 @@ struct FlickSendAnimationV2: View {
     return min(max(0, now.timeIntervalSince(start)), Self.total)
   }
 
-  // ── Path — edge → arc across ~58% height (peak above midline) → off-screen ─
+  // ── Path — left edge → right edge, ONE gentle arc peaking ~18% up ─────────
 
   private func ballPos(geo: GeometryProxy, elapsed: Double) -> CGPoint {
     let size = geo.size
-    let entry = transition.sendEntryPoint(screenSize: size)
-    let exit  = departPoint(size)
-    let mid = CGPoint(x: size.width / 2,
-                      y: size.height * 0.58 - size.height * 0.18)   // arc peak above midline
+    let startPt = CGPoint(x: -size.width * 0.05, y: size.height * 0.62)
+    let endPt   = CGPoint(x: size.width * 1.05,  y: size.height * 0.62)
+    // Control chosen so the quad's apex sits ~18% of the height above the
+    // baseline (apex.y = 0.25·start + 0.5·control + 0.25·end).
+    let ctrl    = CGPoint(x: size.width * 0.5, y: size.height * 0.26)
     let p = CGFloat(min(1, elapsed / Self.total))
-    return CGPoint(
-      x: (1 - p) * (1 - p) * entry.x + 2 * (1 - p) * p * mid.x + p * p * exit.x,
-      y: (1 - p) * (1 - p) * entry.y + 2 * (1 - p) * p * mid.y + p * p * exit.y
-    )
+    let mx = (1 - p) * (1 - p) * startPt.x + 2 * (1 - p) * p * ctrl.x + p * p * endPt.x
+    let my = (1 - p) * (1 - p) * startPt.y + 2 * (1 - p) * p * ctrl.y + p * p * endPt.y
+    return CGPoint(x: mx, y: my)
   }
 
-  private func departPoint(_ size: CGSize) -> CGPoint {
-    let rad = transition.exitBearing * .pi / 180
-    return CGPoint(x: size.width / 2 + CGFloat(sin(rad)) * size.width * 1.15,
-                   y: size.height / 2 - CGFloat(cos(rad)) * size.height * 1.15)
-  }
-
-  // ── The crumpled paper ball — spins 300°/s, grows 0.85→1.0→0.85 ──────────
+  // ── The crumpled paper ball — spins steadily, gentle breathing scale ──────
 
   @ViewBuilder
   private func ball(geo: GeometryProxy, elapsed: Double) -> some View {
     let pos = ballPos(geo: geo, elapsed: elapsed)
-    let spin = elapsed * 300
+    let spin = elapsed * 220                                  // 220°/sec, calm
     let p = min(1, elapsed / Self.total)
-    let grow = 0.85 + 0.15 * CGFloat(sin(p * .pi))
-    ZStack {
-      Circle()
-        .fill(RadialGradient(colors: [Self.paper, Self.paperEdge],
-                             center: UnitPoint(x: 0.4, y: 0.35),
-                             startRadius: 2, endRadius: 22))
-        .frame(width: 40, height: 40)
-        .shadow(color: .black.opacity(0.3), radius: 5, y: 3)
-      ForEach(0..<3, id: \.self) { i in
-        Capsule()
-          .stroke(Self.crease.opacity(0.7), lineWidth: 1)
-          .frame(width: 26 - CGFloat(i) * 5, height: 1)
-          .rotationEffect(.degrees(Double(i) * 57))
-      }
-      Text(transition.emoji).font(.system(size: 18)).opacity(0.3)
-    }
-    .rotationEffect(.degrees(spin))
-    .scaleEffect(grow)
-    .position(pos)
+    let grow = 0.9 + 0.12 * CGFloat(sin(p * .pi))            // 0.9 → ~1.0 → 0.9
+    CrumpledPaperBall(size: 46, emoji: transition.emoji, emojiOpacity: 0.3,
+                      showShadow: false)
+      .rotationEffect(.degrees(spin))
+      .scaleEffect(grow)
+      .position(pos)
   }
 
   // ── Cream trail flecks (NOT gold — paper, not magic) ─────────────────────
 
   @ViewBuilder
   private func trail(geo: GeometryProxy, elapsed: Double) -> some View {
-    ForEach(0..<8, id: \.self) { k in
-      let tb = elapsed - Double(k) * 0.03
+    ForEach(0..<10, id: \.self) { k in
+      let tb = elapsed - Double(k) * 0.07
       if tb > 0 {
-        let frac = Double(k) / 8
+        let frac = Double(k) / 10
         let p = ballPos(geo: geo, elapsed: tb)
         Circle()
-          .fill(Self.paper.opacity((1 - frac) * 0.5))
+          .fill(FlickDeskPalette.paperA.opacity((1 - frac) * 0.45))
           .frame(width: 6 - CGFloat(frac) * 3, height: 6 - CGFloat(frac) * 3)
           .position(p)
           .allowsHitTesting(false)
@@ -150,7 +125,7 @@ struct FlickSendAnimationV2: View {
     }
   }
 
-  // ── Sparse dim stars ──────────────────────────────────────────────────────
+  // ── Faint stars ───────────────────────────────────────────────────────────
 
   @ViewBuilder
   private func stars(geo: GeometryProxy) -> some View {

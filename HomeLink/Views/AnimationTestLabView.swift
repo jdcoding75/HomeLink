@@ -234,8 +234,15 @@ private struct AnimationStageView: View {
             BowInstrumentView(loadedToken: t, loadedSymbol: sym, bearingDegrees: 0,
                               personName: "them", onSend: onDone)
         case .fingerFlick:
-            FlickInstrumentView(loadedToken: t, loadedSymbol: sym, bearingDegrees: 0,
-                                personName: "them", onSend: { _ in onDone() })
+            if def.version == "V2" {
+                // FLICK V2 — the DESK + crumpled-ball compass face (one watchable
+                // beat: finger flicks the paper ball off the desk).
+                FlickDeskCompassFace(personName: "them", emoji: emoji,
+                                     bearingDegrees: 45, onSend: onDone)
+            } else {
+                FlickInstrumentView(loadedToken: t, loadedSymbol: sym, bearingDegrees: 0,
+                                    personName: "them", onSend: { _ in onDone() })
+            }
         case .plane:
             PlaneInstrumentView(loadedToken: t, loadedSymbol: sym, bearingDegrees: 0,
                                 personName: "them", onLaunch: onDone)

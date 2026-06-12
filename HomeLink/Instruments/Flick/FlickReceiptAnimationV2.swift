@@ -77,10 +77,10 @@ struct FlickReceiptAnimationV2: View {
           TimelineView(.animation) { timeline in
             let elapsed = clampedElapsed(now: timeline.date)
             ZStack {
-              // BACKGROUND — the corkBoard world, crossfaded in (matches the
-              // flick reveal ambient for a continuous world).
+              // BACKGROUND — the full school DESK (wall + oak surface),
+              // crossfaded in. The bucket sits upright on the desk floor.
               Color(hex: "#0d0d14").ignoresSafeArea()
-              InstrumentBackground.corkBoard
+              FlickDeskWorld()
                 .ignoresSafeArea()
                 .opacity(boardIn ? 1 : 0)
 
@@ -106,8 +106,8 @@ struct FlickReceiptAnimationV2: View {
     withAnimation(.easeInOut(duration: 0.3)) { boardIn = true }
     // LAND — the thwack, the dust, the glow.
     DispatchQueue.main.asyncAfter(deadline: .now() + Self.landAt) {
-      InstrumentSoundPlayer.shared.playReceipt(.flick)
-      HapticPattern.singleRigid.fire()
+      InstrumentSoundPlayer.shared.playReceipt(.flick)   // muffled soft thud
+      HapticPattern.singleSoft.fire()                    // gentle — NOT a sharp crack
       withAnimation(.easeOut(duration: 0.5)) { landed = true }
     }
     // BLOOM — the reveal. "Felt means felt" fires here.
@@ -155,26 +155,11 @@ struct FlickReceiptAnimationV2: View {
       let spin = elapsed * 300                                  // 300°/sec
       let p = min(1, elapsed / Self.landAt)
       let grow = 0.85 + 0.15 * CGFloat(sin(p * .pi))           // 0.85 → 1.0 → 0.85
-      ZStack {
-        Circle()
-          .fill(RadialGradient(colors: [Self.paper, Self.paperEdge],
-                               center: UnitPoint(x: 0.4, y: 0.35),
-                               startRadius: 2, endRadius: 22))
-          .frame(width: 40, height: 40)
-          .shadow(color: .black.opacity(0.3), radius: 5, y: 3)
-        // Crumple creases
-        ForEach(0..<3, id: \.self) { i in
-          Capsule()
-            .stroke(Self.crease.opacity(0.7), lineWidth: 1)
-            .frame(width: 26 - CGFloat(i) * 5, height: 1)
-            .rotationEffect(.degrees(Double(i) * 57))
-        }
-        // Faint emoji hint showing through (30%)
-        Text(emoji).font(.system(size: 18)).opacity(0.3)
-      }
-      .rotationEffect(.degrees(spin))
-      .scaleEffect(grow)
-      .position(pos)
+      // The shared crumpled-paper ball (one source of truth).
+      CrumpledPaperBall(size: 40, emoji: emoji, emojiOpacity: 0.3, showShadow: false)
+        .rotationEffect(.degrees(spin))
+        .scaleEffect(grow)
+        .position(pos)
     }
   }
 
