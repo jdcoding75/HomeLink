@@ -126,13 +126,20 @@ enum AnimationManifest {
             instrument: .flick, kind: .instrument,
             stages: [.compass, .send, .receipt], fixedEmoji: nil),
 
-        // Rocket has TWO genuinely-distinct receipts — both selectable + labeled.
-        // "Parachute" = the live RocketReceiptAnimation (full compass→send→receipt);
-        // "Legs-down" = the original RocketLanding lander (a receipt-only entry).
+        // Rocket has THREE selectable receipts — all labeled. "Merged" is the
+        // LIVE receipt: the legs-down landing + emoji-popped-from-the-cone into
+        // the bucket, played over the parachute receipt's earth/bucket
+        // environment (RocketLandingReceiptAnimation). The other two are kept
+        // as labeled alternates for comparison: "Parachute" = the original v2
+        // RocketReceiptAnimation; "Legs-down" = the raw RocketLanding lander.
+        AnimationDefinition(
+            icon: "🚀", name: "Rocket", version: "Merged", style: .rocket,
+            instrument: .rocket, kind: .instrument,
+            stages: [.compass, .send, .receipt], fixedEmoji: nil),
         AnimationDefinition(
             icon: "🚀", name: "Rocket", version: "Parachute", style: .rocket,
             instrument: .rocket, kind: .instrument,
-            stages: [.compass, .send, .receipt], fixedEmoji: nil),
+            stages: [.receipt], fixedEmoji: nil),
         AnimationDefinition(
             icon: "🚀", name: "Rocket", version: "Legs-down", style: .rocket,
             instrument: .rocket, kind: .instrument,
@@ -183,12 +190,13 @@ enum AnimationManifest {
 
     /// One live row per instrument, in the user-facing order — the source for
     /// any place that wants "one of each instrument". Skips the secondary
-    /// variants (V2, the rocket "Legs-down" alternate) and dedups by style, so
-    /// rocket's primary "Parachute" row wins.
+    /// variants (V2, the rocket "Parachute"/"Legs-down" alternates) and dedups
+    /// by style, so rocket's primary "Merged" (live) row wins.
+    private static let secondaryVersions: Set<String> = ["V2", "Parachute", "Legs-down"]
     static var liveInstruments: [AnimationDefinition] {
         var seen = Set<SenderStyle>()
         return instruments
-            .filter { $0.version != "V2" && $0.version != "Legs-down" }
+            .filter { !($0.version.map(secondaryVersions.contains) ?? false) }
             .filter { seen.insert($0.style).inserted }
     }
 

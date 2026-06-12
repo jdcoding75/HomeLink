@@ -218,10 +218,13 @@ struct ReceiptView: View {
         )
     }
 
-    // ── ROCKET — the dedicated v2 parachute receipt ────────────────────────
-
+    // ── ROCKET — the MERGED receipt (legs-down landing + emoji-from-cone into
+    // the bucket, on the parachute receipt's earth/bucket world). This is the
+    // final, live rocket receipt; the v2 parachute (RocketReceiptAnimation) and
+    // the raw legs-down lander (RocketLanding) are kept as Animation Test Lab
+    // alternates for comparison.
     private var rocketReceipt: some View {
-        RocketReceiptAnimation(
+        RocketLandingReceiptAnimation(
             senderBearing: compass.rawBearingToTarget ?? 120,
             emoji: ping.emoji,
             message: ping.message,

@@ -327,13 +327,20 @@ private struct AnimationStageView: View {
             WindReceiptAnimation(senderBearing: 120, emoji: emoji, fromName: "",
                                  onRevealed: {}, onFinished: onDone)
         } else if def.style == .rocket {
-            // Rocket has TWO receipts: "Legs-down" = the RocketLanding lander
-            // (via InstrumentLandingView), "Parachute" = RocketReceiptAnimation.
-            if def.version == "Legs-down" {
-                InstrumentLandingView(style: .rocket, emoji: emoji) { onDone() }
-            } else {
+            // Rocket has THREE selectable receipts:
+            //   "Merged" (live)  = RocketLandingReceiptAnimation (legs-down landing
+            //                      + emoji-from-cone into the bucket, earth world)
+            //   "Parachute"      = RocketReceiptAnimation (the v2 parachute)
+            //   "Legs-down"      = RocketLanding via InstrumentLandingView (raw)
+            switch def.version {
+            case "Parachute":
                 RocketReceiptAnimation(senderBearing: 120, emoji: emoji, fromName: "",
                                        onRevealed: {}, onFinished: onDone)
+            case "Legs-down":
+                InstrumentLandingView(style: .rocket, emoji: emoji) { onDone() }
+            default:
+                RocketLandingReceiptAnimation(senderBearing: 120, emoji: emoji, fromName: "",
+                                              onRevealed: {}, onFinished: onDone)
             }
         } else {
             // bow V1 / flick V1 / wand V1 / compass — the landing beat. (Its

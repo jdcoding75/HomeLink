@@ -21,11 +21,14 @@ struct InstrumentLandingView: View {
         GeometryReader { geo in
             ZStack {
                 switch style {
-                // [phase2] ROCKET — BOTH landings kept & wired. The live receive
-                // (ReceiptView) routes .rocket → RocketReceiptAnimation (the v2
-                // PARACHUTE). Here in the lander path (test-lab / replay) the
-                // original RocketLanding (LEGS-down touchdown) is wired back, so
-                // both landings exist and are reachable — neither is orphaned.
+                // [merge] ROCKET — the live receive (ReceiptView) now routes
+                // .rocket → RocketLandingReceiptAnimation (the MERGED final
+                // receipt: legs-down landing + emoji-from-cone into the bucket on
+                // the parachute receipt's earth/bucket world). Here in the lander
+                // path (the test lab's "Legs-down" alternate / replay) the
+                // original RocketLanding (raw LEGS-down touchdown) stays wired, so
+                // every rocket arrival — merged, parachute, legs-down — is
+                // reachable and none is orphaned.
                 case .rocket:       RocketLanding(emoji: emoji, size: geo.size, onComplete: onComplete)
                 // [5/5] WIND — the live receipt's landing beat. The full ACT-3
                 // (sky · big bucket · auto-catch · EmojiRevealView · the
