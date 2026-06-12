@@ -35,6 +35,7 @@ struct BirthdayCakeReceiptV2: View {
     @State private var leanPulse: CGFloat = 0
     @State private var landed = false
     @State private var revealing = false
+    @State private var appearAt: Date? = nil   // [tweak] lower-in entrance clock
 
     private static let cyan = Color(hex: "#50B4F0")
     private static let wood     = Color(hex: "#8B4513")
@@ -50,10 +51,15 @@ struct BirthdayCakeReceiptV2: View {
     private static let landAt:    Double = 3.0
     private static let revealAt:  Double = 3.3
 
+    // [tweak] LOWER-IN entrance — the cake descends from the top, small→big, and
+    // settles full size ~2/3 down. Visual entrance only; blow-out is unchanged.
+    private static let descDur: Double = 0.65
+
     var body: some View {
         GeometryReader { geo in
             let w = geo.size.width, h = geo.size.height
-            let cakeCenter = CGPoint(x: w / 2, y: h * 0.40)
+            // [tweak] cake settles FULL SIZE ~2/3 of the way down the screen.
+            let restCenter = CGPoint(x: w / 2, y: h * 0.62)
             ZStack {
                 if revealing {
                     EmojiRevealView(emoji: emoji, message: message, tagline: tagline,
@@ -72,15 +78,27 @@ struct BirthdayCakeReceiptV2: View {
                         let now = timeline.date
                         let t = now.timeIntervalSinceReferenceDate
                         let since = extinguishedAt.map { now.timeIntervalSince($0) } ?? -1
+                        // [tweak] lower-in entrance: descend from the top edge,
+                        // growing small→big, into the rest position.
+                        let ep = easeOut(entranceP(now: now))
+                        let topY = -h * 0.04
+                        let entranceCenter = CGPoint(
+                            x: restCenter.x,
+                            y: topY + (restCenter.y - topY) * CGFloat(ep))
+                        let entranceScale: CGFloat = 0.35 + 0.65 * CGFloat(ep)
+                        let cakeScale: CGFloat = 1.15 * entranceScale
                         ZStack {
-                            bucket(w: w, h: h)
-                            cakeGlow(center: cakeCenter)
-                            BirthdayCakeBody(center: cakeCenter, scale: 1.15)
-                            candles(center: cakeCenter, t: t, since: since)
-                            smoke(center: cakeCenter, since: since)
-                            sparkleTrail(center: cakeCenter, w: w, h: h, since: since)
-                            emojiView(center: cakeCenter, w: w, h: h, since: since)
-                            emojiInBucket(w: w, h: h, since: since)
+                            // [tweak] bucket REMOVED — the descending cake IS the
+                            // arrival (no bucket catch, no bucket art).
+                            // bucket(w: w, h: h)
+                            cakeGlow(center: entranceCenter, scale: entranceScale)
+                            BirthdayCakeBody(center: entranceCenter, scale: cakeScale)
+                            candles(center: entranceCenter, t: t, since: since, scale: cakeScale)
+                            smoke(center: restCenter, since: since)
+                            // [tweak] bucket-drift choreography removed with the bucket:
+                            // sparkleTrail(center: restCenter, w: w, h: h, since: since)
+                            // emojiView(center: restCenter, w: w, h: h, since: since)
+                            // emojiInBucket(w: w, h: h, since: since)
                             instruction(w: w, h: h)
                         }
                         .frame(width: w, height: h)
@@ -100,8 +118,15 @@ struct BirthdayCakeReceiptV2: View {
     // ── Lifecycle ────────────────────────────────────────────────────────────
 
     private func begin() {
+        appearAt = Date()                       // [tweak] start the lower-in entrance
         breath.onExhale = { advanceBlow() }
         breath.start()
+    }
+
+    /// [tweak] Entrance progress 0…1 over `descDur` from first appearance.
+    private func entranceP(now: Date) -> Double {
+        guard let appearAt else { return 0 }
+        return min(1, max(0, now.timeIntervalSince(appearAt) / Self.descDur))
     }
 
     /// Two-stage blow, with a small debounce so one long breath can't skip a
@@ -142,8 +167,7 @@ struct BirthdayCakeReceiptV2: View {
     // ── Candles + flames (lit → leaning → out) ───────────────────────────────
 
     @ViewBuilder
-    private func candles(center: CGPoint, t: Double, since: Double) -> some View {
-        let scale: CGFloat = 1.15
+    private func candles(center: CGPoint, t: Double, since: Double, scale: CGFloat) -> some View {
         // Live lean from the mic level (visible reaction to breath) + the pulse.
         let liveLean = CGFloat(breath.level) * 0.7
         let lean = min(1, leanPulse + liveLean)
@@ -171,28 +195,47 @@ struct BirthdayCakeReceiptV2: View {
         }
     }
 
-    // ── Smoke puffs from each wick after extinguish ──────────────────────────
+    // ── Smoke wisps rising from each extinguished wick ───────────────────────
+    // [tweak] Clearer "just blown out" read: distinct CURLING WISP LINES rise
+    // from each wick (two staggered strands, widening as they climb), drifting
+    // up and fading over a brief readable beat — not a vague blurred puff.
 
     @ViewBuilder
     private func smoke(center: CGPoint, since: Double) -> some View {
-        if stage == 2 && since >= 0 && since < 1.4 {
+        if stage == 2 && since >= 0 && since < 1.6 {
             let scale: CGFloat = 1.15
-            ForEach(0..<BirthdayCakeV2.candleCount, id: \.self) { i in
-                let c = BirthdayCakeV2.candle(i, center: center, scale: scale)
-                ForEach(0..<4, id: \.self) { k in
-                    let local = since - Double(k) * 0.12
-                    if local > 0 {
-                        let p = min(1, local / 1.0)
-                        let rise = CGFloat(p) * 34
-                        let wob = CGFloat(sin(p * .pi * 2 + Double(i))) * 6
-                        let r = 2.4 + CGFloat(p) * 4
-                        Circle().fill(Color.white.opacity((1 - p) * 0.4))
-                            .frame(width: r * 2, height: r * 2)
-                            .position(x: c.x + wob, y: c.wickY - 12 - rise)
-                            .blur(radius: 2)
+            Canvas { ctx, _ in
+                for i in 0..<BirthdayCakeV2.candleCount {
+                    let c = BirthdayCakeV2.candle(i, center: center, scale: scale)
+                    let baseX = c.x
+                    let baseY = c.wickY - 10 * scale
+                    // Two staggered strands per wick → a defined little plume.
+                    for strand in 0..<2 {
+                        let phase = Double(i) * 0.8 + Double(strand) * 2.3
+                        let local = since - Double(strand) * 0.18
+                        if local <= 0 { continue }
+                        let p = min(1.0, local / 1.3)
+                        let rise = CGFloat(p) * 54 * scale
+                        let drift = CGFloat(p) * 10
+                        let op = (1 - p) * 0.6
+                        var path = Path()
+                        let steps = 18
+                        for s in 0...steps {
+                            let f = CGFloat(s) / CGFloat(steps)
+                            let yy = baseY - rise * f - drift
+                            let amp = (2.5 + 8.0 * f) * scale          // curl widens as it rises
+                            let xx = baseX + CGFloat(sin(Double(f) * .pi * 2.4 + phase + Double(p) * 1.6)) * amp
+                            let pt = CGPoint(x: xx, y: yy)
+                            if s == 0 { path.move(to: pt) } else { path.addLine(to: pt) }
+                        }
+                        ctx.stroke(path,
+                                   with: .color(Color(white: 0.93).opacity(op)),
+                                   style: StrokeStyle(lineWidth: 2.0 * scale,
+                                                      lineCap: .round, lineJoin: .round))
                     }
                 }
             }
+            .blur(radius: 0.6)
             .allowsHitTesting(false)
         }
     }
@@ -282,12 +325,13 @@ struct BirthdayCakeReceiptV2: View {
 
     // ── Cake glow ────────────────────────────────────────────────────────────
 
-    private func cakeGlow(center: CGPoint) -> some View {
+    private func cakeGlow(center: CGPoint, scale: CGFloat) -> some View {
         let warm = stage < 2
         return Circle()
             .fill(RadialGradient(colors: [BirthdayCakeV2.warmGold.opacity(warm ? 0.20 : 0.06), .clear],
                                  center: .center, startRadius: 6, endRadius: 130))
             .frame(width: 260, height: 260)
+            .scaleEffect(scale)               // [tweak] scales with the entrance
             .position(center)
             .blendMode(.screen)
             .allowsHitTesting(false)

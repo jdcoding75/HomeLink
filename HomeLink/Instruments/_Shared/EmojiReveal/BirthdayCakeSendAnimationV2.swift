@@ -24,6 +24,11 @@ struct BirthdayCakeSendAnimationV2: View {
     private static let driftAt: Double = 1.5
     private static let total:   Double = 2.5
 
+    // [tweak] RISE-IN entrance — the cake rises up into its start position over
+    // riseDur (ease-out), THEN the existing send sequence begins, unchanged.
+    private static let riseDur:  Double = 0.6
+    private static let riseFrac: CGFloat = 0.22   // of screen height it rises through
+
     // Confetti pieces — index-derived (no render-time randomness).
     private struct Confetti { let angle: Double; let speed: CGFloat; let color: Color; let oval: Bool; let spin: Double }
     private static let pieces: [Confetti] = {
@@ -41,6 +46,7 @@ struct BirthdayCakeSendAnimationV2: View {
     }()
 
     @State private var start: Date? = nil
+    @State private var appearAt: Date? = nil
     @State private var confettiFired = false
 
     var body: some View {
@@ -49,6 +55,9 @@ struct BirthdayCakeSendAnimationV2: View {
             let center = CGPoint(x: w / 2, y: h * 0.44)
             TimelineView(.animation) { timeline in
                 let e = elapsed(now: timeline.date)
+                // [tweak] rise-in: the cake sits lower and rises into `center`.
+                let riseY = riseOffset(now: timeline.date, h: h)
+                let cakeCenter = CGPoint(x: center.x, y: center.y + riseY)
                 ZStack {
                     Color(hex: "#06070c").ignoresSafeArea()
                     LinearGradient(colors: [Color(hex: "#06070c"), Color(hex: "#111526"), Color(hex: "#181324")],
@@ -56,7 +65,7 @@ struct BirthdayCakeSendAnimationV2: View {
                         .ignoresSafeArea()
 
                     afterglow(center: center, e: e)
-                    cake(center: center, e: e)
+                    cake(center: cakeCenter, e: e)
                     confetti(center: center, w: w, h: h, e: e)
                 }
                 .frame(width: w, height: h)
@@ -71,15 +80,28 @@ struct BirthdayCakeSendAnimationV2: View {
         }
         .ignoresSafeArea()
         .onAppear {
-            start = Date()
+            appearAt = Date()
             HapticPattern.singleSoft.fire()
-            DispatchQueue.main.asyncAfter(deadline: .now() + Self.total) { onComplete() }
+            // [tweak] the cake rises in first; only AFTER riseDur does the
+            // existing send clock start, so the rest plays exactly as before.
+            DispatchQueue.main.asyncAfter(deadline: .now() + Self.riseDur) {
+                start = Date()
+                DispatchQueue.main.asyncAfter(deadline: .now() + Self.total) { onComplete() }
+            }
         }
     }
 
     private func elapsed(now: Date) -> Double {
         guard let start else { return 0 }
         return min(max(0, now.timeIntervalSince(start)), Self.total)
+    }
+
+    /// [tweak] The cake's downward offset during the rise-in: from `riseFrac` of
+    /// the screen height up to 0 (ease-out) over `riseDur`, then it stays at 0.
+    private func riseOffset(now: Date, h: CGFloat) -> CGFloat {
+        guard let appearAt else { return h * Self.riseFrac }
+        let p = min(1, max(0, now.timeIntervalSince(appearAt) / Self.riseDur))
+        return (1 - CGFloat(easeOut(p))) * h * Self.riseFrac
     }
 
     // ── Warm afterglow cloud (pink + lavender + gold soft circles) ───────────
