@@ -8,9 +8,11 @@
 //   app background stays outside; a CRUMPLED PAPER BALL rests at centre with a
 //   👆 finger hint. A TARGET POINT sits on the compass ring edge (the
 //   destination marker). The user simply FLICKS the paper ball toward that
-//   point — a quick swipe (fast enough to count) launches it. It is AIM-FREE:
-//   there is NO compass-alignment / heading mechanic — the flick gesture is the
-//   entire mechanic. A weak flick bounces home; a real flick sends.
+//   point — a quick swipe toward the target launches it. Aim is FORGIVING: a
+//   generous ±45° tolerance cone around the target means flicking in its general
+//   direction counts (no compass-alignment / heading mechanic — just the flick
+//   direction vs. the frozen target). A weak flick, or one aimed well away,
+//   bounces home; a real flick toward the point sends.
 //
 //   The target point is FROZEN on appear (a fixed point on the ring), so it
 //   never tracks the live compass heading — flicking, not aligning, is the act.
@@ -30,7 +32,8 @@ struct FlickDeskCompassFace: View {
     var personName: String = "them"
     var emoji: String = "💜"
     /// Used ONCE on appear to place the FROZEN target point on the ring. After
-    /// that it is ignored — the flick is aim-free, no live heading tracking.
+    /// that the live heading is ignored — the flick direction is checked against
+    /// the FROZEN target (a generous ±45° cone), never the live compass heading.
     var bearingDegrees: Double = 45
     var onSend: () -> Void = {}
     /// true = the test-lab beat that auto-plays once on appear. false = the LIVE
@@ -49,8 +52,8 @@ struct FlickDeskCompassFace: View {
     @State private var ballFlight: CGFloat = 0   // 0 centre → 1 launched at target
     @State private var dustBurst = false
     /// The frozen destination on the ring (degrees, 0 = up, clockwise). Set once
-    /// on appear; never updated from the live heading. The whole "no alignment"
-    /// promise lives here — there is no bearing comparison anywhere below.
+    /// on appear; never updated from the live heading. The flick's ±45° tolerance
+    /// cone is measured against THIS frozen target — not the live compass heading.
     @State private var targetAngle: Double = 45
     @State private var dragOffset: CGSize = .zero
     @State private var dragging = false
@@ -64,9 +67,14 @@ struct FlickDeskCompassFace: View {
     private static let ringRadius: CGFloat = 165
     private static let topCrop: CGFloat = 0.25    // [tweak] crop the top 25% of the desk
 
-    /// A real flick must move at least this fast (points/sec). No DIRECTION test —
-    /// any sufficiently quick flick launches. This is the entire gate.
+    /// A real flick must move at least this fast (points/sec) to count as a launch.
     private let minFlickSpeed: CGFloat = 280
+
+    /// [tolerance cone 2026-06-13] A GENEROUS ±45° cone around the target point.
+    /// The flick only has to head in the general direction of the target — it
+    /// should feel forgiving and fun, never precise. (Restores the aim cone the
+    /// original flick had, which had been lost when the gesture went speed-only.)
+    private static let aimTolerance: Double = 45
 
     private var targetRad: Double { targetAngle * .pi / 180 }
 
@@ -197,7 +205,7 @@ struct FlickDeskCompassFace: View {
                 .opacity(ballFade)
                 .offset(x: ballX, y: ballY)
                 // LIVE: the paper ball itself is flickable. This drag IS the
-                // entire mechanic — no aim, no alignment.
+                // mechanic — flick it within a generous ±45° cone of the target.
                 .gesture(autoPlay || launching ? nil : flickGesture)
 
             if autoPlay {
@@ -275,12 +283,21 @@ struct FlickDeskCompassFace: View {
             .onEnded { value in
                 dragging = false
                 guard !launching else { return }
-                let speed = hypot(value.velocity.width, value.velocity.height)
-                // ONLY a speed check — no direction/alignment test at all.
-                if speed >= minFlickSpeed {
+                let v = value.velocity
+                let speed = hypot(v.width, v.height)
+                // [tolerance cone 2026-06-13] Flick direction in the SAME convention
+                // as targetAngle (0 = up, clockwise): atan2(dx, -dy). A generous ±45°
+                // cone around the frozen target means flicking ANYWHERE in its general
+                // direction counts as a hit — forgiving and fun, not precise.
+                let flickAngle = atan2(Double(v.width), -Double(v.height)) * 180 / .pi
+                let aimError = BearingCalculator.alignmentError(
+                    relativeBearing: flickAngle - targetAngle)
+                if speed >= minFlickSpeed && aimError <= Self.aimTolerance {
                     launchLive()
+                } else if speed < minFlickSpeed {
+                    weakBounce()        // too gentle → "flick a little harder ✦"
                 } else {
-                    weakBounce()
+                    missBounce()        // strong but aimed away → "flick toward the point ✦"
                 }
             }
     }
@@ -306,6 +323,14 @@ struct FlickDeskCompassFace: View {
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.8) {
             withAnimation { showWeakHint = false }
         }
+    }
+
+    /// A flick that was strong enough but aimed well OUTSIDE the ±45° cone — the
+    /// ball springs home. No "flick harder" hint (they flicked hard enough, just
+    /// not toward the target); the standing "flick toward the point ✦" label guides.
+    private func missBounce() {
+        HapticEngine.sendSoft()
+        withAnimation(.spring(response: 0.4, dampingFraction: 0.5)) { dragOffset = .zero }
     }
 
     /// Reset the live face so the next thought can be flicked.
