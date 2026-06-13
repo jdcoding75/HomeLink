@@ -4,9 +4,10 @@
 # Generates wind_breeze.wav — a very soft, low ambient breeze cue layered
 # UNDER the existing wind_send.wav / wind_receipt.wav (it does not replace them).
 #
-# Character: gentle natural breeze — filtered noise with a soft low body and a
-# faint airy band, slowly swelling and ebbing (gusts), very low level, long
-# fades in/out so it slips in and out unnoticed.
+# Character: a LIGHT gentle breeze — a soft airy high band leads (the "shhh" of
+# air, not a sustained heavy-wind rumble), with the low body kept well back,
+# slowly swelling and ebbing (gusts), very low level, long fades in/out so it
+# slips in and out unnoticed.
 #
 # Output: mono · 16-bit · 44100 Hz · 8.0s (covers both the 6.5s send and the
 # 7.2s receipt). Deterministic (seeded).
@@ -18,7 +19,7 @@ import numpy as np
 
 SR = 44100
 DUR = 8.0
-PEAK = 0.0425        # very soft — ambient, sits underneath (halved from 0.085)
+PEAK = 0.02125       # very soft — ambient, sits underneath (halved again from 0.0425)
 OUT = os.path.join(os.path.dirname(__file__), "..", "..", "Sounds", "Instruments", "wind_breeze.wav")
 
 rng = np.random.default_rng(20240611)
@@ -36,24 +37,28 @@ def one_pole_lowpass(x, a):
     return y
 
 
-# Soft low body — heavily low-passed noise (twice, for a gentle rolloff).
-body = one_pole_lowpass(one_pole_lowpass(rng.standard_normal(n), 0.045), 0.045)
+# [tweak] LIGHT GENTLE BREEZE rebalance — was body-dominant (0.78) low rumble
+# that read as sustained heavy wind. Now the low body sits well back and a soft
+# AIRY HIGH band leads, so it feels like a light breeze, not constant wind.
+
+# Soft low body — heavily low-passed noise (twice). Kept, but quiet in the mix.
+body = one_pole_lowpass(one_pole_lowpass(rng.standard_normal(n), 0.040), 0.040)
 body /= np.max(np.abs(body)) + 1e-9
 
-# Faint airy band — a quieter, SOFTER low-mid layer so it reads as gentle "air",
-# not just rumble. [tweak] Double low-pass at a lower cutoff (0.12 vs 0.30) rolls
-# off the harsh mid/highs; the high-pass still removes the low rumble. Quieter in
-# the mix too, so the texture is smoother and airier, less harsh.
-air_lp = one_pole_lowpass(one_pole_lowpass(rng.standard_normal(n), 0.12), 0.12)
-air_hp = one_pole_lowpass(air_lp, 0.02)
-air = air_lp - air_hp                       # soft low-mid band
-air /= np.max(np.abs(air)) + 1e-9
+# Airy HIGH band — high-pass (noise minus its low-pass) drops the low rumble AND
+# the harsh low-mids; a gentle top smoothing keeps it soft "air", not sharp hiss.
+# This is the LEAD texture now — the soft "shhh" of a light breeze.
+hp_src = rng.standard_normal(n)
+airy = hp_src - one_pole_lowpass(hp_src, 0.18)   # keep highs, drop low/low-mid (harsh)
+airy = one_pole_lowpass(airy, 0.55)              # round off the very top edge
+airy /= np.max(np.abs(airy)) + 1e-9
 
-mix = body * 0.78 + air * 0.28
+# Mix — low body well back (0.34), soft airy highs forward (0.50).
+mix = body * 0.34 + airy * 0.50
 
-# [tweak] A final gentle top-end smoothing (~3kHz) to round off any residual
-# edge — keeps the breeze airy but removes harshness.
-mix = one_pole_lowpass(mix, 0.30)
+# Only a very light top smoothing now (was 0.30 ≈ 3 kHz, which dulled the air
+# back toward "wind"); 0.6 keeps the soft airy highs present.
+mix = one_pole_lowpass(mix, 0.6)
 
 # Slow gusts — the breeze swells and ebbs (sub-1 Hz modulation).
 gust = (np.sin(2 * np.pi * 0.13 * t)
