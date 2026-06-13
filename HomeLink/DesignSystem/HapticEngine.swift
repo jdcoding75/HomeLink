@@ -351,8 +351,12 @@ enum HapticEngine {
         case "🤜🤛":           // Fist bump — two fists meet: medium ×2
             tap(.medium, 0.8, after: 0.0)
             tap(.medium, 0.8, after: 0.16)
-        case "😘":            // Kiss — a light pop at the pucker
-            tap(.light, 0.6, after: 0.7)
+        // [fix 2026-06-13] REMOVED duplicate `case "😘"` — 😘 is already handled by
+        // the earlier case above ("single sharp, then a flutter"), so this second
+        // pattern was UNREACHABLE dead code (compiler: "literal value is already
+        // handled by previous pattern"). Commented out per the never-delete rule.
+        // case "😘":            // Kiss — a light pop at the pucker
+        //     tap(.light, 0.6, after: 0.7)
         case "💭", "💌":       // Thought / love note — soft pulses
             tap(.soft, 0.5, after: 0.2)
             tap(.soft, 0.4, after: 0.5)
