@@ -73,6 +73,7 @@ enum EmojiRevealSound {
         case "🎆":   return "emoji_fireworks"
         case "🎓":   return "emoji_graduation"
         case "🎂":   return "emoji_birthday"
+        case "👏":   return "emoji_clap"           // fires on each clap contact
         default:     return nil
         }
     }

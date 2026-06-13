@@ -24,6 +24,7 @@ enum RevealKind {
     case fireworks    // 🎆 — rises → 3 bursts
     case graduation   // 🎓 — cap spins up from the bottom → confetti → bounce
     case birthday     // 🎂 — bloom → candle flicker → confetti
+    case clap         // 👏 — hands clap together rhythmically ×4, impact pulse each, then breathe
 }
 
 struct RevealAnimation {
@@ -49,6 +50,7 @@ enum RevealAnimationRegistry {
         "🎆":   RevealAnimation(kind: .fireworks,  glow: Color(hex: "#FFD700"), fullScreen: true),
         "🎓":   RevealAnimation(kind: .graduation, glow: Color(hex: "#FFD166"), fullScreen: true),
         "🎂":   RevealAnimation(kind: .birthday,   glow: Color(hex: "#FFB347"), fullScreen: false),
+        "👏":   RevealAnimation(kind: .clap,       glow: Color(hex: "#FFC857"), fullScreen: false),
         // Base set that simply blooms (kept their existing glow colours):
         "🙌":   RevealAnimation(kind: .bloom,      glow: Color(hex: "#FFD700"), fullScreen: false),
         "🖐️":   RevealAnimation(kind: .bloom,      glow: Color(hex: "#c4a8d4"), fullScreen: false),

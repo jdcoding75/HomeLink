@@ -59,6 +59,18 @@ struct EmojiRevealView: View {
   private var kind: RevealKind { RevealAnimationRegistry.animation(for: emoji).kind }
   private var glowColor: Color { RevealAnimationRegistry.animation(for: emoji).glow }
 
+  // Shared bloom "pop-in" scale — the bigger, more impactful bloom applies to
+  // EVERY emoji that uses the plain .bloom reveal: it starts ~10% smaller and
+  // lands ~33% larger than before, so the arrival hits harder. Hug / punch /
+  // fist-bump / every custom kind keep their original 0.8 → 1.0 base so their
+  // own animations (squeeze, pump, etc.) are completely unchanged.
+  private var bloomStartScale: CGFloat { kind == .bloom ? 0.9 : 0.8 }
+  private var bloomLandScale:  CGFloat { kind == .bloom ? 1.33 : 1.0 }
+
+  // 👏 always celebrates with its own tagline; every other emoji keeps the
+  // tagline passed in by the caller.
+  private var effectiveTagline: String? { emoji == "👏" ? "great job ✦" : tagline }
+
   var body: some View {
     GeometryReader { geo in
       ZStack {
@@ -88,7 +100,7 @@ struct EmojiRevealView: View {
             }
               .scaleEffect(x: hugOpen ? 1.45 : hugClose ? 0.82 : 1.0,
                            y: hugOpen ? 0.75 : hugClose ? 1.15 : 1.0)
-              .scaleEffect(bloomed ? 1.0 : 0.8)
+              .scaleEffect(bloomed ? bloomLandScale : bloomStartScale)
               .scaleEffect(x: kind == .punch ? punchScaleX : 1,
                            y: kind == .punch ? punchScaleY : 1)
               .offset(x: kind == .punch ? punchOffsetX : 0)
@@ -109,7 +121,7 @@ struct EmojiRevealView: View {
               .opacity(messageVisible ? 1 : 0)
               .animation(.easeOut(duration: 0.5), value: messageVisible)
           }
-          if let tag = tagline, !tag.isEmpty {
+          if let tag = effectiveTagline, !tag.isEmpty {
             Text(tag)
               .font(.system(size: 14, design: .serif).italic())
               .foregroundColor(DesignTokens.Color.textSecondary)
@@ -214,6 +226,8 @@ struct EmojiRevealView: View {
       after(0.3) { HapticPattern.heartbeat.fire() }
     case .punch:
       after(0.3) { HapticPattern.heartbeat.fire() }   // sound fires on the 3rd pump
+    case .clap:
+      break                                            // sound + haptic fire on each clap contact in startClap
     default:
       HapticEngine.revealHaptic(for: emoji)           // new kinds: their own haptic
     }
@@ -231,6 +245,7 @@ struct EmojiRevealView: View {
     case .fireworks:   startFireworks(size)
     case .graduation:  startGraduation(size)
     case .birthday:    startBirthday()
+    case .clap:        startClap()
     }
 
     // Text sequence + auto dismiss (every reveal)
@@ -374,6 +389,31 @@ struct EmojiRevealView: View {
     after(0.9)  { withAnimation(.easeIn(duration: 0.2)) { eScaleX = 0.92; eScaleY = 0.92 } }   // blow out
     after(1.1)  { particlesOn = true
                   withAnimation(.spring(response: 0.35, dampingFraction: 0.45)) { eScaleX = 1.0; eScaleY = 1.0 } }
+  }
+
+  // MARK: - 👏 Clap — hands clap together rhythmically ×4, impact pulse each
+
+  private func startClap() {
+    // One clap: hands spread apart (wind-up), then SNAP together — on contact a
+    // sharp horizontal squeeze + vertical pop (the impact), with sound + haptic —
+    // then a quick spring back to rest. After the last clap eScale returns to 1,
+    // so the emoji settles into the shared bloom/breathe already running.
+    func clap(base: Double) {
+      // wind-up: hands part, flatten a touch
+      after(base)        { withAnimation(.easeIn(duration: 0.10)) { eScaleX = 1.18; eScaleY = 0.92 } }
+      // CONTACT: squeeze together (hands meet) + pop tall (impact pulse)
+      after(base + 0.10) { EmojiRevealSound.play("👏")
+                           HapticPattern.singleSoft.fire()
+                           withAnimation(.easeOut(duration: 0.08)) { eScaleX = 0.80; eScaleY = 1.14 } }
+      // settle back to rest
+      after(base + 0.20) { withAnimation(.spring(response: 0.25, dampingFraction: 0.55)) { eScaleX = 1.0; eScaleY = 1.0 } }
+    }
+    // 4 rhythmic claps, ~0.42s apart.
+    clap(base: 0.30)
+    clap(base: 0.72)
+    clap(base: 1.14)
+    clap(base: 1.56)
+    // → returns to 1.0 at ~1.76s, then the standard breathe/pulse carries it.
   }
 }
 
