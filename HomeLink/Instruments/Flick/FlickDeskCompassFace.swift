@@ -1,18 +1,26 @@
 // FlickDeskCompassFace.swift
 // Pointward › Instruments › Flick
 //
-// ACT 1 of 3 — the FLICK V2 (DESK) compass face. A single watchable beat
-// (rest → action), NOT an interactive drag:
+// ACT 1 of 3 — the FLICK V2 (DESK) compass face.
 //
+// THE LIVE MECHANIC (autoPlay == false) is the ORIGINAL, restored flick:
 //   the desk shows ONLY inside the compass ring (radial oak), the deep-purple
 //   app background stays outside; a CRUMPLED PAPER BALL rests at centre with a
-//   👆 pointing-finger below. The finger slides up to the ball, winds back (the
-//   ball tilts ~3°), then SNAPS forward — the ball launches up-right spinning,
-//   paper-dust bursts, a soft (filtered-noise) flick sound plays — and the
-//   finger retracts. Then it hands off (onSend).
+//   👆 finger hint. A TARGET POINT sits on the compass ring edge (the
+//   destination marker). The user simply FLICKS the paper ball toward that
+//   point — a quick swipe (fast enough to count) launches it. It is AIM-FREE:
+//   there is NO compass-alignment / heading mechanic — the flick gesture is the
+//   entire mechanic. A weak flick bounces home; a real flick sends.
+//
+//   The target point is FROZEN on appear (a fixed point on the ring), so it
+//   never tracks the live compass heading — flicking, not aligning, is the act.
+//
+// THE TEST-LAB BEAT (autoPlay == true) is a single watchable rest→action beat:
+//   the finger slides up, winds back, SNAPS the ball toward the target point,
+//   paper-dust bursts, the flick sound plays, then it hands off (onSend).
 //
 // Shared components (one source of truth): FlickDeskFaceFill + CrumpledPaperBall
-// (FlickDeskWorld.swift) and DirectionIndicator (the person marker). The ring is
+// (FlickDeskWorld.swift) and DirectionIndicator (the target point). The ring is
 // the standard instrument look: lavender, ticks every 30°, dashed inner ring.
 
 import SwiftUI
@@ -21,25 +29,46 @@ struct FlickDeskCompassFace: View {
 
     var personName: String = "them"
     var emoji: String = "💜"
-    var bearingDegrees: Double = 45      // person marker sits here (spec: "S" at 45°)
+    /// Used ONCE on appear to place the FROZEN target point on the ring. After
+    /// that it is ignored — the flick is aim-free, no live heading tracking.
+    var bearingDegrees: Double = 45
     var onSend: () -> Void = {}
-    /// [live 2026-06-13] true (default) = the test-lab beat that auto-plays once
-    /// on appear. false = the LIVE compass face: it rests until TAPPED, plays the
-    /// flick → onSend, then re-arms for the next send (so it is reusable).
+    /// true = the test-lab beat that auto-plays once on appear. false = the LIVE
+    /// compass face: it rests until the paper ball is FLICKED, sends, then
+    /// re-arms for the next flick (so it is reusable).
     var autoPlay: Bool = true
 
+    // Test-lab beat state
     @State private var fingerLift: CGFloat = 0   // 0 rest → 1 up at the ball
     @State private var windBack: CGFloat = 0     // 0 → 1 wound back (ball tilt ~3°)
     @State private var snap: CGFloat = 0         // 0 → 1 snap forward
-    @State private var ballFlight: CGFloat = 0   // 0 centre → 1 launched up-right
-    @State private var dustBurst = false
     @State private var fingerGone = false
     @State private var didRun = false
+
+    // Shared flight + live-flick state
+    @State private var ballFlight: CGFloat = 0   // 0 centre → 1 launched at target
+    @State private var dustBurst = false
+    /// The frozen destination on the ring (degrees, 0 = up, clockwise). Set once
+    /// on appear; never updated from the live heading. The whole "no alignment"
+    /// promise lives here — there is no bearing comparison anywhere below.
+    @State private var targetAngle: Double = 45
+    @State private var dragOffset: CGSize = .zero
+    @State private var dragging = false
+    @State private var interacted = false        // hides the finger hint
+    @State private var hintPhase = false         // looping demo finger
+    @State private var launching = false         // a live flick is in flight
+    @State private var showWeakHint = false      // "flick a little harder"
 
     private static let lavender = Color(hex: "#c4a8d4")
     private static let faceD: CGFloat = 330       // desk circle diameter
     private static let ringRadius: CGFloat = 165
     private static let topCrop: CGFloat = 0.25    // [tweak] crop the top 25% of the desk
+
+    /// A real flick must move at least this fast (points/sec). No DIRECTION test —
+    /// any sufficiently quick flick launches. This is the entire gate.
+    private let minFlickSpeed: CGFloat = 280
+
+    private var targetRad: Double { targetAngle * .pi / 180 }
 
     var body: some View {
         ZStack {
@@ -47,19 +76,27 @@ struct FlickDeskCompassFace: View {
             cluster
             labels
         }
-        .contentShape(Rectangle())                       // whole face is tappable
-        .onTapGesture { if !autoPlay { runOnce() } }     // LIVE: tap to flick-send
-        .onAppear { if autoPlay { runOnce() } }          // TEST LAB: auto-play once
+        .contentShape(Rectangle())
+        // Test lab: tap replays the beat. Live: the ball's own flick gesture is
+        // the mechanic, so a face tap does nothing.
+        .onTapGesture { if autoPlay { didRun = false; runOnce() } }
+        .onAppear {
+            targetAngle = bearingDegrees           // freeze the destination point
+            if autoPlay {
+                runOnce()
+            } else {
+                withAnimation(.easeInOut(duration: 1.4).repeatForever(autoreverses: true)) {
+                    hintPhase = true
+                }
+            }
+        }
     }
 
-    // ── The compass cluster (desk circle + ring + marker + ball/finger) ──────
+    // ── The compass cluster (desk circle + ring + target point + ball/finger) ──
 
     private var cluster: some View {
         ZStack {
-            // [tweak] The warm-oak desk fills only the LOWER ~75% of the circle:
-            // its top 25% is cut by a clean horizontal line, so it reads as a desk
-            // surface with a flat horizon near the top and deep-purple space above
-            // it — rather than oak filling the whole circle.
+            // [tweak] The warm-oak desk fills only the LOWER ~75% of the circle.
             ZStack {
                 FlickDeskFaceFill()
                     .frame(width: Self.faceD, height: Self.faceD)
@@ -72,21 +109,23 @@ struct FlickDeskCompassFace: View {
             .shadow(color: .black.opacity(0.35), radius: 10)
 
             ringDecor
-            DirectionIndicator(bearingDegrees: bearingDegrees, personName: personName,
+            // The TARGET POINT on the ring edge — the destination the ball is
+            // flicked toward. Placed at the FROZEN targetAngle (not live heading).
+            DirectionIndicator(bearingDegrees: targetAngle, personName: personName,
                                personEmoji: emoji, ringRadius: Self.ringRadius,
                                showHint: false)
+            targetGlow
             dust
             ballAndFinger
         }
         .frame(width: 370, height: 370)
     }
 
-    /// [tweak] The bright desk back-edge line along the horizontal crop — the
-    /// "horizon" where the oak surface meets the space above it.
+    /// [tweak] The bright desk back-edge line along the horizontal crop.
     private var horizonLine: some View {
         let r = Self.faceD / 2
-        let off = r - Self.faceD * Self.topCrop          // distance of the cut above centre
-        let half = (r * r - off * off).squareRoot()      // half-chord at the cut
+        let off = r - Self.faceD * Self.topCrop
+        let half = (r * r - off * off).squareRoot()
         return Rectangle()
             .fill(FlickDeskPalette.deskEdge.opacity(0.85))
             .frame(width: half * 2, height: 2)
@@ -113,45 +152,83 @@ struct FlickDeskCompassFace: View {
         }
     }
 
-    // ── The ball + finger ────────────────────────────────────────────────────
-
-    private var ballAndFinger: some View {
-        let flightX: CGFloat = ballFlight * 150
-        let flightY: CGFloat = -ballFlight * 130
-        let ballTilt: Double = Double(windBack) * -3 + Double(ballFlight) * 240
-        let ballFade: Double = 1 - Double(max(0, ballFlight - 0.6) / 0.4)
-
-        // Finger path: rest below → lifts to the ball → winds back a touch →
-        // snaps forward/up → retracts.
-        let baseY: CGFloat = 60
-        let fingerY: CGFloat = baseY - fingerLift * 42 + windBack * 12 - snap * 24
-        let fingerX: CGFloat = snap * 18
-        let fingerRot: Double = -10 + Double(windBack) * 9 - Double(snap) * 18
-
-        return ZStack {
-            CrumpledPaperBall(size: 52, emoji: emoji, emojiOpacity: 0.28,
-                              showShadow: ballFlight < 0.05)
-                .rotationEffect(.degrees(ballTilt))
-                .scaleEffect(1 - ballFlight * 0.5)
-                .opacity(ballFade)
-                .offset(x: flightX, y: flightY)
-
-            Text("👆")
-                .font(.system(size: 38))
-                .rotationEffect(.degrees(fingerRot))
-                .offset(x: fingerX, y: fingerY)
-                .opacity(fingerGone ? 0 : 1)
-                .shadow(color: .black.opacity(0.4), radius: 4)
+    /// A soft pulsing halo on the ring at the target point — reads as "flick to
+    /// here". Calm in the live face; absent during the launch/test beat.
+    @ViewBuilder
+    private var targetGlow: some View {
+        if !autoPlay && !launching {
+            Circle()
+                .fill(Self.lavender.opacity(0.18))
+                .frame(width: 30, height: 30)
+                .scaleEffect(hintPhase ? 1.25 : 0.9)
+                .offset(x: CGFloat(sin(targetRad)) * Self.ringRadius,
+                        y: -CGFloat(cos(targetRad)) * Self.ringRadius)
+                .allowsHitTesting(false)
         }
     }
 
-    // ── Paper-dust burst at the snap ─────────────────────────────────────────
+    // ── The ball + finger ────────────────────────────────────────────────────
+
+    private var ballAndFinger: some View {
+        // Flight travels from centre out to the target point along targetAngle.
+        let reach: CGFloat = ballFlight * 178
+        let flightX: CGFloat = CGFloat(sin(targetRad)) * reach
+        let flightY: CGFloat = -CGFloat(cos(targetRad)) * reach
+        let ballTilt: Double = Double(windBack) * -3 + Double(ballFlight) * 240
+        let ballFade: Double = 1 - Double(max(0, ballFlight - 0.6) / 0.4)
+
+        // While the finger is dragging the ball back, the ball follows it; once
+        // launched (or in the test beat) it rides the flight path.
+        let useDrag = dragging || dragOffset != .zero
+        let ballX = useDrag ? dragOffset.width : flightX
+        let ballY = useDrag ? dragOffset.height : flightY
+
+        // Test-lab finger path: rest below → lifts → winds back → snaps → retracts.
+        let baseY: CGFloat = 60
+        let beatFingerY: CGFloat = baseY - fingerLift * 42 + windBack * 12 - snap * 24
+        let beatFingerX: CGFloat = snap * 18
+        let beatFingerRot: Double = -10 + Double(windBack) * 9 - Double(snap) * 18
+
+        return ZStack {
+            CrumpledPaperBall(size: 52, emoji: emoji, emojiOpacity: 0.28,
+                              showShadow: ballFlight < 0.05 && !dragging)
+                .rotationEffect(.degrees(ballTilt))
+                .scaleEffect(useDrag && dragging ? 1.05 : 1 - ballFlight * 0.5)
+                .opacity(ballFade)
+                .offset(x: ballX, y: ballY)
+                // LIVE: the paper ball itself is flickable. This drag IS the
+                // entire mechanic — no aim, no alignment.
+                .gesture(autoPlay || launching ? nil : flickGesture)
+
+            if autoPlay {
+                // The test-lab demo finger that performs the beat.
+                Text("👆")
+                    .font(.system(size: 38))
+                    .rotationEffect(.degrees(beatFingerRot))
+                    .offset(x: beatFingerX, y: beatFingerY)
+                    .opacity(fingerGone ? 0 : 1)
+                    .shadow(color: .black.opacity(0.4), radius: 4)
+            } else if !interacted && !launching {
+                // LIVE: a gentle looping hint — pull back, flick — fades on touch.
+                Text("👆")
+                    .font(.system(size: 34))
+                    .rotationEffect(.degrees(hintPhase ? -8 : 12))
+                    .offset(x: 16, y: hintPhase ? 20 : -14)
+                    .opacity(0.85)
+                    .shadow(color: .black.opacity(0.4), radius: 4)
+                    .allowsHitTesting(false)
+                    .transition(.opacity)
+            }
+        }
+    }
+
+    // ── Paper-dust burst at the launch ───────────────────────────────────────
 
     @ViewBuilder
     private var dust: some View {
         if dustBurst {
             ForEach(0..<10, id: \.self) { i in
-                let a = Double(i) / 10 * .pi                  // upper half
+                let a = Double(i) / 10 * .pi
                 let r: CGFloat = 30 + CGFloat(i % 4) * 8
                 Circle()
                     .fill(FlickDeskPalette.paperA.opacity(0.7))
@@ -165,7 +242,7 @@ struct FlickDeskCompassFace: View {
         }
     }
 
-    // ── Labels — "pointing toward [name]" above, "flick ✦" below ─────────────
+    // ── Labels ───────────────────────────────────────────────────────────────
 
     private var labels: some View {
         VStack {
@@ -175,7 +252,8 @@ struct FlickDeskCompassFace: View {
                 .shadow(color: .black.opacity(0.5), radius: 5)
                 .padding(.top, 70)
             Spacer()
-            Text("flick ✦")
+            Text(showWeakHint ? "flick a little harder ✦"
+                 : autoPlay ? "flick ✦" : "flick toward the point ✦")
                 .font(.system(size: 18, design: .serif).italic())
                 .foregroundColor(Self.lavender)
                 .shadow(color: .black.opacity(0.5), radius: 5)
@@ -184,31 +262,82 @@ struct FlickDeskCompassFace: View {
         .allowsHitTesting(false)
     }
 
-    // ── The single watchable beat ────────────────────────────────────────────
+    // ── LIVE flick gesture — the entire mechanic (aim-free) ──────────────────
+
+    private var flickGesture: some Gesture {
+        DragGesture(minimumDistance: 1)
+            .onChanged { value in
+                guard !launching else { return }
+                interacted = true
+                dragging = true
+                dragOffset = value.translation
+            }
+            .onEnded { value in
+                dragging = false
+                guard !launching else { return }
+                let speed = hypot(value.velocity.width, value.velocity.height)
+                // ONLY a speed check — no direction/alignment test at all.
+                if speed >= minFlickSpeed {
+                    launchLive()
+                } else {
+                    weakBounce()
+                }
+            }
+    }
+
+    /// A real flick — the ball flies to the target point and hands off.
+    private func launchLive() {
+        launching = true
+        withAnimation(.easeOut(duration: 0.15)) { dragOffset = .zero }
+        InstrumentSoundPlayer.shared.playSend(.flick, proIntensity: 1.25)
+        HapticEngine.flickRelease()
+        dustBurst = true
+        withAnimation(.easeOut(duration: 0.6)) { ballFlight = 1 }
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) { onSend() }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.8)  { rearmLive() }
+    }
+
+    /// A weak flick — the ball springs home, a gentle nudge to flick harder.
+    private func weakBounce() {
+        HapticEngine.sendSoft()
+        withAnimation(.spring(response: 0.4, dampingFraction: 0.5)) { dragOffset = .zero }
+        showWeakHint = true
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.8) {
+            withAnimation { showWeakHint = false }
+        }
+    }
+
+    /// Reset the live face so the next thought can be flicked.
+    private func rearmLive() {
+        var t = Transaction(); t.disablesAnimations = true
+        withTransaction(t) {
+            ballFlight = 0; dustBurst = false; launching = false
+            interacted = false; dragOffset = .zero
+        }
+    }
+
+    // ── The test-lab watchable beat (autoPlay only) ──────────────────────────
 
     private func runOnce() {
         guard !didRun else { return }
         didRun = true
 
-        // Finger slides up to the ball.
         withAnimation(.easeOut(duration: 0.5)) { fingerLift = 1 }
 
-        // Wind back — the ball tilts ~3°, the finger loads.
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.7) {
             withAnimation(.easeInOut(duration: 0.4)) { windBack = 1 }
             HapticPattern.singleSoft.fire()
         }
 
-        // SNAP — ball launches up-right spinning; dust bursts; soft flick sound.
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.3) {
             withAnimation(.easeIn(duration: 0.12)) { snap = 1 }
-            InstrumentSoundPlayer.shared.playSend(.flick, proIntensity: 1.25)   // sharp paper snap. proIntensity 1.25 already clamps the player to full (1.0); the snap was made one notch LOUDER by boosting flick_send.wav itself (~+2 dB RMS) — see FlickSounds.swift.
-            HapticPattern.singleSoft.fire()                 // soft — NOT sharp
+            InstrumentSoundPlayer.shared.playSend(.flick, proIntensity: 1.25)
+            HapticPattern.singleSoft.fire()
             dustBurst = true
             withAnimation(.easeOut(duration: 0.7)) { ballFlight = 1 }
         }
 
-        // Finger retracts.
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.55) {
             withAnimation(.easeOut(duration: 0.3)) { snap = 0; windBack = 0 }
         }
@@ -216,18 +345,14 @@ struct FlickDeskCompassFace: View {
             withAnimation(.easeOut(duration: 0.3)) { fingerGone = true }
         }
 
-        // Hand off — the beat is done.
         DispatchQueue.main.asyncAfter(deadline: .now() + 2.4) {
             onSend()
-            // LIVE: re-arm so the next tap can flick the next thought. (The test
-            // lab leaves didRun latched — it plays exactly once.)
-            if !autoPlay { rearm() }
+            if !autoPlay { rearmBeat() }
         }
     }
 
-    /// Snap every beat-state back to rest (no animation) so a live face can flick
-    /// again. Called after the live hand-off.
-    private func rearm() {
+    /// Reset the test-lab beat state (no animation).
+    private func rearmBeat() {
         var t = Transaction(); t.disablesAnimations = true
         withTransaction(t) {
             fingerLift = 0; windBack = 0; snap = 0
