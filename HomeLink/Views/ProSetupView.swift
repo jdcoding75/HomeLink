@@ -45,8 +45,23 @@ struct ProSetupView: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 22) {
                         statusSection
+
+                        // [three experiences] Named group headers — Connector ·
+                        // Expresser · Special Moments. Labels/copy only; the existing
+                        // section CALLS are grouped under each header (no card or
+                        // logic changes). Dedicated compass/people/pairing surfaces
+                        // live in their own views; the compass-led card here is the
+                        // distance display.
+                        groupHeader("CONNECTOR", "loving · compass-led · always close")
+                        funnyDistanceSection
+
+                        groupHeader("EXPRESSER", "fun · instrument-led · your style")
                         yourStyleSection
+                        soundPersonalitySection
+
+                        groupHeader("SPECIAL MOMENTS", "occasion-grade · card-quality · premium")
                         signatureAnimationsSection   // [job1B] firework + birthday (from manifest)
+
                         // (instrument + skin selections unified above)
                         // instrumentSection
                         // if instrumentStore.selected == .compass { skinSection }
@@ -57,8 +72,6 @@ struct ProSetupView: View {
                         // [3/5] custom sound RECORDING retired (no microphone) —
                         // replaced by a curated per-instrument personality picker.
                         // customSoundsSection
-                        soundPersonalitySection
-                        funnyDistanceSection
                         // holdToSendSection   // [6/6] built into the compass instrument now
                         Spacer(minLength: 30)
                     }
@@ -781,6 +794,20 @@ struct ProSetupView: View {
         Text(text)
             .font(DesignTokens.Font.overline)
             .foregroundColor(DesignTokens.Color.textMuted)
+    }
+
+    /// A named EXPERIENCE group header (Connector · Expresser · Special Moments) —
+    /// the overline section style, accent-tinted to read above the sub-section
+    /// labels, with a one-line descriptor beneath.
+    private func groupHeader(_ title: String, _ descriptor: String) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(title)
+                .font(DesignTokens.Font.overline)
+                .foregroundColor(DesignTokens.Color.accentSoft)
+            Text(descriptor)
+                .font(.system(size: 12, design: .serif).italic())
+                .foregroundColor(DesignTokens.Color.textMuted)
+        }
     }
 
     private func card<Content: View>(@ViewBuilder content: () -> Content) -> some View {

@@ -409,15 +409,19 @@ struct OnboardingView: View {
             }
             .padding(.top, 10)
 
-            Text("four ways to send a feeling")
+            Text("three ways to connect")
                 .font(.system(size: 26, weight: .semibold, design: .serif))
                 .foregroundColor(DesignTokens.Color.textPrimary)
                 .padding(.top, 26)
 
-            Text("each one a different experience")
-                .font(.system(size: 14, design: .serif).italic())
-                .foregroundColor(Self.lavender.opacity(0.85))
-                .padding(.top, 8)
+            // [three experiences] reframe — Connector · Expresser · Special Moments,
+            // each with its one-line descriptor.
+            VStack(spacing: 10) {
+                experienceLine("Connector", "loving · compass-led · always close")
+                experienceLine("Expresser", "fun · instrument-led · your style")
+                experienceLine("Special Moments", "occasion-grade · card-quality · premium")
+            }
+            .padding(.top, 14)
 
             Spacer()
 
@@ -763,6 +767,19 @@ struct OnboardingView: View {
         Text(text)
             .font(DesignTokens.Font.overline)
             .foregroundColor(DesignTokens.Color.textMuted)
+    }
+
+    /// One of the three experiences on the instruments page — name + a one-line
+    /// descriptor (Connector · Expresser · Special Moments).
+    private func experienceLine(_ name: String, _ descriptor: String) -> some View {
+        VStack(spacing: 1) {
+            Text(name)
+                .font(.system(size: 15, weight: .semibold, design: .serif))
+                .foregroundColor(DesignTokens.Color.textPrimary)
+            Text(descriptor)
+                .font(.system(size: 12, design: .serif).italic())
+                .foregroundColor(Self.lavender.opacity(0.85))
+        }
     }
 
     /// The shared address field with live MKLocalSearch suggestions.
