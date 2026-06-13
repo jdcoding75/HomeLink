@@ -183,13 +183,16 @@ struct WindSendAnimation: View {
   private func swirlPos(localT: Double, size: CGSize) -> CGPoint {
     // [1/5] Centre on the TRUE full-screen middle (GeometryReader size) so the
     // leaf swirls through the centre and never touches the bottom.
-    // [tweak] Frequencies scaled ×2/3 (0.72→0.48, 0.45→0.30) so the leaf makes
-    // TWO round-turns instead of three (one up-down = one turn); same lazy-S
-    // shape, same entry (localT 0 → centre), still drifts off as before.
-    //   x = cx + sin(t·0.48) · width  · 0.36
-    //   y = cy + sin(t·0.30 + 1.0) · height · 0.15
-    let sx = sin(localT * 0.48)
-    let sy = sin(localT * 0.30 + 1.0)
+    // [tweak] Horizontal freq lowered 0.48→0.36 (vert 0.30→0.22 to keep the S
+    // proportion). The OLD 0.48 only read as 2 sweeps for SOME exit bearings —
+    // for bearings ~30°–150° the swirl's mid-peak added two extra crossings, so
+    // the send did 4+ sweeps and the count CHANGED run-to-run with the random
+    // exit bearing. At 0.36 the swirl no longer reverses x mid-flight, so it is
+    // a reliable TWO sweeps (enter-in + drift-out) for EVERY exit bearing.
+    //   x = cx + sin(t·0.36) · width  · 0.36
+    //   y = cy + sin(t·0.22 + 1.0) · height · 0.15
+    let sx = sin(localT * 0.36)
+    let sy = sin(localT * 0.22 + 1.0)
     return CGPoint(x: size.width  / 2 + CGFloat(sx) * size.width  * Self.swirlWidthAmp,
                    y: size.height / 2 + CGFloat(sy) * size.height * Self.swirlHeightAmp)
   }

@@ -9,8 +9,9 @@
 // wind finds you). The bucket land hands off to the shared EmojiRevealView, the
 // emotional peak, where the emoji's own sound + reveal haptic fire.
 //
-//   ENTER    (0.8s)  TOP → centre — a full fall, grows 0.5 → 1.0, easeOut
-//   DRIFT    (4.0s)  lazy S-curve (W*0.36 / H*0.15), seeds stream, messages
+//   ENTER    (1.8s)  TOP → centre — a SLOW leaf catching air (easeInOut, no
+//                    fast drop at the start), grows 0.5 → 1.0
+//   DRIFT    (3.0s)  lazy S-curve (W*0.36 / H*0.15), seeds stream, messages
 //   APPROACH (1.5s)  toward the bucket, scale 1.0 → 0.65, easeInOut
 //   LAND     (0.9s)  tips in: rotate −85°, scale 0.65 → 0.25, fade, seed burst
 //   → EmojiRevealView (the reveal)                                      = 7.2s
@@ -42,11 +43,11 @@ struct WindReceiptAnimation: View {
     static let revealLinger: Double = InstrumentBoundaries.Reveal.linger
 
     // Phase boundaries (seconds). 0.8 + 4.0 + 1.5 + 0.9 = 7.2.
-    private static let enterDur:    Double = 0.8
-    private static let driftDur:    Double = 4.0
+    private static let enterDur:    Double = 1.8   // slowed: leaf catches air, no drop
+    private static let driftDur:    Double = 3.0   // trimmed to keep the 7.2s total locked
     private static let approachDur: Double = 1.5
     private static let landDur:     Double = 0.9
-    private static let enterEnd:    Double = enterDur                           // 0.8
+    private static let enterEnd:    Double = enterDur                           // 1.8
     private static let driftEnd:    Double = enterDur + driftDur                // 4.8
     private static let approachEnd: Double = enterDur + driftDur + approachDur  // 6.3
     private static let total:       Double = approachEnd + landDur              // 7.2
@@ -185,8 +186,9 @@ struct WindReceiptAnimation: View {
         let size   = geo.size
         let center = CGPoint(x: size.width / 2, y: size.height / 2)
         if elapsed <= Self.enterEnd {
-            // ENTER — edge → centre, easeOut.
-            return lerp(entryPoint(size), center, easeOut(elapsed / Self.enterDur))
+            // ENTER — top → centre, easeInOut: a gentle slow start (the leaf
+            // catches the air and drifts) rather than easeOut's fast initial drop.
+            return lerp(entryPoint(size), center, easeInOut(elapsed / Self.enterDur))
         } else if elapsed <= Self.driftEnd {
             // DRIFT — lazy S-curve around centre.
             return driftPos(localT: elapsed - Self.enterEnd, size: size)
