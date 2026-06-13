@@ -132,6 +132,16 @@ final class SoundEngine {
             // ── PLANE ✈️ (Coming Soon) — winding ratchet click ──────────────
             // TODO: replace with real_plane_wind.wav
             ("plane.wind",       0.45, makePlaneWind),
+
+            // ── BOW 🏹 — the original two-part COMPASS-SCREEN cue ───────────
+            // Part 1: the string DRAWS back under tension (a rising wooden
+            // creak). Part 2: the arrow RELEASES (a sharp snap + forward
+            // whoosh). Synthesized to the character documented in
+            // BowSounds.swift; played from BowCompassFace at the draw and the
+            // aligned release. (No shipped .wav ever carried this — the bow
+            // compass screen was previously haptic-only.)
+            ("bow.draw",         0.60, makeBowDraw),
+            ("bow.release",      0.65, makeBowRelease),
         ]
         // (Commented out of the core flow, voices kept below for reuse:)
         // ("💜", 0.50, makeHeart), ("💋", 0.55, makeKiss),
@@ -1059,6 +1069,65 @@ final class SoundEngine {
             var s = sin(2 * .pi * 200 * t) * exp(-t * 40) * 0.7
             if p < 0.06 { s += Double.random(in: -1...1) * (1 - p / 0.06) * 0.5 }   // tick
             data[i] = Float(max(-1, min(1, s)) * envelope(p, attack: 0.01, release: 0.4))
+        }
+        return buf
+    }
+
+    /// BOW DRAW — the string stretching back. Part one of the two-part bow
+    /// cue. A low wooden body that climbs in pitch as tension builds (~95→168
+    /// Hz over 0.6 s) plus fibrous friction noise that tightens as the string
+    /// pulls, with a slow stick-slip tremor — wood and sinew under load.
+    private func makeBowDraw() -> AVAudioPCMBuffer? {
+        let d = 0.6
+        guard let (buf, data, n) = makeBuffer(duration: d) else { return nil }
+        var rng = SystemRandomNumberGenerator()
+        var lp = 0.0
+        for i in 0..<n {
+            let t = Double(i) / sampleRate
+            let p = t / d
+            // Wooden body gliding up in pitch as the draw deepens
+            let ph = sweepPhase(t, f0: 95, f1: 168, d: d)
+            var s = sin(ph) * 0.5
+            s += sin(ph * 2.01) * 0.18                 // a stretched overtone
+            // Fibrous friction — noise tightening (rising low-pass) as it pulls
+            let noise  = Double.random(in: -1...1, using: &rng)
+            let cutoff = 0.02 + 0.06 * p
+            lp += (noise - lp) * cutoff
+            s += lp * (0.12 + 0.18 * p)
+            // Stick-slip creak tremor of fibers under tension
+            s *= 1 + 0.12 * sin(2 * .pi * 11 * t)
+            // Swell in over the first 40 %, hold toward full draw, soft tail
+            let swell = min(1, p / 0.4)
+            data[i] = Float(max(-1, min(1, s)) * 0.7 * swell
+                            * envelope(p, attack: 0.05, release: 0.12))
+        }
+        return buf
+    }
+
+    /// BOW RELEASE — the shot. Part two of the two-part bow cue. A sharp string
+    /// SNAP/twang at the front (fast-decaying detuned harmonics + a click),
+    /// followed immediately by a forward WHOOSH of air as the arrow flies away
+    /// (noise through an opening low-pass, swelling then trailing off).
+    private func makeBowRelease() -> AVAudioPCMBuffer? {
+        let d = 0.65
+        guard let (buf, data, n) = makeBuffer(duration: d) else { return nil }
+        var rng = SystemRandomNumberGenerator()
+        var lp = 0.0
+        for i in 0..<n {
+            let t = Double(i) / sampleRate
+            let p = t / d
+            // (1) SNAP — a short, bright twang in the first ~90 ms
+            var snap = sin(2 * .pi * 420 * t) * exp(-t * 38) * 0.7
+            snap += sin(2 * .pi * 631 * t) * exp(-t * 46) * 0.35   // detuned
+            if p < 0.03 {                                          // release click
+                snap += Double.random(in: -1...1) * (1 - p / 0.03) * 0.5
+            }
+            // (2) WHOOSH — air rushing forward, opening filter, fading out
+            let noise  = Double.random(in: -1...1, using: &rng)
+            let cutoff = 0.04 + 0.32 * p * p
+            lp += (noise - lp) * cutoff
+            let whoosh = lp * envelope(p, attack: 0.10, release: 0.45) * 0.6
+            data[i] = Float(max(-1, min(1, snap + whoosh)))
         }
         return buf
     }

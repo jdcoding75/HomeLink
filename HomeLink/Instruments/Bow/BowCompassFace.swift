@@ -52,6 +52,9 @@ struct BowInstrumentView: View {
     @State private var aimPulse = false             // within-5° bright pulsing
     @State private var halfDrawHapticFired = false
     @State private var fullDrawHapticFired = false
+    /// Part 1 of the two-part bow sound fires once as a genuine draw begins,
+    /// re-arming when the string relaxes. (Part 2 — release — fires in endDraw.)
+    @State private var drawSoundFired = false
 
     /// Aim haptics ride the shared alignment bands (2 s / 1 s / 0.5 s).
     private let aimTick = Timer.publish(every: 0.25, on: .main, in: .common).autoconnect()
@@ -419,6 +422,13 @@ struct BowInstrumentView: View {
         }
 
         let newAmount = max(0, min(1, along / 120))
+        // [sound] PART 1 of the two-part bow cue — the string STRETCHING back.
+        // Fires once as a genuine draw begins; re-arms when the string relaxes.
+        if newAmount > 0.12, !drawSoundFired {
+            drawSoundFired = true
+            SoundEngine.shared.play(for: "bow.draw")
+        }
+        if newAmount < 0.06 { drawSoundFired = false }
         // [5/5] BOW — tension building: pulses strengthen and quicken as the
         // string draws back.
         HapticEngine.bowDraw(newAmount)
@@ -438,6 +448,7 @@ struct BowInstrumentView: View {
         defer {
             halfDrawHapticFired = false
             fullDrawHapticFired = false
+            drawSoundFired = false      // re-arm the draw cue for the next pull
         }
         guard loadedToken != nil, drawAmount > 0.35 else {
             withAnimation(.spring(response: 0.35, dampingFraction: 0.6)) {
@@ -447,6 +458,9 @@ struct BowInstrumentView: View {
         }
         if aligned {
             HapticEngine.bowRelease()       // [5/5] sharp snap as it fires
+            // [sound] PART 2 of the two-part bow cue — the RELEASE: a sharp
+            // string snap followed by the arrow's forward whoosh.
+            SoundEngine.shared.play(for: "bow.release")
             withAnimation(.easeOut(duration: 0.05)) { drawAmount = 0 }
             onSend()
         } else {
