@@ -18,7 +18,7 @@ import numpy as np
 
 SR = 44100
 DUR = 8.0
-PEAK = 0.085         # very soft — ambient, sits underneath (softened)
+PEAK = 0.0425        # very soft — ambient, sits underneath (halved from 0.085)
 OUT = os.path.join(os.path.dirname(__file__), "..", "..", "Sounds", "Instruments", "wind_breeze.wav")
 
 rng = np.random.default_rng(20240611)
