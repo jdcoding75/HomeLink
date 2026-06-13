@@ -241,7 +241,11 @@ final class SupabaseService: ObservableObject {
 
     // MARK: - Users table
 
-    private struct UserRow: Codable {
+    // [concurrency 2026-06-13] `nonisolated` so the synthesized Encodable
+    // conformance isn't main-actor-isolated (this type is nested in the
+    // @MainActor SupabaseService). Pure data struct → behavior-identical; clears
+    // the Swift-6 "main actor-isolated conformance to 'Encodable'" warning.
+    private nonisolated struct UserRow: Codable {
         let id: UUID
         let appleUserID: String?
 
@@ -751,7 +755,9 @@ final class SupabaseService: ObservableObject {
 
     // MARK: - Device tokens (for push via Edge Function)
 
-    private struct DeviceTokenRow: Codable {
+    // [concurrency 2026-06-13] `nonisolated` — see UserRow. Pure data struct for
+    // the device_tokens upsert; clears the Swift-6 Encodable-isolation warning.
+    private nonisolated struct DeviceTokenRow: Codable {
         let token: String
         let userID: UUID
         let platform: String
