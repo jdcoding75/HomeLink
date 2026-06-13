@@ -67,3 +67,43 @@ BIRTHDAY_MECHANIC_SPEC.md
   from inline specs all session)
 - Update framework: Plane = dark sky not daySky
 - Device test everything above
+
+## ── Session 7 lock-down — UNRUN QUEUE (pick up here) ──
+
+FIRST MOVE WHEN BACK (two-tab flag — verify before stacking runs):
+  cd ~/Developer/HomeLink && git status && git log --oneline -8
+  Confirm clean tree + both builds' commits landed.
+
+RUN ORDER (one at a time, each pushes before next; all touch manifest):
+  finish running build → plane receipt → firework master → bow send arc
+
+NOT-YET-RUN PROMPTS:
+1. PLANE RECEIPT V2 (continuity): plane from send reappears at TOP of
+   receipt traveling across (continuous flight, not fresh start);
+   parachute releases QUICKLY from top-left, timed to OVERLAP plane
+   travel; rest of receipt unchanged. V2 only, animation-only.
+2. FIREWORK MASTER (combined):
+   [1] Compass: after match-to-fuse initiates, fuse lights + visibly
+       burns DOWN inside compass face before send fires. filtered-noise
+       only, keep match-to-fuse interaction.
+   [2] Receipt: DELETE bucket + square-drop. Keep post-burst glow as
+       backdrop. Show message/emoji BIG + CLEAR over glow (shared
+       EmojiReveal). burst→glow→message = one beat.
+3. BOW SEND ARC: bigger arc, start LOWER in screen, longer path, exit
+   point matching BowReceiptAnimationV2 entry; LENGTHEN path (don't just
+   slow); art/draw/sounds unchanged. V2 only.
+
+VERIFY LANDED: wand crystal-compass image swap; compass unpaired receipt.
+
+## ── LOCK LEDGER (session 7 end) ──
+LOCKED: wind compass · compass screen+send · birthday compass V2 ·
+  bow compass V2 + receipt V2 · plane compass V2 + send V2 · firework send
+ONE TWEAK→LOCK: flick (built,review) · birthday master (running) ·
+  plane receipt · firework compass+receipt · bow send · rocket receipt ·
+  wind send/receipt · wand image · compass receipt
+DEFERRED TO PIVOT: birthday auto-blow-out baseline + download prompt ·
+  catchMode/bucket-catch removal (w/ pairing removal + link delivery)
+BUCKET PRINCIPLE: thrown-object sends keep bucket; THOUGHTS (everyday)
+  + CARD/CELEBRATION (birthday, firework) = NO bucket. Confirmed
+  no-bucket: birthday, firework.
+PARKED: Santa.
