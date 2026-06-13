@@ -1,5 +1,75 @@
 # Pointward — Session Log (latest)
 
+## Session 8 — Phone review, sound batch, emoji review, product structure
+
+### PRODUCT DECISIONS
+- Three experiences defined: Connector (loving, compass-led) · Expresser (fun, instrument-led) · Special Moments (occasion-grade, card-quality, premium)
+- Special Moments are NOT emoji picks — the animation IS the card. Distinct send path from Thoughts.
+- Instrument hints established: each instrument owns a default message tone (source of truth: TaglineSystem.swift instrumentHints)
+- Emoji default message hierarchy: Special Moment voice > Emoji default > Instrument hint. User always overrides.
+- Pro/Free tier configuration: DEFERRED to end-game session. Do not change without product sign-off.
+- Bloom is the default reveal for all emojis without a custom animation. Consistent framework.
+- Taglines are per-person on compass screen. They travel with Thoughts. Special Moments override with their own fixed voice.
+
+### EMOJI SET — FINAL (this session)
+FREE: 🤗 hug · 😘 kiss · 🤜🤛 fist bump · 🖐️ high five · 🫶 heart hands · 💥 boom
+PRO: 💭 thought · 🙏 gratitude · 👏 clapping
+CUSTOM REVEALS BUILT: 🤗 squeeze · 🤜🤛 pump · 👏 clap · 🎁 gift unwrap (Birthday special moment only)
+BLOOM ENHANCED: +33% final size, -10% start size, all bloom emojis
+
+REMOVED (commented out, reasons in CuratedEmoji.swift):
+🙌 celebration (→ replaced by 👏) · 💪 muscle · ✨ special · 🤝 thinking of you
+🎂 birthday emoji (conflicts with Birthday instrument) · 🎆 firework emoji (conflicts with Firework instrument, renders as box)
+💌 love note (→ Valentine's Special Moment) · 🎄 holidays (→ Special Moment) · 💐 for mum (→ Special Moment)
+🎁 gift (→ Birthday Special Moment reveal mechanic, not standalone emoji)
+
+### SPECIAL MOMENTS ROSTER
+BUILT: 🎂 Birthday · 🎆 Firework
+COMING SOON: 💌 Valentine's Day · 🎄 Happy Holidays · 💐 For Mum · 🎇 July 4th · 🎓 Graduation
+NOTE: Architecture TBD — does Special Moment need emoji attached or sends standalone? Decide before building next Special Moment. Ties into pivot session (link delivery).
+
+### GRADUATION NOTE
+🎓 Graduation moved to Special Moments. Emoji reveal = cap thrown in air. Not a standalone thought emoji.
+
+### INSTRUMENT HINTS (TaglineSystem.swift)
+Compass · Bow · Flick · Rocket · Wind · Wand · Plane — each has a default message hint. Source of truth: TaglineSystem.instrumentHints. Edit there only.
+
+### COPY CHANGES (this session)
+- Tagline presets: swapped "Love has a direction." → "Thinking of you."
+- Poetic library: removed 3 near-duplicates, added "Distance far. Thoughts close."
+- Empty bucket → "all caught up ✦"
+- Onboarding → "set your home · let us give direction to your messages ✦"
+- Pairing → "come find me on Pointward ✦ 🧭"
+- Valentine's default → "happy valentine's day ✦"
+- Removed "patience is the message ✦"
+- Removed "hi ✦" from test messages
+- Instrument hints added to TaglineSystem.swift as single source of truth
+
+### ANIMATIONS — LOCKED THIS SESSION
+Wind (visual + sound) · Rocket receipt · Compass (visual + sound) · Wand · Flick V2 (visual + sound) · Bow V2 (visual + sound) · Plane V2 (visual + sound) · Birthday V2 (visual + sound) · Firework compass fuse position
+
+### OPEN / FLAGGED
+- Firework emoji renders as box — diagnosis running (Tab 2)
+- Firework receipt box — likely same root cause as emoji box
+- Emoji lab regression — fuse-burn + preview not playing (heavy, separate session)
+- Wind send visual — still moves more than ideal (locked as-is)
+- Bow compass art — weak illustration (deferred)
+- Birthday send rise — didn't land (locked as-is)
+- Three experiences UI audit — running (Tab 3)
+- Instrument hints wiring into live send flow UI — next build after copy batch lands
+- Firework receipt sparkling sound — built, not yet phone reviewed
+
+### DEFERRED TO PIVOT SESSION
+- Remove pairing + link delivery (PAIRING_AUDIT.md 5-step)
+- CatchMode rework + bucket-catch removal
+- Birthday auto-blow-out + download prompt
+- Special Moments send path architecture (with or without emoji attachment)
+
+### PARKED
+- Santa
+
+---
+
 ## Shipped this session (built + pushed)
 - Bow — visual rebuild, send/receipt live
 - Plane — compass spin, NE send,
