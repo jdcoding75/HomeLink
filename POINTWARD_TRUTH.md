@@ -7,7 +7,7 @@
 > is the top of the hierarchy. When they conflict with reality, the live code +
 > this document win.
 
-_Last updated: Session 8 (structural-truth pass)._
+_Last updated: Session 8 (structural-truth pass) · Phase 2 canon reconciliation — link-based model, scope, senderID, deep-link deferred to P3._
 
 ---
 
@@ -236,18 +236,17 @@ Birthday V2 · Firework compass fuse position.
 
 ## Pivot Session (next major)
 
-The next major effort removes pairing + link delivery. See **PAIRING_AUDIT.md**.
+The next major effort is the **Phase 2 — Link Delivery Model** (see that section
+below). The pivot is **link-BASED** (`pointward.app/m/[messageID]`): it does
+**not** remove link delivery — link delivery *is* the new model. What it removes
+is **pairing** — manual codes, typed IDs, the `connections` table, and
+`PairAcceptView` — replacing it with a real sent message that carries the
+sender's identity in the link.
 
-**5-step removal order (from PAIRING_AUDIT.md):**
-1. Remove pairing + link delivery.
-2. CatchMode rework + bucket-catch removal.
-3. Birthday auto-blow-out + download prompt.
-4. Special Moments **send path architecture** — decide: with or without emoji
-   attachment (the Special Moments "TBD" above resolves here).
-5. Reconcile the send/receipt pipeline to the new (link-free) delivery model.
-
-> Follow the precise step order and findings in `PAIRING_AUDIT.md` — that file is
-> the authority for the pivot mechanics.
+> The authoritative removal mechanics — the load-bearing step order and the exact
+> seams to cut — live in **PAIRING_AUDIT.md §5** ("Suggested order for the
+> pivot"). Defer to that file; the order is intentionally **not** reproduced here,
+> to avoid drift.
 
 ---
 
@@ -261,14 +260,35 @@ The next major effort removes pairing + link delivery. See **PAIRING_AUDIT.md**.
 
 ## Phase 2 — Link Delivery Model (decided, not yet built)
 
+### Phase 2 Scope & Decisions (this session)
+- **Scope — explicitly EXCLUDED** (animation-chat / parked; NOT part of the
+  Phase 2 link-delivery pivot, and not gating it): **CatchMode rework**,
+  **Birthday auto-blow-out + download prompt**, and **Special Moments send-path
+  architecture** (the "Architecture TBD"). These remain tracked as deferred —
+  removed from the *pivot* framing, not dropped.
+- **senderID = the existing Supabase `users` table `id`** (the UserProfile
+  account UUID). It is the immutable routing key. **No new field is added.**
+- **Deferred deep linking is OUT for Phase 2.** No third-party SDK
+  (Branch / Adjust), no clipboard fingerprinting. The no-app path **always**
+  lands on short-code entry. Full deferred deep linking is a **Phase 3**
+  candidate.
+- **Short-code entry recovers the most-recent UNOPENED message** for that
+  senderID — a single Supabase query. The contact is created **and** the
+  original thought is recovered, so the first experience is never "contact
+  created, thought lost."
+
 ### Core Model
 - Sender sends → Supabase stores message → generates shareable link
 - Link format: pointward.app/m/[messageID]?from=[senderID]&name=[displayName]
 - Sender shares via iOS native share sheet (Messages, Mail, etc — user chooses)
 - Recipient taps link:
   - Has app → opens directly → animation plays → sender auto-created as contact
-  - No app → App Store → installs → deferred deep link fires → animation plays
-  - Deep link fails → fallback: "enter their short code" (last 6 of senderID)
+  - No app → App Store → installs → opens to **short-code entry** (Phase 2: no
+    deferred deep linking — see *Scope & Decisions* above): enter the short code
+    (last 6 of senderID) → contact created **and** the original unopened thought
+    recovered → animation plays
+  - *(Phase 3 candidate: deferred deep linking so the no-app path auto-opens the
+    thought without a code.)*
 
 ### What Travels In The Link
 - Message content + emoji + instrument
@@ -350,8 +370,8 @@ AUTOMATED (Claude writes):
 - Message in history if unopened
 
 LIVE DEVICE (Joshua tests):
-- No app → App Store → install → deferred deep link fires correctly
-- Deep link fails → short code fallback works
+- No app → App Store → install → opens to short-code entry (Phase 2: no deferred deep link)
+- Short-code entry recovers the most-recent UNOPENED message for that senderID
 - Recipient already has app → link opens directly, no App Store
 - Sender void feeling → acceptable for Phase 2
 - Stale location after move → manual fix acceptable
