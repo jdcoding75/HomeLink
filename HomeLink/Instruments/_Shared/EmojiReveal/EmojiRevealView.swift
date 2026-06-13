@@ -103,6 +103,10 @@ struct EmojiRevealView: View {
                 // Custom gift-box ART so the lid can lift off the body. Data stays 🎁.
                 GiftBoxGlyph(height: 156, lidLift: lidLift,
                              lidOpacity: lidOpacity, lidTilt: lidTilt)
+              } else if emoji == "🎆" {
+                // Custom firework ART — the 🎆 system glyph renders as an empty
+                // box in this context, so draw the burst instead. Data stays 🎆.
+                FireworkGlyph(height: 156)
               } else {
                 Text(emoji).font(.system(size: 156))
               }

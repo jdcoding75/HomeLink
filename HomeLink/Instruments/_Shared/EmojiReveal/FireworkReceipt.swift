@@ -223,8 +223,16 @@ struct FireworkReceipt: View {
             let lp = (e - Self.bloomAt) / 0.6
             let bloom: CGFloat = lp < 0.7 ? CGFloat(easeOut(max(0, lp) / 0.7)) * 1.18
                                : (lp < 1.0 ? 1.18 - 0.18 * CGFloat((lp - 0.7) / 0.3) : 1.0)
-            Text(emoji)
-                .font(.system(size: 150))
+            // Custom firework ART instead of the 🎆 system glyph (which renders
+            // as an empty box in this context). Same vector burst the reveal hero
+            // uses — see FireworkGlyph. Data stays 🎆.
+            Group {
+                if emoji == "🎆" {
+                    FireworkGlyph(height: 150)
+                } else {
+                    Text(emoji).font(.system(size: 150))
+                }
+            }
                 .scaleEffect(bloom)
                 .shadow(color: Self.gold.opacity(0.6), radius: 22)
                 .position(x: w / 2, y: h * 0.42)
