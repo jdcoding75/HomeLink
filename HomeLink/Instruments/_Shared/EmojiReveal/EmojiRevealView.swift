@@ -47,6 +47,11 @@ struct EmojiRevealView: View {
   @State private var eOffY: CGFloat = 0
   @State private var eRot: Double = 0
 
+  // 🎁 gift lid — lifts off the box body independently (GiftBoxGlyph)
+  @State private var lidLift: CGFloat = 0
+  @State private var lidOpacity: Double = 1
+  @State private var lidTilt: Double = 0
+
   // Effects (overlays per kind)
   @State private var ringScale: CGFloat = 0
   @State private var ringOpacity: Double = 0
@@ -94,6 +99,10 @@ struct EmojiRevealView: View {
                 // [phase3] Custom cake ART at the reveal hero (not the 🎂 glyph),
                 // matching the bucket + compass/send/receipt screens. Data stays 🎂.
                 BirthdayCakeGlyph(height: 156)
+              } else if emoji == "🎁" {
+                // Custom gift-box ART so the lid can lift off the body. Data stays 🎁.
+                GiftBoxGlyph(height: 156, lidLift: lidLift,
+                             lidOpacity: lidOpacity, lidTilt: lidTilt)
               } else {
                 Text(emoji).font(.system(size: 156))
               }
@@ -195,7 +204,13 @@ struct EmojiRevealView: View {
         RevealParticles(symbols: ["💗", "💕"], count: 5, color: glowColor,
                         scatter: false, origin: c, spread: 170)
       }
-    case .gift, .birthday:
+    case .gift:
+      if particlesOn {
+        // A small, warm burst rising up out of the open box top (upward fan).
+        RevealParticles(symbols: ["✨", "🎉", "🎊"], count: 10, color: glowColor,
+                        scatter: false, origin: CGPoint(x: c.x, y: c.y - 46), spread: 150)
+      }
+    case .birthday:
       if particlesOn {
         RevealParticles(symbols: ["🎉", "🎊", "✨"], count: 12, color: glowColor,
                         scatter: true, origin: c, spread: 200)
@@ -349,14 +364,31 @@ struct EmojiRevealView: View {
     after(0.9) { withAnimation(.spring(response: 0.4, dampingFraction: 0.6)) { eScaleX = 1; eScaleY = 1 } }
   }
 
-  // MARK: - 🎁 Gift — shake → pop → confetti
+  // MARK: - 🎁 Gift — box blooms in → lid pops off (bounce) & floats away,
+  // a small warm burst leaves the open top, then it settles into breathe.
+  // The hero is GiftBoxGlyph: `lid*` move the lid, `eScale*` the whole box.
 
   private func startGift() {
-    for k in 0..<5 { after(0.06 * Double(k)) { withAnimation(.linear(duration: 0.06)) { eRot = (k % 2 == 0 ? 6 : -6) } } }
-    after(0.32) { withAnimation(.easeOut(duration: 0.12)) { eRot = 0 } }
-    after(0.35) { EmojiRevealSound.play("🎁")
-                  withAnimation(.spring(response: 0.35, dampingFraction: 0.5)) { eOffY = -30; eScaleX = 1.15; eScaleY = 1.15 }; particlesOn = true }
-    after(0.7)  { withAnimation(.spring(response: 0.5, dampingFraction: 0.6)) { eOffY = 0; eScaleX = 1; eScaleY = 1 } }
+    // The box blooms in closed (shared bloom). Then the lid releases:
+    after(0.5) {
+      EmojiRevealSound.play("🎁")               // unwrap/pop — fires as the lid pops
+      HapticPattern.singleSoft.fire()           // a soft tactile pop
+      // slight bounce: the lid hops up with overshoot and a touch of tilt
+      withAnimation(.spring(response: 0.32, dampingFraction: 0.5)) {
+        lidLift = 34; lidTilt = -8
+      }
+      particlesOn = true                         // the burst escapes the open top
+      // the box body gives a tiny settle squash as the lid leaves
+      withAnimation(.easeOut(duration: 0.12)) { eScaleY = 0.95 }
+    }
+    after(0.64) { withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) { eScaleY = 1 } }
+    // the lid keeps rising, fading and tilting until it disappears
+    after(0.7) {
+      withAnimation(.easeIn(duration: 0.55)) {
+        lidLift = 210; lidOpacity = 0; lidTilt = -16
+      }
+    }
+    // → the open box stays bloomed; the shared glow breathe carries the handoff.
   }
 
   // MARK: - 🎆 Fireworks — rises then bursts

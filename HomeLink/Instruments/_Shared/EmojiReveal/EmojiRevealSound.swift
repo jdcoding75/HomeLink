@@ -69,7 +69,7 @@ enum EmojiRevealSound {
         case "💭":   return "emoji_thoughtbubble"
         case "💌":   return "emoji_envelope"
         case "💥":   return "emoji_explosion"
-        case "🎁":   return "emoji_gift"
+        case "🎁":   return "emoji_gift_unwrap"   // lid-pop cue (GiftUnwrapSoundGenerator.py)
         case "🎆":   return "emoji_fireworks"
         case "🎓":   return "emoji_graduation"
         case "🎂":   return "emoji_birthday"
