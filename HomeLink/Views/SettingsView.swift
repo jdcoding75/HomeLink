@@ -1,148 +1,79 @@
 // SettingsView.swift
 // Pointward › Views
 //
-// Emotional core: feel · expression · compass · notifications · account · about.
+// A clean, minimal settings surface:
+//   send preferences · notifications · about Pointward · account · developer.
+// The Pro screen was retired as a tab; instrument/skin selection lives on the
+// compass long-press picker, and Pro status + upgrade now live here in account.
 
 import SwiftUI
-import UIKit
 
 struct SettingsView: View {
 
     @EnvironmentObject var subscription: SubscriptionManager
-    @EnvironmentObject var skinStore:    SkinStore
-    @EnvironmentObject var instrumentStore: InstrumentStore
     #if DEBUG
-    @EnvironmentObject var devPeople:  PeopleManager
-    @EnvironmentObject var devPings:   PingManager
-    @EnvironmentObject var devCompass: CompassManager
+    @EnvironmentObject var devPings: PingManager
     #endif
 
-    @AppStorage("quietMode")      private var quietMode      = false
-    @AppStorage("hapticsEnabled") private var hapticsEnabled = true
-    // Distance units — defaults to the locale's measurement system, user can override
-    @AppStorage("useMiles") private var useMiles = Locale.current.measurementSystem == .us
-    @AppStorage("lockScreenWidgetEnabled") private var lockScreenWidget = false
-    @AppStorage("notifyPointing") private var notifyPointing = true
+    // Display preference — surprise unit each launch (-1) or a locked favourite.
+    @AppStorage("funnyUnitLocked")       private var funnyUnitLocked      = -1
+    @AppStorage("notifyPointing")        private var notifyPointing       = true
     @AppStorage("arrivalPreviewEnabled") private var arrivalPreviewEnabled = true   // [5/6]
-    @AppStorage("funnyUnitLocked")      private var funnyUnitLocked      = -1
-    @AppStorage("thoughtTaglineLocked") private var thoughtTaglineLocked = -1
-    @AppStorage(ProFeatures.storageKey) private var proFeatures = false
-    // @AppStorage("holdToSendEnabled") private var holdToSend = false   // retired with the row
 
-    @State private var showCopied     = false
-    @State private var showConnect    = false
-    @State private var showSkinPicker = false
+    @State private var showGivingBack = false
     @State private var showAbout      = false
-    @State private var showUnlock     = false
-    @State private var showAccount    = false
+    @State private var showPaywall    = false
     #if DEBUG
-    @State private var showClearAllConfirm = false
-    @State private var showClearConnConfirm = false
-    @State private var devBusy = false
-    @State private var showTestSheet = false
-    @State private var showCustomEmojiPicker = false
-    @State private var showAnimationLab = false
+    @State private var showTestSheet        = false
+    @State private var showAnimationLab     = false
     @State private var showAnimationFeedback = false
-    @State private var mockHeadingOn = false
-    @State private var farAwayOn = false
-    @State private var nearbyOn = false
     #endif
+
+    /// Toggle ON = clear warm teal; OFF stays the system's dark grey track.
+    private static let toggleOn = Color(hex: "#5dcaa5")
+    private static let green    = Color(hex: "#5dcaa5")
+
+    private var isPro: Bool { subscription.tier != .free }
 
     var body: some View {
         ZStack {
             DesignTokens.Color.background.ignoresSafeArea()
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
-                    // Quiet Mode retired — full emotional intensity, always.
-                    // sectionHeader("feel")
-                    // feelSection
 
-                    // [6/6] Pro moved to its own tab — no Pro section in Settings.
-                    // sectionHeader("pro")
-                    // proSection
+                    sectionHeader("send preferences")
+                    sendPreferencesSection
 
-                    // Final clean: expression toggles + skin row moved
-                    // into ProSetupView. (kept below for reference)
-                    // sectionHeader("expression")
-                    // expressionSection
-                    // sectionHeader("compass")
-                    // skinSection
-
-                    // [2/6] Ambient presence is always-on now — the toggle was
-                    // the only notification pref, so the section is gone.
-                    // sectionHeader("notifications")
-                    // notificationsSection
-
-                    sectionHeader("account")
-                    accountSection
-
-                    // [1/6] Notifications preferences — the single "thoughts"
-                    // toggle (a gentle word when someone points toward you).
                     sectionHeader("notifications")
                     notificationsSection
 
-                    sectionHeader("about")
+                    sectionHeader("about Pointward")
                     aboutSection
+
+                    sectionHeader("account")
+                    accountSection
 
                     #if DEBUG
                     sectionHeader("developer")
                     developerSection
                     #endif
 
-                    // ── Stripped in the emotional-core pass (kept, not lost) ──
-                    // sectionHeader("about")
-                    // aboutSection              // story · version · offline
-                    // if subscription.tier == .free {
-                    //     sectionHeader("unlock")
-                    //     unlockSection          // paywall now reached via Expression
-                    // }
-                    // sectionHeader("invite")
-                    // inviteSection             // inviting lives on person cards now
-                    // sectionHeader("experience")
-                    // experienceSection         // miles toggle, pickers, lock-screen row
+                    // removed — see SESSION_LOG.md for history
+                    // (proSection · inviteSection · unlockSection · feelSection ·
+                    //  expressionSection · experienceSection · skinSection ·
+                    //  hold-to-send block · `if false` pairing-code rows)
 
                     Spacer(minLength: 40)
                 }
                 .padding(.horizontal, DesignTokens.Spacing.lg)
             }
         }
-        .sheet(isPresented: $showSkinPicker) {
-            SkinPickerView()
-                .environmentObject(skinStore)
-                .environmentObject(subscription)
-        }
-        .sheet(isPresented: $showAbout) {
-            AboutView()
-        }
-        .sheet(isPresented: $showUnlock) {
-            PaywallView()
-        }
-        .sheet(isPresented: $showAccount) {
-            AccountView()
-        }
+        .sheet(isPresented: $showGivingBack) { GivingBackView() }
+        .sheet(isPresented: $showAbout) { AboutView() }
+        .sheet(isPresented: $showPaywall) { PaywallView() }
         #if DEBUG
-        .confirmationDialog("Clear all my data",
-                            isPresented: $showClearAllConfirm, titleVisibility: .visible) {
-            Button("Delete everything", role: .destructive) { runClearAll() }
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            Text("This will delete all your Pointward data from the server. Are you sure?")
-        }
-        .confirmationDialog("Clear partner connection",
-                            isPresented: $showClearConnConfirm, titleVisibility: .visible) {
-            Button("Remove connection", role: .destructive) { runClearConnections() }
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            Text("Removes your pairing only — your thought history is kept. Good for testing pairing again.")
-        }
         .sheet(isPresented: $showTestSheet) {
             TestMessageSheet().environmentObject(devPings)
-        }
-        .sheet(isPresented: $showCustomEmojiPicker) {
-            DevCustomEmojiPicker { token in
-                showCustomEmojiPicker = false
-                DevTools.sendTestCustomEmoji(pings: devPings, token: token)
-            }
         }
         .fullScreenCover(isPresented: $showAnimationLab) {
             AnimationTestLabView()
@@ -153,605 +84,41 @@ struct SettingsView: View {
         #endif
     }
 
-    #if DEBUG
-    // MARK: - [5/5] Developer (DEBUG only — never ships)
+    // MARK: - Send preferences
 
-    private var developerSection: some View {
-        settingsGroup {
-            Button { showClearAllConfirm = true } label: {
-                settingsRow {
-                    Image(systemName: "trash")
-                        .settingsIcon()
-                        .foregroundColor(.red)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Clear all my data")
-                            .settingsLabel()
-                            .foregroundColor(.red)
-                        Text("wipe everything server-side · sign out")
-                            .font(.system(size: 11))
-                            .foregroundColor(DesignTokens.Color.textMuted)
-                    }
-                    Spacer()
-                }
-            }
-            .buttonStyle(.plain)
-            .disabled(devBusy)
-
-            Button { showClearConnConfirm = true } label: {
-                settingsRow {
-                    Image(systemName: "person.crop.circle.badge.xmark")
-                        .settingsIcon()
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Clear partner connection only")
-                            .settingsLabel()
-                        Text("keeps history · re-test pairing")
-                            .font(.system(size: 11))
-                            .foregroundColor(DesignTokens.Color.textMuted)
-                    }
-                    Spacer()
-                }
-            }
-            .buttonStyle(.plain)
-            .disabled(devBusy)
-
-            // [3/4] Send yourself a test thought — full receipt, no 2nd phone.
-            Button { showTestSheet = true } label: {
-                settingsRow {
-                    Image(systemName: "paperplane.fill")
-                        .settingsIcon()
-                        .foregroundColor(Color(hex: "#c4a8d4"))
-                    Text("Send myself a test thought").settingsLabel()
-                    Spacer()
-                    Image(systemName: "chevron.right").font(.system(size: 12))
-                        .foregroundColor(DesignTokens.Color.textDim)
-                }
-            }
-            .buttonStyle(.plain)
-
-            // 🧪 Animation Test Lab — a dedicated space to fire every send and
-            // land animation in isolation (no queue, no pairing, no compass).
-            Button { showAnimationLab = true } label: {
-                settingsRow {
-                    Image(systemName: "theatermasks").settingsIcon()
-                        .foregroundColor(Color(hex: "#c4a8d4"))
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("🧪 Animation Test Lab").settingsLabel()
-                        Text("every send + land animation, in isolation")
-                            .font(.system(size: 11)).foregroundColor(DesignTokens.Color.textMuted)
-                    }
-                    Spacer()
-                    Image(systemName: "chevron.right").font(.system(size: 12))
-                        .foregroundColor(DesignTokens.Color.textDim)
-                }
-            }
-            .buttonStyle(.plain)
-
-            // [2/6] 📋 View animation feedback — the approved / needs-work
-            // summary of every animation, from the ratings made in the lab.
-            Button { showAnimationFeedback = true } label: {
-                settingsRow {
-                    Image(systemName: "list.clipboard").settingsIcon()
-                        .foregroundColor(Color(hex: "#c4a8d4"))
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("📋 View animation feedback").settingsLabel()
-                        Text("approved / needs-work summary from the lab")
-                            .font(.system(size: 11)).foregroundColor(DesignTokens.Color.textMuted)
-                    }
-                    Spacer()
-                    Image(systemName: "chevron.right").font(.system(size: 12))
-                        .foregroundColor(DesignTokens.Color.textDim)
-                }
-            }
-            .buttonStyle(.plain)
-
-            // [5/5] 🎬 Test All Animations — one test thought per instrument, in
-            // sequence (compass → bow → flick → rocket → wind → wand → plane),
-            // each a different base emoji + random message, 2 s apart. All 7
-            // QUEUE in the bucket; then tap "🪣 Auto-catch all" to watch them.
-            Button { DevTools.testAllAnimations(pings: devPings) } label: {
-                settingsRow {
-                    Image(systemName: "film").settingsIcon()
-                        .foregroundColor(Color(hex: "#c4a8d4"))
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("🎬 Test All Animations").settingsLabel()
-                        Text("all 7 queue up · then auto-catch all")
-                            .font(.system(size: 11)).foregroundColor(DesignTokens.Color.textMuted)
-                    }
-                    Spacer()
-                }
-            }
-            .buttonStyle(.plain)
-
-            // [4/5] 🪣 Auto-catch all — drains the whole bucket, auto-aligning
-            // and playing each receipt in sequence with a 2 s pause. No manual
-            // spinning. Perfect after "Test All Animations".
-            Button {
-                NotificationCenter.default.post(name: .pointwardOpenCompass, object: nil)
-                DevTools.autoCatchAll(pings: devPings)
-            } label: {
-                settingsRow {
-                    Image(systemName: "basket.fill").settingsIcon()
-                        .foregroundColor(Color(hex: "#c4a8d4"))
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("🪣 Auto-catch all").settingsLabel()
-                        Text("play every queued thought, 2 s apart")
-                            .font(.system(size: 11)).foregroundColor(DesignTokens.Color.textMuted)
-                    }
-                    Spacer()
-                }
-            }
-            .buttonStyle(.plain)
-
-            // [2/5] 🎬 Test Random — one random instrument, fastest single check.
-            Button { DevTools.testRandom(pings: devPings) } label: {
-                settingsRow {
-                    Image(systemName: "shuffle").settingsIcon()
-                    Text("🎬 Test Random").settingsLabel()
-                    Spacer()
-                }
-            }
-            .buttonStyle(.plain)
-
-            // [2/5] 🗑️ Clear test thoughts — removes only dev-generated thoughts
-            // from the bucket; real thoughts are kept.
-            Button { devPings.clearTestThoughts() } label: {
-                settingsRow {
-                    Image(systemName: "trash.slash").settingsIcon()
-                    Text("🗑️ Clear test thoughts").settingsLabel()
-                    Spacer()
-                }
-            }
-            .buttonStyle(.plain)
-
-            // [2/5] 👆 Test Custom Emoji — pick one of your saved slots and send
-            // a test with it, to verify custom emojis travel correctly.
-            Button { showCustomEmojiPicker = true } label: {
-                settingsRow {
-                    Image(systemName: "hand.point.up.left").settingsIcon()
-                    Text("👆 Test Custom Emoji").settingsLabel()
-                    Spacer()
-                    Image(systemName: "chevron.right").font(.system(size: 12))
-                        .foregroundColor(DesignTokens.Color.textDim)
-                }
-            }
-            .buttonStyle(.plain)
-
-            Button { DevTools.resetToOnboarding(people: devPeople) } label: {
-                settingsRow {
-                    Image(systemName: "arrow.counterclockwise").settingsIcon()
-                    Text("Reset to onboarding").settingsLabel()
-                    Spacer()
-                }
-            }
-            .buttonStyle(.plain)
-
-            Button { DevTools.clearOnboardingFlagOnly() } label: {
-                settingsRow {
-                    Image(systemName: "flag.slash").settingsIcon()
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Clear onboarding flag only").settingsLabel()
-                        Text("re-see onboarding · keep data")
-                            .font(.system(size: 11)).foregroundColor(DesignTokens.Color.textMuted)
-                    }
-                    Spacer()
-                }
-            }
-            .buttonStyle(.plain)
-
-            Toggle(isOn: $mockHeadingOn) {
-                settingsRow {
-                    Image(systemName: "gyroscope").settingsIcon()
-                    Text("Mock compass heading").settingsLabel()
-                    Spacer()
-                }
-            }
-            .onChange(of: mockHeadingOn) { _, on in devCompass.setMockHeading(on) }
-
-            Toggle(isOn: $farAwayOn) {
-                settingsRow {
-                    Image(systemName: "airplane").settingsIcon()
-                    Text("Simulate far away (5000 km)").settingsLabel()
-                    Spacer()
-                }
-            }
-            .onChange(of: farAwayOn) { _, on in
-                guard on else { return }
-                nearbyOn = false
-                DevTools.setMockDistance(farAway: true, people: devPeople, compass: devCompass)
-            }
-
-            Toggle(isOn: $nearbyOn) {
-                settingsRow {
-                    Image(systemName: "figure.walk").settingsIcon()
-                    Text("Simulate nearby (0.5 km)").settingsLabel()
-                    Spacer()
-                }
-            }
-            .onChange(of: nearbyOn) { _, on in
-                guard on else { return }
-                farAwayOn = false
-                DevTools.setMockDistance(farAway: false, people: devPeople, compass: devCompass)
-            }
-        }
-    }
-
-    private func runClearAll() {
-        devBusy = true
-        Task {
-            // Server side: device_tokens · pings · connections · compass_bearings
-            // · users, then sign out.
-            try? await SupabaseService.shared.clearAllMyData()
-            await MainActor.run {
-                // [4/5] Local side: SURGICAL — only user data (people, thoughts,
-                // and an explicit list of UserDefaults keys). Developer tool
-                // settings, sound personalities, instrument/skin/emoji choices,
-                // subscription, and iOS permissions are all left intact.
-                DevTools.clearLocalUserData(people: devPeople, pings: devPings)
-                devCompass.stop()
-                devBusy = false
-                // Sign-out flips the app back to onboarding via RootView's
-                // auth observer; nudge the compass tab so it lands cleanly.
-                NotificationCenter.default.post(name: .pointwardOpenCompass, object: nil)
-            }
-        }
-    }
-
-    private func runClearConnections() {
-        devBusy = true
-        Task {
-            try? await SupabaseService.shared.clearConnectionsOnly()
-            await MainActor.run { devBusy = false }
-        }
-    }
-    #endif
-
-    // MARK: - Pro
-
-    @State private var showProSetup = false
-
-    private var proSection: some View {
+    /// Funny Distance — a display preference moved out of the old Pro screen.
+    /// Surprise-me each launch, or lock a favourite unit.
+    private var sendPreferencesSection: some View {
         settingsGroup {
             settingsRow {
-                Image(systemName: "sparkles")
+                Image(systemName: "ruler")
                     .settingsIcon()
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("✦ Pro Features")
+                    Text("funny distance")
                         .settingsLabel()
-                    // The current style at a glance —
-                    // "🏹 bow & arrow · pro active" / "🧭 vintage brass · free"
-                    Text("\(InstrumentOption.selected.icon) \(InstrumentOption.selected.displayName) · "
-                         + (subscription.tier == .free
-                            ? "free"
-                            : (proFeatures ? "pro active" : "pro · switched off")))
-                        .font(.system(size: 11))
-                        .foregroundColor(subscription.tier != .free && proFeatures
-                                         ? Color(hex: "#5dcaa5")
-                                         : DesignTokens.Color.textDim)
-                }
-                Spacer()
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 12))
-                    .foregroundColor(DesignTokens.Color.textDim)
-            }
-            .contentShape(Rectangle())
-            .onTapGesture { showProSetup = true }
-        }
-        .sheet(isPresented: $showProSetup) {
-            ProSetupView()
-                .environmentObject(subscription)
-                .environmentObject(skinStore)
-                .environmentObject(instrumentStore)
-        }
-    }
-
-    // MARK: - Invite
-
-    private var inviteSection: some View {
-        settingsGroup {
-            ShareLink(item: AppLinks.inviteMessage(pairingCode: SupabaseService.localPairingCode)) {
-                settingsRow {
-                    Image(systemName: "square.and.arrow.up.circle.fill")
-                        .font(.system(size: 24))
-                        .foregroundColor(DesignTokens.Color.accentSoft)
-                        .frame(width: 26, height: 26)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("invite a friend")
-                            .settingsLabel()
-                        Text(SupabaseService.localPairingCode != nil
-                             ? "sends the TestFlight link + your pairing code"
-                             : "sends the TestFlight link")
-                            .font(.system(size: 11))
-                            .foregroundColor(DesignTokens.Color.textDim)
-                    }
-                    Spacer()
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 12))
-                        .foregroundColor(DesignTokens.Color.textDim)
-                }
-            }
-        }
-    }
-
-    // MARK: - Account
-
-    @State private var showGivingBack = false
-
-    private var accountSection: some View {
-        settingsGroup {
-            // Giving back — above sign in, where the heart belongs
-            settingsRow {
-                Text("❤️")
-                    .font(.system(size: 16))
-                    .frame(width: 26, height: 26)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("giving back")
-                        .settingsLabel()
-                    Text(CharityConfig.current.map { "50% of Pro supports \($0.name)" }
-                         ?? "supporting those who need it most")
-                        .font(.system(size: 11))
-                        .foregroundColor(DesignTokens.Color.textDim)
-                }
-                Spacer()
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 12))
-                    .foregroundColor(DesignTokens.Color.textDim)
-            }
-            .contentShape(Rectangle())
-            .onTapGesture { showGivingBack = true }
-            .sheet(isPresented: $showGivingBack) { GivingBackView() }
-
-            Divider().background(DesignTokens.Color.border).padding(.leading, 44)
-
-            settingsRow {
-                Image(systemName: "person.crop.circle")
-                    .settingsIcon()
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(SupabaseService.localUserID == nil ? "sign in" : "account")
-                        .settingsLabel()
-                    Text(SupabaseService.connectedFriendID != nil
-                         ? "connected — thoughts travel for real"
-                         : "pair with someone to send real thoughts")
-                        .font(.system(size: 11))
-                        .foregroundColor(DesignTokens.Color.textDim)
-                }
-                Spacer()
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 12))
-                    .foregroundColor(DesignTokens.Color.textDim)
-            }
-            .contentShape(Rectangle())
-            .onTapGesture { showAccount = true }
-
-            // ── "your connection" row retired — connecting lives on each
-            // person's own card now (People → tap a person → connect). ──
-            // Divider().background(DesignTokens.Color.border).padding(.leading, 44)
-            // settingsRow {
-            //     Image(systemName: "link")
-            //         .settingsIcon()
-            //     Text("your connection")
-            //         .settingsLabel()
-            //     Spacer()
-            //     Image(systemName: "chevron.right")
-            //         .font(.system(size: 12))
-            //         .foregroundColor(DesignTokens.Color.textDim)
-            // }
-            // .contentShape(Rectangle())
-            // .onTapGesture { showConnect = true }
-            // .sheet(isPresented: $showConnect) { ConnectView() }
-
-            // (pairing-code copy row replaced by ConnectView; kept)
-            if false, let code = SupabaseService.localPairingCode {
-                Divider().background(DesignTokens.Color.border).padding(.leading, 44)
-
-                settingsRow {
-                    Image(systemName: "number")
-                        .settingsIcon()
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("your pairing code")
-                            .settingsLabel()
-                        Text(showCopied ? "copied ✓" : code.replacingOccurrences(of: "-", with: " · "))
-                            .font(.system(size: 13, design: .monospaced))
-                            .foregroundColor(showCopied ? Color(hex: "#5dcaa5")
-                                                        : DesignTokens.Color.accentSoft)
-                    }
-                    Spacer()
-                    Image(systemName: "doc.on.doc")
-                        .font(.system(size: 13))
-                        .foregroundColor(DesignTokens.Color.textDim)
-                }
-                .contentShape(Rectangle())
-                .onTapGesture {
-                    UIPasteboard.general.string = code
-                    HapticEngine.saved()
-                    withAnimation { showCopied = true }
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-                        withAnimation { showCopied = false }
-                    }
-                }
-            }
-
-            Divider().background(DesignTokens.Color.border).padding(.leading, 44)
-
-            ShareLink(item: AppLinks.shareMessage) {
-                settingsRow {
-                    Image(systemName: "square.and.arrow.up")
-                        .settingsIcon()
-                    Text("share Pointward")
-                        .settingsLabel()
-                    Spacer()
-                }
-            }
-        }
-    }
-
-    // MARK: - Unlock (one-time purchase — shown only while on the free tier)
-
-    private var unlockSection: some View {
-        settingsGroup {
-            settingsRow {
-                Image(systemName: "sparkles")
-                    .settingsIcon()
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Unlock Pointward — $2.99")
-                        .settingsLabel()
-                    Text("unlimited people · all skins · widget — one-time purchase")
-                        .font(.system(size: 11))
-                        .foregroundColor(DesignTokens.Color.textDim)
-                }
-                Spacer()
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 12))
-                    .foregroundColor(DesignTokens.Color.textDim)
-            }
-            .contentShape(Rectangle())
-            .onTapGesture { showUnlock = true }
-
-            Divider().background(DesignTokens.Color.border).padding(.leading, 44)
-
-            settingsRow {
-                Image(systemName: "arrow.clockwise")
-                    .settingsIcon()
-                Text("restore purchase")
-                    .settingsLabel()
-                Spacer()
-            }
-            .contentShape(Rectangle())
-            .onTapGesture {
-                Task { await subscription.restorePurchases() }
-            }
-        }
-    }
-
-    // MARK: - Feel (retired — quiet mode gone, full intensity always)
-
-    private var feelSection: some View {
-        settingsGroup {
-            // settingsRow {
-            //     Image(systemName: "moon.stars")
-            //         .settingsIcon()
-            //     VStack(alignment: .leading, spacing: 2) {
-            //         Text("quiet mode")
-            //             .settingsLabel()
-            //         Text("slower animations · reduced haptics · dimmer glows")
-            //             .font(.system(size: 11))
-            //             .foregroundColor(DesignTokens.Color.textDim)
-            //     }
-            //     Spacer()
-            //     Toggle("", isOn: $quietMode)
-            //         .tint(Self.toggleOn)
-            //         .labelsHidden()
-            // }
-            EmptyView()
-
-            // (haptics row commented out in the settings-final pass — the
-            // hapticsEnabled storage still gates HapticEngine everywhere)
-            // Divider().background(DesignTokens.Color.border).padding(.leading, 44)
-            // settingsRow {
-            //     Image(systemName: "iphone.radiowaves.left.and.right")
-            //         .settingsIcon()
-            //     Text("haptics")
-            //         .settingsLabel()
-            //     Spacer()
-            //     Toggle("", isOn: $hapticsEnabled)
-            //         .tint(Self.toggleOn)
-            //         .labelsHidden()
-            // }
-        }
-    }
-
-    /// Toggle ON = clear warm teal with a white knob; OFF stays the system's
-    /// dark grey track — the two states read instantly at a glance.
-    private static let toggleOn = Color(hex: "#5dcaa5")
-
-    // MARK: - Expression (the paid playground)
-
-    private var expressionSection: some View {
-        settingsGroup {
-            settingsRow {
-                Image(systemName: "party.popper")
-                    .settingsIcon()
-                VStack(alignment: .leading, spacing: 2) {
-                    HStack(spacing: 6) {
-                        Text("Pro Features")
-                            .settingsLabel()
-                        if subscription.tier == .free {
-                            Text("unlock")
-                                .font(.system(size: 9, weight: .semibold))
-                                .foregroundColor(DesignTokens.Color.accentSoft)
-                                .padding(.horizontal, 6)
-                                .padding(.vertical, 2)
-                                .background(Capsule().stroke(DesignTokens.Color.accentMid, lineWidth: 1))
-                        }
-                    }
-                    Text("custom emojis, funny distances, hold to send, and more")
+                    Text(funnyUnitLocked < 0 ? "a surprise unit each launch"
+                                             : "locked to your favourite")
                         .font(.system(size: 11))
                         .foregroundColor(DesignTokens.Color.textDim)
                 }
                 Spacer()
                 Toggle("", isOn: Binding(
-                    get: { proFeatures && subscription.tier != .free },
-                    set: { wantsOn in
-                        if subscription.tier == .free {
-                            HapticEngine.paywallReached()
-                            showUnlock = true     // Pro Mode is the paid tier
-                        } else {
-                            proFeatures = wantsOn
-                        }
-                    }
+                    get: { funnyUnitLocked >= 0 },
+                    set: { locked in funnyUnitLocked = locked ? 0 : -1 }
                 ))
                 .tint(Self.toggleOn)
                 .labelsHidden()
             }
 
-            // [6/6] Hold to Send retired as a setting — it IS the compass
-            // instrument's send mechanic now. (row kept below)
-            /* Divider().background(DesignTokens.Color.border).padding(.leading, 44)
-
-            settingsRow {
-                Image(systemName: "timer")
-                    .settingsIcon()
-                VStack(alignment: .leading, spacing: 2) {
-                    HStack(spacing: 6) {
-                        Text("Hold to Send")
-                            .settingsLabel()
-                        if subscription.tier == .free {
-                            Image(systemName: "lock.fill")
-                                .font(.system(size: 10))
-                                .foregroundColor(DesignTokens.Color.accentSoft)
-                        }
-                    }
-                    Text("hold your phone toward them for 2 seconds to send a thought instead of tapping")
-                        .font(.system(size: 11))
-                        .foregroundColor(DesignTokens.Color.textDim)
-                }
-                Spacer()
-                Toggle("", isOn: Binding(
-                    get: { holdToSend && subscription.tier != .free },
-                    set: { wantsOn in
-                        if subscription.tier == .free {
-                            HapticEngine.paywallReached()
-                            showUnlock = true
-                        } else {
-                            holdToSend = wantsOn
-                        }
-                    }
-                ))
-                .tint(Self.toggleOn)
-                .labelsHidden()
-            } */
-
-            // Lock a favourite funny unit (or keep the per-launch surprise)
-            if proFeatures && subscription.tier != .free {
+            if funnyUnitLocked >= 0 {
                 Divider().background(DesignTokens.Color.border).padding(.leading, 44)
-
                 settingsRow {
                     Image(systemName: "sportscourt")
                         .settingsIcon()
-                    Text("funny distance unit")
+                    Text("favourite unit")
                         .settingsLabel()
                     Spacer()
                     Picker("", selection: $funnyUnitLocked) {
-                        Text("surprise me").tag(-1)
                         ForEach(0..<DistanceFun.funnyCount, id: \.self) { i in
                             Text(DistanceFun.funnyLabels[i]).tag(i)
                         }
@@ -763,7 +130,7 @@ struct SettingsView: View {
         }
     }
 
-    // MARK: - Notifications
+    // MARK: - Notifications  (will evolve with Phase 2)
 
     private var notificationsSection: some View {
         settingsGroup {
@@ -809,160 +176,27 @@ struct SettingsView: View {
         }
     }
 
-    // MARK: - Experience (stripped from the body; kept for reference)
+    // MARK: - About Pointward
 
-    private var experienceSection: some View {
-        settingsGroup {
-            settingsRow {
-                Image(systemName: "moon.stars")
-                    .settingsIcon()
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("quiet mode")
-                        .settingsLabel()
-                    Text("slower animations · reduced haptics · dimmer glows")
-                        .font(.system(size: 11))
-                        .foregroundColor(DesignTokens.Color.textDim)
-                }
-                Spacer()
-                Toggle("", isOn: $quietMode)
-                    .tint(DesignTokens.Color.accentMid)
-                    .labelsHidden()
-            }
-
-            Divider().background(DesignTokens.Color.border).padding(.leading, 44)
-
-            settingsRow {
-                Image(systemName: "iphone.radiowaves.left.and.right")
-                    .settingsIcon()
-                Text("haptics")
-                    .settingsLabel()
-                Spacer()
-                Toggle("", isOn: $hapticsEnabled)
-                    .tint(DesignTokens.Color.accentMid)
-                    .labelsHidden()
-            }
-
-            Divider().background(DesignTokens.Color.border).padding(.leading, 44)
-
-            settingsRow {
-                Image(systemName: "ruler")
-                    .settingsIcon()
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(useMiles ? "use miles" : "use kilometers")
-                        .settingsLabel()
-                    Text(useMiles ? "88 mi · 142 km" : "142 km · 88 mi")
-                        .font(.system(size: 11))
-                        .foregroundColor(DesignTokens.Color.textDim)
-                }
-                Spacer()
-                Toggle("", isOn: $useMiles)
-                    .tint(DesignTokens.Color.accentMid)
-                    .labelsHidden()
-            }
-
-            Divider().background(DesignTokens.Color.border).padding(.leading, 44)
-
-            settingsRow {
-                Image(systemName: "sportscourt")
-                    .settingsIcon()
-                Text("funny distance unit")
-                    .settingsLabel()
-                Spacer()
-                Picker("", selection: $funnyUnitLocked) {
-                    Text("surprise me").tag(-1)
-                    ForEach(0..<DistanceFun.funnyCount, id: \.self) { i in
-                        Text(DistanceFun.funnyLabels[i]).tag(i)
-                    }
-                }
-                .pickerStyle(.menu)
-                .tint(DesignTokens.Color.accentSoft)
-            }
-
-            Divider().background(DesignTokens.Color.border).padding(.leading, 44)
-
-            settingsRow {
-                Image(systemName: "sparkle")
-                    .settingsIcon()
-                Text("thought speed tagline")
-                    .settingsLabel()
-                Spacer()
-                Picker("", selection: $thoughtTaglineLocked) {
-                    Text("surprise me").tag(-1)
-                    ForEach(0..<DistanceFun.thoughtTaglines.count, id: \.self) { i in
-                        Text(DistanceFun.thoughtTaglines[i]).tag(i)
-                    }
-                }
-                .pickerStyle(.menu)
-                .tint(DesignTokens.Color.accentSoft)
-            }
-
-            Divider().background(DesignTokens.Color.border).padding(.leading, 44)
-
-            settingsRow {
-                Image(systemName: "location.north.line")
-                    .settingsIcon()
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("notify me when someone points toward me")
-                        .settingsLabel()
-                    Text("a quiet compass toast when their needle finds you")
-                        .font(.system(size: 11))
-                        .foregroundColor(DesignTokens.Color.textDim)
-                }
-                Spacer()
-                Toggle("", isOn: $notifyPointing)
-                    .tint(DesignTokens.Color.accentMid)
-                    .labelsHidden()
-                    .onChange(of: notifyPointing) { _, enabled in
-                        // Mirror server-side so closed-app pushes respect it too
-                        Task { await SupabaseService.shared.setNotifyPointing(enabled) }
-                    }
-            }
-
-            Divider().background(DesignTokens.Color.border).padding(.leading, 44)
-
-            settingsRow {
-                Image(systemName: "lock.iphone")
-                    .settingsIcon()
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("lock screen widget")
-                        .settingsLabel()
-                    if lockScreenWidget {
-                        Text("long press your lock screen to add")
-                            .font(.system(size: 11))
-                            .foregroundColor(DesignTokens.Color.textDim)
-                        Link("how to add a widget →",
-                             destination: URL(string: "https://support.apple.com/en-us/HT207122")!)
-                            .font(.system(size: 11))
-                            .foregroundColor(DesignTokens.Color.accentSoft)
-                    } else {
-                        Text("the needle, right above the clock")
-                            .font(.system(size: 11))
-                            .foregroundColor(DesignTokens.Color.textDim)
-                    }
-                }
-                Spacer()
-                Toggle("", isOn: $lockScreenWidget)
-                    .tint(DesignTokens.Color.accentMid)
-                    .labelsHidden()
-            }
-        }
+    private var appVersion: String {
+        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.0"
+    }
+    private var buildNumber: String {
+        Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "—"
     }
 
-    // MARK: - Skin
-
-    private var skinSection: some View {
+    private var aboutSection: some View {
         settingsGroup {
+            // Giving back — half of every Pro purchase does good. Lives here now.
             settingsRow {
-                Text(skinStore.activeSkin.displayName
-                     .prefix(1).uppercased() +
-                     skinStore.activeSkin.displayName.dropFirst())
-                    .font(.system(size: 18))
+                Text("❤️")
+                    .font(.system(size: 16))
                     .frame(width: 26, height: 26)
-                    .padding(.leading, -2)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(skinStore.activeSkin.displayName)
+                    Text("giving back")
                         .settingsLabel()
-                    Text(skinStore.activeSkin.description)
+                    Text(CharityConfig.current.map { "50% of Pro supports \($0.name)" }
+                         ?? "supporting those who need it most")
                         .font(.system(size: 11))
                         .foregroundColor(DesignTokens.Color.textDim)
                 }
@@ -972,18 +206,10 @@ struct SettingsView: View {
                     .foregroundColor(DesignTokens.Color.textDim)
             }
             .contentShape(Rectangle())
-            .onTapGesture { showSkinPicker = true }
-        }
-    }
+            .onTapGesture { showGivingBack = true }
 
-    // MARK: - About
+            Divider().background(DesignTokens.Color.border).padding(.leading, 44)
 
-    private var appVersion: String {
-        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.0"
-    }
-
-    private var aboutSection: some View {
-        settingsGroup {
             settingsRow {
                 Image(systemName: "heart.text.square")
                     .settingsIcon()
@@ -997,14 +223,20 @@ struct SettingsView: View {
             .contentShape(Rectangle())
             .onTapGesture { showAbout = true }
 
-            // (share moved to the account section in the emotional-core pass)
-            // ShareLink(item: AppLinks.shareMessage) {
-            //     settingsRow {
-            //         Image(systemName: "square.and.arrow.up").settingsIcon()
-            //         Text("share Pointward").settingsLabel()
-            //         Spacer()
-            //     }
-            // }
+            Divider().background(DesignTokens.Color.border).padding(.leading, 44)
+
+            Link(destination: URL(string: "https://pointward.app/privacy")!) {
+                settingsRow {
+                    Image(systemName: "lock.shield")
+                        .settingsIcon()
+                    Text("privacy policy")
+                        .settingsLabel()
+                    Spacer()
+                    Image(systemName: "arrow.up.right")
+                        .font(.system(size: 11))
+                        .foregroundColor(DesignTokens.Color.textDim)
+                }
+            }
 
             Divider().background(DesignTokens.Color.border).padding(.leading, 44)
 
@@ -1021,39 +253,180 @@ struct SettingsView: View {
 
             Divider().background(DesignTokens.Color.border).padding(.leading, 44)
 
-            // [6/6] Privacy policy link
-            Link(destination: URL(string: "https://pointward.app/privacy")!) {
-                settingsRow {
-                    Image(systemName: "lock.shield")
-                        .settingsIcon()
-                    Text("privacy policy")
+            // The one-line mission.
+            settingsRow {
+                Spacer()
+                Text("feelings, delivered ✦")
+                    .font(.system(size: 13, design: .serif).italic())
+                    .foregroundColor(DesignTokens.Color.accentSoft)
+                Spacer()
+            }
+        }
+    }
+
+    // MARK: - Account  (folded in — AccountView retired)
+
+    private var accountSection: some View {
+        settingsGroup {
+            // Signed-in identity — static, no action.
+            settingsRow {
+                Image(systemName: "applelogo")
+                    .settingsIcon()
+                Text("Signed in with Apple ✦")
+                    .settingsLabel()
+                Spacer()
+            }
+
+            Divider().background(DesignTokens.Color.border).padding(.leading, 44)
+
+            // Pro status — "Pro ✦" or "Free · upgrade" (tap free to upgrade).
+            settingsRow {
+                Image(systemName: "sparkles")
+                    .settingsIcon()
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(isPro ? "Pro ✦" : "Free · upgrade")
                         .settingsLabel()
-                    Spacer()
-                    Image(systemName: "arrow.up.right")
+                        .foregroundColor(isPro ? Self.green : DesignTokens.Color.textPrimary)
+                    Text(isPro ? "thank you — yours forever ✦"
+                               : "unlock everything · one-time $2.99")
                         .font(.system(size: 11))
                         .foregroundColor(DesignTokens.Color.textDim)
                 }
+                Spacer()
+                if !isPro {
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 12))
+                        .foregroundColor(DesignTokens.Color.textDim)
+                }
+            }
+            .contentShape(Rectangle())
+            .onTapGesture { if !isPro { showPaywall = true } }
+
+            Divider().background(DesignTokens.Color.border).padding(.leading, 44)
+
+            // Restore purchase — re-grant Pro on a new device / reinstall.
+            settingsRow {
+                Image(systemName: "arrow.clockwise")
+                    .settingsIcon()
+                Text("restore purchase")
+                    .settingsLabel()
+                Spacer()
+            }
+            .contentShape(Rectangle())
+            .onTapGesture {
+                Task { await subscription.restorePurchases() }
             }
 
-            // [1/5] "connection mode · offline" row retired — a permanent
-            // status indicator only confused people ("am I broken?"). Send
-            // failures now surface contextually instead: PingManager sets
-            // sendFailedNotice ("couldn't send — check your connection") only
-            // when a real send fails, shown as a transient toast on the
-            // compass (CompassView). No standing status line anywhere.
-            // Divider().background(DesignTokens.Color.border).padding(.leading, 44)
-            // settingsRow {
-            //     Image(systemName: "antenna.radiowaves.left.and.right")
-            //         .settingsIcon()
-            //     Text("connection mode")
-            //         .settingsLabel()
-            //     Spacer()
-            //     Text("offline")
-            //         .font(DesignTokens.Font.caption)
-            //         .foregroundColor(Color(hex: "#5dcaa5"))
-            // }
+            Divider().background(DesignTokens.Color.border).padding(.leading, 44)
+
+            // Sign out — at the bottom.
+            settingsRow {
+                Image(systemName: "rectangle.portrait.and.arrow.right")
+                    .settingsIcon()
+                    .foregroundColor(.red)
+                Text("sign out")
+                    .settingsLabel()
+                    .foregroundColor(.red)
+                Spacer()
+            }
+            .contentShape(Rectangle())
+            .onTapGesture { signOut() }
         }
     }
+
+    private func signOut() {
+        Task {
+            await SupabaseService.shared.stopListening()   // realtime dies with the session
+            try? await SupabaseService.shared.signOut()
+            SupabaseService.localUserID       = nil
+            SupabaseService.connectedFriendID = nil
+            SupabaseService.localPairingCode  = nil
+        }
+    }
+
+    #if DEBUG
+    // MARK: - Developer (DEBUG only — never ships)
+    //
+    // Minimal: the animation lab, a self-send, and build info. Simulate
+    // far/nearby, auto-catch-all, and pairing/connection-testing tools were
+    // removed — see SESSION_LOG.md for history.
+
+    private var developerSection: some View {
+        settingsGroup {
+            // Send yourself a test thought — full receipt, no 2nd phone.
+            Button { showTestSheet = true } label: {
+                settingsRow {
+                    Image(systemName: "paperplane.fill")
+                        .settingsIcon()
+                        .foregroundColor(Color(hex: "#c4a8d4"))
+                    Text("Send myself a test thought").settingsLabel()
+                    Spacer()
+                    Image(systemName: "chevron.right").font(.system(size: 12))
+                        .foregroundColor(DesignTokens.Color.textDim)
+                }
+            }
+            .buttonStyle(.plain)
+
+            Divider().background(DesignTokens.Color.border).padding(.leading, 44)
+
+            // 🧪 Animation Test Lab — every send + land animation, in isolation.
+            Button { showAnimationLab = true } label: {
+                settingsRow {
+                    Image(systemName: "theatermasks").settingsIcon()
+                        .foregroundColor(Color(hex: "#c4a8d4"))
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("🧪 Animation Test Lab").settingsLabel()
+                        Text("every send + land animation, in isolation")
+                            .font(.system(size: 11)).foregroundColor(DesignTokens.Color.textMuted)
+                    }
+                    Spacer()
+                    Image(systemName: "chevron.right").font(.system(size: 12))
+                        .foregroundColor(DesignTokens.Color.textDim)
+                }
+            }
+            .buttonStyle(.plain)
+
+            Divider().background(DesignTokens.Color.border).padding(.leading, 44)
+
+            // 📋 Animation feedback — approved / needs-work summary from the lab.
+            Button { showAnimationFeedback = true } label: {
+                settingsRow {
+                    Image(systemName: "list.clipboard").settingsIcon()
+                        .foregroundColor(Color(hex: "#c4a8d4"))
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("📋 View animation feedback").settingsLabel()
+                        Text("approved / needs-work summary from the lab")
+                            .font(.system(size: 11)).foregroundColor(DesignTokens.Color.textMuted)
+                    }
+                    Spacer()
+                    Image(systemName: "chevron.right").font(.system(size: 12))
+                        .foregroundColor(DesignTokens.Color.textDim)
+                }
+            }
+            .buttonStyle(.plain)
+
+            Divider().background(DesignTokens.Color.border).padding(.leading, 44)
+
+            // Build info.
+            settingsRow {
+                Image(systemName: "hammer").settingsIcon()
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("build info").settingsLabel()
+                    Text("v\(appVersion) (\(buildNumber)) · debug")
+                        .font(.system(size: 11, design: .monospaced))
+                        .foregroundColor(DesignTokens.Color.textMuted)
+                }
+                Spacer()
+            }
+
+            // removed — see SESSION_LOG.md for history
+            // (Clear all my data · Clear partner connection · Test All Animations ·
+            //  Auto-catch all · Test Random · Clear test thoughts · Test Custom
+            //  Emoji · Reset to onboarding · Clear onboarding flag · Mock heading ·
+            //  Simulate far away · Simulate nearby)
+        }
+    }
+    #endif
 
     // MARK: - Layout helpers
 
@@ -1106,7 +479,8 @@ private extension Text {
 }
 
 #if DEBUG
-// MARK: - [2/5] Developer custom-emoji picker
+// MARK: - Developer custom-emoji picker (kept for reference — its Settings entry
+// was removed in the minimal-settings pass; see SESSION_LOG.md for history)
 //
 // Lists the user's saved slots (their personal six); tapping one sends a test
 // thought with that emoji so custom emojis can be verified end to end.

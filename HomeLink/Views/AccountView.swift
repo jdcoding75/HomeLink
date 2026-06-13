@@ -9,6 +9,11 @@ import AuthenticationServices
 import CryptoKit
 import os
 
+// removed — see SESSION_LOG.md for history.
+// The account screen was folded into Settings (inline). This full Sign in with
+// Apple + pairing-code screen is disabled via #if false (kept, not deleted).
+// NOTE: PairingCelebrationView (below) stays LIVE — RootView depends on it.
+#if false
 struct AccountView: View {
 
     private static let log = Logger(subsystem: "com.jdcoding75.pointward", category: "account")
@@ -321,6 +326,7 @@ struct AccountView: View {
         return hash.map { String(format: "%02x", $0) }.joined()
     }
 }
+#endif
 
 // MARK: - Pairing celebration
 
@@ -482,11 +488,14 @@ struct PairingCelebrationView: View {
     }
 }
 
+// removed — see SESSION_LOG.md for history (AccountView disabled via #if false)
+#if false
 #Preview {
     AccountView()
         .environmentObject(PeopleManager(subscriptionManager: SubscriptionManager()))
         .preferredColorScheme(.dark)
 }
+#endif
 
 #Preview("Celebration") {
     PairingCelebrationView(

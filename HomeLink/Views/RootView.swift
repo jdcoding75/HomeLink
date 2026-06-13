@@ -601,6 +601,9 @@ struct MainTabView: View {
     @EnvironmentObject var appState:     AppStateManager
 
     @State private var selectedTab = 0
+    // The compass "✦ Pro" badge opens the paywall directly now that the Pro tab
+    // is retired (status + upgrade also live in Settings → account).
+    @State private var showPaywall = false
 
     var body: some View {
         TabView(selection: $selectedTab) {
@@ -610,25 +613,27 @@ struct MainTabView: View {
                 }
                 .tag(0)
 
-            // [6/6] Pro is its own tab now — the home for everything Pro.
-            // Free users see it locked (each 🔒 → paywall); Pro users see it all.
-            ProSetupView(isTab: true)
-                .tabItem {
-                    Label("pro", systemImage: "sparkles")
-                }
-                .tag(1)
+            // removed — see SESSION_LOG.md for history
+            // Pro screen retired as a standalone tab. ProSetupView kept (not
+            // deleted); its instrument/skin selection still lives in the
+            // compass long-press picker. Tab bar is now Compass · People · Settings.
+            // ProSetupView(isTab: true)
+            //     .tabItem {
+            //         Label("pro", systemImage: "sparkles")
+            //     }
+            //     .tag(1)
 
             PeopleListView(geocodingService: geocodingService)
                 .tabItem {
                     Label("people", systemImage: "person.2")
                 }
-                .tag(2)
+                .tag(1)
 
             SettingsView()
                 .tabItem {
                     Label("settings", systemImage: "gearshape")
                 }
-                .tag(3)
+                .tag(2)
         }
         .tint(DesignTokens.Color.accentSoft)
         .preferredColorScheme(.dark)
@@ -674,12 +679,14 @@ struct MainTabView: View {
                 }
             }
         }
-        // [6/6] The "✦ Pro" badge on the compass jumps to the Pro tab now.
+        // The "✦ Pro" badge on the compass now opens the paywall directly
+        // (the Pro tab was retired; upgrade + status live in Settings → account).
+        .sheet(isPresented: $showPaywall) { PaywallView() }
         .onReceive(NotificationCenter.default.publisher(for: .pointwardOpenPro)) { _ in
-            selectedTab = 1
+            showPaywall = true
         }
         .onReceive(NotificationCenter.default.publisher(for: .pointwardOpenSettings)) { _ in
-            selectedTab = 3
+            selectedTab = 2   // Settings is tab 2 now (Pro tab removed)
         }
         // A notification-opened catch needs the compass visible
         .onReceive(NotificationCenter.default.publisher(for: .pointwardOpenCompass)) { _ in
@@ -687,7 +694,7 @@ struct MainTabView: View {
         }
         // The post-onboarding prompt leads here — connecting lives on cards
         .onReceive(NotificationCenter.default.publisher(for: .pointwardOpenPeople)) { _ in
-            selectedTab = 2
+            selectedTab = 1   // People is tab 1 now (Pro tab removed)
         }
         // (thoughts tab retired — the pill/notification path is gone)
         // .onReceive(NotificationCenter.default.publisher(for: .pointwardOpenThoughts)) { _ in
