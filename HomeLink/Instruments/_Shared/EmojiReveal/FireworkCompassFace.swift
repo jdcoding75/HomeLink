@@ -49,13 +49,14 @@ struct FireworkCompassFace: View {
             let bodyW = R * 0.34, bodyH = R * 0.72
             let bodyCY = cy - R * 0.04
             let bodyTopY = bodyCY - bodyH / 2
-            // The match STARTS TOP-LEFT; the user drags it DOWN to the ignition
-            // tip. The fuse then runs from that tip DOWN to the rocket charge —
-            // long and curled enough that the burn-down is a watchable beat (see
-            // fuse(): the spark crawls down it and the burned section is consumed).
-            let fuseTip = CGPoint(x: cx + R * 0.14, y: cy - R * 0.58)
-            let chargePoint = CGPoint(x: cx + bodyW * 0.40, y: bodyTopY + bodyH * 0.04)
-            let matchRest = CGPoint(x: cx - R * 0.62, y: cy - R * 0.66)
+            // [tweak] The fuse exits the BOTTOM of the body near the stick and
+            // DANGLES DOWN to the right; its free TIP — the light target — sits at
+            // the bottom, so the user drags the match up from below to light it.
+            // The charge (where the fuse meets the rocket) is at the body's bottom
+            // edge; the spark then crawls UP the fuse to the rocket as it burns.
+            let chargePoint = CGPoint(x: cx + bodyW * 0.22, y: bodyCY + bodyH / 2)
+            let fuseTip = CGPoint(x: cx + R * 0.34, y: bodyCY + bodyH / 2 + R * 0.34)
+            let matchRest = CGPoint(x: cx - R * 0.45, y: cy + R * 0.72)
             let matchPos = CGPoint(x: matchRest.x + matchDrag.width,
                                    y: matchRest.y + matchDrag.height)
 
@@ -104,7 +105,7 @@ struct FireworkCompassFace: View {
                         .gesture(matchGesture(fuseTip: fuseTip, matchRest: matchRest))
 
                     // ── Instruction ──
-                    Text(lit ? "fuse burning... ✦" : "drag the match down to the fuse ✦")
+                    Text(lit ? "fuse burning... ✦" : "drag the match up to the fuse ✦")
                         .font(.system(size: 12, design: .serif).italic())
                         .foregroundColor(Self.lavender.opacity(0.85))
                         .shadow(color: .black.opacity(0.5), radius: 4)
@@ -162,15 +163,15 @@ struct FireworkCompassFace: View {
 
     @ViewBuilder
     private func fuse(from start: CGPoint, to tip: CGPoint, burn: Double, t: Double) -> some View {
-        // A neat fuse from the rocket charge (start, lower) UP to the ignition
-        // tip (end). [tweak] The old control points bowed ~50pt out to the right
-        // over a ~31pt rise, so the idle fuse read as a loose "string" dangling
-        // off the top of the rocket. Tightened to a small hug (8/6pt) so it sits
-        // as a tidy fuse — the ignition endpoints (charge/tip), the match-to-fuse
-        // hit-test, the burn-down trim, and the 2 s timing are all UNCHANGED.
-        let span = start.y - tip.y                  // vertical distance charge↔tip
-        let c1 = CGPoint(x: start.x + 8, y: start.y - span * 0.30)
-        let c2 = CGPoint(x: tip.x + 6,  y: tip.y + span * 0.30)
+        // [tweak] A fuse from the rocket charge (start, at the body's BOTTOM edge)
+        // DOWN to the free TIP that dangles to the right (the light target). It
+        // bows out to the right as it drops, so it reads as a fuse hanging off the
+        // bottom near the stick. The spark starts at the TIP and crawls UP to the
+        // charge as it burns; the match-to-fuse hit-test, burn-down trim, and the
+        // 2 s timing are all UNCHANGED.
+        let drop = tip.y - start.y                  // the fuse hangs DOWN to the tip
+        let c1 = CGPoint(x: start.x + 18, y: start.y + drop * 0.30)
+        let c2 = CGPoint(x: tip.x + 16,  y: tip.y - drop * 0.35)
         // Spark position along the path: 1 = ignition tip, 0 = rocket charge.
         // As it burns, the consumed (tip-side) section is trimmed away, so the
         // fuse visibly SHORTENS down toward the charge.
