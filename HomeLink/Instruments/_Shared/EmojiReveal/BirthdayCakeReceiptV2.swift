@@ -120,6 +120,9 @@ struct BirthdayCakeReceiptV2: View {
 
     private func begin() {
         appearAt = Date()                       // [tweak] start the lower-in entrance
+        // Warm "Happy Birthday to You" music-box melody plays throughout the receipt.
+        InstrumentSoundPlayer.shared.playCue(file: BirthdaySounds.melodyFile,
+                                             duration: BirthdaySounds.melodyDuration)
         breath.onExhale = { advanceBlow() }
         breath.start()
     }

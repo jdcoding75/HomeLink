@@ -81,6 +81,9 @@ struct BirthdayCakeSendAnimationV2: View {
         .ignoresSafeArea()
         .onAppear {
             appearAt = Date()
+            // Warm "Happy Birthday to You" music-box melody plays throughout the send.
+            InstrumentSoundPlayer.shared.playCue(file: BirthdaySounds.melodyFile,
+                                                 duration: BirthdaySounds.melodyDuration)
             HapticPattern.singleSoft.fire()
             // [tweak] the cake rises in first; only AFTER riseDur does the
             // existing send clock start, so the rest plays exactly as before.
