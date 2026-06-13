@@ -19,4 +19,9 @@ enum WindSounds {
   static let receiptFile = "wind_receipt"
   static let sendDuration: Double = 6.5
   static let receiptDuration: Double = 7.2
+
+  // Soft ambient breeze layered UNDER send + receipt (does not replace the
+  // wind_send / wind_receipt voices). 8.0s, very low level. Played via playCue.
+  static let breezeFile = "wind_breeze"
+  static let breezeDuration: Double = 8.0
 }

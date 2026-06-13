@@ -108,6 +108,9 @@ struct WindSendAnimation: View {
       start = Date()
       // The approved wind send sound (6.5s, matches the journey).
       InstrumentSoundPlayer.shared.playSend(.wind)
+      // Soft ambient breeze layered UNDER the send voice (playCue does not change
+      // the send/receipt phase, so it never replaces or stops wind_send).
+      InstrumentSoundPlayer.shared.playCue(file: WindSounds.breezeFile, duration: Self.total)
       withAnimation(.easeInOut(duration: 0.3)) { skyIn = true }   // crossfade
       // After the leaf departs → the sent confirmation reveal.
       DispatchQueue.main.asyncAfter(deadline: .now() + Self.total) {

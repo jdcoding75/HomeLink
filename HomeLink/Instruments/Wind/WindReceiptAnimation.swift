@@ -123,6 +123,9 @@ struct WindReceiptAnimation: View {
         withAnimation(.easeInOut(duration: 0.3)) { skyIn = true }   // crossfade
         // The wind receipt sound starts at the very begin (7.2 s, matches).
         InstrumentSoundPlayer.shared.playReceipt(.firefly)
+        // Soft ambient breeze layered UNDER the receipt voice (playCue does not
+        // change the phase, so it never replaces or stops wind_receipt).
+        InstrumentSoundPlayer.shared.playCue(file: WindSounds.breezeFile, duration: Self.total)
 
         // On arrival (the leaf reaches centre after ENTER).
         DispatchQueue.main.asyncAfter(deadline: .now() + Self.enterEnd) {
