@@ -49,11 +49,13 @@ struct FireworkCompassFace: View {
             let bodyW = R * 0.34, bodyH = R * 0.72
             let bodyCY = cy - R * 0.04
             let bodyTopY = bodyCY - bodyH / 2
-            // [phase3] SHORT fuse just above the rocket — the long non-functional
-            // "top fuse string" that ran to the corner is gone. The match now
-            // STARTS TOP-LEFT and the user drags it DOWN to the fuse.
-            let fuseTip = CGPoint(x: cx + bodyW * 0.55, y: bodyTopY - R * 0.10)
-            let matchRest = CGPoint(x: cx - R * 0.62, y: cy - R * 0.64)
+            // The match STARTS TOP-LEFT; the user drags it DOWN to the ignition
+            // tip. The fuse then runs from that tip DOWN to the rocket charge —
+            // long and curled enough that the burn-down is a watchable beat (see
+            // fuse(): the spark crawls down it and the burned section is consumed).
+            let fuseTip = CGPoint(x: cx + R * 0.14, y: cy - R * 0.58)
+            let chargePoint = CGPoint(x: cx + bodyW * 0.40, y: bodyTopY + bodyH * 0.04)
+            let matchRest = CGPoint(x: cx - R * 0.62, y: cy - R * 0.66)
             let matchPos = CGPoint(x: matchRest.x + matchDrag.width,
                                    y: matchRest.y + matchDrag.height)
 
@@ -94,9 +96,8 @@ struct FireworkCompassFace: View {
                     rocket(cx: cx, bodyCY: bodyCY, bodyW: bodyW, bodyH: bodyH, R: R)
                         .rotationEffect(.degrees(jitter), anchor: .bottom)
 
-                    // ── The curled fuse + travelling spark ──
-                    fuse(from: CGPoint(x: cx + bodyW * 0.35, y: bodyTopY + 2),
-                         to: fuseTip, burn: burn, t: t)
+                    // ── The curled fuse + travelling spark (burns down) ──
+                    fuse(from: chargePoint, to: fuseTip, burn: burn, t: t)
 
                     // ── The match (draggable) ──
                     match(at: matchPos, t: t)
@@ -161,23 +162,35 @@ struct FireworkCompassFace: View {
 
     @ViewBuilder
     private func fuse(from start: CGPoint, to tip: CGPoint, burn: Double, t: Double) -> some View {
-        // A curling bezier from the rocket top out to the fuse tip.
-        let c1 = CGPoint(x: start.x + (tip.x - start.x) * 0.1, y: start.y - 34)
-        let c2 = CGPoint(x: tip.x + 14, y: start.y - 6)
+        // A long curling bezier from the rocket charge (start, lower) UP to the
+        // ignition tip (end). It bows out to the right so the spark has a real
+        // run to travel — the burn-down is meant to be watched.
+        let span = start.y - tip.y                  // vertical distance charge↔tip
+        let c1 = CGPoint(x: start.x + 50, y: start.y - span * 0.30)
+        let c2 = CGPoint(x: tip.x + 42,  y: tip.y + span * 0.30)
+        // Spark position along the path: 1 = ignition tip, 0 = rocket charge.
+        // As it burns, the consumed (tip-side) section is trimmed away, so the
+        // fuse visibly SHORTENS down toward the charge.
+        let p: CGFloat = lit ? CGFloat(1 - burn) : 1.0
         ZStack {
+            // Remaining (unburned) fuse — from the rocket charge up to the spark.
             FuseCurl(start: start, c1: c1, c2: c2, end: tip)
-                .stroke(Self.fuseGrey, style: StrokeStyle(lineWidth: 2.2, lineCap: .round))
+                .trim(from: 0, to: max(0.02, p))
+                .stroke(Self.fuseGrey, style: StrokeStyle(lineWidth: 2.4, lineCap: .round))
             // The burning spark crawls from the TIP down toward the rocket.
             if lit {
-                let p = 1 - burn                    // 1 at tip → 0 at rocket
-                let sparkPos = bezier(start: start, c1: c1, c2: c2, end: tip, t: p)
+                let sparkPos = bezier(start: start, c1: c1, c2: c2, end: tip, t: Double(p))
+                // a soft ember halo at the burn point
+                Circle().fill(Self.spark.opacity(0.5))
+                    .frame(width: 14, height: 14).blur(radius: 5)
+                    .position(sparkPos)
                 ForEach(0..<5, id: \.self) { k in
                     let jit = CGFloat(sin(t * 40 + Double(k))) * 3
                     Circle()
                         .fill(k % 2 == 0 ? Self.spark : Color.white)
-                        .frame(width: 5 - CGFloat(k) * 0.6, height: 5 - CGFloat(k) * 0.6)
+                        .frame(width: 6 - CGFloat(k) * 0.7, height: 6 - CGFloat(k) * 0.7)
                         .position(x: sparkPos.x + jit, y: sparkPos.y - CGFloat(k) * 2)
-                        .shadow(color: Self.spark.opacity(0.8), radius: 4)
+                        .shadow(color: Self.spark.opacity(0.85), radius: 5)
                         .opacity(1 - Double(k) * 0.15)
                 }
             }
