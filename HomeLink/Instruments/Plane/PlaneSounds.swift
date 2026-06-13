@@ -21,6 +21,10 @@ enum PlaneSounds {
   // Per-phase one-shot cues (layered via InstrumentSoundPlayer.playCue).
   static let propIdleFile   = "plane_prop_idle"
   static let propSpinupFile = "plane_prop_spinup"
+  // COMPASS wind-circle cue — an ultra-light rubber-band propeller wind-up
+  // (replaces the harsh "plane.wind" ratchet click). Compass face only.
+  static let windupFile     = "plane_windup"
+  static let windupDuration: Double = 0.55
   static let launchFile     = "plane_launch"
   static let flightFile     = "plane_flight"
   static let approachFile   = "plane_approach"   // receipt: plane growing toward the viewer

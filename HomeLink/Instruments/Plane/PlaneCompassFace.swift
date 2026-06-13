@@ -286,7 +286,11 @@ struct PlaneInstrumentView: View {
     /// the final circle), a whir burst, and at full it arms the auto-launch.
     private func circleCompleted(_ n: Int) {
         propBoost = 42
-        SoundEngine.shared.play(for: "plane.wind")
+        // [tweak] Ultra-light rubber-band propeller wind-up (was the harsh
+        // "plane.wind" ratchet click). Compass face only — send/receipt still use
+        // the shared plane.wind voice, untouched.
+        InstrumentSoundPlayer.shared.playCue(file: PlaneSounds.windupFile,
+                                             duration: PlaneSounds.windupDuration)
         if n >= Self.maxWinds {
             HapticEngine.rocketLaunch()                  // strong rumble at full wind
             armLaunch()                                  // "let fly" → auto-launch in 1 s
