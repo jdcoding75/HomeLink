@@ -9,6 +9,7 @@
 
 import SwiftUI
 import Combine
+import UIKit
 
 struct PingView: View {
 
@@ -299,6 +300,15 @@ struct PingView: View {
 
     // MARK: - Bottom drawer (the curated six)
 
+    /// Screen height via the active window scene — UIScreen.main is deprecated
+    /// in iOS 26 (use the scene's screen instead). Falls back to a sane default
+    /// if no foreground window scene is available.
+    private static var screenHeight: CGFloat {
+        UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .first?.screen.bounds.height ?? 800
+    }
+
     /// Collapsed: a pill handle + your six in one quiet row, compass fully
     /// visible above. Expanded: a bottom sheet (≤40% of screen) with the
     /// 3×2 grid, "✦ edit", and the locked preview for free users.
@@ -349,7 +359,7 @@ struct PingView: View {
         }
         .padding(.horizontal, 14)
         .padding(.bottom, 12)
-        .frame(maxHeight: drawerExpanded ? UIScreen.main.bounds.height * 0.40 : nil)
+        .frame(maxHeight: drawerExpanded ? Self.screenHeight * 0.40 : nil)
         .background(
             RoundedRectangle(cornerRadius: 24)
                 .fill(DesignTokens.Color.background.opacity(0.85))

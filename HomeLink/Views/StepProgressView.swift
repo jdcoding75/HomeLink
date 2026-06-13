@@ -72,14 +72,18 @@ struct StepProgressView: View {
             .shadow(color: Self.lavender.opacity(active ? 0.7 : 0), radius: 4)
 
             // [4/6] The optional message step shows a trailing "?".
-            (Text(label)
-             + (label == Self.optionalStep
-                ? Text(" ?").foregroundColor(Self.lavender.opacity(0.7))
-                : Text("")))
-                .font(.system(size: 8, weight: active ? .semibold : .regular))
-                .foregroundColor(active ? Self.lavender
-                                 : (completed ? Self.lavender.opacity(0.7)
-                                              : DesignTokens.Color.textDim))
+            // (Text "+" concatenation is deprecated in iOS 26 → separate Text
+            //  views in an HStack, so the "?" keeps its own lavender tint.)
+            HStack(spacing: 0) {
+                Text(label)
+                if label == Self.optionalStep {
+                    Text(" ?").foregroundColor(Self.lavender.opacity(0.7))
+                }
+            }
+            .font(.system(size: 8, weight: active ? .semibold : .regular))
+            .foregroundColor(active ? Self.lavender
+                             : (completed ? Self.lavender.opacity(0.7)
+                                          : DesignTokens.Color.textDim))
         }
         .frame(width: 46)
         .animation(.easeOut(duration: 0.25), value: currentStep)
