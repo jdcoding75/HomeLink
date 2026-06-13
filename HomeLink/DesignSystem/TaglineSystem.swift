@@ -5,11 +5,30 @@ import Foundation
 
 enum TaglineSystem {
 
-    static let defaultTagline = "Love has a direction."
+    static let defaultTagline = "Thinking of you."
     static let maxLength = 60
 
+    // INSTRUMENT HINTS — default message tone per instrument.
+    // Edit here only. These are starting points — user can always override.
+    // Pro/Free gate: TBD — end-game configuration session.
+    //
+    // Keyed by SenderStyle.rawValue (String, not the enum, so this file stays
+    // usable from any target). Look up with hint(forStyle:) or instrumentHints[style.rawValue].
+    static let instrumentHints: [String: String] = [
+        "glow":        "sending this straight to where you are ✦",   // Compass
+        "bowArrow":    "shooting you a thought ✦",                   // Bow
+        "fingerFlick": "flicked this your way ✦",                    // Flick
+        "rocket":      "launched something just for you ✦",          // Rocket
+        "firefly":     "carried this to you on the wind ✦",          // Wind
+        "wand":        "a little magic headed your way ✦",           // Wand
+        "plane":       "air mail · on its way to you ✦",             // Plane
+    ]
+
+    /// The instrument hint for a SenderStyle raw value (nil if none).
+    static func hint(forStyleRaw raw: String) -> String? { instrumentHints[raw] }
+
     static let presets: [String] = [
-        "Love has a direction.",
+        "Thinking of you.",
         "You're my home.",
         "Always close.",
         "My heart points to you.",
@@ -24,7 +43,6 @@ enum TaglineSystem {
         "Near is a feeling.",
         "You're the pull.",
         "I turn toward you.",
-        "Love has a direction.",
         "You're my true north.",
         "No distance exists between two minds.",
         "Felt before it was sent.",
@@ -33,13 +51,11 @@ enum TaglineSystem {
         "Distance is only physical.",
         "Speed of love · immeasurable.",
         "Closer than the miles suggest.",
-        "You're closer than the miles.",
         "My heart points to you.",
-        "Where you are, I point.",
         "The needle always knows.",
         "I feel you move.",
-        "Near is where the heart points.",
         "You're the direction I always return to.",
+        "Distance far. Thoughts close.",
     ]
 
     /// A random poetic tagline — assigned to each new person so they start

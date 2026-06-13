@@ -20,12 +20,12 @@ enum AppLinks {
     static func inviteMessage(pairingCode: String?) -> String {
         guard let code = pairingCode, !code.isEmpty else {
             return """
-            Join me on Pointward 🧭
+            come find me on Pointward ✦ 🧭
             Download here: \(website)
             """
         }
         return """
-        Join me on Pointward 🧭
+        come find me on Pointward ✦ 🧭
         Tap to connect instantly:
         \(pairLink(code: code))
         """

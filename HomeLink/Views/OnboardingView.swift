@@ -698,7 +698,7 @@ struct OnboardingView: View {
     private var aboutYouScreen: some View {
         ScrollView {
             VStack(spacing: 0) {
-                Text("tell us about you ✦")
+                Text("set your home · let us give direction to your messages ✦")
                     .font(.system(size: 27, weight: .semibold, design: .serif))
                     .foregroundColor(DesignTokens.Color.textPrimary)
                     .padding(.top, 56)
@@ -952,7 +952,7 @@ struct OnboardingView: View {
 
     /// The pre-filled share message for your code.
     private static func shareCodeMessage(code: String) -> String {
-        "Connect with me on Pointward ✦\n\(AppLinks.pairLink(code: code))"
+        "come find me on Pointward ✦ 🧭\n\(AppLinks.pairLink(code: code))"
     }
 
     /// Mint YOUR connection code, carrying your profile, once signed in.

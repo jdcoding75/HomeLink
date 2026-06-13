@@ -621,7 +621,7 @@ struct PingHistoryView: View {
                     }
                     .rotationEffect(.degrees(-12))
                     .opacity(0.7)
-                    Text("your thought bucket is empty ✦")
+                    Text("all caught up ✦")
                         .font(.system(size: 15, design: .serif).italic())
                         .foregroundColor(DesignTokens.Color.textMuted)
                         .multilineTextAlignment(.center)

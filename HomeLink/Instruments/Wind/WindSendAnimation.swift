@@ -295,7 +295,9 @@ struct WindSendAnimation: View {
     let lt = elapsed - Self.enterDur     // swirl-local seconds
     if lt < 1.5 { return "drifting toward \(name) ✦" }
     if lt < 3.0 { return "taking its time ✦" }
-    return "patience is the message ✦"
+    // [copy] "patience is the message ✦" removed — no replacement (shows nothing
+    // for the final beat). Copy-only change; animation timing/behaviour unchanged.
+    return ""
   }
 
   // ── Easing + interpolation helpers ───────────────────────────────────────

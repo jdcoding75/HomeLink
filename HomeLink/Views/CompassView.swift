@@ -1011,7 +1011,7 @@ struct CompassView: View {
                 .foregroundColor(DesignTokens.Color.textMuted)
                 .padding(.bottom, 10)
 
-            Text("Love has a direction.")
+            Text("Thinking of you.")
                 .font(.system(size: 14, design: .serif).italic())
                 .foregroundColor(DesignTokens.Color.accentMid)
                 .padding(.bottom, 28)
@@ -2113,7 +2113,7 @@ struct CompassView: View {
                 .foregroundColor(Color(hex: "#c4a8d4"))
                 .padding(.leading, 4)
             if compassThoughts.isEmpty {
-                Text(thoughtsLoaded ? "your bucket is empty ✦" : "loading…")
+                Text(thoughtsLoaded ? "all caught up ✦" : "loading…")
                     .font(.system(size: 12, design: .serif).italic())
                     .foregroundColor(DesignTokens.Color.textMuted)
                     .padding(.vertical, 12)

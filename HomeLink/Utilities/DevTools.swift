@@ -103,7 +103,7 @@ enum DevTools {
     /// [3/7] Random content pools for one-tap animation testing — restricted to
     /// the SAME curated base set the send row offers (the 6 with sounds wired).
     static let testEmojis = CuratedEmoji.base.map { $0.emoji }
-    static let testMessages = ["thinking of you", "miss you", "hi ✦", "almost home",
+    static let testMessages = ["thinking of you", "miss you", "almost home",
                                "love you", "☀️ for you", "saw this & smiled"]
     static let testTaglines = ["near is a feeling ✦", "across the miles ✦",
                                "quick as a thought ✦", "carried on the wind ✦",
