@@ -205,8 +205,9 @@ struct CompassReceiptAnimation: View {
     // ── Sequencing ──────────────────────────────────────────────────────────
 
     private func run() {
-        // No dedicated compass receipt voice is mapped (safe no-op); a soft
-        // settle cue plays on arrival. Never crashes if the file is missing.
+        // The warm compass receipt chime (compass_receipt.wav, 1.5s) plays at
+        // the START of the receipt screen — a soft, warm welcome as the thought
+        // arrives. Safe no-op if the file is ever missing.
         InstrumentSoundPlayer.shared.playReceipt(.compass)
         HapticPattern.singleSoft.fire()
 
@@ -219,8 +220,11 @@ struct CompassReceiptAnimation: View {
             faceLocked = true
             ringPulse = true
             HapticPattern.doubleSoft.fire()
-            InstrumentSoundPlayer.shared.playCue(file: CompassSounds.receiptFile,
-                                                 duration: 0.5)
+            // [removed] The settle no longer re-triggers the receipt chime — the
+            // warm welcome now plays once at the START via playReceipt(.compass)
+            // above. Re-playing the same file here would double the tone.
+            // InstrumentSoundPlayer.shared.playCue(file: CompassSounds.receiptFile,
+            //                                      duration: 0.5)
             withAnimation(.easeOut(duration: 0.12)) { flash = true }
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.14) {
                 withAnimation(.easeIn(duration: 0.25)) { flash = false }

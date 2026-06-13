@@ -1112,6 +1112,10 @@ struct SenderAnimationView<Symbol: View>: View {
         case .glow:
             // [6/6] CHARGE 200 ms — the whole compass face expands and glows,
             // the needle locks, the golden ring blooms from center.
+            // SEND SOUND — the soft compass departure (compass_send.wav, 2.2s):
+            // a very gentle airy whoosh, a thought leaving. Plays at the start
+            // of the send, the way wind plays playSend(.wind) in its branch.
+            InstrumentSoundPlayer.shared.playSend(.compass)
             chargeScale = 1.2
             chargeGlow  = true
             HapticEngine.lockOn()                     // the satisfying needle snap

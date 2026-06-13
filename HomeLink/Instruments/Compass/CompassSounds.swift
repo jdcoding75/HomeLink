@@ -2,31 +2,32 @@
 // Pointward › Instruments › Compass
 //
 // STATUS:
-// compass_send.wav     3.5s  ⏳ placeholder (silent) — pending approval
-// compass_receipt.wav  1.5s  ⏳ placeholder (silent) — pending approval
+// compass_send.wav     2.2s  ✅ synthesized — soft departing breath/whoosh
+// compass_receipt.wav  1.5s  ✅ synthesized — warm welcoming chime
 //
 // CHARACTER:
-// Send: warm singing-bowl tone, gentle strike
-//       building during hold then fading as the
-//       orb departs. Intimate and peaceful.
-// Receipt: same bowl arriving — tone descends
-//       gently and resolves to silence.
+// Send: a very soft, airy departing breath that
+//       swells then drifts away, with a faint low
+//       tone gliding down — a thought leaving.
+// Receipt: a very soft, warm singing-bowl chime —
+//       a gentle strike resolving to a long warm
+//       decay. A warm welcome.
 //
 // TO REGENERATE: python3 CompassSoundGenerator.py
+// (pure-stdlib synthesis lives in that script).
 //
 // ElevenLabs prompt (send):
-// "Warm soft singing bowl tone, gentle strike
-//  building slowly then fading, intimate and
-//  peaceful, 3.5 seconds"
+// "Soft airy departing breath whoosh, gentle swell
+//  then fading away, intimate and peaceful, 2.2s"
 //
 // ElevenLabs prompt (receipt):
-// "Soft singing bowl arrival tone, descending
-//  gently to silence, peaceful and complete,
-//  1.5 seconds"
+// "Warm soft singing bowl arrival chime, gentle
+//  strike resolving to a long warm decay, peaceful
+//  and welcoming, 1.5 seconds"
 
 enum CompassSounds {
   static let sendFile = "compass_send"
   static let receiptFile = "compass_receipt"
-  static let sendDuration: Double = 3.5
+  static let sendDuration: Double = 2.2
   static let receiptDuration: Double = 1.5
 }

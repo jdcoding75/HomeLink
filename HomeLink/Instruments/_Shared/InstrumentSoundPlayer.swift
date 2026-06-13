@@ -118,6 +118,7 @@ final class InstrumentSoundPlayer {
   /// Send file + duration per instrument. WIND: wind_send.wav · 6.5s.
   private static func sendInfo(_ instrument: Instrument) -> (String, Double)? {
     switch instrument {
+    case .compass: return (CompassSounds.sendFile, CompassSounds.sendDuration)
     case .firefly: return (WindSounds.sendFile, WindSounds.sendDuration)
     case .rocket:  return (RocketSounds.sendFile, RocketSounds.sendDuration)
     case .bow:     return (BowSounds.sendFile, BowSounds.sendDuration)
@@ -131,6 +132,7 @@ final class InstrumentSoundPlayer {
   /// WIND: wind_receipt.wav · 7.2s · ROCKET: rocket_receipt.wav · 7.75s.
   private static func receiptInfo(_ instrument: Instrument) -> (String, Double)? {
     switch instrument {
+    case .compass: return (CompassSounds.receiptFile, CompassSounds.receiptDuration)
     case .firefly: return (WindSounds.receiptFile, WindSounds.receiptDuration)
     case .rocket:  return (RocketSounds.receiptFile, RocketSounds.receiptDuration)
     case .bow:     return (BowSounds.receiptFile, BowSounds.receiptDuration)
