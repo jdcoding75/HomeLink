@@ -1,5 +1,11 @@
 # Pointward — Claude Code Project Context
 
+## ⭐ CANONICAL REFERENCE
+Read **POINTWARD_TRUTH.md** (repo root) FIRST — it is the single source of
+truth for the whole project (experiences, sources of truth, instruments, emoji
+set, special moments, standards, lock ledger, pivot plan). This file (CLAUDE.md)
+holds the always-loaded essentials; POINTWARD_TRUTH.md holds the full picture.
+
 ## App Identity
 - App Name: Pointward
 - Bundle ID: com.jdcoding75.pointward
@@ -10,6 +16,14 @@
 - GitHub: github.com/jdcoding75/HomeLink
 - Supabase: jlbgdlgwtrkmqcfnomlr.supabase.co
 
+## Three Experiences
+- Connector — loving, compass-led (the emotional core)
+- Expresser — fun, instrument-led
+- Special Moments — occasion-grade, card-quality, premium
+  (the animation IS the card; distinct send path from Thoughts)
+- Message default hierarchy: Special Moment voice > Emoji default >
+  Instrument hint. User's own message always overrides.
+
 ## Architecture
 - SwiftUI + SwiftData
 - Supabase backend (auth, realtime, push)
@@ -17,6 +31,46 @@
 - APNs via Supabase Edge Function
 - Widget extension: PointwardWidgets
 - App Group for shared data
+- Special Moments: occasion-grade card sends
+  (Birthday, Firework live) — distinct send
+  path from Thoughts; the animation is the card.
+  Live under Instruments/_Shared/EmojiReveal/.
+
+## SOURCES OF TRUTH
+Each data type has ONE owning file. Edit the
+owner — never duplicate. Every UI surface that
+shows emojis/instruments/copy/colors MUST read
+from these, never hardcode.
+- AnimationManifest.swift — all animations,
+  stages, versions, live-instrument list/order
+- CuratedEmoji.swift — all emojis, tiers,
+  defaults, suggestions, soundMap
+- TaglineSystem.swift — poetic library, presets,
+  instrumentHints (per-instrument message tone)
+- InstrumentSoundPlayer.swift — per-instrument
+  sound routing (send/receipt/cue)
+- SoundEngine.swift — programmatic synthesis
+  voices, cached buffers, play(for:)
+- RevealAnimationRegistry.swift — emoji reveal
+  kinds + glow colors
+- DesignTokens.swift — colors, typography, spacing
+- ProFeatures.swift — pro/free gates
+  (end-game config; do not change w/o sign-off)
+- InstrumentBoundaries.swift — screen coordinate
+  rules + instrument generation spec
+Note: instrumentHints is the designated source of
+truth for instrument copy but is NOT yet wired
+into the live send flow (open item).
+
+## BUILD CHECKLIST — run before every commit:
+// New emoji added? → Update CuratedEmoji, soundMap, RevealAnimationRegistry
+// New instrument added? → Update AnimationManifest, InstrumentSoundPlayer,
+//   TaglineSystem.instrumentHints, create full file set
+// New sound added? → Add generator .py, update soundMap if emoji sound
+// New UI surface showing emojis/instruments? → Must read from registry,
+//   never hardcode
+// New Special Moment added? → Update CuratedEmoji.specialMoments,
+//   AnimationManifest, create full instrument file set
 
 ## Golden Rules
 - NEVER delete code — comment out only
@@ -130,13 +184,13 @@ xcodebuild -scheme HomeLink \
 - WindSounds.swift
 - Sounds: wind_send.wav ✅ · wind_receipt.wav ✅ · emoji_hug_v2.wav ✅
 
-### Rocket receipt: v2 PARACHUTE COMPLETE ✅
-- RocketReceiptAnimation.swift — LIVE via ReceiptView interception of .rocket.
-- Capsule falls into a deep-space starfield over a curved Earth horizon, the
-  parachute DEPLOYS (whoosh), it FLOATS down on a lazy sway, then LANDS softly
-  into the bucket — AUTO-CATCH — and hands off to EmojiRevealView (.rocket).
-- 7.75s: fall 1.5 · deploy 0.8 · float 4.55 · land 0.9.
-- Sound: rocket_receipt.wav (7.75s).
+### Rocket receipt: COMPLETE ✅
+- LIVE receipt = RocketLandingReceiptAnimation.swift (merged landing),
+  dispatched via ReceiptView for .rocket. THIS is the live one.
+- RocketReceiptAnimation.swift (the v2 PARACHUTE — capsule falls into a
+  deep-space starfield over a curved Earth horizon, parachute deploys, floats
+  down, lands in the bucket; 7.75s) is TEST-LAB ONLY, not the live dispatch.
+- Sound: rocket_receipt.wav.
 - Rocket SEND + compass face still use the OLD structure (not yet migrated).
 
 ### Fist bump reveal: COMPLETE ✅
@@ -144,10 +198,11 @@ xcodebuild -scheme HomeLink \
   then 3 pump cycles. Sound (emoji_fistbump) fires ONLY on the 3rd pump's
   punch-forward — never the 1st/2nd, and not at bloom.
 
-### Bow receipt: APPROVED (spec only — temporary, not yet built) ⏳
-- Approved design: giant bucket with a bullseye target; the arrow lands in the
-  bullseye centre; the emoji rides the arrowhead tip; screen shake on impact;
-  thud sound. NOT yet implemented — bow send + compass face also pending.
+### Bow receipt: COMPLETE ✅ (V2 live)
+- LIVE receipt = BowReceiptAnimationV2.swift, dispatched via ReceiptView for
+  .bow. Bow SEND = BowSendAnimationV2; compass face = BowCompassFace (with the
+  two-part draw/release SoundEngine cue). V1 files kept (retired), not live.
+- Bow is locked this session (visual + sound).
 
 ### Other instruments: NOT YET MIGRATED
 - Flick / Wand / Plane (and Bow, Rocket-send) still use the OLD structure
@@ -237,8 +292,11 @@ Never go silent for more than 2 minutes.
 See SESSION_LOG.md for running
 history of decisions and approvals.
 
-## Session Log
-See SESSION_LOG.md for approved decisions and pending work.
-
-## Animation Framework
-Read ANIMATION_FRAMEWORK.md before touching any animation file.
+## Canonical Docs
+- POINTWARD_TRUTH.md — the single canonical
+  reference (read first).
+- SESSION_LOG.md — running session history.
+- POINTWARD_ANIMATION_FRAMEWORK.md — the locked
+  animation grammar; read before touching any
+  animation file.
+- PAIRING_AUDIT.md — pivot-session removal plan.

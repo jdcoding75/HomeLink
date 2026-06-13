@@ -1,5 +1,7 @@
 # Pointward — Session Log (latest)
 
+> See POINTWARD_TRUTH.md for the current canonical reference.
+
 ## Session 8 — Phone review, sound batch, emoji review, product structure
 
 ### PRODUCT DECISIONS

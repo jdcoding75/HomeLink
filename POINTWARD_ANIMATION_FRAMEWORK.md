@@ -2,6 +2,8 @@
 **Version 1.0 — merged from Copilot framework + Claude session learnings**
 **Source of truth: Wind and Rocket instruments**
 
+> See POINTWARD_TRUTH.md for the current canonical reference.
+
 ---
 
 ## 1. Core Principles
