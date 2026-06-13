@@ -46,11 +46,17 @@ struct PingView: View {
     // Focused set — each emoji has its own synthesized voice in SoundEngine.
     // "gecko" renders the custom-drawn LeopardGeckoView — a personal touch
     // for the leopard-gecko lover in the family
-    // ── CORE — six emotions, always visible, no labels ───────────────────
-    // ❤️ love · 💋 tenderness · 🤗 embrace · ✨ a spark · 🌸 fleeting · 🌙 night
-    private let coreEmojis = ["❤️","💋","🤗","✨","🌸","🌙"]
+    // ── CORE — always visible, no labels ─────────────────────────────────
+    // [registry 2026-06-13] Reads CuratedEmoji.base (the free, sound-wired set) —
+    // was a hardcoded ["❤️","💋","🤗","✨","🌸","🌙"] that had drifted from the
+    // curated registry. Source of truth: CuratedEmoji. Never hardcode again.
+    private let coreEmojis = CuratedEmoji.base.map { $0.emoji }
 
     // ── PRO — the playground, visible only in Pro Mode ─────
+    // NOTE: these three are an animation-ROUTING taxonomy (which launch beat an
+    // emoji rides), NOT a send surface — they are intentionally not derived from
+    // CuratedEmoji. The send surfaces (coreEmojis above, presets below) read the
+    // registry. (PingView itself is currently an orphan — superseded by CompassView.)
     private let feelingEmojis = ["😤","🤬","👊","💢","⚡️","🌋","🔥","😡","💨"]
     private let foodEmojis    = ["🍕","🍫","🍺","🍷","🍰","☕","🧁","🍜","🍣","🥂"]
     private let sillyEmojis   = ["😂","🤪","🥳","💥","🎉","gecko"]
@@ -1232,8 +1238,9 @@ struct CreateThoughtSheet: View {
     private let lavender   = Color(hex: "#c4a8d4")
     private let lavenderHi = Color(hex: "#e0ccee")
 
-    // Every synthesized voice is available as a preset
-    private let presets = ["💜","💋","🤗","🌸","✨","😢","😤","🤬","⚡️","🔥","💨"]
+    // [registry 2026-06-13] Preset emoji read from CuratedEmoji.all — was a
+    // hardcoded ["💜","💋","🤗",…] list. Source of truth: CuratedEmoji.
+    private let presets = CuratedEmoji.all.map { $0.emoji }
 
     private var canSave: Bool {
         guard !chosenEmoji.isEmpty else { return false }

@@ -322,6 +322,13 @@ enum HapticEngine {
     // The single entry point for the reveal moment: a matched emoji fires its
     // own signature; everything else gets the emotional heartbeat. Both leave
     // the gentle presence pulse running until dismissed.
+    //
+    // NOTE [registry 2026-06-13]: this switch is per-emoji haptic CHOREOGRAPHY
+    // (which pulse pattern an emoji feels like) — it is NOT a duplicate of the
+    // CuratedEmoji token list, so it stays a switch. The token SET it keys on,
+    // though, is owned by CuratedEmoji: retired tokens (🙌, 👊) are removed here
+    // to stay in step with the registry. Any unmapped token falls to the
+    // emotional heartbeat default, so removals degrade gracefully.
     static func revealHaptic(for emoji: String) {
         guard hapticsEnabled else { return }
         switch emoji {
@@ -332,13 +339,15 @@ enum HapticEngine {
         case "😘":            // Kiss — single sharp, then a flutter
             tap(.rigid, 0.8, after: 0.0)
             tap(.soft,  0.3, after: 0.3)
-        case "🙌":            // Celebration — rapid joyful triple → medium
-            tap(.light,  0.5, after: 0.0)
-            tap(.light,  0.5, after: 0.12)
-            tap(.light,  0.5, after: 0.24)
-            tap(.medium, 0.7, after: 0.4)
-        case "👊":            // Punch — single decisive heavy
-            tap(.heavy, 0.9, after: 0.0)
+        // [registry 2026-06-13] REMOVED retired 🙌 (→ 👏) and 👊 (→ 🤜🤛); both now
+        // fall to the emotional-heartbeat default.
+        // case "🙌":            // Celebration — rapid joyful triple → medium
+        //     tap(.light,  0.5, after: 0.0)
+        //     tap(.light,  0.5, after: 0.12)
+        //     tap(.light,  0.5, after: 0.24)
+        //     tap(.medium, 0.7, after: 0.4)
+        // case "👊":            // Punch — single decisive heavy
+        //     tap(.heavy, 0.9, after: 0.0)
         case "🤜🤛":           // Fist bump — two fists meet: medium ×2
             tap(.medium, 0.8, after: 0.0)
             tap(.medium, 0.8, after: 0.16)

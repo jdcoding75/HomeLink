@@ -39,7 +39,12 @@ enum RevealAnimationRegistry {
     static let map: [String: RevealAnimation] = [
         // Migrated first, pixel-identical:
         "🤗":   RevealAnimation(kind: .hug,        glow: Color(hex: "#90EE90"), fullScreen: false),
-        "👊":   RevealAnimation(kind: .punch,      glow: Color(hex: "#FF6B35"), fullScreen: false),
+        // [registry 2026-06-13] REMOVED retired 👊 — replaced in the base set by
+        // 🤜🤛 (fistBump). A legacy 👊 ping now falls back to .bloom. (The .punch
+        // RevealKind + its EmojiRevealView beat are kept, just unmapped.)
+        // "👊":   RevealAnimation(kind: .punch,      glow: Color(hex: "#FF6B35"), fullScreen: false),
+        // [registry 2026-06-13] 🙏 gratitude — graduated to .pro; shared BLOOM reveal.
+        "🙏":   RevealAnimation(kind: .bloom,      glow: Color(hex: "#FFD479"), fullScreen: false),
         // New placeholders:
         "😘":   RevealAnimation(kind: .kiss,       glow: Color(hex: "#FF6FAF"), fullScreen: false),
         "🤜🤛": RevealAnimation(kind: .fistBump,   glow: Color(hex: "#FF8C42"), fullScreen: true),
@@ -52,7 +57,9 @@ enum RevealAnimationRegistry {
         "🎂":   RevealAnimation(kind: .birthday,   glow: Color(hex: "#FFB347"), fullScreen: false),
         "👏":   RevealAnimation(kind: .clap,       glow: Color(hex: "#FFC857"), fullScreen: false),
         // Base set that simply blooms (kept their existing glow colours):
-        "🙌":   RevealAnimation(kind: .bloom,      glow: Color(hex: "#FFD700"), fullScreen: false),
+        // [registry 2026-06-13] REMOVED retired 🙌 — replaced by 👏 (clap). A
+        // legacy 🙌 ping falls back to .bloom anyway, so nothing changes for it.
+        // "🙌":   RevealAnimation(kind: .bloom,      glow: Color(hex: "#FFD700"), fullScreen: false),
         "🖐️":   RevealAnimation(kind: .bloom,      glow: Color(hex: "#c4a8d4"), fullScreen: false),
         "🫶":   RevealAnimation(kind: .bloom,      glow: Color(hex: "#FF69B4"), fullScreen: false),
     ]

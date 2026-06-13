@@ -23,6 +23,10 @@ struct FlickDeskCompassFace: View {
     var emoji: String = "💜"
     var bearingDegrees: Double = 45      // person marker sits here (spec: "S" at 45°)
     var onSend: () -> Void = {}
+    /// [live 2026-06-13] true (default) = the test-lab beat that auto-plays once
+    /// on appear. false = the LIVE compass face: it rests until TAPPED, plays the
+    /// flick → onSend, then re-arms for the next send (so it is reusable).
+    var autoPlay: Bool = true
 
     @State private var fingerLift: CGFloat = 0   // 0 rest → 1 up at the ball
     @State private var windBack: CGFloat = 0     // 0 → 1 wound back (ball tilt ~3°)
@@ -43,7 +47,9 @@ struct FlickDeskCompassFace: View {
             cluster
             labels
         }
-        .onAppear { runOnce() }
+        .contentShape(Rectangle())                       // whole face is tappable
+        .onTapGesture { if !autoPlay { runOnce() } }     // LIVE: tap to flick-send
+        .onAppear { if autoPlay { runOnce() } }          // TEST LAB: auto-play once
     }
 
     // ── The compass cluster (desk circle + ring + marker + ball/finger) ──────
@@ -211,7 +217,23 @@ struct FlickDeskCompassFace: View {
         }
 
         // Hand off — the beat is done.
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2.4) { onSend() }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.4) {
+            onSend()
+            // LIVE: re-arm so the next tap can flick the next thought. (The test
+            // lab leaves didRun latched — it plays exactly once.)
+            if !autoPlay { rearm() }
+        }
+    }
+
+    /// Snap every beat-state back to rest (no animation) so a live face can flick
+    /// again. Called after the live hand-off.
+    private func rearm() {
+        var t = Transaction(); t.disablesAnimations = true
+        withTransaction(t) {
+            fingerLift = 0; windBack = 0; snap = 0
+            ballFlight = 0; dustBurst = false; fingerGone = false
+        }
+        didRun = false
     }
 }
 

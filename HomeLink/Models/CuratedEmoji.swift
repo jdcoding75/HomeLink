@@ -119,18 +119,24 @@ enum CuratedEmoji {
         // CuratedEmoji.all (replaced by 👏) AND emoji_celebration.wav is not in
         // the bundle. Commented out (never-delete) rather than left dangling.
         // "🙌": "emoji_celebration",   // not yet shipped → graceful no-op
-        "👊": "emoji_punch",          // renamed from emoji_fistbump
+        // [registry 2026-06-13] REMOVED retired 👊 — replaced in the base set by
+        // 🤜🤛 (fist bump); 👊 is no longer in CuratedEmoji.all.
+        // "👊": "emoji_punch",          // renamed from emoji_fistbump
         "🤜🤛": "emoji_fistbump_real",
         "🖐️": "emoji_highfive",
         "🫶": "emoji_hearthands",
+        "🙏": "emoji_gratitude",      // [registry 2026-06-13] 🙏 graduated to .pro
         "👏": "emoji_clap",
         "💭": "emoji_thoughtbubble",
         "💌": "emoji_envelope",
         "💥": "emoji_explosion",
         "🎁": "emoji_gift",
-        "🎆": "emoji_fireworks",
+        // [registry 2026-06-13] REMOVED 🎆 / 🎂 — they conflict with the Firework
+        // and Birthday INSTRUMENTS (which own their own sounds) and are no longer
+        // emoji-reveal sends; they live on only as Special Moments.
+        // "🎆": "emoji_fireworks",
         "🎓": "emoji_graduation",
-        "🎂": "emoji_birthday",
+        // "🎂": "emoji_birthday",
     ]
 
     // ── SPECIAL MOMENTS ───────────────────────────────────────────────────

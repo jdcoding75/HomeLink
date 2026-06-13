@@ -109,17 +109,13 @@ enum DevTools {
                                "quick as a thought ✦", "carried on the wind ✦",
                                "straight to you ✦"]
 
-    /// The seven instruments, in the order they appear to the user, each paired
-    /// with the SenderStyle its thoughts travel + land with.
-    static let instrumentSequence: [(icon: String, style: SenderStyle)] = [
-        ("🧭", .glow),        // compass
-        ("🏹", .bowArrow),    // bow
-        ("👆", .fingerFlick), // flick
-        ("🚀", .rocket),      // rocket
-        ("🌬️", .firefly),     // wind
-        ("🪄", .wand),        // wand
-        ("✈️", .plane),       // plane
-    ]
+    /// The instruments, in the order they appear to the user, each paired with
+    /// the SenderStyle its thoughts travel + land with.
+    /// [registry 2026-06-13] Derived from AnimationManifest.liveInstruments (the
+    /// single source of truth — one live row per instrument, in user-facing
+    /// order) — was a hardcoded 7-tuple that could drift from the manifest.
+    static let instrumentSequence: [(icon: String, style: SenderStyle)] =
+        AnimationManifest.liveInstruments.map { (icon: $0.icon, style: $0.style) }
 
     /// [5/5] Send ONE test thought for EACH of the 7 instruments, in order
     /// (compass → bow → flick → rocket → wind → wand → plane). Each gets a

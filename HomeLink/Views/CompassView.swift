@@ -308,15 +308,27 @@ struct CompassView: View {
                             //     onSend: { if let token = selectedToken { sendThought(token) } }
                             // )
                         case .flick:
-                            FlickInstrumentView(
-                                loadedToken: selectedToken,
-                                loadedSymbol: selectedToken.map { AnyView(sendSymbol($0, size: 26)) },
-                                loadedEmoji: selectedToken.map { sendRemoteEmoji(for: $0) },
-                                bearingDegrees: compass.state.bearingDegrees,
+                            // [live 2026-06-13] FLICK V2 (DESK) is now the live
+                            // face — the built FlickDeskCompassFace, no longer the
+                            // old post-it FlickInstrumentView. autoPlay:false makes
+                            // it the interactive live face (tap to flick → send,
+                            // then it re-arms). Old face commented out (never delete).
+                            FlickDeskCompassFace(
                                 personName: compass.state.personName,
-                                personEmoji: compass.state.personEmoji,
-                                onSend: { _ in if let token = selectedToken { sendThought(token) } }
+                                emoji: selectedToken.map { sendRemoteEmoji(for: $0) } ?? "💜",
+                                bearingDegrees: compass.state.bearingDegrees,
+                                onSend: { if let token = selectedToken { sendThought(token) } },
+                                autoPlay: false
                             )
+                            // FlickInstrumentView(
+                            //     loadedToken: selectedToken,
+                            //     loadedSymbol: selectedToken.map { AnyView(sendSymbol($0, size: 26)) },
+                            //     loadedEmoji: selectedToken.map { sendRemoteEmoji(for: $0) },
+                            //     bearingDegrees: compass.state.bearingDegrees,
+                            //     personName: compass.state.personName,
+                            //     personEmoji: compass.state.personEmoji,
+                            //     onSend: { _ in if let token = selectedToken { sendThought(token) } }
+                            // )
                         case .rocket:
                             // 🚀 ROCKET — tap-to-fuel, then blast off. The
                             // mechanic owns emoji loading + alignment, then
@@ -1381,12 +1393,31 @@ struct CompassView: View {
         }
     }
 
-    /// The default message first, then its alternatives — 4 options total.
+    /// The default message first, then its alternatives, then the current
+    /// instrument's hint — offered as message options when composing.
     private func composeSuggestions(for token: String) -> [String] {
         var options: [String] = []
         if let def = CuratedEmoji.defaultMessage(token) { options.append(def) }
         options.append(contentsOf: CuratedEmoji.suggestions(token))
+        // [hints 2026-06-13] The per-instrument default tone — TaglineSystem owns
+        // these (instrumentHints, keyed by SenderStyle.rawValue). Offered as a
+        // last option so the instrument's voice is always reachable.
+        if let hint = instrumentHint(), !options.contains(hint) { options.append(hint) }
         return options
+    }
+
+    /// The current instrument's default-message hint (TaglineSystem.instrumentHints).
+    /// nil if the instrument has no registered hint.
+    private func instrumentHint() -> String? {
+        TaglineSystem.hint(forStyleRaw: instrumentStore.selected.senderStyle.rawValue)
+    }
+
+    /// The starting message for a freshly-picked emoji: its curated default if it
+    /// has one, otherwise the current instrument's hint (TaglineSystem). This is
+    /// the single point where the message field is seeded on selection.
+    private func seedMessage(for item: CuratedEmoji.Item) -> String {
+        if !item.defaultMessage.isEmpty { return item.defaultMessage }
+        return instrumentHint() ?? ""
     }
 
     private func finishComposing() {
@@ -1436,7 +1467,9 @@ struct CompassView: View {
             } else {
                 withAnimation(.spring(response: 0.32, dampingFraction: 0.6)) { selectedToken = item.emoji }
                 // [3/3] Auto-fill the warm default message (user can edit/clear).
-                messageText = MessageRules.clamped(item.defaultMessage)
+                // [hints 2026-06-13] seedMessage falls back to the instrument's
+                // TaglineSystem hint when the emoji has no curated default.
+                messageText = MessageRules.clamped(seedMessage(for: item))
                 triggerLoadFlight(item.emoji)
             }
         } label: {

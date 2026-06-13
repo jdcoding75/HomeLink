@@ -360,10 +360,14 @@ struct EmojiLibrarySheet: View {
     @State private var showCreateSheet = false
     @State private var showPaywall = false
 
-    private let core    = PersonalSet.coreDefault
-    private let feeling = ["😤","🤬","👊","💢","⚡️","🌋","🔥","😡","💨"]
-    private let food    = ["🍕","🍫","🍺","🍷","🍰","☕","🧁","🍜","🍣","🥂"]
-    private let silly   = ["😂","🤪","🥳","💥","🎉","gecko"]
+    // [registry 2026-06-13] The library now reads from CuratedEmoji.all, grouped
+    // by access tier — was four hardcoded arrays (core/feeling/food/silly) that
+    // had drifted from the curated registry (they held retired tokens like 👊,
+    // and emoji never wired for send). Source of truth: CuratedEmoji. Never
+    // hardcode an emoji list on this surface again.
+    private let core   = CuratedEmoji.all.filter { $0.access == .free }.map { $0.emoji }
+    private let proSet = CuratedEmoji.all.filter { $0.access == .pro  }.map { $0.emoji }
+    private let soon   = CuratedEmoji.all.filter { $0.access == .comingSoon }.map { $0.emoji }
 
     private static let lavender = Color(hex: "#c4a8d4")
     private let grid = Array(repeating: GridItem(.flexible(), spacing: 10), count: 5)
@@ -375,9 +379,10 @@ struct EmojiLibrarySheet: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 18) {
                         section("core", tokens: core, locked: false)
-                        section("with feeling", tokens: feeling, locked: !isPaid)
-                        section("with food & drink", tokens: food, locked: !isPaid)
-                        section("silly", tokens: silly, locked: !isPaid)
+                        section("pro", tokens: proSet, locked: !isPaid)
+                        if !soon.isEmpty {
+                            section("coming soon", tokens: soon, locked: true)
+                        }
                         yoursSection
                         Spacer(minLength: 24)
                     }
