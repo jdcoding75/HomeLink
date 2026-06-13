@@ -20,11 +20,19 @@ struct InstrumentOptionPicker: View {
     private static let lavender = Color(hex: "#c4a8d4")
     private static let green    = Color(hex: "#5dcaa5")
 
+    // [registry 2026-06-13] LIST + ORDER + free/pro split come from the registry
+    // (AnimationManifest.liveInstruments), not InstrumentOption.allCases. Each
+    // manifest row is bridged to its InstrumentOption for persistence + per-card
+    // copy. Grouping derives from AnimationDefinition.requiresPro (compass = free).
     private var freeOptions: [InstrumentOption] {
-        InstrumentOption.allCases.filter { !$0.requiresPro }
+        AnimationManifest.liveInstruments
+            .filter { !$0.requiresPro }
+            .compactMap(InstrumentOption.init(definition:))
     }
     private var proOptions: [InstrumentOption] {
-        InstrumentOption.allCases.filter(\.requiresPro)
+        AnimationManifest.liveInstruments
+            .filter(\.requiresPro)
+            .compactMap(InstrumentOption.init(definition:))
     }
 
     var body: some View {

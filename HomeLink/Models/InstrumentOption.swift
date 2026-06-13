@@ -100,6 +100,34 @@ enum InstrumentOption: String, CaseIterable, Identifiable {
         }
     }
 
+    // ── Bridge from the registry ───────────────────────────────────────────
+    // [registry 2026-06-13] The picker surfaces now read their LIST + ORDER from
+    // AnimationManifest.liveInstruments (the single source of truth). This bridge
+    // maps a manifest row back to the InstrumentOption used for persistence +
+    // store routing, so the saved-selection key keeps working unchanged. The
+    // manifest owns "which instruments exist"; InstrumentOption owns "what's saved".
+
+    /// The saved-selection option for a manifest instrument row (matched by the
+    /// underlying Instrument it routes to). nil for emoji-only rows (no instrument).
+    init?(definition def: AnimationDefinition) {
+        guard let instrument = def.instrument else { return nil }
+        self.init(instrument: instrument)
+    }
+
+    /// The saved-selection option for an underlying Instrument. Total — every
+    /// Instrument has exactly one option.
+    init(instrument: Instrument) {
+        switch instrument {
+        case .compass: self = .compassVintage
+        case .bow:     self = .bow
+        case .flick:   self = .flick
+        case .rocket:  self = .rocket
+        case .firefly: self = .wind
+        case .wand:    self = .wand
+        case .plane:   self = .plane
+        }
+    }
+
     // ── Persistence ──────────────────────────────────────────────────────
 
     static let storageKey = "selectedInstrumentOption"
@@ -152,4 +180,14 @@ enum InstrumentOption: String, CaseIterable, Identifiable {
         }
         defaults.set(derived.rawValue, forKey: storageKey)
     }
+}
+
+// ── Registry-side free/pro flag ────────────────────────────────────────────
+// [registry 2026-06-13] Picker grouping is derived HERE, from the manifest row,
+// so the free/pro split is owned by the registry — not re-stated on
+// InstrumentOption.requiresPro. Defined in this bridge file (not in
+// AnimationManifest.swift, which stays untouched) so both picker surfaces share it.
+extension AnimationDefinition {
+    /// Free tier = the compass (the default face); every other instrument is Pro.
+    var requiresPro: Bool { instrument != .compass }
 }

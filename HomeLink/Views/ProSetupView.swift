@@ -238,7 +238,11 @@ struct ProSetupView: View {
             LazyVGrid(columns: [GridItem(.flexible(), spacing: 10),
                                 GridItem(.flexible(), spacing: 10)],
                       spacing: 10) {
-                ForEach(InstrumentOption.allCases) { option in
+                // [registry 2026-06-13] List + order from the registry
+                // (AnimationManifest.liveInstruments), bridged to InstrumentOption
+                // for persistence + card copy — was InstrumentOption.allCases.
+                ForEach(AnimationManifest.liveInstruments
+                            .compactMap(InstrumentOption.init(definition:))) { option in
                     styleCard(option)
                 }
             }
