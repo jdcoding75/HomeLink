@@ -34,10 +34,12 @@ struct FireworkReceipt: View {
     private static let woodDark  = Color(hex: "#6E3A1E")
     private static let brass     = Color(hex: "#C9A86A")
 
-    private static let bloomAt:  Double = 1.0
+    private static let bloomAt:  Double = 0.6
+    private static let total:    Double = 2.0
+    // [firework] Bucket beat removed — these stages no longer drive the receipt
+    // (kept only for the now-unreferenced bucket/drift helpers below).
     private static let driftAt:  Double = 2.0
     private static let landAt:   Double = 3.5
-    private static let total:    Double = 3.8
 
     private static let bucketW: CGFloat = 140
     private static let bucketH: CGFloat = 120
@@ -81,10 +83,14 @@ struct FireworkReceipt: View {
                         ZStack {
                             afterglow(w: w, h: h, e: e)
                             sparkles(w: w, h: h, e: e)
-                            bucket(w: w, h: h)
-                            sparkleTrail(w: w, h: h, e: e)
+                            // [firework] BUCKET REMOVED — the firework metaphor ends in
+                            // a held glow + a big, clear MESSAGE reveal, not a bucket
+                            // catch. The drift/land/bucket helpers below are preserved
+                            // (commented) but no longer rendered.
+                            //   bucket(w: w, h: h)
+                            //   sparkleTrail(w: w, h: h, e: e)
                             emojiView(w: w, h: h, e: e)
-                            emojiInBucket(w: w, h: h, e: e)
+                            //   emojiInBucket(w: w, h: h, e: e)
 
                             Text("from \(fromName.isEmpty ? "someone" : fromName) ✦")
                                 .font(.system(size: 16, design: .serif).italic())
@@ -111,14 +117,10 @@ struct FireworkReceipt: View {
         DispatchQueue.main.asyncAfter(deadline: .now() + Self.bloomAt) {
             HapticPattern.heartbeat.fire()
         }
-        DispatchQueue.main.asyncAfter(deadline: .now() + Self.landAt) {
-            InstrumentSoundPlayer.shared.playCue(file: "firework_sparkle", duration: 1.0)
-            HapticPattern.singleSoft.fire()
-            withAnimation(.easeOut(duration: 0.4)) { landed = true }
-        }
+        // burst → held glow → big MESSAGE reveal, as one continuous beat (no bucket).
         DispatchQueue.main.asyncAfter(deadline: .now() + Self.total) {
             onRevealed()
-            withAnimation(.easeInOut(duration: 0.3)) { revealing = true }
+            withAnimation(.easeInOut(duration: 0.4)) { revealing = true }
         }
     }
 
@@ -149,7 +151,8 @@ struct FireworkReceipt: View {
 
     @ViewBuilder
     private func afterglow(w: CGFloat, h: CGFloat, e: Double) -> some View {
-        let op = max(0, 0.28 - e * 0.12)
+        // Hold a soft glow floor — this is the backdrop the message reveals over.
+        let op = max(0.16, 0.30 - e * 0.07)
         Circle()
             .fill(RadialGradient(colors: [Self.gold.opacity(op), Self.red.opacity(op * 0.7), .clear],
                                  center: .center, startRadius: 6, endRadius: 200))
@@ -176,21 +179,17 @@ struct FireworkReceipt: View {
 
     @ViewBuilder
     private func emojiView(w: CGFloat, h: CGFloat, e: Double) -> some View {
-        if e >= Self.bloomAt && e < Self.landAt {
-            let bloom: CGFloat = {
-                let lp = (e - Self.bloomAt) / 0.6
-                if lp < 0 { return 0 }
-                if lp < 0.7 { return CGFloat(easeOut(lp / 0.7)) * 1.2 }      // 0 → 1.2
-                if lp < 1.0 { return 1.2 - 0.2 * CGFloat((lp - 0.7) / 0.3) } // 1.2 → 1.0
-                return 1.0
-            }()
-            let drifting = e >= Self.driftAt
-            let scale = drifting ? max(0.6, 1.0 - CGFloat((e - Self.driftAt) / (Self.landAt - Self.driftAt)) * 0.4) : bloom
+        if e >= Self.bloomAt {
+            // Bloom big at the centre over the held glow and HOLD there — no drift,
+            // no bucket. The focal point that the shared reveal then grows into.
+            let lp = (e - Self.bloomAt) / 0.6
+            let bloom: CGFloat = lp < 0.7 ? CGFloat(easeOut(max(0, lp) / 0.7)) * 1.15
+                               : (lp < 1.0 ? 1.15 - 0.15 * CGFloat((lp - 0.7) / 0.3) : 1.0)
             Text(emoji)
-                .font(.system(size: 96))
-                .scaleEffect(scale)
-                .shadow(color: Self.gold.opacity(0.5), radius: 16)
-                .position(emojiPos(w: w, h: h, e: e))
+                .font(.system(size: 104))
+                .scaleEffect(bloom)
+                .shadow(color: Self.gold.opacity(0.55), radius: 18)
+                .position(centerPoint(w, h))
                 .allowsHitTesting(false)
         }
     }
