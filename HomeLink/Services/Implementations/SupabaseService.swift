@@ -15,6 +15,14 @@ import Combine
 import Supabase
 import os
 
+// [concurrency 2026-06-13] PostgREST's PostgrestResponse isn't marked Sendable
+// upstream, so every `.execute()` result that flows through withRetry's
+// `T: Sendable` constraint warns "type 'PostgrestResponse<Void>' does not conform
+// to the 'Sendable' protocol" (a Swift 6 error). We only ever read these response
+// values (and usually discard them), so an @unchecked Sendable conformance is
+// safe. Marked @retroactive since the type lives in another module.
+extension PostgrestResponse: @retroactive @unchecked Sendable {}
+
 enum SupabaseServiceError: LocalizedError, Equatable {
     case notConfigured
     case notSignedIn
@@ -82,6 +90,11 @@ final class SupabaseService: ObservableObject {
     /// Retry transient (network/timeout) failures once after a short pause,
     /// then surface a human-readable error. Non-transient errors (RLS,
     /// schema, bad input) throw immediately — retrying won't fix those.
+    // [concurrency 2026-06-13] @discardableResult — many call sites run a write
+    // (.execute() → PostgrestResponse<Void>) purely for effect and ignore the
+    // result; without this, each is a "result of call to withRetry is unused"
+    // warning (a Swift 6 error). Callers that DO need the value still get it.
+    @discardableResult
     private func withRetry<T: Sendable>(
         attempts: Int = 2,
         label: String,

@@ -134,9 +134,11 @@ struct RootView: View {
         // heavy bit of work on the send path; doing it in the background here
         // keeps the compass instant to open and the first send stutter-free.
         .task(priority: .background) {
-            await Task.detached(priority: .background) {
-                _ = SoundEngine.shared
-            }.value
+            // [concurrency 2026-06-13] SoundEngine.shared is main-actor isolated
+            // (default actor isolation), so it can't be touched from a detached
+            // task — warm it on the main actor instead. The surrounding .task still
+            // runs at background priority, keeping launch responsive.
+            await Task { @MainActor in _ = SoundEngine.shared }.value
         }
         // Universal links: pointward.app/pair/POINT-XXXX (and /join/ fallback).
         // SwiftUI delivers them via user activity; onOpenURL covers scheme opens.

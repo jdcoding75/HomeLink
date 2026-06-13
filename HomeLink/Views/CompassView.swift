@@ -1107,7 +1107,12 @@ struct CompassView: View {
 
     /// [5/6] True when the compass is showing the auto-created demo person (Alex).
     private var isDemoSelected: Bool {
-        people.selectedPerson.map(DemoPerson.isDemo) ?? false
+        // [concurrency 2026-06-13] Call DemoPerson.isDemo directly on the main actor
+        // instead of passing it as a function value to `.map` — the latter strips
+        // its main-actor isolation (a Swift 6 error: "main actor-isolated static
+        // method 'isDemo' in a synchronous nonisolated context").
+        guard let person = people.selectedPerson else { return false }
+        return DemoPerson.isDemo(person)
     }
 
     // ── BOTTOM ZONE ───────────────────────────────────────────────────────
