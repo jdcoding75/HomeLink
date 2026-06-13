@@ -130,7 +130,7 @@ struct RocketReceiptAnimation: View {
     /// The capsule's centre Y over the whole journey.
     private func capsuleY(_ size: CGSize, _ e: Double) -> CGFloat {
         let h = size.height
-        let bucketTop = bucketPoint(size).y - 24    // settle just inside the mouth
+        let bucketTop = bucketPoint(size).y - 8     // settle so the legs meet the bucket mouth
         if e <= Self.fallEnd {
             return lerp(-0.14 * h, 0.20 * h, easeOut(e / Self.fallDur))
         } else if e <= Self.deployEnd {
