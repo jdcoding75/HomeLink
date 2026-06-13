@@ -214,6 +214,35 @@ final class SupabaseService: ObservableObject {
         }
     }
 
+    // [phase2] Read-only decode of OUR own public.users row — just the
+    // short_code for now. nonisolated Decodable (pure data) → no main-actor
+    // Encodable warning; Decodable-only so it can never write.
+    private nonisolated struct SelfProfileRow: Decodable {
+        let shortCode: String?
+        enum CodingKeys: String, CodingKey { case shortCode = "short_code" }
+    }
+
+    /// [phase2] Fetch OUR own `short_code` from public.users. Read-only, no UI
+    /// surfacing yet (Build 3+ wires it). Returns nil — degrading gracefully —
+    /// when signed out, unconfigured, or the column doesn't exist yet (the
+    /// short_code migration hasn't been applied). Does NOT touch the send/pairing
+    /// paths and does NOT read message rows.
+    func fetchMyShortCode() async -> String? {
+        guard let client, let me = await currentUserID else { return nil }
+        do {
+            let rows: [SelfProfileRow] = try await client
+                .from("users")
+                .select("short_code")
+                .eq("id", value: me.uuidString)
+                .limit(1)
+                .execute().value
+            return rows.first?.shortCode
+        } catch {
+            log.warning("profile: short_code read skipped (column missing?) — \(error.localizedDescription, privacy: .public)")
+            return nil
+        }
+    }
+
     /// The signed-in user's id, or nil when signed out / unconfigured.
     var currentUserID: UUID? {
         get async {

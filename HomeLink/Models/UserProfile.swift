@@ -22,7 +22,12 @@ final class UserProfile {
     var longitude:           Double
     var displayAddress:      String
     var locationDisplayName: String
-    var code:                String      // POINT-XXXX, auto-generated
+    var code:                String      // POINT-XXXX pairing code (old path)
+    // [phase2] The per-user short_code from public.users — a SEPARATE random
+    // fallback code (≠ `code` above, ≠ users.id). Read from Supabase, surfaced
+    // as "your code" in a later build. Defaulted "" for SwiftData lightweight
+    // migration; empty until the messages/short_code migration is applied + read.
+    var shortCode:           String = ""
     var createdAt:           Date
 
     init(
@@ -32,7 +37,8 @@ final class UserProfile {
         longitude:           Double = 0,
         displayAddress:      String = "",
         locationDisplayName: String = "",
-        code:                String = ""
+        code:                String = "",
+        shortCode:           String = ""
     ) {
         self.displayName         = displayName
         self.emoji               = emoji
@@ -41,6 +47,7 @@ final class UserProfile {
         self.displayAddress      = displayAddress
         self.locationDisplayName = locationDisplayName
         self.code                = code
+        self.shortCode           = shortCode
         self.createdAt           = .now
     }
 
@@ -64,17 +71,19 @@ extension UserProfile {
         var displayAddress: String
         var locationDisplayName: String
         var code: String
+        var shortCode: String = ""      // [phase2] per-user short_code (see model)
         var hasLocation: Bool { latitude != 0 || longitude != 0 }
     }
 
     private enum Keys {
-        static let name    = "profileDisplayName"
-        static let emoji   = "profileEmoji"
-        static let lat     = "profileLatitude"
-        static let lng     = "profileLongitude"
-        static let address = "profileDisplayAddress"
-        static let locName = "profileLocationName"
-        static let code    = "profileCode"
+        static let name      = "profileDisplayName"
+        static let emoji     = "profileEmoji"
+        static let lat       = "profileLatitude"
+        static let lng       = "profileLongitude"
+        static let address   = "profileDisplayAddress"
+        static let locName   = "profileLocationName"
+        static let code      = "profileCode"
+        static let shortCode = "profileShortCode"   // [phase2]
     }
 
     /// Mirror the live profile to UserDefaults so SupabaseService can read it.
@@ -87,6 +96,7 @@ extension UserProfile {
         d.set(s.displayAddress,      forKey: Keys.address)
         d.set(s.locationDisplayName, forKey: Keys.locName)
         d.set(s.code,                forKey: Keys.code)
+        d.set(s.shortCode,           forKey: Keys.shortCode)
     }
 
     /// The cached snapshot, or nil if no profile has been created yet.
@@ -100,6 +110,7 @@ extension UserProfile {
             longitude:           d.double(forKey: Keys.lng),
             displayAddress:      d.string(forKey: Keys.address) ?? "",
             locationDisplayName: d.string(forKey: Keys.locName) ?? "",
-            code:                d.string(forKey: Keys.code) ?? "")
+            code:                d.string(forKey: Keys.code) ?? "",
+            shortCode:           d.string(forKey: Keys.shortCode) ?? "")
     }
 }
