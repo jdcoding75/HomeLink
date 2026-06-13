@@ -6,11 +6,12 @@
 // shared wooden bucket on a gold sparkle trail before handing off to the shared
 // EmojiRevealView.
 //
-//   AFTERGLOW (0.0–1.0s)  residual sparkle dots + soft red/gold centre glow
-//   BLOOM     (1.0–2.0s)  🎆 blooms 0 → 1.2 → 1.0 (spring) from the centre
-//   DRIFT     (2.0–3.5s)  emoji drifts to the lower-right bucket, sparkle trail
-//   LAND      (3.5s)      cyan glow + celebration sparkles; firework_sparkle
-//   → EmojiRevealView (.received)                                      ≈ 3.8s
+//   BURST  (0.0–0.9s)  full-screen explosion — plays firework_big_burst, the
+//                      IDENTICAL sound to the send screen's big burst
+//   GLOW   (0.6s+)     held red/gold afterglow settles as the backdrop
+//   BLOOM  (1.1s+)     🎆 blooms BIG over the glow + "from … ✦" — SILENT, no
+//                      sound at all through the message reveal + handoff
+//   → EmojiRevealView (.received)                                      ≈ 2.6s
 //
 // Screen-coordinate rules: GeometryReader root, .ignoresSafeArea() background,
 // positions from geo.size.
@@ -131,8 +132,12 @@ struct FireworkReceipt: View {
 
     private func begin() {
         start = Date()
-        // Keep the existing receipt sound; a heavier hit on the opening burst.
-        InstrumentSoundPlayer.shared.playCue(file: "firework_sparkle", duration: 1.5)
+        // SOUND — the receipt's opening explosion plays the IDENTICAL sound to
+        // the send screen's big burst (firework_big_burst, 1.2s — see
+        // FireworkSendAnimation.tick). The message-reveal portion that follows
+        // (held glow → 🎆 bloom → "from … ✦" → EmojiRevealView handoff) is
+        // completely silent: no sparkle, no chime, nothing layered after the burst.
+        InstrumentSoundPlayer.shared.playCue(file: "firework_big_burst", duration: 1.2)
         HapticPattern.singleHeavy.fire()
         DispatchQueue.main.asyncAfter(deadline: .now() + Self.bloomAt) {
             HapticPattern.heartbeat.fire()
