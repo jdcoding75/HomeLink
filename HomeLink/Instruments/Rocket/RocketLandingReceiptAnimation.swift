@@ -97,14 +97,33 @@ struct RocketLandingReceiptAnimation: View {
     /// ejects from the cone and arcs across into the bucket.
     private func rocketX(_ size: CGSize) -> CGFloat { size.width * 0.34 }
 
-    private func bucketPoint(_ size: CGSize) -> CGPoint {
-        CGPoint(x: size.width * 0.66, y: size.height - 120)
+    /// The curved earth's surface Y at a given x — the SAME ellipse drawn by
+    /// earthHorizon, so the rocket + bucket seat exactly on the VISIBLE horizon
+    /// (no floating gap).
+    private func earthSurfaceY(_ size: CGSize, atX x: CGFloat) -> CGFloat {
+        let earthH: CGFloat = 145
+        let earthR = size.width * 1.8
+        let cyEarth = size.height + earthR - earthH
+        let dx = x - size.width / 2
+        let inside = max(0, earthR * earthR - dx * dx)
+        return cyEarth - inside.squareRoot()
     }
 
-    /// The rocket centre Y over the descent (top → landed pad on the earth).
+    /// Legs-bottom offset from the rocket's centre (frame 110×200, scale 1).
+    private static let rocketFootOffset: CGFloat = 86
+
+    /// The bucket sits SEATED on the earth, lightly planted (base ~34pt below the
+    /// surface) at its x — so the rocket and bucket share one grounded horizon.
+    private func bucketPoint(_ size: CGSize) -> CGPoint {
+        let bx = size.width * 0.66
+        return CGPoint(x: bx, y: earthSurfaceY(size, atX: bx) - 34)
+    }
+
+    /// The rocket centre Y over the descent: from the top of the screen down to a
+    /// SEATED pad where its legs touch the curved earth surface (no floating gap).
     private func rocketY(_ size: CGSize) -> CGFloat {
         let topY = size.height * 0.10
-        let padY = size.height * 0.70
+        let padY = earthSurfaceY(size, atX: rocketX(size)) - Self.rocketFootOffset
         return topY + (padY - topY) * descend
     }
 
@@ -351,40 +370,46 @@ struct RocketLandingReceiptAnimation: View {
         InstrumentSoundPlayer.shared.playReceipt(.rocket)
         HapticPattern.singleSoft.fire()
 
-        // FALL — descends upright and grows.
-        withAnimation(.easeIn(duration: 2.0)) { descend = 0.85; grow = 1.0 }
+        // FALL — descends upright and grows, gently.
+        withAnimation(.easeIn(duration: 2.6)) { descend = 0.82; grow = 1.0 }
         for k in 0..<3 {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.6 + Double(k) * 0.4) {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.7 + Double(k) * 0.45) {
                 HapticEngine.rocketCountdown(); jitter()
             }
         }
 
-        // LEGS — deploy, switch to a hover flame.
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+        // LEGS — deploy + switch to a hover flame, just before the settle.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.4) {
             withAnimation(AnimationSystem.easeOutBack(0.4)) { legs = 1 }
             hover = true
         }
 
-        // TOUCH — final settle: flash · dust · BOOM · bounce.
-        DispatchQueue.main.asyncAfter(deadline: .now() + 3.2) {
-            withAnimation(.easeIn(duration: 0.3)) { descend = 1 }
-            HapticPattern.doubleSoft.fire()           // the BOOM
+        // SETTLE — a SLOW, graceful final descent that DECELERATES onto the
+        // surface (0.82 → 1.0 over 2.0s, easeOut) — no fast drop.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.8) {
+            withAnimation(.easeOut(duration: 2.0)) { descend = 1 }
+        }
+
+        // TOUCHDOWN — fires as the legs seat (tail of the slow settle):
+        // soft dust · flash · gentle bounce.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 4.4) {
+            HapticPattern.doubleSoft.fire()
             dust = true
             withAnimation(.easeOut(duration: 0.08)) { flash = true }
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                 withAnimation(.easeOut(duration: 0.2)) { flash = false }
             }
-            withAnimation(AnimationSystem.easeOutBack(0.4)) { bounce = 1.05 }
+            withAnimation(AnimationSystem.easeOutBack(0.4)) { bounce = 1.04 }
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
                 withAnimation(AnimationSystem.easeOutBack(0.3)) { bounce = 1.0 }
             }
         }
 
         // EJECT — nose cone splits, emoji pops out of the cone.
-        DispatchQueue.main.asyncAfter(deadline: .now() + 4.0) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 4.9) {
             withAnimation(AnimationSystem.easeOutBack(0.5)) { noseOpen = 1 }
         }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 4.4) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 5.3) {
             HapticEngine.catchReveal()
             withAnimation(AnimationSystem.easeOutBack(0.5)) { emojiScale = 1 }
             // Arc across and drop into the bucket.
@@ -392,14 +417,14 @@ struct RocketLandingReceiptAnimation: View {
         }
 
         // SETTLE — the emoji drops in; catch glow + soft thud.
-        DispatchQueue.main.asyncAfter(deadline: .now() + 5.3) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 6.2) {
             withAnimation(.easeOut(duration: 0.4)) { emojiScale = 0.55; bucketGlow = true }
             InstrumentSoundPlayer.shared.playCue(file: PlaneSounds.catchFile, duration: 0.45)
             HapticPattern.singleSoft.fire()
         }
 
         // → the shared reveal.
-        DispatchQueue.main.asyncAfter(deadline: .now() + 6.0) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 6.8) {
             onRevealed()
             withAnimation(.easeInOut(duration: 0.3)) { revealing = true }
         }
