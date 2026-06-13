@@ -1176,11 +1176,12 @@ struct SenderAnimationView<Symbol: View>: View {
             // PHASE 2 · GATHER (1 s)  the wander settles, the wind picks a way.
             // PHASE 3 · SEND (2.5 s)  the leaf accelerates toward them and fades.
             HapticEngine.sendSoft()
-            SoundEngine.shared.play(for: "style.chime")
-            // [5/5] WIND SEND SOUND — the approved wind_send.wav (6.5s, matches
-            // the send duration) plays alongside the chime for the live wind
-            // send. (The extracted full-screen prototype is WindSendAnimation.)
+            // [tweak] The send "beep" (style.chime) is REMOVED — no replacement.
+            // The live wind send now carries the silent wind_send.wav slot plus a
+            // soft ambient breeze layered underneath (matching the wind receipt).
             InstrumentSoundPlayer.shared.playSend(.wind)
+            InstrumentSoundPlayer.shared.playCue(file: WindSounds.breezeFile,
+                                                 duration: WindSounds.breezeDuration)
             chargeGlow = true
             windSky = true                                   // full-screen sky in
             windFloating = true                              // big, lazy swirl
