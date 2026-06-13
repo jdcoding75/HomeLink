@@ -43,8 +43,17 @@ struct WindSendAnimation: View {
   private static let total:     Double = enterDur + swirlDur + departDur  // 6.5
 
   // Swirl geometry (per spec).
-  private static let swirlWidthAmp:  CGFloat = 0.36   // × screen width
+  // swirlWidthAmp = 0 → NO horizontal excursion (was 0.36, the cause of the
+  // inconsistent extra sweep). The leaf now bobs vertically only, so the journey
+  // is a clean enter-in + drift-out = exactly 2 sweeps for EVERY exit bearing.
+  private static let swirlWidthAmp:  CGFloat = 0.0    // × screen width (0 = no horizontal swirl)
   private static let swirlHeightAmp: CGFloat = 0.15   // × screen height
+  // Angular rate (radians/sec) of the horizontal swirl sine. NAMED so it is
+  // never confused with swirlWidthAmp again (the two used to both be 0.36, which
+  // hid the real bug). With swirlWidthAmp = 0 it has no visible effect today, but
+  // it stays named + distinct so the amplitude and frequency roles can't be
+  // conflated by a future edit.
+  private static let swirlFrequency: CGFloat = 0.36
 
   private static let leafW: CGFloat = 200
   private static let leafH: CGFloat = 124
@@ -186,15 +195,20 @@ struct WindSendAnimation: View {
   private func swirlPos(localT: Double, size: CGSize) -> CGPoint {
     // [1/5] Centre on the TRUE full-screen middle (GeometryReader size) so the
     // leaf swirls through the centre and never touches the bottom.
-    // [tweak] Horizontal freq lowered 0.48→0.36 (vert 0.30→0.22 to keep the S
-    // proportion). The OLD 0.48 only read as 2 sweeps for SOME exit bearings —
-    // for bearings ~30°–150° the swirl's mid-peak added two extra crossings, so
-    // the send did 4+ sweeps and the count CHANGED run-to-run with the random
-    // exit bearing. At 0.36 the swirl no longer reverses x mid-flight, so it is
-    // a reliable TWO sweeps (enter-in + drift-out) for EVERY exit bearing.
-    //   x = cx + sin(t·0.36) · width  · 0.36
-    //   y = cy + sin(t·0.22 + 1.0) · height · 0.15
-    let sx = sin(localT * 0.36)
+    //
+    // SWEEP COUNT — the real fix. The extra, bearing-dependent sweep was caused
+    // by the HORIZONTAL swirl: a FIXED screen-space excursion (swirlWidthAmp,
+    // toward the right) that opposed the bearing-anchored enter/depart whenever
+    // sin(exitBearing) was small, forcing the leaf to double back. Earlier
+    // attempts only lowered the horizontal FREQUENCY (0.48→0.36), which never
+    // touched the amplitude and so never fixed it. Setting swirlWidthAmp = 0
+    // removes the horizontal excursion entirely: the leaf comes in to centre and
+    // drifts back out along the same bearing — exactly 2 sweeps for EVERY exit
+    // bearing. Only the vertical bob (swirlHeightAmp) remains, which never adds a
+    // horizontal sweep.
+    //   x = cx + sin(t·swirlFrequency) · width  · swirlWidthAmp   (swirlWidthAmp = 0)
+    //   y = cy + sin(t·0.22 + 1.0)     · height · swirlHeightAmp
+    let sx = sin(localT * Double(Self.swirlFrequency))
     let sy = sin(localT * 0.22 + 1.0)
     return CGPoint(x: size.width  / 2 + CGFloat(sx) * size.width  * Self.swirlWidthAmp,
                    y: size.height / 2 + CGFloat(sy) * size.height * Self.swirlHeightAmp)
