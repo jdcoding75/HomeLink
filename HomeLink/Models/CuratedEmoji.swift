@@ -32,8 +32,9 @@ enum CuratedEmoji {
         Item(emoji: "😘", label: "kiss",        defaultMessage: "thinking of you ✦",        access: .free,
              glowColor: "#FF69B4",
              suggestions: ["miss you ✦", "xoxo ✦", "you're on my mind ✦"]),
-        Item(emoji: "🙌", label: "celebration", defaultMessage: "yes! so proud of you ✦",   access: .free,
-             suggestions: ["you did it! ✦", "amazing news ✦", "celebrating you ✦"]),
+        // [removed] 🙌 Celebration — replaced by 👏 clap (see `pro`).
+        // Item(emoji: "🙌", label: "celebration", defaultMessage: "yes! so proud of you ✦", access: .free,
+        //      suggestions: ["you did it! ✦", "amazing news ✦", "celebrating you ✦"]),
         // [6/6] 👊 (punch) replaced in the free base set by 🤜🤛 (fist bump).
         Item(emoji: "🤜🤛", label: "fist bump", defaultMessage: "you got this ✦",           access: .free,
              glowColor: "#FF8C42",
@@ -44,14 +45,25 @@ enum CuratedEmoji {
              suggestions: ["love you ✦", "always here for you ✦", "thinking of you ✦"]),
     ]
 
-    /// [2/7] These have NO sounds yet — shown as COMING SOON (not locked), not
-    /// selectable, alongside the occasion set. They graduate as sounds ship.
+    /// [2/7] Pro extras. Coming-soon entries have no sound/animation yet (not
+    /// locked, not selectable) and graduate as they ship; 🙏 has graduated.
     static let pro: [Item] = [
-        Item(emoji: "💪", label: "you got this",    defaultMessage: "I believe in you ✦",             access: .comingSoon),
-        Item(emoji: "🙏", label: "gratitude",       defaultMessage: "so grateful for you ✦",          access: .comingSoon),
-        Item(emoji: "👏", label: "well done",       defaultMessage: "so well done ✦",                 access: .comingSoon),
-        Item(emoji: "🤝", label: "thinking of you", defaultMessage: "just thinking of you ✦",         access: .comingSoon),
-        Item(emoji: "✨", label: "special",         defaultMessage: "you make everything brighter ✦", access: .comingSoon),
+        // [removed] 💪 Muscle — dropped, no clear identity.
+        // Item(emoji: "💪", label: "you got this", defaultMessage: "I believe in you ✦", access: .comingSoon),
+
+        // [promoted] 🙏 Gratitude — graduated from coming-soon to a real .pro
+        // send; uses the shared BLOOM reveal (RevealAnimationRegistry fallback).
+        Item(emoji: "🙏", label: "gratitude",       defaultMessage: "so grateful for you ✦",          access: .pro),
+
+        // [added] 👏 Clapping hands — replaces 🙌 celebration. Coming soon for now
+        // (its clap reveal animation isn't built yet). tagline: "great job ✦".
+        Item(emoji: "👏", label: "clapping hands",  defaultMessage: "so proud of you ✦",              access: .comingSoon,
+             glowColor: "#FFD700", suggestions: ["great job ✦", "well done ✦", "bravo ✦"]),
+
+        // [removed] 🤝 Thinking of you — dropped.
+        // Item(emoji: "🤝", label: "thinking of you", defaultMessage: "just thinking of you ✦", access: .comingSoon),
+        // [removed] ✨ Special — no clear identity, dropped.
+        // Item(emoji: "✨", label: "special", defaultMessage: "you make everything brighter ✦", access: .comingSoon),
     ]
 
     /// [4–6/6] The newly-built animated reveals (placeholder polish). These have
@@ -59,19 +71,25 @@ enum CuratedEmoji {
     /// "coming soon"). Glow colours mirror RevealAnimationRegistry.
     static let proAnimated: [Item] = [
         Item(emoji: "💭", label: "thinking",   defaultMessage: "just thinking of you ✦",       access: .pro, glowColor: "#c4a8d4"),
-        Item(emoji: "💌", label: "love note",  defaultMessage: "sending you love ✦",           access: .pro, glowColor: "#FF6B9D"),
+        // [removed] 💌 Love note — reserved for Special Moments (Valentine's Day card).
+        // Item(emoji: "💌", label: "love note",  defaultMessage: "sending you love ✦", access: .pro, glowColor: "#FF6B9D"),
         Item(emoji: "💥", label: "boom",       defaultMessage: "that's huge! ✦",               access: .pro, glowColor: "#FF4530"),
         Item(emoji: "🎁", label: "a gift",     defaultMessage: "a little something for you ✦", access: .pro, glowColor: "#FF5CA8"),
-        Item(emoji: "🎆", label: "fireworks",  defaultMessage: "celebrating you ✦",            access: .pro, glowColor: "#FFD700"),
+        // [removed] 🎆 Firework — conflicts with the Firework instrument; the emoji
+        // renders as a box. (Lives on as a Special Moment / instrument.)
+        // Item(emoji: "🎆", label: "fireworks",  defaultMessage: "celebrating you ✦", access: .pro, glowColor: "#FFD700"),
         Item(emoji: "🎓", label: "graduation", defaultMessage: "so proud of you ✦",            access: .pro, glowColor: "#FFD166"),
-        Item(emoji: "🎂", label: "birthday",   defaultMessage: "happy birthday ✦",             access: .pro, glowColor: "#FFB347"),
+        // [removed] 🎂 Birthday cake — conflicts with the Birthday instrument; the
+        // emoji renders as a box. (Lives on as a Special Moment / instrument.)
+        // Item(emoji: "🎂", label: "birthday",   defaultMessage: "happy birthday ✦", access: .pro, glowColor: "#FFB347"),
     ]
 
-    /// Occasion — shown with a "coming soon" badge (not selectable). (🎂 moved
-    /// to proAnimated now that it has a real animation + sound.)
+    /// Occasion — now empty; these moved to Special Moments (see bottom).
     static let occasion: [Item] = [
-        Item(emoji: "🎄", label: "happy holidays", defaultMessage: "happy holidays ✦",   access: .comingSoon),
-        Item(emoji: "💐", label: "for mum",        defaultMessage: "love you so much ✦", access: .comingSoon),
+        // [removed] 🎄 Happy holidays — reserved for Special Moments.
+        // Item(emoji: "🎄", label: "happy holidays", defaultMessage: "happy holidays ✦", access: .comingSoon),
+        // [removed] 💐 For mum — reserved for Special Moments.
+        // Item(emoji: "💐", label: "for mum", defaultMessage: "love you so much ✦", access: .comingSoon),
     ]
 
     static let all: [Item] = base + proAnimated + pro + occasion
@@ -99,5 +117,20 @@ enum CuratedEmoji {
         "🎆": "emoji_fireworks",
         "🎓": "emoji_graduation",
         "🎂": "emoji_birthday",
+    ]
+
+    // ── Special Moments ──────────────────────────────────────────────────────
+    // Special Moments — occasion-grade cinematic sends. These are not emoji
+    // picks. The animation IS the card. Premium, shareable, no instrument picker.
+    //
+    // Scaffold only: NOT part of `all` (they never appear in the emoji picker).
+    // Birthday and Firework already exist as instruments; the rest are upcoming.
+    static let specialMoments: [Item] = [
+        Item(emoji: "🎂", label: "birthday",       defaultMessage: "happy birthday ✦",     access: .comingSoon),
+        Item(emoji: "🎆", label: "firework",       defaultMessage: "celebrating you ✦",    access: .comingSoon),
+        Item(emoji: "💌", label: "valentine's day", defaultMessage: "be mine ✦",           access: .comingSoon),
+        Item(emoji: "🎄", label: "happy holidays", defaultMessage: "happy holidays ✦",     access: .comingSoon),
+        Item(emoji: "💐", label: "for mum",        defaultMessage: "love you so much ✦",   access: .comingSoon),
+        Item(emoji: "🎇", label: "july 4th",       defaultMessage: "happy 4th ✦",          access: .comingSoon),
     ]
 }
