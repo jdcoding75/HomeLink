@@ -19,16 +19,11 @@ struct TestMessageSheet: View {
     @State private var tagline = "near is a feeling ✦"
     @State private var fromName = "Test Sarah"
 
-    /// The seven instruments, by their wire SenderStyle.
-    private let instruments: [(icon: String, label: String, style: SenderStyle)] = [
-        ("🧭", "compass", .glow),
-        ("🏹", "bow",     .bowArrow),
-        ("👆", "flick",   .fingerFlick),
-        ("🚀", "rocket",  .rocket),
-        ("🌬️", "wind",    .firefly),
-        ("🪄", "wand",    .wand),
-        ("✈️", "plane",   .plane),
-    ]
+    /// All live instruments — read from the registry (AnimationManifest) so this
+    /// dev screen shows EVERY live instrument automatically. [registry 2026-06-13]
+    /// Was a hardcoded 7-tuple (emoji/name/style) that could drift from the
+    /// manifest. Emoji ← icon, name ← name, style ← style of each AnimationDefinition.
+    private var instruments: [AnimationDefinition] { AnimationManifest.liveInstruments }
     // [3/7] Only the curated base set (the 6 with sounds wired).
     private let testEmojis = CuratedEmoji.base.map { $0.emoji }
 
@@ -68,13 +63,13 @@ struct TestMessageSheet: View {
                 .foregroundColor(DesignTokens.Color.textMuted)
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 10) {
-                    ForEach(instruments, id: \.label) { inst in
+                    ForEach(instruments) { inst in
                         Button {
                             fire(style: inst.style, emoji: "💜", message: nil)
                         } label: {
                             VStack(spacing: 3) {
                                 Text(inst.icon).font(.system(size: 22))
-                                Text(inst.label).font(.system(size: 9))
+                                Text(inst.name).font(.system(size: 9))
                                     .foregroundColor(DesignTokens.Color.textMuted)
                             }
                             .frame(width: 58, height: 58)
@@ -95,9 +90,9 @@ struct TestMessageSheet: View {
             Text("instrument").font(.system(size: 12)).foregroundColor(DesignTokens.Color.textMuted)
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
-                    ForEach(instruments, id: \.label) { inst in
+                    ForEach(instruments) { inst in
                         Button { style = inst.style } label: {
-                            Text("\(inst.icon) \(inst.label)")
+                            Text("\(inst.icon) \(inst.name)")
                                 .font(.system(size: 13))
                                 .padding(.horizontal, 12).padding(.vertical, 8)
                                 .background(style == inst.style ? Self.lavender.opacity(0.3) : DesignTokens.Color.backgroundCard)
