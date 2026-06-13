@@ -7,13 +7,25 @@
 // compass long-press picker, and Pro status + upgrade now live here in account.
 
 import SwiftUI
+import AuthenticationServices
+import CryptoKit
+import os
 
 struct SettingsView: View {
+
+    private static let log = Logger(subsystem: "com.jdcoding75.pointward", category: "settings-account")
 
     @EnvironmentObject var subscription: SubscriptionManager
     #if DEBUG
     @EnvironmentObject var devPings: PingManager
     #endif
+
+    // Sign-in state — drives the account section (button when signed out,
+    // static identity when signed in). Seeded from the persisted session.
+    @State private var signedInUserID: UUID? = SupabaseService.localUserID
+    @State private var currentNonce  = ""
+    @State private var isSigningIn   = false
+    @State private var signInError: String? = nil
 
     // Display preference — surprise unit each launch (-1) or a locked favourite.
     @AppStorage("funnyUnitLocked")       private var funnyUnitLocked      = -1
@@ -268,13 +280,47 @@ struct SettingsView: View {
 
     private var accountSection: some View {
         settingsGroup {
-            // Signed-in identity — static, no action.
-            settingsRow {
-                Image(systemName: "applelogo")
-                    .settingsIcon()
-                Text("Signed in with Apple ✦")
-                    .settingsLabel()
-                Spacer()
+            // Identity — Sign in with Apple when signed out, static line when in.
+            if signedInUserID == nil {
+                VStack(alignment: .leading, spacing: 8) {
+                    SignInWithAppleButton(.signIn) { request in
+                        currentNonce = Self.randomNonce()
+                        request.requestedScopes = [.fullName]
+                        request.nonce = Self.sha256(currentNonce)
+                    } onCompletion: { result in
+                        handleAppleResult(result)
+                    }
+                    .signInWithAppleButtonStyle(.white)
+                    .frame(height: 46)
+                    .cornerRadius(DesignTokens.Radius.button)
+                    .disabled(isSigningIn)
+
+                    Text("sign in to pair and send real thoughts")
+                        .font(.system(size: 11))
+                        .foregroundColor(DesignTokens.Color.textDim)
+
+                    if let signInError {
+                        Text(signInError)
+                            .font(.system(size: 11))
+                            .foregroundColor(.red)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    if isSigningIn {
+                        ProgressView().tint(DesignTokens.Color.accentSoft)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, DesignTokens.Spacing.md)
+                .padding(.vertical, 13)
+            } else {
+                // Signed-in identity — static, no action.
+                settingsRow {
+                    Image(systemName: "applelogo")
+                        .settingsIcon()
+                    Text("Signed in with Apple ✦")
+                        .settingsLabel()
+                    Spacer()
+                }
             }
 
             Divider().background(DesignTokens.Color.border).padding(.leading, 44)
@@ -317,20 +363,58 @@ struct SettingsView: View {
                 Task { await subscription.restorePurchases() }
             }
 
-            Divider().background(DesignTokens.Color.border).padding(.leading, 44)
+            // Sign out — at the bottom, only when there's a session to leave.
+            if signedInUserID != nil {
+                Divider().background(DesignTokens.Color.border).padding(.leading, 44)
 
-            // Sign out — at the bottom.
-            settingsRow {
-                Image(systemName: "rectangle.portrait.and.arrow.right")
-                    .settingsIcon()
-                    .foregroundColor(.red)
-                Text("sign out")
-                    .settingsLabel()
-                    .foregroundColor(.red)
-                Spacer()
+                settingsRow {
+                    Image(systemName: "rectangle.portrait.and.arrow.right")
+                        .settingsIcon()
+                        .foregroundColor(.red)
+                    Text("sign out")
+                        .settingsLabel()
+                        .foregroundColor(.red)
+                    Spacer()
+                }
+                .contentShape(Rectangle())
+                .onTapGesture { signOut() }
             }
-            .contentShape(Rectangle())
-            .onTapGesture { signOut() }
+        }
+    }
+
+    // MARK: - Sign in / out (ported from the retired AccountView; standard
+    // Sign in with Apple + Supabase pattern)
+
+    private func handleAppleResult(_ result: Result<ASAuthorization, Error>) {
+        switch result {
+        case .failure(let error):
+            Self.log.error("signin: Apple authorization failed: \(error.localizedDescription, privacy: .public)")
+            signInError = "Sign in didn't complete — try again."
+        case .success(let auth):
+            guard let credential = auth.credential as? ASAuthorizationAppleIDCredential,
+                  let tokenData = credential.identityToken,
+                  let idToken = String(data: tokenData, encoding: .utf8) else {
+                Self.log.error("signin: missing identity token in Apple credential")
+                signInError = "Sign in didn't complete — try again."
+                return
+            }
+            isSigningIn = true
+            signInError = nil
+            Task {
+                defer { isSigningIn = false }
+                do {
+                    try await SupabaseService.shared.signInWithApple(idToken: idToken,
+                                                                     nonce: currentNonce)
+                    let me = try await SupabaseService.shared.ensureUser(appleUserID: credential.user)
+                    _ = try await SupabaseService.shared.myPairingCode()
+                    _ = try await SupabaseService.shared.refreshConnection()
+                    signedInUserID = me
+                    Self.log.info("signin: complete ✓")
+                } catch {
+                    Self.log.error("signin: post-auth setup failed: \(error.localizedDescription, privacy: .public)")
+                    signInError = error.localizedDescription
+                }
+            }
         }
     }
 
@@ -341,7 +425,18 @@ struct SettingsView: View {
             SupabaseService.localUserID       = nil
             SupabaseService.connectedFriendID = nil
             SupabaseService.localPairingCode  = nil
+            signedInUserID = nil
         }
+    }
+
+    private static func randomNonce(length: Int = 32) -> String {
+        let charset = Array("0123456789ABCDEFabcdef")
+        return String((0..<length).map { _ in charset.randomElement()! })
+    }
+
+    private static func sha256(_ input: String) -> String {
+        let hash = SHA256.hash(data: Data(input.utf8))
+        return hash.map { String(format: "%02x", $0) }.joined()
     }
 
     #if DEBUG
