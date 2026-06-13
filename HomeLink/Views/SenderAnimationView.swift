@@ -898,7 +898,11 @@ struct SenderAnimationView<Symbol: View>: View {
         // screen, particles scatter in every direction, and the thought
         // launches from the explosion on a trail of stars.
         let control = controlOffset(for: end, drama: 60)
-        return ZStack {
+        // [fix] No explicit `return` here — in a @ViewBuilder an explicit return
+        // composes only the single returned expression and silently drops any
+        // sibling views. Letting the ZStack be the trailing expression keeps the
+        // builder free to compose correctly (and lets siblings be added safely).
+        ZStack {
             wandWhiteFlashLayer
             wandExplosionCore
             wandScatter

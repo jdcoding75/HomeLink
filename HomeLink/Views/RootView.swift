@@ -6,6 +6,8 @@
 // Configures PeopleManager with the SwiftData model context.
 
 import SwiftUI
+import SwiftData          // [fix] explicit — \.modelContext (line below) is a
+                          // SwiftData environment key; was resolving transitively
 import CoreLocation
 import UserNotifications
 import os
