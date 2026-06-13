@@ -256,3 +256,136 @@ The next major effort removes pairing + link delivery. See **PAIRING_AUDIT.md**.
 - **AppGroupStore `suiteName`** — baked into both targets.
 - **Widget target bundle ID.**
 - **Associated domains entitlement.**
+
+---
+
+## Phase 2 — Link Delivery Model (decided, not yet built)
+
+### Core Model
+- Sender sends → Supabase stores message → generates shareable link
+- Link format: pointward.app/m/[messageID]?from=[senderID]&name=[displayName]
+- Sender shares via iOS native share sheet (Messages, Mail, etc — user chooses)
+- Recipient taps link:
+  - Has app → opens directly → animation plays → sender auto-created as contact
+  - No app → App Store → installs → deferred deep link fires → animation plays
+  - Deep link fails → fallback: "enter their short code" (last 6 of senderID)
+
+### What Travels In The Link
+- Message content + emoji + instrument
+- SenderID (immutable key, never changes)
+- Sender display name (how they want to be known)
+- Location does NOT travel in link — shared separately, optionally
+
+### Contact Model
+- Every send auto-creates or updates a contact record silently
+- SenderID = immutable key for deduplication and routing
+- Name = sender's display name, recipient can edit locally
+- Location = empty until recipient adds manually
+- Sorted by most recent send in People tab
+- Recipient owns their local copy — no auto-sync after initial creation
+- Delete contact = effectively blocks further appearances
+
+### People Tab
+- Auto-created on every send (silent, no prompt)
+- Shows: name · last sent timestamp
+- Sorted by most recent
+- Tap person → straight to send flow
+- Edit contact: name (local only, shows warning) · location (local only)
+- Gentle hint when no address: "add location for accurate compass · add now ✦"
+- Hint shown ONLY on contact card, NEVER in send flow
+
+### Compass Without Location
+- No address → seeded random bearing (seeded to senderID — same person 
+  always appears from same direction, feels intentional not broken)
+- Mutual pointing requires real location on both sides — only feature 
+  that genuinely requires it
+- Everything else degrades gracefully with seeded fake
+
+### Location Policy Standard
+Every component touching location must document:
+// LOCATION POLICY:
+// REQUIRES_REAL: true/false
+// FAKE_STRATEGY: seeded random from senderID / center default / not applicable
+// DEGRADES_TO: description of degraded experience
+// MUTUAL_ONLY: true/false
+
+### Location Requirement Matrix
+- Compass pointing: REQUIRES_REAL=false, FAKE=seeded random
+- Send animation direction: REQUIRES_REAL=false, FAKE=seeded random
+- Receipt animation direction: REQUIRES_REAL=false, FAKE=seeded random
+- Bow/Rocket aim: REQUIRES_REAL=false, FAKE=center default
+- Funny distance display: REQUIRES_REAL=false, FAKE=funny distance mode
+- Mutual pointing moment: REQUIRES_REAL=true, FAKE=skip feature entirely
+- People tab contact card: REQUIRES_REAL=false, FAKE=no map shown
+
+### Notifications — Phase 2
+- Push notifications removed from send flow entirely
+- The iOS share sheet message IS the notification
+- No redundant double-notification
+- Phase 3: consider "your message was opened ✦" sender notification
+
+### Sender Display Name
+- Set in onboarding — how everyone sees you
+- Warning shown when set: "this is how everyone who receives your 
+  messages will see you ✦"
+- Recipient can edit locally — their copy only
+- Warning shown when editing: "editing your local view only ✦"
+
+### The Send Flow Is Sacred
+- Nothing interrupts a send. Ever.
+- Hints and prompts live on contact cards and settings only
+- Missing information never blocks sending
+- Graceful degradation: app works at every step without complete information
+
+### Phase 2 Test Scenarios
+
+AUTOMATED (Claude writes):
+- Send to existing contact → no duplicate created
+- Multiple sends same contact → timestamp updates, no duplicate
+- Recipient has app, sender is contact → direct open, no setup
+- Recipient has app, sender not contact → auto-create contact
+- Recipient sends back → two-way connection established
+- Local name edit → sender display unchanged for others
+- Delete contact → no further appearances
+- Message in history if unopened
+
+LIVE DEVICE (Joshua tests):
+- No app → App Store → install → deferred deep link fires correctly
+- Deep link fails → short code fallback works
+- Recipient already has app → link opens directly, no App Store
+- Sender void feeling → acceptable for Phase 2
+- Stale location after move → manual fix acceptable
+
+### Pairing — Removed in Phase 2
+- No manual pairing ID entry ever
+- No pairing codes
+- No wrong-person bugs (ID travels in link, not typed manually)
+- PairAcceptView → removed
+- connections table → retired
+- Every connection starts with a real sent message
+
+### Product Principles (established this session)
+1. The send flow is sacred — nothing interrupts it
+2. Graceful degradation — app works without complete information
+3. More information = better experience, never required
+4. Hints live on contact cards, never in send flow
+5. SenderID is the immutable key — name and location are editable metadata
+6. Auto-create contacts silently — deletion is the exception, keeping is default
+
+### Future — Interactive Animations (logged, not scheduled)
+Ball throw / glove catch:
+- Sender throws ball (instrument mechanic)
+- Ball travels to recipient
+- Recipient moves glove to catch spinning ball (interactive receipt)
+- Catch = reveal
+- First truly interactive receipt mechanic
+- Only works for users with app installed (not passive link view)
+- Ball landing position seeded to sender bearing if available, random if not
+- Fits Expresser archetype perfectly
+
+### Special Moments — Architecture TBD
+- Does Special Moment send need emoji attached or standalone?
+- Decide before building next Special Moment
+- Link delivery makes Special Moments ideal for viral sharing
+- Beautiful web preview opportunity (Phase 3)
+- Graduation → Special Moment, emoji = cap thrown in air
