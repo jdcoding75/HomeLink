@@ -112,9 +112,13 @@ enum CuratedEmoji {
     /// Wav filenames per emoji, for the ones with shipped sounds (HomeLink/Sounds).
     /// Emojis without a shipped sound simply no-op. (🫂 → 🤗 [1/7] — same file.)
     static let soundMap: [String: String] = [
-        "🤗": "emoji_hug",
+        "🤗": "emoji_hug_v2",        // [cleanup 2026-06-13] was "emoji_hug" (old dup
+                                     // wav removed); emoji_hug_v2 is the canonical hug.
         "😘": "emoji_kiss",
-        "🙌": "emoji_celebration",   // not yet shipped → graceful no-op
+        // [cleanup 2026-06-13] REMOVED unreachable entry — 🙌 is no longer in
+        // CuratedEmoji.all (replaced by 👏) AND emoji_celebration.wav is not in
+        // the bundle. Commented out (never-delete) rather than left dangling.
+        // "🙌": "emoji_celebration",   // not yet shipped → graceful no-op
         "👊": "emoji_punch",          // renamed from emoji_fistbump
         "🤜🤛": "emoji_fistbump_real",
         "🖐️": "emoji_highfive",

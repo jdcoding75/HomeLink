@@ -8,6 +8,15 @@
 // compass with a quiet "sent ✦". On by default for the first sends; toggle in
 // Settings → notifications.
 
+// ───────────────────────────────────────────────────────────────────────────
+// [cleanup 2026-06-13] ORPHAN — entire file disabled, not deleted (per CLAUDE.md
+// never-delete rule). ArrivalPreviewView has ZERO live callers; it was
+// SUPERSEDED by the shared EmojiRevealView(.sent) confirmation. Wrapped in
+// `#if false` so the code is preserved verbatim for reference / possible restore
+// of the arrival-preview feature, but excluded from compilation.
+// ───────────────────────────────────────────────────────────────────────────
+#if false
+
 import SwiftUI
 
 struct ArrivalPreviewView: View {
@@ -66,3 +75,5 @@ struct ArrivalPreviewView: View {
         }
     }
 }
+
+#endif  // [cleanup 2026-06-13] end ORPHAN ArrivalPreviewView

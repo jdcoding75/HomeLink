@@ -10,6 +10,16 @@
 // hold the phone toward them, and over two seconds the light brightens
 // until it releases itself. Gentle encouragement, never penalty.
 
+// ───────────────────────────────────────────────────────────────────────────
+// [cleanup 2026-06-13] ORPHAN — entire file disabled, not deleted (per CLAUDE.md
+// never-delete rule). FireflyInstrumentView has ZERO live callers (its only
+// remaining mention is a commented-out line in CompassView); it was SUPERSEDED
+// by WindCompassFace / WindInstrumentView (the firefly slot became WIND 🌬️).
+// Wrapped in `#if false` so the code is preserved verbatim but excluded from
+// compilation.
+// ───────────────────────────────────────────────────────────────────────────
+#if false
+
 import SwiftUI
 import Combine
 
@@ -135,3 +145,5 @@ struct FireflyInstrumentView: View {
         }
     }
 }
+
+#endif  // [cleanup 2026-06-13] end ORPHAN FireflyInstrumentView
