@@ -481,6 +481,12 @@ struct SettingsView: View {
             }
             .buttonStyle(.plain)
 
+            // [fix 2026-06-13] REMOVED "View animation feedback" dev option — it has
+            // no functional implementation and cluttered the developer section.
+            // Commented out (never-delete rule); its @State + .sheet are left dormant
+            // and harmless. The preceding divider is removed with it to avoid a
+            // double separator.
+            /*
             Divider().background(DesignTokens.Color.border).padding(.leading, 44)
 
             // 📋 Animation feedback — approved / needs-work summary from the lab.
@@ -499,6 +505,7 @@ struct SettingsView: View {
                 }
             }
             .buttonStyle(.plain)
+            */
 
             Divider().background(DesignTokens.Color.border).padding(.leading, 44)
 

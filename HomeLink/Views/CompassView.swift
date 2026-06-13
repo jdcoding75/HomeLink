@@ -1571,7 +1571,7 @@ struct CompassView: View {
         if pings.nowPlaying != nil {
             EmptyView()
         } else if selectedToken == nil {
-            Text("tap a feeling below to load")
+            Text("tap above to add a feeling ✦")
                 .font(.system(size: 22, weight: .bold, design: .rounded))
                 .foregroundColor(.white.opacity(0.92))
                 .minimumScaleFactor(0.6)

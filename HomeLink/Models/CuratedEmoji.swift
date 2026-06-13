@@ -59,9 +59,9 @@ enum CuratedEmoji {
         Item(emoji: "🙏", label: "gratitude",       defaultMessage: "so grateful for you ✦",          access: .pro,
              suggestions: ["thank you so so much ✦", "you mean so much ✦", "couldn't do it without you ✦"]),
 
-        // [added] 👏 Clapping hands — replaces 🙌 celebration. Coming soon for now
-        // (its clap reveal animation isn't built yet).
-        Item(emoji: "👏", label: "clapping hands",  defaultMessage: "you nailed it ✦",                access: .comingSoon,
+        // [added] 👏 Clapping hands — replaces 🙌 celebration. [promoted 2026-06-13]
+        // its clap reveal animation is built, so it's now a real selectable .pro send.
+        Item(emoji: "👏", label: "clapping hands",  defaultMessage: "you nailed it ✦",                access: .pro,
              glowColor: "#FFD700",
              suggestions: ["you absolutely nailed it ✦", "that took courage ✦", "standing ovation ✦"]),
 
