@@ -2,8 +2,11 @@
 // Pointward › Instruments › Flick
 //
 // STATUS:
-// flick_send.wav     0.7s  ⏳ placeholder (silent) — pending approval
-// flick_receipt.wav  1.0s  ⏳ placeholder (silent) — pending approval
+// flick_send.wav     ✅ real paper snap (~0.3s external asset, NOT from the
+//                    silent generator below). Boosted ~+2 dB RMS so the
+//                    compass snap reads one notch louder (it was already at
+//                    the player's volume ceiling) — see FlickDeskCompassFace.
+// flick_receipt.wav  ✅ real thwack (~0.4s external asset, NOT from generator)
 //
 // CHARACTER:
 // Send: a single sharp paper snap — like flicking a

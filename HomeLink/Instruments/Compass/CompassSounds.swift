@@ -3,6 +3,7 @@
 //
 // STATUS:
 // compass_send.wav     2.2s  ✅ synthesized — soft departing breath/whoosh
+//                            (peak 0.115, softened mid/highs — less harsh)
 // compass_receipt.wav  1.5s  ✅ synthesized — warm welcoming chime
 //
 // CHARACTER:

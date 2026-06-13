@@ -64,7 +64,8 @@ def synth_send(secs=2.2):
         # White noise → two one-pole lowpasses; their difference is a soft
         # mid "air" band (breath), with the harsh top and the low rumble gone.
         x = rng.uniform(-1.0, 1.0)
-        lp_a += 0.12 * (x - lp_a)     # gentle lowpass (tames the hiss)
+        lp_a += 0.07 * (x - lp_a)     # softer lowpass (lower cutoff — less
+                                      # harsh mid/high "hiss" edge than 0.12)
         lp_b += 0.015 * (x - lp_b)    # very low rumble
         air = lp_a - lp_b
         # Faint low tone gliding DOWN in pitch (320 → 170 Hz) — the thought
@@ -79,7 +80,7 @@ def synth_send(secs=2.2):
             d = (t - atk) / (secs - atk)
             env = math.cos(d * (math.pi / 2)) ** 1.5         # ease-out to 0
         out.append((air * 0.85 + tone) * env)
-    return _normalize(out, 0.16)      # very soft
+    return _normalize(out, 0.115)     # softer still — lower peak than 0.16
 
 
 # ── RECEIPT — warm welcoming chime ──────────────────────────────────────────

@@ -48,6 +48,12 @@ def write_silence(name, secs):
 # ----------------------------------------------------------
 
 if __name__ == "__main__":
-    os.makedirs(OUT, exist_ok=True)
-    for name, secs in SPECS:
-        write_silence(name, secs)
+    # SAFETY: flick_send.wav / flick_receipt.wav are now REAL external audio
+    # assets (a paper snap + a thwack). This generator only ever wrote SILENT
+    # placeholders, so running write_silence() would WIPE the real sounds.
+    # It is therefore guarded off. Re-enable only to regenerate true silence.
+    print("FlickSoundGenerator: real flick_*.wav assets exist — skipping "
+          "silent placeholder write to avoid overwriting them.")
+    # os.makedirs(OUT, exist_ok=True)
+    # for name, secs in SPECS:
+    #     write_silence(name, secs)

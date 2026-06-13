@@ -196,7 +196,7 @@ struct FlickDeskCompassFace: View {
         // SNAP — ball launches up-right spinning; dust bursts; soft flick sound.
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.3) {
             withAnimation(.easeIn(duration: 0.12)) { snap = 1 }
-            InstrumentSoundPlayer.shared.playSend(.flick, proIntensity: 1.25)   // sharp, percussive paper snap — boosted to full volume on the compass cue
+            InstrumentSoundPlayer.shared.playSend(.flick, proIntensity: 1.25)   // sharp paper snap. proIntensity 1.25 already clamps the player to full (1.0); the snap was made one notch LOUDER by boosting flick_send.wav itself (~+2 dB RMS) — see FlickSounds.swift.
             HapticPattern.singleSoft.fire()                 // soft — NOT sharp
             dustBurst = true
             withAnimation(.easeOut(duration: 0.7)) { ballFlight = 1 }
