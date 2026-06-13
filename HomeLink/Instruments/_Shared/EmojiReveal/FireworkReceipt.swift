@@ -34,12 +34,28 @@ struct FireworkReceipt: View {
     private static let woodDark  = Color(hex: "#6E3A1E")
     private static let brass     = Color(hex: "#C9A86A")
 
-    private static let bloomAt:  Double = 0.6
-    private static let total:    Double = 2.0
-    // [firework] Bucket beat removed — these stages no longer drive the receipt
-    // (kept only for the now-unreferenced bucket/drift helpers below).
+    // [tweak] One continuous full-screen beat: BURST → held GLOW → big BLOOM.
+    private static let burstEnd: Double = 0.9     // full-screen burst expands then fades
+    private static let glowInAt: Double = 0.6     // the held glow fades in as the backdrop
+    private static let bloomAt:  Double = 1.1     // the 🎆 blooms BIG over the glow
+    private static let total:    Double = 2.6     // → EmojiRevealView (.compass)
+    // (legacy bucket-beat stages — now-unreferenced helpers below)
     private static let driftAt:  Double = 2.0
     private static let landAt:   Double = 3.5
+
+    private static let palette: [Color] = [gold, lavender, red, amber, Color.white]
+
+    // Full-screen burst arms — angle · colour · length factor (index-derived).
+    private static let armCount = 30
+    private static let arms: [(angle: Double, color: Color, len: CGFloat)] = {
+        var out: [(angle: Double, color: Color, len: CGFloat)] = []
+        for i in 0..<armCount {
+            out.append((angle: (Double(i) / Double(armCount)) * 2 * .pi,
+                        color: palette[i % palette.count],
+                        len: CGFloat(0.78 + Double((i * 31) % 22) / 100.0)))
+        }
+        return out
+    }()
 
     private static let bucketW: CGFloat = 140
     private static let bucketH: CGFloat = 120
@@ -66,36 +82,38 @@ struct FireworkReceipt: View {
             let w = geo.size.width, h = geo.size.height
             ZStack {
                 if revealing {
+                    // [tweak] the reveal renders over the CORRECT firework ambient
+                    // (.compass = the brand deep-purple "user background"), not the
+                    // forced rocket deep-space-with-star-drift.
                     EmojiRevealView(emoji: emoji, message: message, tagline: tagline,
                                     context: .received(fromName: fromName),
-                                    ambient: .rocket,
+                                    ambient: .compass,
                                     onDismiss: onFinished)
                         .transition(.opacity)
                 } else {
-                    // ── DEEP SPACE gradient ──
-                    Color(hex: "#080911").ignoresSafeArea()
-                    LinearGradient(colors: [Color(hex: "#080911"), Color(hex: "#11162b"), Color(hex: "#1f1826")],
+                    // ── Full-screen dark world (deep purple — continuous with the
+                    //    .compass reveal it hands off to). ──
+                    Color(hex: "#0d0d14").ignoresSafeArea()
+                    LinearGradient(colors: [Color(hex: "#0d0d14"), Color(hex: "#12101c"), Color(hex: "#0d0d14")],
                                    startPoint: .top, endPoint: .bottom)
                         .ignoresSafeArea()
 
                     TimelineView(.animation) { timeline in
                         let e = elapsed(now: timeline.date)
                         ZStack {
-                            afterglow(w: w, h: h, e: e)
-                            sparkles(w: w, h: h, e: e)
-                            // [firework] BUCKET REMOVED — the firework metaphor ends in
-                            // a held glow + a big, clear MESSAGE reveal, not a bucket
-                            // catch. The drift/land/bucket helpers below are preserved
-                            // (commented) but no longer rendered.
-                            //   bucket(w: w, h: h)
-                            //   sparkleTrail(w: w, h: h, e: e)
-                            emojiView(w: w, h: h, e: e)
-                            //   emojiInBucket(w: w, h: h, e: e)
+                            // ONE continuous full-screen beat: the held glow settles
+                            // as the backdrop, a genuine edge-to-edge BURST opens, the
+                            // 🎆 then blooms BIG and clear over the glow. No box.
+                            heldGlow(w: w, h: h, e: e)
+                            burst(w: w, h: h, e: e)
+                            bigEmoji(w: w, h: h, e: e)
 
                             Text("from \(fromName.isEmpty ? "someone" : fromName) ✦")
                                 .font(.system(size: 16, design: .serif).italic())
-                                .foregroundColor(Self.lavender.opacity(0.8))
+                                .foregroundColor(Self.lavender.opacity(0.85))
                                 .position(x: w / 2, y: h * 0.86)
+                                .opacity(e >= Self.bloomAt ? 1 : 0)
+                                .animation(.easeIn(duration: 0.4), value: e >= Self.bloomAt)
                         }
                     }
                 }
@@ -113,14 +131,96 @@ struct FireworkReceipt: View {
 
     private func begin() {
         start = Date()
+        // Keep the existing receipt sound; a heavier hit on the opening burst.
         InstrumentSoundPlayer.shared.playCue(file: "firework_sparkle", duration: 1.5)
+        HapticPattern.singleHeavy.fire()
         DispatchQueue.main.asyncAfter(deadline: .now() + Self.bloomAt) {
             HapticPattern.heartbeat.fire()
         }
-        // burst → held glow → big MESSAGE reveal, as one continuous beat (no bucket).
+        // burst → held glow → big BLOOM, as one continuous beat (no bucket).
         DispatchQueue.main.asyncAfter(deadline: .now() + Self.total) {
             onRevealed()
             withAnimation(.easeInOut(duration: 0.4)) { revealing = true }
+        }
+    }
+
+    // ── Full-screen opening burst (radial arms · shockwave rings · white core) ─
+
+    @ViewBuilder
+    private func burst(w: CGFloat, h: CGFloat, e: Double) -> some View {
+        if e < Self.burstEnd {
+            let cx = w / 2, cy = h * 0.42
+            let R = max(w, h)
+            let grow = easeOut(min(1, e / 0.45))
+            let fade = 1 - easeIn(min(1, max(0, (e - 0.3) / (Self.burstEnd - 0.3))))
+            ZStack {
+                // radial arms reaching toward the screen edges
+                ForEach(0..<Self.arms.count, id: \.self) { i in
+                    let arm = Self.arms[i]
+                    let len = R * 0.6 * arm.len * CGFloat(grow)
+                    let tip = CGPoint(x: cx + CGFloat(cos(arm.angle)) * len,
+                                      y: cy + CGFloat(sin(arm.angle)) * len)
+                    Path { p in p.move(to: CGPoint(x: cx, y: cy)); p.addLine(to: tip) }
+                        .stroke(arm.color.opacity(fade * 0.85),
+                                style: StrokeStyle(lineWidth: 2.5, lineCap: .round))
+                    Circle().fill(arm.color.opacity(fade))
+                        .frame(width: 6, height: 6).position(tip)
+                        .shadow(color: arm.color.opacity(fade * 0.8), radius: 5)
+                }
+                // expanding shockwave rings
+                ForEach(0..<4, id: \.self) { k in
+                    let rl = e - Double(k) * 0.1
+                    if rl > 0 && rl < 0.8 {
+                        let p = rl / 0.8
+                        let d = CGFloat(easeOut(p)) * R
+                        Circle()
+                            .stroke(Self.palette[k % Self.palette.count].opacity((1 - p) * 0.5),
+                                    lineWidth: CGFloat(3 * (1 - p) + 0.5))
+                            .frame(width: d, height: d)
+                            .position(x: cx, y: cy)
+                    }
+                }
+                // white-hot core
+                Circle()
+                    .fill(RadialGradient(colors: [Color.white.opacity(fade), Self.gold.opacity(fade * 0.5), .clear],
+                                         center: .center, startRadius: 2, endRadius: 90))
+                    .frame(width: 220, height: 220)
+                    .position(x: cx, y: cy)
+                    .blendMode(.screen)
+            }
+            .allowsHitTesting(false)
+        }
+    }
+
+    // ── The held glow backdrop (full-screen, settles after the burst) ────────
+
+    @ViewBuilder
+    private func heldGlow(w: CGFloat, h: CGFloat, e: Double) -> some View {
+        let inP = easeOut(min(1, max(0, (e - Self.glowInAt) / 0.4)))
+        let op = 0.34 * inP
+        Circle()
+            .fill(RadialGradient(colors: [Self.gold.opacity(op), Self.red.opacity(op * 0.6), .clear],
+                                 center: .center, startRadius: 8, endRadius: max(w, h) * 0.7))
+            .frame(width: max(w, h) * 1.5, height: max(w, h) * 1.5)
+            .position(x: w / 2, y: h * 0.42)
+            .blendMode(.screen)
+            .allowsHitTesting(false)
+    }
+
+    // ── The 🎆 blooms BIG and clear over the glow ────────────────────────────
+
+    @ViewBuilder
+    private func bigEmoji(w: CGFloat, h: CGFloat, e: Double) -> some View {
+        if e >= Self.bloomAt {
+            let lp = (e - Self.bloomAt) / 0.6
+            let bloom: CGFloat = lp < 0.7 ? CGFloat(easeOut(max(0, lp) / 0.7)) * 1.18
+                               : (lp < 1.0 ? 1.18 - 0.18 * CGFloat((lp - 0.7) / 0.3) : 1.0)
+            Text(emoji)
+                .font(.system(size: 150))
+                .scaleEffect(bloom)
+                .shadow(color: Self.gold.opacity(0.6), radius: 22)
+                .position(x: w / 2, y: h * 0.42)
+                .allowsHitTesting(false)
         }
     }
 
@@ -267,6 +367,7 @@ struct FireworkReceipt: View {
     }
 
     private func easeOut(_ t: Double) -> Double { let x = min(max(t,0),1); return 1 - pow(1 - x, 3) }
+    private func easeIn(_ t: Double) -> Double { let x = min(max(t,0),1); return x * x }
     private func easeInOut(_ t: Double) -> Double {
         let x = min(max(t,0),1); return x < 0.5 ? 4*x*x*x : 1 - pow(-2*x + 2, 3) / 2
     }

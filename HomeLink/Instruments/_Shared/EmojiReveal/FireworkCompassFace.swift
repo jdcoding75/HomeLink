@@ -162,12 +162,15 @@ struct FireworkCompassFace: View {
 
     @ViewBuilder
     private func fuse(from start: CGPoint, to tip: CGPoint, burn: Double, t: Double) -> some View {
-        // A long curling bezier from the rocket charge (start, lower) UP to the
-        // ignition tip (end). It bows out to the right so the spark has a real
-        // run to travel — the burn-down is meant to be watched.
+        // A neat fuse from the rocket charge (start, lower) UP to the ignition
+        // tip (end). [tweak] The old control points bowed ~50pt out to the right
+        // over a ~31pt rise, so the idle fuse read as a loose "string" dangling
+        // off the top of the rocket. Tightened to a small hug (8/6pt) so it sits
+        // as a tidy fuse — the ignition endpoints (charge/tip), the match-to-fuse
+        // hit-test, the burn-down trim, and the 2 s timing are all UNCHANGED.
         let span = start.y - tip.y                  // vertical distance charge↔tip
-        let c1 = CGPoint(x: start.x + 50, y: start.y - span * 0.30)
-        let c2 = CGPoint(x: tip.x + 42,  y: tip.y + span * 0.30)
+        let c1 = CGPoint(x: start.x + 8, y: start.y - span * 0.30)
+        let c2 = CGPoint(x: tip.x + 6,  y: tip.y + span * 0.30)
         // Spark position along the path: 1 = ignition tip, 0 = rocket charge.
         // As it burns, the consumed (tip-side) section is trimmed away, so the
         // fuse visibly SHORTENS down toward the charge.

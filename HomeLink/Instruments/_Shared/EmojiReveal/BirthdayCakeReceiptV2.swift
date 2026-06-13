@@ -86,7 +86,8 @@ struct BirthdayCakeReceiptV2: View {
                             x: restCenter.x,
                             y: topY + (restCenter.y - topY) * CGFloat(ep))
                         let entranceScale: CGFloat = 0.35 + 0.65 * CGFloat(ep)
-                        let cakeScale: CGFloat = 1.15 * entranceScale
+                        // [tweak] final cake 25% larger: base 1.15 → 1.4375.
+                        let cakeScale: CGFloat = 1.4375 * entranceScale
                         ZStack {
                             // [tweak] bucket REMOVED — the descending cake IS the
                             // arrival (no bucket catch, no bucket art).
@@ -203,7 +204,7 @@ struct BirthdayCakeReceiptV2: View {
     @ViewBuilder
     private func smoke(center: CGPoint, since: Double) -> some View {
         if stage == 2 && since >= 0 && since < 1.6 {
-            let scale: CGFloat = 1.15
+            let scale: CGFloat = 1.4375   // [tweak] match the 25%-larger cake
             Canvas { ctx, _ in
                 for i in 0..<BirthdayCakeV2.candleCount {
                     let c = BirthdayCakeV2.candle(i, center: center, scale: scale)

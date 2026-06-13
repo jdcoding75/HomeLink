@@ -35,6 +35,7 @@ struct FlickDeskCompassFace: View {
     private static let lavender = Color(hex: "#c4a8d4")
     private static let faceD: CGFloat = 330       // desk circle diameter
     private static let ringRadius: CGFloat = 165
+    private static let topCrop: CGFloat = 0.25    // [tweak] crop the top 25% of the desk
 
     var body: some View {
         ZStack {
@@ -49,11 +50,20 @@ struct FlickDeskCompassFace: View {
 
     private var cluster: some View {
         ZStack {
-            FlickDeskFaceFill()
-                .frame(width: Self.faceD, height: Self.faceD)
-                .clipShape(Circle())
-                .overlay(Circle().stroke(Color(hex: "#6a3e1e").opacity(0.6), lineWidth: 3))
-                .shadow(color: .black.opacity(0.35), radius: 10)
+            // [tweak] The warm-oak desk fills only the LOWER ~75% of the circle:
+            // its top 25% is cut by a clean horizontal line, so it reads as a desk
+            // surface with a flat horizon near the top and deep-purple space above
+            // it — rather than oak filling the whole circle.
+            ZStack {
+                FlickDeskFaceFill()
+                    .frame(width: Self.faceD, height: Self.faceD)
+                horizonLine
+            }
+            .frame(width: Self.faceD, height: Self.faceD)
+            .clipShape(DeskCropShape(topCrop: Self.topCrop))
+            .overlay(DeskCropShape(topCrop: Self.topCrop)
+                .stroke(Color(hex: "#6a3e1e").opacity(0.6), lineWidth: 3))
+            .shadow(color: .black.opacity(0.35), radius: 10)
 
             ringDecor
             DirectionIndicator(bearingDegrees: bearingDegrees, personName: personName,
@@ -63,6 +73,18 @@ struct FlickDeskCompassFace: View {
             ballAndFinger
         }
         .frame(width: 370, height: 370)
+    }
+
+    /// [tweak] The bright desk back-edge line along the horizontal crop — the
+    /// "horizon" where the oak surface meets the space above it.
+    private var horizonLine: some View {
+        let r = Self.faceD / 2
+        let off = r - Self.faceD * Self.topCrop          // distance of the cut above centre
+        let half = (r * r - off * off).squareRoot()      // half-chord at the cut
+        return Rectangle()
+            .fill(FlickDeskPalette.deskEdge.opacity(0.85))
+            .frame(width: half * 2, height: 2)
+            .offset(y: -off)
     }
 
     /// Lavender ring · ticks every 30° · dashed inner ring.
@@ -190,5 +212,19 @@ struct FlickDeskCompassFace: View {
 
         // Hand off — the beat is done.
         DispatchQueue.main.asyncAfter(deadline: .now() + 2.4) { onSend() }
+    }
+}
+
+/// The desk circle with its TOP `topCrop` fraction cut off by a clean horizontal
+/// line — the circle intersected with its lower portion — so the warm oak reads
+/// as a surface with a flat horizon near the top and space above it.
+private struct DeskCropShape: Shape {
+    var topCrop: CGFloat = 0.25
+    func path(in rect: CGRect) -> Path {
+        let circle = Path(ellipseIn: rect)
+        let cutY = rect.minY + rect.height * topCrop
+        let lower = Path(CGRect(x: rect.minX, y: cutY,
+                                width: rect.width, height: rect.maxY - cutY))
+        return circle.intersection(lower)
     }
 }
