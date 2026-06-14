@@ -187,7 +187,7 @@ struct IncomingMessageView: View {
         let name = (m.senderDisplayName?.trimmingCharacters(in: .whitespaces)).flatMap {
             $0.isEmpty ? nil : $0
         } ?? "someone"
-        let emoji = (m.emoji?.isEmpty == false ? m.emoji! : "💜")
+        let emoji = (m.emoji?.isEmpty == false ? m.emoji! : CuratedEmoji.defaultEmoji)
         return PingManager.ReceivedPing(
             fromName:    name,
             emoji:       emoji,
@@ -200,7 +200,12 @@ struct IncomingMessageView: View {
     }
 
     private func instrumentStyle(from m: Message) -> SenderStyle {
-        Instrument(rawValue: m.instrument ?? "")?.senderStyle ?? .glow
+        if let raw = m.instrument, let known = Instrument(rawValue: raw) {
+            return known.senderStyle
+        }
+        // Registry-driven fallback: the manifest's first (default) live instrument
+        // — .compass, whose style is .glow. Never a hardcoded style.
+        return (AnimationManifest.liveInstruments.first?.instrument ?? .compass).senderStyle
     }
 }
 

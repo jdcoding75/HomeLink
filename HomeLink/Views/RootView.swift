@@ -35,6 +35,9 @@ struct RootView: View {
     @State private var showSplash = true
     @State private var pairRequest: PairRequest? = nil   // from universal links
     @State private var messageOpenRequest: MessageOpenRequest? = nil   // /m/<id> links (4a)
+    #if DEBUG
+    @State private var didDebugOpenMessage = false   // one-shot scaffold guard
+    #endif
     @AppStorage("postOnboardConnectPromptShown") private var connectPromptShown = false
     @State private var showConnectPrompt = false
     /// Inviter-side celebration — someone just claimed one of our codes
@@ -84,6 +87,7 @@ struct RootView: View {
             people.configure(with: modelContext)
             #if DEBUG
             applySkipOnboardingIfNeeded()
+            maybeDebugOpenMessage()   // -openMessageID <uuid> → drive the real /m flow
             #endif
             ensureDemoPersonIfAppropriate()   // [5/6] Alex when no one's added yet
             startCompassIfNeeded()
@@ -343,6 +347,27 @@ struct RootView: View {
         if UserDefaults.standard.bool(forKey: DevTools.injectFlagKey) {
             UserDefaults.standard.removeObject(forKey: DevTools.injectFlagKey)
             DevTools.injectMockData(people: people, pings: pings, withHistory: false)
+        }
+    }
+
+    /// DEBUG-ONLY throwaway scaffold (4a sim testing). Launch with
+    ///   -openMessageID <uuid>
+    /// to drive the REAL /m receive flow: this sets the SAME `messageOpenRequest`
+    /// the universal-link handler sets, so fetch → incoming beat → receipt →
+    /// opened-flip all run through the real path — no AASA / link routing needed.
+    /// Reads the launch ARGUMENT only (volatile, per-launch), so it can never
+    /// fire on a normal launch, and the whole thing is compiled out of release.
+    private func maybeDebugOpenMessage() {
+        guard !didDebugOpenMessage,
+              let i = CommandLine.arguments.firstIndex(of: "-openMessageID"),
+              i + 1 < CommandLine.arguments.count,
+              let id = UUID(uuidString: CommandLine.arguments[i + 1]) else { return }
+        didDebugOpenMessage = true
+        rootLog.info("DEBUG: open message via -openMessageID \(id.uuidString, privacy: .public)")
+        // Defer so the splash + data layer settle first (mirrors real cold-launch
+        // timing before the cover presents).
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+            messageOpenRequest = MessageOpenRequest(id: id)
         }
     }
     #endif

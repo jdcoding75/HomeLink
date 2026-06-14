@@ -104,6 +104,12 @@ enum CuratedEmoji {
 
     static let all: [Item] = base + proAnimated + pro + occasion
 
+    /// The registry's designated DEFAULT emoji — the first base (free) feeling.
+    /// The in-set fallback wherever an emoji is required but missing (e.g. opening
+    /// a link-delivered message that carries no emoji). DERIVED from the set, so
+    /// it can never drift out of the library.
+    static let defaultEmoji: String = base.first?.emoji ?? "🤗"
+
     static func item(_ emoji: String) -> Item? { all.first { $0.emoji == emoji } }
     static func label(_ emoji: String) -> String? { item(emoji)?.label }
     static func defaultMessage(_ emoji: String) -> String? { item(emoji)?.defaultMessage }
