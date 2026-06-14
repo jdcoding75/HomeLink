@@ -8,6 +8,7 @@
 > this document win.
 
 _Last updated: Session 8 (structural-truth pass) · Phase 2 canon reconciliation — link-based model, scope, senderID, deep-link deferred to P3._
+_Updated this session: Phase 2 progress + findings pass — builds 1–4b shipped & verified, per-person history-bucket finding (coupled to build 9), re-sequenced build order 5–11, onboarding + infrastructure notes banked._
 
 ---
 
@@ -258,7 +259,112 @@ sender's identity in the link.
 
 ---
 
-## Phase 2 — Link Delivery Model (decided, not yet built)
+## Phase 2 — Link Delivery Model (IN PROGRESS — builds 1–4b shipped)
+
+### Phase 2 Progress Ledger (DONE + verified)
+Builds 1–4b are committed and verified. The link-delivery path exists end-to-end
+(send → message → /m/[id] link → open/replay → opened-flip); pairing has **not**
+been removed yet (that is the coordinated teardown, builds 8–9 below).
+
+- **Build 1 — canon reconciliation** (link-based model, scope, senderID,
+  deep-link deferred to P3). `[12ae0a0]`
+- **Build 2 — short_code + messages table + `Message` model** (+ profile
+  short_code decode). Migration **APPLIED** in live Supabase. `[6617882]`
+- **Build 3 — link-based send**: insert message → build `/m/[id]` link → iOS
+  share sheet. Additive; old path intact; DEBUG-gated. `[b86124d]`
+- **Build 4a — open `/m/[id]` links**: route + cold-launch replay, fetch by id,
+  incoming envelope beat → receipt, **opened flips on COMPLETION** (not on
+  interrupt). VERIFIED on device. `mark_opened` migration **APPLIED**.
+  `[c0cc87a, 5f56c72]`
+- **Build 4b — short-code fallback**: code entry (People-tab tray button) →
+  claim ALL unopened → newest plays via the 4a chain → rest to history store.
+  Core VERIFIED (drain works, flips correctly). `[3264953]`
+
+### Key Architecture Finding — the history bucket is PER-PERSON (pairing-era)
+The compass history bucket (`thoughtsDrawer` / **"your bucket ✦"**,
+`CompassView.swift`) is **per-person and pairing-era**, and **fully LIVE** (not
+stale or half-migrated):
+- Scoped to `selectedPerson`; reload keyed to it
+  (`.task(id: people.selectedPerson)` ~line 925, `.onChange(of: selectedPerson)`
+  ~line 999).
+- Server fetch **by `pairedUserID`** (`loadCompassThoughts()`,
+  `fetchPings(with: pid)` ~line 2318).
+- Local merge filtered **`isTest || fromName == selectedPerson.name`**
+  (`mergedLocalHistory`, ~line 2334) — attributes every item to the tracked
+  contact.
+
+**Consequence:** it structurally **cannot** show link/short-code messages from
+non-selected or unsaved senders. 4b's "rest to history" lands in the store but is
+**hidden** by the per-person filter for any non-selected sender — recovery of
+held-back messages currently works **only by RE-ENTERING the short code**.
+
+The link-delivery model **requires a sender-agnostic unified bucket** ("all
+thoughts sent to you"). This is a **NEW requirement, not a regression** — the
+"unified" impression in past testing came from `isTest` messages **bypassing** the
+per-person filter (test data looked unified; real multi-sender data is not).
+
+**DECISION:** the bucket conversion is **coupled to pairing removal** — it can't
+become sender-agnostic while it fetches by `pairedUserID`. So it is scheduled
+**WITH build 9** (retire pairing data layer), not as a standalone build.
+
+Also: tapping a bucket item **REPLAYS but does NOT flip opened**
+(`replayThought`, ~line 2286 — no `markOpened`). Only live receive + `/m/` open
+flip `opened_at`. The unified rework should decide whether replay-from-history
+marks opened.
+
+### Re-sequenced Build Order (5–11)
+Discipline: build new **additively**, prove it, **THEN** remove pairing as one
+coordinated teardown.
+
+5. **Contact auto-create on send** — audit existing auto-add at `RootView` ~541 /
+   line ~397 first (likely **update-not-build**).
+6. **People tab rework** — recent-sorted, same-name distinguisher, location hint.
+7. **Compass seeded-bearing degradation** — no-address → consistent fake bearing
+   (directional compass already survives pairing removal).
+8. **Strip pairing UI** — `ConnectView` (already unrouted), `PairAcceptView`,
+   `MutualMomentView`, `/pair/` deep link, onboarding connection-code screen.
+9. **Retire pairing data layer** — `connections`, `reportPointing`,
+   `compass_bearings`, `isDynamic` **+ CONVERT history bucket to sender-agnostic**
+   (coupled — same seam).
+10. **Onboarding rewrite** — see notes below.
+11. **Phase 2 test suite** — automated scenarios.
+
+### Onboarding Notes (bank for build 10, from live walkthrough)
+Current flow is ~8 screens: Apple-messages allow → cover/begin → Sign in with
+Apple → set home (name + city; **address is OPTIONAL/skippable** — confirmed
+live) → emoji selection (a default emoji that does **NOT** align with
+`CuratedEmoji` — likely remove) → **"your connection code"** screen (shows
+**BLANK** — reads the old pairing code field, not `short_code` — repoint or
+remove) → "3 ways to connect" (connector/expresser/special-moments framing, needs
+refinement) → unlock-all-instruments paywall screen → 50%-to-charity tagline →
+"all set" → enter app.
+
+Build 10 should: trim ad-like screens (paywall/charity mid-onboarding is friction
+for link-arrival users); keep **address OPTIONAL** (honors "more info = better,
+never required" + enables build-7 degradation); fix/remove the blank
+connection-code screen; fix the off-registry onboarding emoji; capture sender
+display name with the agreed warning copy ("this is how everyone who receives
+your messages will see you ✦").
+
+### Infrastructure / Gotchas (bank so future sessions don't re-trip)
+- **WEBSITE lives in the SEPARATE `pointward` GitHub repo** (Pages → custom domain
+  pointward.app), **NOT** in `HomeLink/website/`. The `HomeLink/website/` folder
+  is a **DEAD duplicate** that serves nothing — do not edit it expecting live
+  effect; delete someday.
+- **AASA** (apple-app-site-association) is hosted in the `pointward` repo and now
+  lists `/pair/*`, `/join/*`, **AND `/m/*`** (live, verified via curl).
+- **iOS caches AASA hard** — device link tests may require delete+reinstall to
+  pick up `/m/*`.
+- **Identity edge:** app delete+reinstall (and/or `-skipOnboarding`) can create a
+  **DUPLICATE `users` row** (a null-name orphan was created this way). Joshua's
+  real account (messages + name "John") = `users.id 3ef2a987-…`, short_code
+  **DS2CVW**. Investigate whether normal returning-user sign-in can also duplicate
+  identities (build 2 / identity hardening).
+- **`-skipOnboarding` launch arg** exists (now unchecked) — remember it when
+  testing onboarding (build 10), or it skips the thing under test.
+- **Retention:** time-based expiry ("x days") **NOT** implemented (`created_at`
+  enables it, Phase 3). A possible ~50-message cap is **UNCONFIRMED** — check at
+  build 6/9.
 
 ### Phase 2 Scope & Decisions (this session)
 - **Scope — explicitly EXCLUDED** (animation-chat / parked; NOT part of the
