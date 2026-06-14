@@ -9,6 +9,7 @@
 
 _Last updated: Session 8 (structural-truth pass) · Phase 2 canon reconciliation — link-based model, scope, senderID, deep-link deferred to P3._
 _Updated this session: Phase 2 progress + findings pass — builds 1–4b shipped & verified, per-person history-bucket finding (coupled to build 9), re-sequenced build order 5–11, onboarding + infrastructure notes banked._
+_Findings pass 2: builds 5–6 + display-name/shortCode fix DONE & device-verified; sharpened the build-9 bucket finding (pings-table vs messages-table seam); banked hint legibility, Sarah dev-seed, duplicate-users, onboarding-emoji, share-sheet, and send-sound-distortion notes._
 
 ---
 
@@ -259,11 +260,12 @@ sender's identity in the link.
 
 ---
 
-## Phase 2 — Link Delivery Model (IN PROGRESS — builds 1–4b shipped)
+## Phase 2 — Link Delivery Model (IN PROGRESS — builds 1–6 shipped)
 
 ### Phase 2 Progress Ledger (DONE + verified)
-Builds 1–4b are committed and verified. The link-delivery path exists end-to-end
-(send → message → /m/[id] link → open/replay → opened-flip); pairing has **not**
+Builds 1–6 are committed and verified. The link-delivery path exists end-to-end
+(send → message → /m/[id] link → open/replay → opened-flip) and the People tab now
+reflects the link model (recency sort, link-era contact cards); pairing has **not**
 been removed yet (that is the coordinated teardown, builds 8–9 below).
 
 - **Build 1 — canon reconciliation** (link-based model, scope, senderID,
@@ -279,6 +281,23 @@ been removed yet (that is the coordinated teardown, builds 8–9 below).
 - **Build 4b — short-code fallback**: code entry (People-tab tray button) →
   claim ALL unopened → newest plays via the 4a chain → rest to history store.
   Core VERIFIED (drain works, flips correctly). `[3264953]`
+- **Build 5 — contact auto-create ON RECEIVE** (rescoped from "on send": no
+  recipient identity exists at send time). senderID-keyed, **silent**, dedup (N
+  messages from one sender → ONE contact); **NO contact emoji**; mirror-writes
+  `pairedUserID = senderID` as a bucket bridge (build-9 must keep senderID). Wired
+  to both receive hooks (link open + short-code claim). Device-verified, 4 tests.
+  `[3cd8328]`
+- **Display-name / shortCode fix** — send now reads `people.profile?.displayName`
+  FIRST (UserDefaults mirror as fallback); `cacheProfile` now writes `shortCode`
+  (was blanked every cache). Residual NULL only on never-onboarded/orphan accounts
+  (Build-10 identity work). `[40529b5]`
+- **Build 6 — People tab rework**: recency sort (`lastReceivedAt` desc, **nils
+  last**, createdAt-desc secondary) + most-recent sender as the launch default;
+  same-name disambiguator (People-tab only); location hint (also **fixes the
+  null-island distance bug**); monogram emoji fallback for emoji-less contacts;
+  pairing connection-status row **suppressed for link contacts** (senderID-gated,
+  NOT pairedUserID — Build 5 mirror-writes it). Device-verified, 7 tests.
+  `[bde566e]`
 
 ### Key Architecture Finding — the history bucket is PER-PERSON (pairing-era)
 The compass history bucket (`thoughtsDrawer` / **"your bucket ✦"**,
@@ -307,6 +326,18 @@ per-person filter (test data looked unified; real multi-sender data is not).
 become sender-agnostic while it fetches by `pairedUserID`. So it is scheduled
 **WITH build 9** (retire pairing data layer), not as a standalone build.
 
+**SHARPENED (build 6 confirmed the exact seam):** the bucket's SERVER fetch
+(`loadCompassThoughts → fetchPings(with: pairedUserID)`) queries the **`pings`**
+table — but link sends live in the **`messages`** table. So a link contact gets
+**ZERO server-side bucket content**; only LOCAL `caughtHistory` (the short-code
+"rest" + locally-caught thoughts, matched by sender name) shows. Build 5's
+mirror-write makes `pairedUserID` non-nil so the fetch *runs*, but it queries the
+wrong table → empty. **Build 9 must repoint the server fetch from
+`pings`/`pairedUserID` → `messages`/`senderID`, reconciled with the
+sender-agnostic unified-bucket goal.** Benign until then: no crash; worst case is a
+thinner bucket / "all caught up ✦". (Surfaced because build 6's launch default now
+auto-selects the most-recent LINK contact.)
+
 Also: tapping a bucket item **REPLAYS but does NOT flip opened**
 (`replayThought`, ~line 2286 — no `markOpened`). Only live receive + `/m/` open
 flip `opened_at`. The unified rework should decide whether replay-from-history
@@ -316,9 +347,10 @@ marks opened.
 Discipline: build new **additively**, prove it, **THEN** remove pairing as one
 coordinated teardown.
 
-5. **Contact auto-create on send** — audit existing auto-add at `RootView` ~541 /
-   line ~397 first (likely **update-not-build**).
-6. **People tab rework** — recent-sorted, same-name distinguisher, location hint.
+5. ✅ **DONE — Contact auto-create ON RECEIVE** (rescoped from "on send"; the audit
+   found no recipient identity at send time). `[3cd8328]`
+6. ✅ **DONE — People tab rework** — recency sort, same-name disambiguator, location
+   hint, monogram fallback, link-contact status suppression. `[bde566e]`
 7. **Compass seeded-bearing degradation** — no-address → consistent fake bearing
    (directional compass already survives pairing removal).
 8. **Strip pairing UI** — `ConnectView` (already unrouted), `PairAcceptView`,
@@ -365,6 +397,44 @@ your messages will see you ✦").
 - **Retention:** time-based expiry ("x days") **NOT** implemented (`created_at`
   enables it, Phase 3). A possible ~50-message cap is **UNCONFIRMED** — check at
   build 6/9.
+
+### Banked Items (findings pass 2 — tagged with trigger build)
+- **[build 8+ styling] Location-hint legibility.** The build-6 hint ("add
+  location…") is too small / low-contrast on device — it's the action we want, yet
+  the *least* visible, while the soon-removed pairing status row is the *most*
+  visible. Increase its visual weight — but **design against the POST-pairing card**
+  (build 8 removes the competing status rows), so style it after pairing removal to
+  avoid doing it twice.
+- **[build 8/9] Sarah dev-seed idempotency** uses the OLD `person(forPairedUserID:)`
+  lookup → breaks down as pairing retires (created a **duplicate Sarah** in
+  testing). When pairing is removed, either drop the Sarah dev-seed or repoint it to
+  `person(forSenderID:)`. Sarah is **⚠️ DO-NOT-REMOVE** (drives `-skipOnboarding` +
+  `testSkipOnboardingInjectsSarah`) — coordinate carefully.
+- **[build 2 / identity hardening] Duplicate `users` rows.** App delete+reinstall
+  and/or `-skipOnboarding` can create a duplicate / null-name `users` row (orphan
+  observed). Joshua's real account = `users.id 3ef2a987-…`, short_code **DS2CVW**,
+  name "John". Investigate whether **normal returning-user sign-in** can also
+  duplicate identities.
+- **[build 8 or 10 audit] Onboarding emoji screen + `UserProfile.emoji`.** Joshua
+  wants the emoji-selection screen removed (purposeless onboarding distraction). **Do
+  NOT cut blind** — first audit what consumes `UserProfile.emoji`; if orphaned,
+  remove the screen + field. Surface at whichever build first touches
+  onboarding/UserProfile.
+- **[Phase 3 polish] Share-sheet (sender side).** Sends via the raw iOS share sheet.
+  Text content is correct (name + link + shortCode — verified) but the **sender's
+  preview truncates it** (normal iOS clipping; the recipient gets the full text). The
+  raw share sheet "seems sloppy" as Pointward's sending moment — polish is Phase 3.
+  **NOT a bug; NOT a recipient-side visibility gap** (confirmed sender-side only).
+- **[verify; animation-chat if real] Send-sound distortion.** Send sound reported
+  distorted on device under a **DEBUG Xcode build** — likely a debug-mode artifact
+  (consistent with the earlier "choppy animation" observation). **MUST verify in a
+  release/TestFlight build** before treating as a regression. If distorted in release
+  → **animation-chat** item (sound files are animation-chat territory, not Phase 2).
+  If debug-only → ignore.
+- **[reminder] `-skipOnboarding` is currently CHECKED** for testing convenience —
+  **UNCHECK before any onboarding test** (build 10) or it skips the thing under test.
+  It also **bypasses name capture** — the source of the null-name-orphan + the
+  display-name-NULL bug class (see the display-name fix above).
 
 ### Phase 2 Scope & Decisions (this session)
 - **Scope — explicitly EXCLUDED** (animation-chat / parked; NOT part of the
