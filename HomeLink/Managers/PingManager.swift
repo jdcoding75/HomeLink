@@ -290,6 +290,53 @@ final class PingManager: ObservableObject {
         }
     }
 
+    #if DEBUG
+    // ════════════════════════════════════════════════════════════════════
+    // [phase2 build3] LINK-BASED SEND — DEV ONLY (DEBUG-gated)
+    // ════════════════════════════════════════════════════════════════════
+    // GUARDRAIL: /m/[id] links are not openable until Build 4, so this whole
+    // path is `#if DEBUG` — it cannot ship to TestFlight/release, and it NEVER
+    // auto-shares (Joshua picks the destination in the share sheet). It runs
+    // ADDITIVELY, alongside the old sendRemote, and never blocks the animation.
+
+    /// "couldn't create your link — retry" — the message insert failed. The
+    /// animation already played (sacred); this is a quiet, non-blocking notice
+    /// with a retry that re-runs the insert.
+    @Published var linkFailedNotice: String?
+    private var lastLinkSend: (() -> Void)?
+
+    /// Store the just-sent thought as a `messages` row, then present the share
+    /// sheet with the /m/[id] link + the short-code fallback. Background work —
+    /// the caller has already kicked off the (uninterrupted) send animation.
+    func devCreateAndShareLink(content: String?, emoji: String, instrument: String,
+                               senderName: String, shortCode: String) {
+        let run: () -> Void = { [weak self] in
+            guard let self else { return }
+            self.linkFailedNotice = nil
+            Task { @MainActor in
+                do {
+                    let id = try await SupabaseService.shared.insertMessage(
+                        content: content, emoji: emoji, instrument: instrument,
+                        senderDisplayName: senderName.isEmpty ? nil : senderName)
+                    let link = MessageLink.url(for: id)
+                    let text = MessageLink.shareText(senderName: senderName,
+                                                     link: link, shortCode: shortCode)
+                    self.log.info("link: message stored, presenting share sheet (id=\(id.uuidString, privacy: .public))")
+                    ShareSheet.present(text)
+                } catch {
+                    self.log.error("link: insert FAILED — \(error.localizedDescription, privacy: .public)")
+                    self.linkFailedNotice = "couldn't create your link — retry"
+                }
+            }
+        }
+        lastLinkSend = run
+        run()
+    }
+
+    /// Re-run the last link send (the retry affordance on linkFailedNotice).
+    func devRetryLinkSend() { lastLinkSend?() }
+    #endif
+
     func showFelt(name: String) {
         feltNotice = "\(name) felt your thought ✓"
         Task {

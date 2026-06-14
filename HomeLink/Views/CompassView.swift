@@ -692,6 +692,40 @@ struct CompassView: View {
                 .animation(.easeInOut(duration: 0.4), value: pings.sendFailedNotice)
             }
 
+            #if DEBUG
+            // [phase2 build3] DEV ONLY — link create failed. The flight already
+            // played (sacred); offer a quiet, tappable retry. Mirrors the
+            // sendFailedNotice capsule. Never blocks; auto-clears via re-run.
+            if let linkFailure = pings.linkFailedNotice {
+                VStack {
+                    Button { pings.devRetryLinkSend() } label: {
+                        HStack(spacing: 6) {
+                            Image(systemName: "link")
+                                .font(.system(size: 10))
+                            Text(linkFailure)
+                                .font(.system(size: 12, design: .serif).italic())
+                            Image(systemName: "arrow.clockwise")
+                                .font(.system(size: 10))
+                        }
+                        .foregroundColor(Color(hex: "#e08a3c"))
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 8)
+                        .background(
+                            Capsule()
+                                .fill(DesignTokens.Color.background.opacity(0.9))
+                                .overlay(Capsule().stroke(Color(hex: "#e08a3c").opacity(0.35), lineWidth: 1))
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.top, 64)
+                    Spacer()
+                }
+                .zIndex(8)
+                .transition(.opacity.combined(with: .move(edge: .top)))
+                .animation(.easeInOut(duration: 0.4), value: pings.linkFailedNotice)
+            }
+            #endif
+
             // (felt-receipt text capsule retired — replaced by the symbolic
             //  caught confirmation above; view kept for reference)
             // if let notice = pings.feltNotice {
@@ -1845,6 +1879,21 @@ struct CompassView: View {
             playSendSound(token)
             // HapticEngine.thoughtLaunched()   // retired — single .light at launch
         }
+
+        #if DEBUG
+        // [phase2 build3] DEV ONLY — additive link-based send. The animation
+        // above has ALREADY fired (sacred, never blocked); this stores the
+        // thought as a /m/[id] message in the BACKGROUND and presents the share
+        // sheet so Joshua can test it. GUARDRAIL: DEBUG-gated + never auto-shares,
+        // so no dead link can reach a real recipient before Build 4. The old
+        // pairing sendRemote above is untouched and still runs.
+        pings.devCreateAndShareLink(
+            content: outgoingMessage.isEmpty ? nil : outgoingMessage,
+            emoji: sendRemoteEmoji(for: token),
+            instrument: style.rawValue,                       // wire style (matches pings.sender_style)
+            senderName: UserProfile.snapshot?.displayName ?? "",
+            shortCode: UserProfile.snapshot?.shortCode ?? "")
+        #endif
         // Cleanup moved to SenderAnimationView.onComplete (duration varies by style)
         // DispatchQueue.main.asyncAfter(deadline: .now() + 1.6) {
         //     flightToken = nil

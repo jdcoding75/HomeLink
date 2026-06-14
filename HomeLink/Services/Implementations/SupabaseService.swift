@@ -962,6 +962,58 @@ final class SupabaseService: ObservableObject {
         }
     }
 
+    // MARK: - Messages (Phase 2 link delivery)
+
+    // [phase2] Insert payload for public.messages. nonisolated pure-data struct
+    // (no main-actor Encodable warning). opened / opened_at / created_at are left
+    // to the DB defaults — we send only the columns we own at send time.
+    private nonisolated struct MessageInsert: Encodable {
+        let senderID: UUID
+        let senderDisplayName: String?
+        let content: String?
+        let emoji: String?
+        let instrument: String?
+        enum CodingKeys: String, CodingKey {
+            case senderID          = "sender_id"
+            case senderDisplayName = "sender_display_name"
+            case content
+            case emoji
+            case instrument
+        }
+    }
+
+    private nonisolated struct InsertedMessageID: Decodable, Sendable { let id: UUID }
+
+    /// [phase2] Store a thought as a `messages` row (the /m/[id] link-delivery
+    /// record) and return the new message id. Mirrors sendPing's contract:
+    /// auth-guarded, retried via withRetry, and THROWN on failure (never
+    /// swallowed) so the caller can surface a retry. Does NOT touch
+    /// pings / pairing. `senderDisplayName` is the caller's snapshot of the
+    /// profile name at send time (denormalized into the row).
+    func insertMessage(content: String?, emoji: String, instrument: String,
+                       senderDisplayName: String?) async throws -> UUID {
+        guard let client else { throw SupabaseServiceError.notConfigured }
+        guard let me = await currentUserID else { throw SupabaseServiceError.notSignedIn }
+        let payload = MessageInsert(
+            senderID: me,
+            senderDisplayName: senderDisplayName?.isEmpty == true ? nil : senderDisplayName,
+            content: content?.isEmpty == true ? nil : content,
+            emoji: emoji,
+            instrument: instrument)
+        log.info("messages: insert → sender=\(me.uuidString, privacy: .public) emoji=\(emoji, privacy: .public) instrument=\(instrument, privacy: .public)")
+        let row: InsertedMessageID = try await withRetry(label: "insertMessage") {
+            try await client
+                .from("messages")
+                .insert(payload)
+                .select("id")
+                .single()
+                .execute()
+                .value
+        }
+        log.info("messages: insert ✓ id=\(row.id.uuidString, privacy: .public)")
+        return row.id
+    }
+
     /// Realtime shape of a partner's compass_bearings row.
     struct PointingEvent: Codable {
         let userID: UUID
