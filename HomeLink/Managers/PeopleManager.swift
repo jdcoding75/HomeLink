@@ -83,7 +83,8 @@ final class PeopleManager: ObservableObject {
                                 latitude: p.latitude, longitude: p.longitude,
                                 displayAddress: p.displayAddress,
                                 locationDisplayName: p.locationDisplayName,
-                                code: p.code))
+                                code: p.code,
+                                shortCode: p.shortCode))   // [fix] was omitted → mirror blanked shortCode to "" on every cache
     }
 
     func canAddPerson() -> Bool {

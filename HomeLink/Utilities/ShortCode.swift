@@ -49,3 +49,9 @@ enum ShortCodeClaim {
         (messages.first, Array(messages.dropFirst()))
     }
 }
+
+extension String {
+    /// `nil` for an empty string, otherwise `self`. Lets a stored `""` (e.g. a
+    /// not-yet-populated shortCode) fall through to a fallback via `??`.
+    var nilIfEmpty: String? { isEmpty ? nil : self }
+}

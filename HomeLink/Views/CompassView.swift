@@ -1891,8 +1891,9 @@ struct CompassView: View {
             content: outgoingMessage.isEmpty ? nil : outgoingMessage,
             emoji: sendRemoteEmoji(for: token),
             instrument: style.rawValue,                       // wire style (matches pings.sender_style)
-            senderName: UserProfile.snapshot?.displayName ?? "",
-            shortCode: UserProfile.snapshot?.shortCode ?? "")
+            senderName: people.profile?.displayName ?? UserProfile.snapshot?.displayName ?? "",
+            shortCode: people.profile?.shortCode.nilIfEmpty
+                       ?? UserProfile.snapshot?.shortCode ?? "")
         #endif
         // Cleanup moved to SenderAnimationView.onComplete (duration varies by style)
         // DispatchQueue.main.asyncAfter(deadline: .now() + 1.6) {
