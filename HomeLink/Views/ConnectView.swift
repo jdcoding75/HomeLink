@@ -9,6 +9,10 @@ import MessageUI
 import CoreLocation
 import os
 
+// [build8] Pairing UI stripped — ConnectView is unrouted (only commented refs).
+// Reversible: remove the #if false / #endif to restore. Full deletion is the
+// build-9 cleanup pass. See reports/build8_report.md.
+#if false
 struct ConnectView: View {
 
     private static let log = Logger(subsystem: "com.jdcoding75.pointward", category: "pairing")
@@ -349,6 +353,9 @@ struct ConnectView: View {
     //     }
     // }
 }
+#endif
+// [build8] NOTE: MessageComposerView (below) is a SHARED helper still used live by
+// PersonDetailView (B1 deferred) — it stays OUTSIDE the #if false above.
 
 // MARK: - iMessage composer wrapper
 

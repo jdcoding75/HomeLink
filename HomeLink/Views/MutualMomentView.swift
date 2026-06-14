@@ -9,6 +9,9 @@
 
 import SwiftUI
 
+// [build8] Pairing UI stripped — MutualMomentView no longer rendered (RootView).
+// Reversible via #if false / #endif. Full deletion is the build-9 cleanup pass.
+#if false
 struct MutualMomentView: View {
 
     let partnerName: String
@@ -66,3 +69,4 @@ struct MutualMomentView: View {
         MutualMomentView(partnerName: "Mum")
     }
 }
+#endif

@@ -33,17 +33,21 @@ struct RootView: View {
     @EnvironmentObject var appEnv: AppEnvironment
 
     @State private var showSplash = true
-    @State private var pairRequest: PairRequest? = nil   // from universal links
+    // [build8] pairing UI stripped (comment-out, reversible) — /pair deep link no
+    // longer routes; build 9 removes the data layer. See reports/build8_report.md.
+    // @State private var pairRequest: PairRequest? = nil   // from universal links
     @State private var messageOpenRequest: MessageOpenRequest? = nil   // /m/<id> links (4a)
     #if DEBUG
     @State private var didDebugOpenMessage = false   // one-shot scaffold guard
     #endif
-    @AppStorage("postOnboardConnectPromptShown") private var connectPromptShown = false
-    @State private var showConnectPrompt = false
+    // [build8] post-onboarding connect nudge stripped (pairing-era).
+    // @AppStorage("postOnboardConnectPromptShown") private var connectPromptShown = false
+    // @State private var showConnectPrompt = false
     /// Inviter-side celebration — someone just claimed one of our codes
     /// (detected over realtime; both phones celebrate together).
-    @State private var celebratePerson: Person? = nil
-    @State private var showInviterCelebration = false
+    // [build8] inviter-celebration render stripped (realtime plumbing kept for build 9).
+    // @State private var celebratePerson: Person? = nil
+    // @State private var showInviterCelebration = false
     @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
@@ -60,11 +64,14 @@ struct RootView: View {
 
             // ── The mutual moment — both needles resting on each other.
             // Golden glow over whatever is on screen, 3 s, then gone. ──────
-            if pings.mutualMoment != nil {
-                MutualMomentView(partnerName: pings.partnerPointingName)
-                    .transition(.opacity)
-                    .zIndex(9)
-            }
+            // [build8] mutual-moment render stripped (pairing-era). The
+            // checkMutualPointing trigger still fires harmlessly; the data layer
+            // (mutualMoment / partnerPointing) is removed in build 9.
+            // if pings.mutualMoment != nil {
+            //     MutualMomentView(partnerName: pings.partnerPointingName)
+            //         .transition(.opacity)
+            //         .zIndex(9)
+            // }
 
             // Branded launch moment — 1.5s, then fades into the app
             if showSplash {
@@ -73,7 +80,8 @@ struct RootView: View {
                     .zIndex(10)
             }
         }
-        .animation(.easeOut(duration: 0.8), value: pings.mutualMoment != nil)
+        // [build8] mutual-moment render stripped → its animation hook too.
+        // .animation(.easeOut(duration: 0.8), value: pings.mutualMoment != nil)
         // Our own lock edge can complete the mutual moment too — their
         // pointing report may have arrived seconds before we settled.
         .onChange(of: compass.state.isLocked) { _, locked in
@@ -102,18 +110,20 @@ struct RootView: View {
             people.configure(with: modelContext)
             if done { ensureDemoPersonIfAppropriate() }   // [5/6] no one added → Alex
             startCompassIfNeeded()
-            // One-time gentle nudge after first setup
-            if done && !connectPromptShown {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
-                    showConnectPrompt = true
-                    connectPromptShown = true
-                }
-            }
+            // [build8] post-onboarding "want to connect?" nudge stripped (pairing-era).
+            // // One-time gentle nudge after first setup
+            // if done && !connectPromptShown {
+            //     DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
+            //         showConnectPrompt = true
+            //         connectPromptShown = true
+            //     }
+            // }
         }
-        .sheet(isPresented: $showConnectPrompt) {
-            PostOnboardConnectPrompt()
-                .presentationDetents([.medium, .large])
-        }
+        // [build8] post-onboarding connect-prompt sheet stripped (pairing-era).
+        // .sheet(isPresented: $showConnectPrompt) {
+        //     PostOnboardConnectPrompt()
+        //         .presentationDetents([.medium, .large])
+        // }
         // Realtime lives only in the foreground — reopen on activate,
         // close gracefully when backgrounding.
         .onChange(of: scenePhase) { _, phase in
@@ -151,14 +161,15 @@ struct RootView: View {
         .onContinueUserActivity(NSUserActivityTypeBrowsingWeb) { activity in
             if let url = activity.webpageURL { handleIncomingURL(url) }
         }
-        .sheet(item: $pairRequest) { request in
-            // The acceptance flow: who wants to connect → add as new person
-            // or link to someone already here → celebration.
-            // (PairRequestView, the old auto-link sheet, is superseded — kept.)
-            PairAcceptView(code: request.code) {
-                pairRequest = nil
-            }
-        }
+        // [build8] /pair accept sheet stripped (pairing-era). The /m/ message
+        // cover below is the link-era path and is UNTOUCHED.
+        // .sheet(item: $pairRequest) { request in
+        //     // The acceptance flow: who wants to connect → add as new person
+        //     // or link to someone already here → celebration.
+        //     PairAcceptView(code: request.code) {
+        //         pairRequest = nil
+        //     }
+        // }
         // [phase2 4a] /m/<id> link → incoming beat → receipt → opened-on-completion.
         // Full-screen, over onboarding OR the main app (cold + warm launch).
         .fullScreenCover(item: $messageOpenRequest) { request in
@@ -176,11 +187,13 @@ struct RootView: View {
         // ([5/6] replay cover moved onto the TabView in MainTabView —
         //  presenting from here failed while a child sheet was up)
         // ── Inviter-side celebration — their phone learns over realtime ───
-        .fullScreenCover(isPresented: $showInviterCelebration) {
-            PairingCelebrationView(person: celebratePerson) {
-                showInviterCelebration = false
-            }
-        }
+        // [build8] inviter-celebration render stripped (pairing-era). The realtime
+        // discover/bindConnection plumbing stays (data layer = build 9).
+        // .fullScreenCover(isPresented: $showInviterCelebration) {
+        //     PairingCelebrationView(person: celebratePerson) {
+        //         showInviterCelebration = false
+        //     }
+        // }
     }
 
     /// pointward.app/pair/POINT-GP2S → confirmation sheet with the code filled in.
@@ -196,18 +209,22 @@ struct RootView: View {
             messageOpenRequest = MessageOpenRequest(id: messageID)
             return
         }
-        guard parts.count >= 2,
-              ["pair", "join"].contains(parts[0].lowercased()) else {
-            rootLog.warning("deeplink: not a pair/join link — ignored")
-            return
-        }
-        let code = SupabaseService.normalizePairingCode(parts[1])
-        guard SupabaseService.isValidPairingCode(code) else {
-            rootLog.warning("deeplink: malformed code '\(parts[1], privacy: .public)' — ignored")
-            return
-        }
-        rootLog.info("deeplink: pair request for \(code, privacy: .public)")
-        pairRequest = PairRequest(code: code)
+        // [build8] /pair + /join deep-link routing stripped (pairing-era). The /m/
+        // branch above is the link-era path and stays live. AASA still lists
+        // /pair/* + /join/* (left intact) so old links just no-op here now.
+        _ = parts   // keep `parts` referenced; the pair branch below is disabled.
+        // guard parts.count >= 2,
+        //       ["pair", "join"].contains(parts[0].lowercased()) else {
+        //     rootLog.warning("deeplink: not a pair/join link — ignored")
+        //     return
+        // }
+        // let code = SupabaseService.normalizePairingCode(parts[1])
+        // guard SupabaseService.isValidPairingCode(code) else {
+        //     rootLog.warning("deeplink: malformed code '\(parts[1], privacy: .public)' — ignored")
+        //     return
+        // }
+        // rootLog.info("deeplink: pair request for \(code, privacy: .public)")
+        // pairRequest = PairRequest(code: code)
     }
 
     /// Phase 2: discover pairings, stamp presence, and open the single
@@ -294,15 +311,17 @@ struct RootView: View {
                 onPaired: { connection in
                     Task { @MainActor in
                         rootLog.info("pairing: claim detected over realtime — celebrating ✦")
+                        // [build8] bindConnection plumbing kept (data layer = build 9);
+                        // the inviter-celebration RENDER trigger is stripped.
                         people.bindConnection(friendID: connection.partnerID,
                                               toPersonID: connection.myPersonID)
-                        celebratePerson = people.people.first {
-                            $0.pairedUserID == connection.partnerID.uuidString
-                        }
-                        // Don't interrupt a pairing flow already on screen
-                        if pairRequest == nil && !showInviterCelebration {
-                            showInviterCelebration = true
-                        }
+                        // celebratePerson = people.people.first {
+                        //     $0.pairedUserID == connection.partnerID.uuidString
+                        // }
+                        // // Don't interrupt a pairing flow already on screen
+                        // if pairRequest == nil && !showInviterCelebration {
+                        //     showInviterCelebration = true
+                        // }
                     }
                 }
             )
@@ -382,6 +401,9 @@ struct RootView: View {
 
 // MARK: - Post-onboarding connect prompt (shown once, ever)
 
+// [build8] pairing-era nudge stripped (no longer presented). Reversible: remove
+// the #if false / #endif to restore. Full removal is the build-9 cleanup pass.
+#if false
 struct PostOnboardConnectPrompt: View {
 
     @Environment(\.dismiss) private var dismiss
@@ -433,6 +455,7 @@ struct PostOnboardConnectPrompt: View {
         .preferredColorScheme(.dark)
     }
 }
+#endif
 
 // MARK: - Pair request (universal link)
 
@@ -450,6 +473,8 @@ struct MessageOpenRequest: Identifiable {
 /// Confirmation sheet for a tapped pairing link — shows who the invite is
 /// from (the identity stored with the connection), one Accept pairs AND
 /// auto-adds them to the People list.
+// [build8] DEAD pairing view (never presented) — stripped. Reversible via #if.
+#if false
 struct PairRequestView: View {
 
     let code: String
@@ -610,6 +635,7 @@ struct PairRequestView: View {
         }
     }
 }
+#endif
 
 // MARK: - SplashView
 

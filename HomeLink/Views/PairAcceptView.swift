@@ -19,6 +19,10 @@ import SwiftUI
 import CoreLocation
 import os
 
+// [build8] Pairing UI stripped — PairAcceptView no longer presented (its callers
+// — the /pair sheet, ConnectView, AccountView — are all stripped/orphaned).
+// Reversible via #if false / #endif. Full deletion is the build-9 cleanup pass.
+#if false
 struct PairAcceptView: View {
 
     private static let log = Logger(subsystem: "com.jdcoding75.pointward", category: "pairing")
@@ -643,3 +647,4 @@ struct PairAcceptView: View {
         withAnimation(.easeOut(duration: 0.4)) { step = .celebrating }
     }
 }
+#endif

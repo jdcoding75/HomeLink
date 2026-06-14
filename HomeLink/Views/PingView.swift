@@ -1188,6 +1188,9 @@ struct PingView: View {
                 .foregroundColor(DesignTokens.Color.textMuted)
                 .multilineTextAlignment(.center)
 
+            // [build8] pairing-era invite ShareLink stripped (PingView is itself
+            // orphaned — no live caller; whole-file cleanup deferred to build 9).
+            #if false
             // No one paired to actually receive it? Offer the invite.
             if SupabaseService.connectedFriendID == nil {
                 VStack(spacing: 7) {
@@ -1210,6 +1213,7 @@ struct PingView: View {
                 }
                 .padding(.top, 6)
             }
+            #endif
         }
         .padding(.horizontal, 22)
         .padding(.vertical, 12)
