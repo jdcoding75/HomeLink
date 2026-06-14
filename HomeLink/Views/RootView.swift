@@ -166,6 +166,13 @@ struct RootView: View {
                 messageOpenRequest = nil
             }
         }
+        // [phase2 4b] short-code claim → play the NEWEST through the SAME 4a chain.
+        // (Posted by ShortCodeEntryView with object: the message UUID.)
+        .onReceive(NotificationCenter.default.publisher(for: .pointwardOpenMessage)) { note in
+            if let id = note.object as? UUID {
+                messageOpenRequest = MessageOpenRequest(id: id)
+            }
+        }
         // ([5/6] replay cover moved onto the TabView in MainTabView —
         //  presenting from here failed while a child sheet was up)
         // ── Inviter-side celebration — their phone learns over realtime ───

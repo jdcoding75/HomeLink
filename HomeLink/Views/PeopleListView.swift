@@ -12,6 +12,7 @@ struct PeopleListView: View {
     let geocodingService: GeocodingServiceProtocol
 
     @State private var showAdd    = false
+    @State private var showCodeEntry = false   // [phase2 4b] short-code receive
     @State private var editPerson: Person? = nil
     @State private var detailPerson: Person? = nil
     @State private var showConnect = false
@@ -30,6 +31,7 @@ struct PeopleListView: View {
                             .font(DesignTokens.Font.compassName)
                             .foregroundColor(DesignTokens.Color.textPrimary)
                         Spacer()
+                        codeEntryButton   // [phase2 4b] "got a code from someone?"
                         addButton
                     }
                     .padding(.horizontal, DesignTokens.Spacing.lg)
@@ -88,6 +90,9 @@ struct PeopleListView: View {
         }
         .sheet(isPresented: $showAdd) {
             AddPersonView(geocodingService: geocodingService)
+        }
+        .sheet(isPresented: $showCodeEntry) {
+            ShortCodeEntryView()   // [phase2 4b] short-code receive — NOT pairing
         }
         .sheet(item: $editPerson, onDismiss: {
             // Edits to the selected person (name, emoji, address) should show
@@ -155,6 +160,21 @@ struct PeopleListView: View {
 
     // MARK: - Subviews
 
+    /// [phase2 4b] "someone sent me something, let me get it" — opens the
+    /// short-code entry sheet (the no-link receive path). NOT pairing.
+    private var codeEntryButton: some View {
+        Button { showCodeEntry = true } label: {
+            Image(systemName: "tray.and.arrow.down")
+                .font(.system(size: 15, weight: .medium))
+                .foregroundColor(DesignTokens.Color.accentSoft)
+                .frame(width: 34, height: 34)
+                .background(DesignTokens.Color.backgroundLift)
+                .clipShape(Circle())
+                .overlay(Circle().stroke(DesignTokens.Color.borderMid, lineWidth: 1))
+        }
+        .accessibilityLabel("Enter a message code")
+    }
+
     private var addButton: some View {
         Button {
             if people.canAddPerson() {
@@ -182,6 +202,11 @@ struct PeopleListView: View {
 extension Notification.Name {
     /// Posted by the post-onboarding connect prompt — MainTabView jumps to People.
     static let pointwardOpenPeople = Notification.Name("pointwardOpenPeople")
+
+    /// [phase2 4b] Posted (object: message UUID) when the short-code claim has a
+    /// newest message to play — RootView routes it into the SAME 4a receive
+    /// chain (sets messageOpenRequest → IncomingMessageView cover).
+    static let pointwardOpenMessage = Notification.Name("pointwardOpenMessage")
 }
 
 // MARK: - PersonCard

@@ -1034,6 +1034,28 @@ final class SupabaseService: ObservableObject {
         return rows.first
     }
 
+    /// [phase2 4b] The SHORT-CODE FALLBACK fetch — resolve a typed sender code to
+    /// that sender's UNOPENED messages (newest-first), via the
+    /// `get_unopened_for_short_code(p_code)` SECURITY DEFINER RPC (Build 2
+    /// migration). Anon-callable (the recipient may be signed out / not the
+    /// sender) — no currentUserID guard, mirroring `getMessage`. Returns an empty
+    /// array for an unknown code OR a code whose messages are all already opened
+    /// (the caller treats both as the gentle empty state). Server-side already
+    /// uppercases the code; we normalize on the client too. Retried via withRetry.
+    func getUnopenedForShortCode(_ code: String) async throws -> [Message] {
+        guard let client else { throw SupabaseServiceError.notConfigured }
+        let normalized = ShortCode.normalize(code)
+        log.info("messages: short-code claim → code=\(normalized, privacy: .public)")
+        let rows: [Message] = try await withRetry(label: "getUnopenedForShortCode") {
+            try await client
+                .rpc("get_unopened_for_short_code", params: ["p_code": normalized])
+                .execute()
+                .value
+        }
+        log.info("messages: short-code claim ✓ count=\(rows.count)")
+        return rows
+    }
+
     /// [phase2] Flip a message's `opened` flag via the `mark_opened(p_id)`
     /// SECURITY DEFINER RPC (Build 4a migration — NOT YET APPLIED). The recipient
     /// may be unauthenticated / not the row owner, so this bypasses RLS as the
