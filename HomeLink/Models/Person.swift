@@ -20,6 +20,15 @@ final class Person {
     var tagline:             String?
     var skinOverride:        String?
     var createdAt:           Date
+    /// [phase2 build5] The immutable LINK-ERA key = Message.senderID = users.id.
+    /// Set when a contact is auto-created on RECEIVE (PeopleManager.upsertContact).
+    /// This is the real, pairing-free routing/dedup key going forward. Additive
+    /// optional → SwiftData lightweight-migrates (no .sql). See `pairedUserID`'s
+    /// double-duty note in PeopleManager.upsertContact.
+    var senderID:            String?
+    /// [phase2 build5] When this contact last SENT us a message — populated now so
+    /// Build 6's most-recent People-tab sort has data. Not consumed for display here.
+    var lastReceivedAt:      Date?
 
     init(
         id:                  UUID    = UUID(),
@@ -32,7 +41,9 @@ final class Person {
         isDynamic:           Bool    = false,
         pairedUserID:        String? = nil,
         tagline:             String? = nil,
-        skinOverride:        String? = nil
+        skinOverride:        String? = nil,
+        senderID:            String? = nil,
+        lastReceivedAt:      Date?   = nil
     ) {
         self.id                  = id
         self.name                = name
@@ -46,6 +57,8 @@ final class Person {
         self.tagline             = tagline
         self.skinOverride        = skinOverride
         self.createdAt           = .now
+        self.senderID            = senderID
+        self.lastReceivedAt      = lastReceivedAt
     }
 
     var coordinate: CLLocationCoordinate2D {

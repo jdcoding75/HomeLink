@@ -13,8 +13,9 @@
 //      onRevealed — the reveal moment). Interruption before that (dismiss /
 //      background) never flips → the message stays recoverable and replays.
 //
-// Build 6 hook (NOT built here): the "add this sender as a contact" prompt will
-// hang off a VALID fetched message — see `// [build6]` below.
+// Build 5 (DONE): a VALID fetched message silently auto-creates/updates the
+// sender as a contact, keyed on Message.senderID — see `people.upsertContact`
+// in begin(). No prompt (silent, per TRUTH product principle #6).
 
 import SwiftUI
 
@@ -42,6 +43,8 @@ struct IncomingMessageView: View {
     // ReceiptView needs these; inherited from RootView's environment.
     @EnvironmentObject var compass: CompassManager
     @EnvironmentObject var pings:   PingManager
+    // [phase2 build5] Auto-create the sender as a contact on a valid message.
+    @EnvironmentObject var people:  PeopleManager
 
     private enum Phase { case incoming, receipt, notFound }
     @State private var phase: Phase = .incoming
@@ -72,9 +75,9 @@ struct IncomingMessageView: View {
                         onRevealed: { flipOpened() },          // ← completion signal
                         onFinished: { onFinished() }           // ← dismiss (no flip)
                     )
-                    // [build6] A VALID opened message is where the "save <sender>
-                    // as a contact" prompt will later hook (deferred to Build 6) —
-                    // it has message.senderDisplayName + senderID to seed it.
+                    // [build5-done] Contact auto-create for this sender already
+                    // fired at FETCH (see begin() → people.upsertContact). It is
+                    // silent by design — no prompt hangs here (TRUTH principle #6).
                     .transition(.opacity)
                 }
             }
@@ -159,6 +162,13 @@ struct IncomingMessageView: View {
                     if let result {
                         message = result
                         phase = .receipt
+                        // [phase2 build5] A VALID message means a real sender —
+                        // silently create-or-update them as a contact, keyed on
+                        // the immutable senderID. Fires at FETCH (not at the
+                        // opened-flip), so the contact exists even if the receipt
+                        // is interrupted before completion.
+                        people.upsertContact(senderID: result.senderID.uuidString,
+                                             displayName: result.senderDisplayName)
                     } else {
                         phase = .notFound
                     }

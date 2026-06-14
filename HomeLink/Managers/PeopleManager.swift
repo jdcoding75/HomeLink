@@ -216,6 +216,76 @@ final class PeopleManager: ObservableObject {
         return person
     }
 
+    // ── [phase2 build5] Contact auto-create ON RECEIVE (pairing-FREE) ─────
+
+    /// Resolve a link-era contact by its immutable senderID (= Message.senderID).
+    /// The Phase-2 dedup key — replaces the pairing-era `person(forPairedUserID:)`.
+    func person(forSenderID senderID: String) -> Person? {
+        people.first { $0.senderID == senderID }
+    }
+
+    /// Silently create-or-update the contact for a received message's SENDER,
+    /// keyed on the immutable senderID. Called from the receive hooks
+    /// (IncomingMessageView / ShortCodeEntryView) — NEVER from the send flow,
+    /// which has no recipient identity (see reports/build5_audit.md).
+    ///
+    /// Dedup: many messages from ONE sender (e.g. a short-code claim of N) collapse
+    /// to exactly ONE contact — found → update, not found → one create.
+    ///
+    /// Silent (no prompt) and gate-free (a received message is connection-initiated,
+    /// like the invite paths) — TRUTH product principles #1/#6.
+    @discardableResult
+    func upsertContact(senderID: String, displayName: String?) -> Person? {
+        guard modelContext != nil, !senderID.isEmpty else { return nil }
+        let incoming = (displayName ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+
+        if let existing = person(forSenderID: senderID) {
+            // UPDATE — bump recency. The recipient OWNS their local name (TRUTH:
+            // "recipient can edit locally — their copy only"). We therefore only
+            // FILL a name we never had; any non-empty local name is treated as the
+            // user's and is NEVER overwritten by a later auto-update.
+            existing.lastReceivedAt = .now
+            if existing.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+               !incoming.isEmpty {
+                existing.name = incoming
+            }
+            try? save()
+            return existing
+        }
+
+        // CREATE. No emoji — auto-created contacts have NO emoji (the contact-level
+        // default emoji was removed as overcomplexity; how an emoji-less contact
+        // renders is a Build 6 concern, not handled here).
+        let person = Person(
+            name:                incoming,
+            emoji:               "",          // intentionally NO emoji
+            latitude:            0,
+            longitude:           0,
+            locationDisplayName: incoming,
+            // MIRROR-WRITE BRIDGE: today's per-person history bucket fetches by
+            // `pairedUserID` (CompassView.loadCompassThoughts). Duplicating senderID
+            // into pairedUserID keeps auto-created contacts visible in the CURRENT
+            // bucket until Build 9 unifies it.
+            // ⚠️ [build9 FLAG] pairedUserID is doing DOUBLE DUTY here — it mirrors
+            // senderID, it is NOT a pairing connection. When Build 9 retires the
+            // pairing data layer it MUST keep `senderID` (the real key) and only
+            // drop the pairedUserID mirror — never discard senderID data.
+            pairedUserID:        senderID,
+            tagline:             TaglineSystem.random,
+            senderID:            senderID,
+            lastReceivedAt:      .now)
+        modelContext?.insert(person)
+        try? modelContext?.save()
+        fetchAll()
+        // First real contact for a fresh user → make them active (and Alex steps
+        // aside), mirroring the invite paths so the history bucket has a subject.
+        if selectedPerson == nil || selectedPerson.map(DemoPerson.isDemo) == true {
+            selectedPerson = person
+        }
+        removeDemoPersonIfPresent()
+        return person
+    }
+
     enum PeopleError: Error, LocalizedError {
         case upgradeRequired
         var errorDescription: String? { "Unlock Pointward to add more people — one-time purchase, no subscription." }

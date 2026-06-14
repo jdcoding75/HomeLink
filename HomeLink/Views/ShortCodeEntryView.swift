@@ -20,6 +20,8 @@ struct ShortCodeEntryView: View {
 
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var pings: PingManager
+    // [phase2 build5] Auto-create the claimed sender as a contact (once).
+    @EnvironmentObject private var people: PeopleManager
 
     private enum Phase { case entry, claiming, empty }
     @State private var phase: Phase = .entry
@@ -158,10 +160,16 @@ struct ShortCodeEntryView: View {
     private func handle(_ messages: [Message]) {
         let (newest, rest) = ShortCodeClaim.split(messages)
 
-        // [build6] CONTACT AUTO-CREATE hook — NOT built here. The claimed result
-        // (newest + rest) each carry `senderID` + `senderDisplayName`; Build 6's
-        // "save this sender as a contact" prompt attaches at this point, before
-        // routing. Deferred.
+        // [build5-done] CONTACT AUTO-CREATE — link-era, senderID-keyed, pairing-FREE.
+        // Every message claimed by ONE short code shares ONE senderID, so this is a
+        // SINGLE upsert (create-or-update) — exactly one contact, never one per
+        // message. Silent (no prompt). Runs even when only `rest` exist (all already
+        // opened is impossible here — these are unopened), and is skipped on an
+        // empty claim (nothing to attribute).
+        if let sender = newest ?? rest.first {
+            people.upsertContact(senderID: sender.senderID.uuidString,
+                                 displayName: sender.senderDisplayName)
+        }
 
         guard let newest else {
             HapticEngine.personSelected()   // a soft wink — gentle, not an error
