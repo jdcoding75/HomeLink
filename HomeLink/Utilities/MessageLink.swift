@@ -21,6 +21,16 @@ enum MessageLink {
         "\(AppLinks.website)/m/\(messageID.uuidString)"
     }
 
+    /// Parse a tapped universal link back to its message id, if it is a /m/<id>
+    /// link with a valid UUID. Returns nil for any other path (e.g. /pair/…) or a
+    /// malformed id. Pure + testable — the routing sibling of the pair route in
+    /// RootView. (Build 4b will add the short-code fallback elsewhere; NOT here.)
+    static func messageID(from url: URL) -> UUID? {
+        let parts = url.pathComponents.filter { $0 != "/" }
+        guard parts.count >= 2, parts[0].lowercased() == "m" else { return nil }
+        return UUID(uuidString: parts[1])
+    }
+
     /// Warm, Pointward-voiced share copy: the link plus the short-code fallback
     /// so a no-app recipient can open Pointward and type the code. e.g.
     ///   "Sarah sent you a thought 💭  https://pointward.app/m/…

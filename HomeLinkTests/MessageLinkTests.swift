@@ -55,4 +55,63 @@ final class MessageLinkTests: XCTestCase {
         XCTAssertFalse(text.contains("enter"), "no code → no code clause")
         XCTAssertTrue(text.contains("L"), "link still present")
     }
+
+    // MARK: - Build 4a · /m/<id> parsing (round-trip + rejection)
+
+    func testMessageIDParsesFromValidLink() {
+        let id = UUID()
+        let url = URL(string: MessageLink.url(for: id))!
+        XCTAssertEqual(MessageLink.messageID(from: url), id,
+                       "a /m/<uuid> link must round-trip back to its id")
+    }
+
+    func testMessageIDParsesValidLinkWithCaseAndTrailingSlash() {
+        let id = UUID()
+        // host/path casing varies in the wild; the path token /m/ is matched
+        // case-insensitively and the uuid is parsed case-insensitively by UUID.
+        let url = URL(string: "https://pointward.app/M/\(id.uuidString.lowercased())")!
+        XCTAssertEqual(MessageLink.messageID(from: url), id)
+    }
+
+    func testMessageIDRejectsMalformedID() {
+        let url = URL(string: "https://pointward.app/m/not-a-uuid")!
+        XCTAssertNil(MessageLink.messageID(from: url), "a non-uuid id must be rejected, not crash")
+    }
+
+    func testMessageIDRejectsMissingID() {
+        XCTAssertNil(MessageLink.messageID(from: URL(string: "https://pointward.app/m/")!))
+        XCTAssertNil(MessageLink.messageID(from: URL(string: "https://pointward.app/m")!))
+    }
+
+    func testMessageIDRejectsNonMessageRoutes() {
+        // The pair route (and anything else) must NOT be claimed by the /m/ parser.
+        XCTAssertNil(MessageLink.messageID(from: URL(string: "https://pointward.app/pair/POINT-GP2S")!))
+        XCTAssertNil(MessageLink.messageID(from: URL(string: "https://pointward.app/join/POINT-GP2S")!))
+        XCTAssertNil(MessageLink.messageID(from: URL(string: "https://pointward.app/")!))
+        // A uuid under the WRONG path is still not a message link.
+        XCTAssertNil(MessageLink.messageID(from: URL(string: "https://pointward.app/x/\(UUID().uuidString)")!))
+    }
+
+    // MARK: - Build 4a · opened-flip gate (flips on completion, NOT interruption)
+
+    func testFlipGateFlipsOnCompletion() {
+        var gate = OpenedFlipGate()
+        XCTAssertFalse(gate.didFlip)
+        XCTAssertTrue(gate.completionReached(), "the first completion performs the write")
+        XCTAssertTrue(gate.didFlip)
+    }
+
+    func testFlipGateFlipsAtMostOnce() {
+        var gate = OpenedFlipGate()
+        XCTAssertTrue(gate.completionReached(), "first completion → write")
+        XCTAssertFalse(gate.completionReached(), "a second completion must NOT re-write")
+        XCTAssertFalse(gate.completionReached())
+        XCTAssertTrue(gate.didFlip)
+    }
+
+    func testFlipGateDoesNotFlipWithoutCompletion() {
+        // Interruption = onRevealed never fires = completionReached never called.
+        let gate = OpenedFlipGate()
+        XCTAssertFalse(gate.didFlip, "an interrupted receipt (no completion) must NOT flip opened")
+    }
 }

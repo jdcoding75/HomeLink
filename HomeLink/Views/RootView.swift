@@ -34,6 +34,7 @@ struct RootView: View {
 
     @State private var showSplash = true
     @State private var pairRequest: PairRequest? = nil   // from universal links
+    @State private var messageOpenRequest: MessageOpenRequest? = nil   // /m/<id> links (4a)
     @AppStorage("postOnboardConnectPromptShown") private var connectPromptShown = false
     @State private var showConnectPrompt = false
     /// Inviter-side celebration — someone just claimed one of our codes
@@ -154,6 +155,13 @@ struct RootView: View {
                 pairRequest = nil
             }
         }
+        // [phase2 4a] /m/<id> link → incoming beat → receipt → opened-on-completion.
+        // Full-screen, over onboarding OR the main app (cold + warm launch).
+        .fullScreenCover(item: $messageOpenRequest) { request in
+            IncomingMessageView(messageID: request.id) {
+                messageOpenRequest = nil
+            }
+        }
         // ([5/6] replay cover moved onto the TabView in MainTabView —
         //  presenting from here failed while a child sheet was up)
         // ── Inviter-side celebration — their phone learns over realtime ───
@@ -168,6 +176,15 @@ struct RootView: View {
     private func handleIncomingURL(_ url: URL) {
         rootLog.info("deeplink: incoming URL \(url.absoluteString, privacy: .public)")
         let parts = url.pathComponents.filter { $0 != "/" }
+        // [phase2 4a] NEW sibling route: /m/<id> message links. Checked BEFORE the
+        // pair guard; the pair/join path below is completely unchanged.
+        if let messageID = MessageLink.messageID(from: url) {
+            rootLog.info("deeplink: message open \(messageID.uuidString, privacy: .public)")
+            // QUEUE-as-state: held until RootView presents it (cold-launch safe,
+            // mirrors pairRequest). The fetch then runs async inside the cover.
+            messageOpenRequest = MessageOpenRequest(id: messageID)
+            return
+        }
         guard parts.count >= 2,
               ["pair", "join"].contains(parts[0].lowercased()) else {
             rootLog.warning("deeplink: not a pair/join link — ignored")
@@ -390,6 +407,12 @@ struct PostOnboardConnectPrompt: View {
 struct PairRequest: Identifiable {
     let code: String
     var id: String { code }
+}
+
+/// A tapped /m/<id> link awaiting open (Phase 2 Build 4a). The deep-link sibling
+/// of PairRequest — set by handleIncomingURL, presented by RootView.
+struct MessageOpenRequest: Identifiable {
+    let id: UUID
 }
 
 /// Confirmation sheet for a tapped pairing link — shows who the invite is

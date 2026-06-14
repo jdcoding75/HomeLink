@@ -1014,6 +1014,44 @@ final class SupabaseService: ObservableObject {
         return row.id
     }
 
+    // MARK: - Messages: open by link (Phase 2 Build 4a)
+
+    /// [phase2] Fetch the single message behind a /m/[id] link via the
+    /// `get_message(p_id)` SECURITY DEFINER RPC (Build 2 migration). Anon-callable
+    /// — the recipient opening the link may be signed out or a DIFFERENT user than
+    /// the sender, so this does NOT require currentUserID. Returns nil for a
+    /// bad/expired id (the function returns an empty set). Retried via withRetry.
+    func getMessage(id: UUID) async throws -> Message? {
+        guard let client else { throw SupabaseServiceError.notConfigured }
+        log.info("messages: get → id=\(id.uuidString, privacy: .public)")
+        let rows: [Message] = try await withRetry(label: "getMessage") {
+            try await client
+                .rpc("get_message", params: ["p_id": id.uuidString])
+                .execute()
+                .value
+        }
+        log.info("messages: get ✓ found=\(rows.first != nil)")
+        return rows.first
+    }
+
+    /// [phase2] Flip a message's `opened` flag via the `mark_opened(p_id)`
+    /// SECURITY DEFINER RPC (Build 4a migration — NOT YET APPLIED). The recipient
+    /// may be unauthenticated / not the row owner, so this bypasses RLS as the
+    /// function owner; the SQL only flips a still-unopened row (idempotent).
+    /// Best-effort: logged, never thrown to the UI (a failed flip just leaves the
+    /// message recoverable, which is the intended fail-safe).
+    func markMessageOpened(id: UUID) async {
+        guard let client else { return }
+        do {
+            try await client
+                .rpc("mark_opened", params: ["p_id": id.uuidString])
+                .execute()
+            log.info("messages: mark_opened ✓ id=\(id.uuidString, privacy: .public)")
+        } catch {
+            log.error("messages: mark_opened failed: \(error.localizedDescription, privacy: .public)")
+        }
+    }
+
     /// Realtime shape of a partner's compass_bearings row.
     struct PointingEvent: Codable {
         let userID: UUID
