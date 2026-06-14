@@ -80,6 +80,23 @@ into the live send flow (open item).
 - NEVER ask for confirmation — just do it
 - Only stop for credentials or physical device actions
 
+## Standing build patterns (self-enforce)
+Apply these on every build without re-specification:
+- AUDIT-FIRST, TWO-PHASE for any deletion, pairing-adjacent, or data-layer build:
+  audit + write the report + STOP for review before the build phase.
+- COMMENT-OUT, never hard-delete — until the dedicated cleanup pass.
+- Write every build/audit report to `reports/<name>.md` (for clean retrieval).
+- BUILD AFTER EACH MAJOR STEP in a multi-step build; if it breaks, STOP and report.
+- NEVER touch animation / instrument / sound / receipt / reveal files unless
+  explicitly instructed; if a task seems to require it, STOP and flag — don't cross
+  the layer.
+- FLAG-DON'T-FORCE: if an audit/build surfaces something unexpected, broader, or
+  more entangled than scoped, STOP and flag for a decision rather than pressing on.
+- Confirm explicitly in each report that load-bearing / shared code — especially the
+  **DELIVERY BACKBONE** (see POINTWARD_TRUTH.md: link send still `#if DEBUG`, so the
+  legacy pings path is the only release delivery) — was left untouched, with a
+  grep-style verification.
+
 ## Tier System
 - Free: Minimal skin only, 1 person, 
   core 6 emojis, no Pro features

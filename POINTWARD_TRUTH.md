@@ -10,6 +10,7 @@
 _Last updated: Session 8 (structural-truth pass) · Phase 2 canon reconciliation — link-based model, scope, senderID, deep-link deferred to P3._
 _Updated this session: Phase 2 progress + findings pass — builds 1–4b shipped & verified, per-person history-bucket finding (coupled to build 9), re-sequenced build order 5–11, onboarding + infrastructure notes banked._
 _Findings pass 2: builds 5–6 + display-name/shortCode fix DONE & device-verified; sharpened the build-9 bucket finding (pings-table vs messages-table seam); banked hint legibility, Sarah dev-seed, duplicate-users, onboarding-emoji, share-sheet, and send-sound-distortion notes._
+_Session lock-up: builds 5–9 (safe half) shipped & ledgered; CRITICAL link-send-`#if DEBUG` / delivery-backbone finding banked; bucket finding RESOLVED (sender-agnostic, local); 3 locked bucket decisions; back-half re-sequenced (11b cutover → 9b delivery-retire → 10 onboarding → 11 tests → 12 web → cleanup); build-9 left-intentionally flags + findings-pass-3 notes. CLAUDE.md: standing build patterns added._
 
 ---
 
@@ -260,13 +261,16 @@ sender's identity in the link.
 
 ---
 
-## Phase 2 — Link Delivery Model (IN PROGRESS — builds 1–6 shipped)
+## Phase 2 — Link Delivery Model (IN PROGRESS — builds 1–9 safe-half shipped)
 
 ### Phase 2 Progress Ledger (DONE + verified)
-Builds 1–6 are committed and verified. The link-delivery path exists end-to-end
-(send → message → /m/[id] link → open/replay → opened-flip) and the People tab now
-reflects the link model (recency sort, link-era contact cards); pairing has **not**
-been removed yet (that is the coordinated teardown, builds 8–9 below).
+Builds 1–9 (safe half) are committed and verified. The link-delivery path exists
+end-to-end (send → message → /m/[id] link → open/replay → opened-flip), the People
+tab reflects the link model, the compass degrades gracefully without location, the
+pairing **UI** is stripped, and the history bucket is now **sender-agnostic**.
+Pairing's pure-presence data layer is retired; the **delivery backbone is
+deliberately KEPT** (see the critical finding below) until the link send ships to
+release.
 
 - **Build 1 — canon reconciliation** (link-based model, scope, senderID,
   deep-link deferred to P3). `[12ae0a0]`
@@ -298,8 +302,55 @@ been removed yet (that is the coordinated teardown, builds 8–9 below).
   pairing connection-status row **suppressed for link contacts** (senderID-gated,
   NOT pairedUserID — Build 5 mirror-writes it). Device-verified, 7 tests.
   `[bde566e]`
+- **Build 7 — compass seeded-bearing degradation**: no real location → a stable
+  per-person bearing (**FNV-1a from senderID**, NOT Swift `hashValue`); distance
+  hidden for seeded contacts (kills the null-island number); mutual-pointing
+  real-location guard. CompassManager-only seam — **no animation file touched**.
+  Device-verified, 7 tests. `[5595104]`
+- **Build 8 — strip pairing UI** (comment-out, reversible): `/pair`+`/join`
+  deep-link branch, `PairAccept`/`Connect`/`MutualMoment`/`PairRequest` views, the
+  post-onboarding connect nudge, the inviter-celebration render. `/m/` route
+  untouched. Data layer + PersonDetail connect (B1) + onboarding code screen (B5)
+  deferred. `[26c59ff]`
+- **Build 9 (SAFE HALF)** `[2919f1f]`: **unified sender-agnostic bucket** — built
+  from LOCAL `caughtHistory` (all senders, per-person filter + server `fetchPings`
+  dropped); **`/m/` opens now record to history** (they were missing) with
+  `remoteID = message.id` dedup; per-item `fromName` on `PingRecord`. **Pure-pairing
+  retired**: `compass_bearings`/`reportPointing` (no-op'd) + mutual-pointing source
+  + `connections` realtime + discover. **Sarah repointed** to `senderID` (via
+  `upsertContact`; mirror-write keeps her `pairedUserID` so tests stay green).
+  4 new tests. ⚠️ **DEVICE RE-VERIFY of the sender-agnostic bucket is PENDING** — a
+  clean install wiped test history before confirmation, and the first device check
+  was muddied by 3 stale same-named "Sarah" contacts (since cleared). Logic verified
+  by unit tests; re-verify **opportunistically** when a later build (10 / 11b)
+  naturally produces multi-sender history — no special staging needed.
 
-### Key Architecture Finding — the history bucket is PER-PERSON (pairing-era)
+### ⚠️ CRITICAL — THE LINK SEND IS STILL `#if DEBUG` (the delivery backbone)
+In a **RELEASE / TestFlight build the ONLY delivery is the LEGACY path**:
+`sendThought` → `pings.sendRemote` → `pings` table, recipient =
+`selectedPerson.pairedUserID ?? connectedFriendID` (`CompassView` ~1889 gates
+`devCreateAndShareLink` behind `#if DEBUG`, so the `/m/` link send **never runs in
+release**). **Therefore these are the LIVE DELIVERY BACKBONE and must NOT be retired
+yet:** `connectedFriendID`, `sendRemote`, the **pings** realtime insert/felt streams,
+`syncMissedThoughts`, `Person.pairedUserID`'s **send-recipient read**, and the
+`upsertContact` **mirror-write** (`pairedUserID = senderID`). Retiring any of these
+before the link send is un-gated to release ships **an app that cannot deliver a
+message.** Un-gating the link send (build **11b**) is the prerequisite cutover.
+
+### Three LOCKED bucket decisions (Joshua, this session)
+1. **Replay-from-history does NOT flip opened** — replay = re-feel, not consume.
+2. **Bucket is ALL senders** — per-person scoping dropped ("fill my bucket" intent).
+3. **50-cap stays**; opened link messages count toward it.
+
+### Key Architecture Finding — the history bucket is PER-PERSON (pairing-era) — ✅ RESOLVED (build 9)
+> **✅ RESOLVED in build 9** (the sender-agnostic conversion below). The finding is
+> kept for history; the bucket no longer fetches by `pairedUserID` — it is built
+> from LOCAL `caughtHistory`, all senders, and `/m/` opens now record into it.
+> (The "repoint server fetch to messages/senderID" idea was superseded: there is
+> **no `messages`-sent-to-me server query** — `messages` is sender-keyed, no
+> recipient column — so the bucket went LOCAL instead.)
+
+The compass history bucket (`thoughtsDrawer` / **"your bucket ✦"**,
 The compass history bucket (`thoughtsDrawer` / **"your bucket ✦"**,
 `CompassView.swift`) is **per-person and pairing-era**, and **fully LIVE** (not
 stale or half-migrated):
@@ -343,23 +394,51 @@ Also: tapping a bucket item **REPLAYS but does NOT flip opened**
 flip `opened_at`. The unified rework should decide whether replay-from-history
 marks opened.
 
-### Re-sequenced Build Order (5–11)
-Discipline: build new **additively**, prove it, **THEN** remove pairing as one
-coordinated teardown.
+### Re-sequenced Build Order (back half) — replaces the prior 9→10→11
+Builds 5–9-safe-half are ✅ DONE (see ledger). The remaining order was re-sequenced
+this session — **the safe-half mechanical chunk was front-loaded; what's left is the
+decision-heavy, fresh-mind work.**
 
-5. ✅ **DONE — Contact auto-create ON RECEIVE** (rescoped from "on send"; the audit
-   found no recipient identity at send time). `[3cd8328]`
-6. ✅ **DONE — People tab rework** — recency sort, same-name disambiguator, location
-   hint, monogram fallback, link-contact status suppression. `[bde566e]`
-7. **Compass seeded-bearing degradation** — no-address → consistent fake bearing
-   (directional compass already survives pairing removal).
-8. **Strip pairing UI** — `ConnectView` (already unrouted), `PairAcceptView`,
-   `MutualMomentView`, `/pair/` deep link, onboarding connection-code screen.
-9. **Retire pairing data layer** — `connections`, `reportPointing`,
-   `compass_bearings`, `isDynamic` **+ CONVERT history bucket to sender-agnostic**
-   (coupled — same seam).
-10. **Onboarding rewrite** — see notes below.
-11. **Phase 2 test suite** — automated scenarios.
+- **5** ✅ DONE — contact auto-create on receive `[3cd8328]`
+- **6** ✅ DONE — People tab rework `[bde566e]`
+- **7** ✅ DONE — compass seeded-bearing degradation `[5595104]`
+- **8** ✅ DONE — strip pairing UI `[26c59ff]`
+- **9 (safe half)** ✅ DONE — unified bucket + pure-pairing retirement + Sarah
+  repoint `[2919f1f]`
+- **11b — UN-GATE the link send to release** (remove the `#if DEBUG` on
+  `devCreateAndShareLink`). **THE PIVOT CUTOVER** — changes how every send is
+  delivered; needs focused QA + a deliberate readiness decision. **Fresh-mind
+  work. Prerequisite for retiring the delivery backbone.**
+- **9b — retire the DELIVERY BACKBONE** (`connectedFriendID` / `sendRemote` / pings
+  realtime / `syncMissedThoughts` / `pairedUserID` send-read / the mirror-write) —
+  **ONLY after 11b proves the link send works in release.**
+- **10 — onboarding rewrite** (decision-heavy; see Onboarding Notes). Also touches
+  `redeem`/`createInvite` (deferred B1) and `myPairingCode` (B5).
+- **11 — Phase 2 test suite** (automated scenarios).
+- **12 — floor web page** — a minimal `pointward.app/m/[id]` landing for no-app
+  users.
+- **cleanup pass** — tighten/consolidate transitional logic (the mirror-write
+  bridge etc.), **hard-delete** the commented code, test audit, final TRUTH cleanup.
+
+> b10 / 11b are the **decision-heavy / fresh-mind** builds; b9 safe-half was the
+> last mechanical chunk (front-loaded deliberately).
+
+### Build-9 LEFT-INTENTIONALLY (flagged; for the cleanup pass / focused follow-ups)
+- **4 PeopleManager pairing funcs** (`addFromInvite` / `bindConnection` /
+  `insertFromInvite` / `person(forPairedUserID:)`) are **APP-ORPHANED** (Sarah
+  repointed; pairing UI `#if false`) but **LEFT** — `PairingScenarioTests` (~12 of
+  18) exercise them, interleaved with `redeem`/`claimOutcome` tests that STAY.
+  Remove + migrate tests at the **cleanup pass** (with the test audit) — zero
+  behavioural gain to do sooner.
+- **Mutual-pointing — more entangled than audited**: retired at the **SOURCE** (no
+  events generated) but the **dormant consumers LEFT intact** — `presenceFelt`
+  (also called by **push** `NotificationHandler`), `partnerPointing*` / `mutualMoment`,
+  the **CompassView ambient edge-glow** (~899-909), and `CompassManager`
+  `presenceTimer` / `reportPointingIfNeeded` (now call a no-op `reportPointing`).
+  Focused follow-up; the feature doesn't operate, so not urgent.
+- **SupabaseService orphans** (`redeemCode` / `createProfileInvite` / `lookupInvite`,
+  `PairingServiceProtocol` / `MockPairingService` + the `ServiceContainer` field) —
+  LEFT (commenting the protocol/mock means editing the composition root). Cleanup.
 
 ### Onboarding Notes (bank for build 10, from live walkthrough)
 Current flow is ~8 screens: Apple-messages allow → cover/begin → Sign in with
@@ -395,8 +474,9 @@ your messages will see you ✦").
 - **`-skipOnboarding` launch arg** exists (now unchecked) — remember it when
   testing onboarding (build 10), or it skips the thing under test.
 - **Retention:** time-based expiry ("x days") **NOT** implemented (`created_at`
-  enables it, Phase 3). A possible ~50-message cap is **UNCONFIRMED** — check at
-  build 6/9.
+  enables it, Phase 3). The **50-message cap is CONFIRMED** (build 9):
+  `PingManager.maxCaughtHistory = 50`, FIFO drop-oldest; it now governs the unified
+  bucket and opened link messages count toward it (locked decision #3).
 
 ### Banked Items (findings pass 2 — tagged with trigger build)
 - **[build 8+ styling] Location-hint legibility.** The build-6 hint ("add
@@ -405,11 +485,12 @@ your messages will see you ✦").
   visible. Increase its visual weight — but **design against the POST-pairing card**
   (build 8 removes the competing status rows), so style it after pairing removal to
   avoid doing it twice.
-- **[build 8/9] Sarah dev-seed idempotency** uses the OLD `person(forPairedUserID:)`
-  lookup → breaks down as pairing retires (created a **duplicate Sarah** in
-  testing). When pairing is removed, either drop the Sarah dev-seed or repoint it to
-  `person(forSenderID:)`. Sarah is **⚠️ DO-NOT-REMOVE** (drives `-skipOnboarding` +
-  `testSkipOnboardingInjectsSarah`) — coordinate carefully.
+- **[build 9 — ✅ DONE] Sarah dev-seed repointed.** Was keyed on
+  `person(forPairedUserID:)` + `insertFromInvite`; now dedups + inserts via the
+  link-era `upsertContact(senderID: mockFriendID)` (mirror-write keeps her
+  `pairedUserID`, so `testSkipOnboardingInjectsSarah` passes unchanged).
+  `setMockDistance` repointed to `person(forSenderID:)`. Sarah remains
+  **⚠️ DO-NOT-REMOVE**.
 - **[build 2 / identity hardening] Duplicate `users` rows.** App delete+reinstall
   and/or `-skipOnboarding` can create a duplicate / null-name `users` row (orphan
   observed). Joshua's real account = `users.id 3ef2a987-…`, short_code **DS2CVW**,
@@ -435,6 +516,28 @@ your messages will see you ✦").
   **UNCHECK before any onboarding test** (build 10) or it skips the thing under test.
   It also **bypasses name capture** — the source of the null-name-orphan + the
   display-name-NULL bug class (see the display-name fix above).
+
+### Banked Items (findings pass 3 — session lock-up)
+- **[build 10 / People-polish — taste] Launch opens to the most-recent SENDER**, not
+  the last-manually-selected person (build 6's recency launch default — Joshua
+  noticed). Taste call — revisit with the People-tab polish.
+- **[B1 follow-up] `MessageComposerView`** (the iMessage wrapper, defined in
+  `ConnectView.swift`) is a **SHARED helper kept LIVE for PersonDetailView's connect**
+  flow — it sits **outside** ConnectView's `#if false`. When B1 (PersonDetailView
+  connect) is cut, **re-check if it's then orphaned**.
+- **[cleanup pass] Xcode warnings — 14 total, build ships clean.** Build 9 cleared
+  **2** (`compass_bearings` + `connections` `postgresChange`). Remaining for cleanup:
+  hoist `PingPayload`/`ConnectionRow` (MainActor `Encodable`); `@MainActor`-annotate
+  `InstrumentOptionPicker`/`ProSetupView` init calls; `subscribeWithError` + the new
+  filter syntax (with an SDK bump); MapKit `placemark` → `location`/`address`; 1
+  unused-var is in **locked animation territory** (animation chat). **DECISION: stay
+  in Swift 5 language mode THROUGH LAUNCH** — do not flip to Swift 6 pre-launch (the
+  concurrency warnings would become hard errors).
+- **[Joshua-requested] Pre-App-Store CLEANUP PASS** — tighten + consolidate
+  transitional logic (the mirror-write bridge etc.), **hard-delete** the commented
+  code, test audit (remove dead pairing tests **only after confirming not-live**; ADD
+  coverage for the link-model paths), final doc cleanup. (Now an explicit step in the
+  back-half build order.)
 
 ### Phase 2 Scope & Decisions (this session)
 - **Scope — explicitly EXCLUDED** (animation-chat / parked; NOT part of the
