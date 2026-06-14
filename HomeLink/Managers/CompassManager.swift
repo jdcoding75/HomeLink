@@ -56,16 +56,28 @@ final class CompassManager: NSObject, ObservableObject {
     }
 
     /// Publish person identity right away, using the best-known location if any.
+    ///
+    /// LOCATION POLICY:
+    /// REQUIRES_REAL: false (degrades to a seeded per-person bearing)
+    /// FAKE_STRATEGY: seeded from senderID when target/user has no real location
+    /// DEGRADES_TO: stable seeded direction; numeric distance hidden (rawBearing nil)
+    /// MUTUAL_ONLY: false
     private func seedState(with person: Person) {
         let activeSkin = resolvedSkin(for: person)
+        let hasRealLocation = (person.latitude != 0 || person.longitude != 0) && userLocation != nil
         var distance = 0.0
-        var bearing  = 0.0
-        if let userLocation {
+        let bearing: Double
+        if hasRealLocation, let userLocation {
             distance = BearingCalculator.distanceKm(from: userLocation.coordinate,
                                                     to: person.coordinate)
-            bearing  = (BearingCalculator.bearing(from: userLocation.coordinate,
-                                                  to: person.coordinate)
-                        - currentHeading + 360).truncatingRemainder(dividingBy: 360)
+            let abs = BearingCalculator.bearing(from: userLocation.coordinate, to: person.coordinate)
+            rawBearingToTarget = abs                            // real-location signal
+            bearing = (abs - currentHeading + 360).truncatingRemainder(dividingBy: 360)
+        } else {
+            // SEEDED: stable per-person direction, heading-only (no user fix needed).
+            let abs = Self.seededAbsoluteBearing(for: person)
+            rawBearingToTarget = nil                            // the "this is seeded" signal
+            bearing = (abs - currentHeading + 360).truncatingRemainder(dividingBy: 360)
         }
         wasLocked = false
         state = CompassState(
@@ -78,7 +90,7 @@ final class CompassManager: NSObject, ObservableObject {
             tagline:          person.tagline,
             pendingPingEmoji: state.pendingPingEmoji,
             isLocked:         false,
-            isFarFromHome:    userLocation != nil && distance > farFromHomeThresholdKm,
+            isFarFromHome:    hasRealLocation && distance > farFromHomeThresholdKm,
             activeSkin:       activeSkin
         )
         AppGroupStore.activePersonName  = person.name
@@ -120,7 +132,17 @@ final class CompassManager: NSObject, ObservableObject {
 
     /// Steady-lock only, paired-person only, at most once per FIVE minutes —
     /// the silent presence signal behind the partner's edge glow.
+    ///
+    /// LOCATION POLICY:
+    /// REQUIRES_REAL: true (mutual pointing is the one feature that needs it)
+    /// FAKE_STRATEGY: not applicable — skip entirely when seeded
+    /// DEGRADES_TO: feature simply does not fire
+    /// MUTUAL_ONLY: true
     private func reportPointingIfNeeded(target: Person, bearing: Double) {
+        // [build7] REAL-LOCATION GUARD — never report a SEEDED bearing. Build 5
+        // mirror-writes pairedUserID = senderID, so the pairing gate alone could
+        // trip on a link contact; require a real bearing (rawBearingToTarget != nil).
+        guard rawBearingToTarget != nil else { return }
         guard let friend = SupabaseService.connectedFriendID,
               target.pairedUserID == friend.uuidString,
               Date.now.timeIntervalSince(lastPointingReport) > 300
@@ -207,14 +229,53 @@ final class CompassManager: NSObject, ObservableObject {
     /// reported bearing. nil until a location fix exists.
     @Published private(set) var rawBearingToTarget: Double?
 
+    /// [phase2 build7] A deterministic 0–360° bearing for a contact, derived from
+    /// the immutable key. Used as the SEEDED fallback when there's no real
+    /// location — same person always appears from the SAME direction (feels
+    /// intentional, not broken).
+    ///
+    /// LOCATION POLICY:
+    /// REQUIRES_REAL: false
+    /// FAKE_STRATEGY: seeded from senderID (fallback person.id) → 0–360°
+    /// DEGRADES_TO: a stable per-person compass direction (same every launch)
+    /// MUTUAL_ONLY: false
+    ///
+    /// FNV-1a over the key's UTF-8 bytes — STABLE across launches/devices. NOT
+    /// Swift's `Hashable.hashValue` (per-process randomized → a different
+    /// direction every launch).
+    static func seededAbsoluteBearing(for person: Person) -> Double {
+        let key = (person.senderID?.isEmpty == false) ? person.senderID! : person.id.uuidString
+        var hash: UInt64 = 1469598103934665603              // FNV-1a offset basis
+        for byte in key.utf8 {
+            hash = (hash ^ UInt64(byte)) &* 1099511628211    // FNV-1a prime
+        }
+        return Double(hash % 360)
+    }
+
+    /// LOCATION POLICY:
+    /// REQUIRES_REAL: false (degrades to a seeded per-person bearing)
+    /// FAKE_STRATEGY: seeded from senderID when target/user has no real location
+    /// DEGRADES_TO: stable seeded direction; numeric distance hidden (rawBearing nil)
+    /// MUTUAL_ONLY: false (mutual pointing is guarded separately — see reportPointing)
     private func updateCompassState() {
-        guard let userLocation, let target = targetPerson else { return }
-        let userCoord   = userLocation.coordinate
-        let targetCoord = target.coordinate
-        let rawBearing  = BearingCalculator.bearing(from: userCoord, to: targetCoord)
-        rawBearingToTarget = rawBearing
-        let distance    = BearingCalculator.distanceKm(from: userCoord, to: targetCoord)
-        let relativeBearing = (rawBearing - currentHeading + 360)
+        guard let target = targetPerson else { return }
+        // REAL only when the TARGET has a real coordinate AND we have a user fix.
+        // Otherwise SEEDED — which needs only `currentHeading` (magnetometer,
+        // location-independent), so it must paint even when the USER has no fix.
+        let hasRealLocation = (target.latitude != 0 || target.longitude != 0) && userLocation != nil
+        let absoluteBearing: Double
+        let distance: Double
+        if hasRealLocation, let userLocation {
+            let userCoord = userLocation.coordinate
+            absoluteBearing = BearingCalculator.bearing(from: userCoord, to: target.coordinate)
+            rawBearingToTarget = absoluteBearing                 // real-location signal
+            distance = BearingCalculator.distanceKm(from: userCoord, to: target.coordinate)
+        } else {
+            absoluteBearing = Self.seededAbsoluteBearing(for: target)
+            rawBearingToTarget = nil                             // the "this is seeded" signal
+            distance = 0                                          // no real distance; UI hides it
+        }
+        let relativeBearing = (absoluteBearing - currentHeading + 360)
             .truncatingRemainder(dividingBy: 360)
         let bearingDiff  = min(relativeBearing, 360 - relativeBearing)
         let isNowLocked  = bearingDiff <= lockThresholdDegrees
@@ -228,8 +289,9 @@ final class CompassManager: NSObject, ObservableObject {
         }
         // Ambient presence: only after the needle has RESTED on them for
         // 10+ seconds — a held gaze, not a glance. Throttled to 5 minutes.
+        // (reportPointing self-guards on real location — never fires for seeded.)
         if isNowLocked, Date.now.timeIntervalSince(lockedSince) >= 10 {
-            reportPointingIfNeeded(target: target, bearing: rawBearing)
+            reportPointingIfNeeded(target: target, bearing: absoluteBearing)
         }
         wasLocked = isNowLocked
         let activeSkin = resolvedSkin(for: target)
@@ -243,11 +305,11 @@ final class CompassManager: NSObject, ObservableObject {
             tagline:          target.tagline,
             pendingPingEmoji: state.pendingPingEmoji,
             isLocked:         isNowLocked,
-            isFarFromHome:    distance > farFromHomeThresholdKm,
+            isFarFromHome:    hasRealLocation && distance > farFromHomeThresholdKm,
             activeSkin:       activeSkin
         )
         AppGroupStore.activeBearing    = relativeBearing
-        AppGroupStore.activeDistanceKm = distance
+        AppGroupStore.activeDistanceKm = hasRealLocation ? distance : 0   // widget: no null-island km for seeded
         AppGroupStore.activePersonName = target.name
         AppGroupStore.activePersonEmoji = target.emoji
         AppGroupStore.activeTagline    = target.resolvedTagline

@@ -1,6 +1,13 @@
 // DirectionResolver.swift
 // Pointward › AnimationEngine
 //
+// ⚠️ ORPHANED / NOT LIVE (verified phase2 build7) — ZERO callers. The LIVE
+// direction source is `CompassManager` (`state.bearingDegrees` + the seeded
+// fallback, build 7). This file's rotating `symbolicBearing()` CONTRADICTS the
+// seeded-STABLE rule (same person → same direction), and its `pairedUserID` gate
+// is now wrong (Build 5 mirror-writes pairedUserID = senderID). Do NOT revive
+// without a rewrite.
+//
 // SINGLE SOURCE OF TRUTH for direction.
 //
 // RULE:

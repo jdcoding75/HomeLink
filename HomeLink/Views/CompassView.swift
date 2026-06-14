@@ -218,8 +218,14 @@ struct CompassView: View {
                     nameHeader
                         .padding(.top, 16)
 
-                    distanceLine
-                        .padding(.top, 6)
+                    // [build7] Seeded contacts (no real location) have no real
+                    // distance — hide the number entirely (rawBearingToTarget == nil
+                    // is the seeded signal). Keeps the bogus null-island km / funny /
+                    // light-speed lines off the compass; the seeded DIRECTION stays.
+                    if compass.rawBearingToTarget != nil {
+                        distanceLine
+                            .padding(.top, 6)
+                    }
 
                     Spacer(minLength: 12)
 
