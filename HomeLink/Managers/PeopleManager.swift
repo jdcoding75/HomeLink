@@ -29,8 +29,24 @@ final class PeopleManager: ObservableObject {
 
     func fetchAll() {
         guard let context = modelContext else { return }
-        let descriptor = FetchDescriptor<Person>(sortBy: [SortDescriptor(\.createdAt)])
-        people = (try? context.fetch(descriptor)) ?? []
+        // [phase2 build6] RECENCY SORT — most-recent SENDER first. Fetch unsorted,
+        // then sort in Swift: SwiftData SortDescriptor places `nil` on an optional
+        // Date? unreliably, and we need an explicit nils-last rule.
+        //   primary:   lastReceivedAt DESCENDING, nils LAST (link contacts on top)
+        //   secondary: createdAt DESCENDING (the nil group stays newest-first)
+        // people.first therefore becomes the most-recent sender (approved launch
+        // default) — and stays well-defined for an all-nil list (fresh user /
+        // Alex-only): it falls through to createdAt-desc, never empty/crashing.
+        let all = (try? context.fetch(FetchDescriptor<Person>())) ?? []
+        people = all.sorted { a, b in
+            switch (a.lastReceivedAt, b.lastReceivedAt) {
+            case let (l?, r?): if l != r { return l > r }   // both have a value
+            case (.some, nil): return true                  // a recent, b never → a first
+            case (nil, .some): return false                 // b recent → b first
+            case (nil, nil):   break                         // both never → secondary
+            }
+            return a.createdAt > b.createdAt                 // secondary: newest created first
+        }
         if selectedPerson == nil { selectedPerson = people.first }
     }
 

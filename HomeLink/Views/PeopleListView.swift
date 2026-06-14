@@ -40,6 +40,7 @@ struct PeopleListView: View {
 
                     // Person cards
                     VStack(spacing: 12) {
+                        let dupes = duplicatedNameKeys
                         ForEach(people.people) { person in
                             PersonCard(
                                 person: person,
@@ -47,7 +48,10 @@ struct PeopleListView: View {
                                 distanceText: distanceText(for: person),
                                 isConnected: isConnected(person),
                                 isPending: isPending(person),
-                                lastSeenText: lastSeenText(for: person)
+                                lastSeenText: lastSeenText(for: person),
+                                showLocationHint: needsLocation(person),
+                                disambiguator: disambiguator(for: person, dupes: dupes),
+                                hideConnectionStatus: isLinkContact(person)
                             ) {
                                 // Tap card → select + open the detail view
                                 people.select(person)
@@ -55,6 +59,9 @@ struct PeopleListView: View {
                                 HapticEngine.personSelected()
                                 detailPerson = person
                             } onEdit: {
+                                editPerson = person
+                            } onAddLocation: {
+                                // The location hint taps straight into the edit path.
                                 editPerson = person
                             }
                         }
@@ -158,6 +165,54 @@ struct PeopleListView: View {
         }
     }
 
+    // MARK: - [phase2 build6] Display helpers
+
+    /// A LINK-era contact (auto-created on receive, Build 5) carries a senderID.
+    /// Gate on senderID — NOT pairedUserID, which Build 5 mirror-writes = senderID,
+    /// so it's no longer a reliable "is pairing contact" signal.
+    private func isLinkContact(_ person: Person) -> Bool {
+        !(person.senderID ?? "").isEmpty
+    }
+
+    /// No real address set → the contact card shows the gentle add-location hint
+    /// (and the bogus null-island distance/name line is suppressed).
+    private func needsLocation(_ person: Person) -> Bool {
+        person.latitude == 0 && person.longitude == 0
+    }
+
+    /// The lowercased name keys shared by ≥2 contacts — drives disambiguation.
+    private var duplicatedNameKeys: Set<String> {
+        var counts: [String: Int] = [:]
+        for p in people.people {
+            let key = p.name.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            if !key.isEmpty { counts[key, default: 0] += 1 }
+        }
+        return Set(counts.filter { $0.value >= 2 }.keys)
+    }
+
+    /// For a card whose name collides with another, a subtle suffix line:
+    /// "<name> · <place ?? relative-time>". `nil` for unique names (card renders
+    /// today's location line unchanged).
+    private func disambiguator(for person: Person, dupes: Set<String>) -> String? {
+        let key = person.name.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard dupes.contains(key) else { return nil }
+        let suffix = placeComponent(for: person)
+            ?? PoeticTime.string(for: person.lastReceivedAt ?? person.createdAt)
+        return "\(person.name) · \(suffix)"
+    }
+
+    /// First component of locationDisplayName when it's a real place AND not just
+    /// the name echoed back (link contacts seed locationDisplayName = name).
+    private func placeComponent(for person: Person) -> String? {
+        let loc = person.locationDisplayName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !loc.isEmpty else { return nil }
+        let first = (loc.split(separator: ",").first.map(String.init) ?? loc)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let name = person.name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !first.isEmpty, first.lowercased() != name.lowercased() else { return nil }
+        return first
+    }
+
     // MARK: - Subviews
 
     /// [phase2 4b] "someone sent me something, let me get it" — opens the
@@ -220,8 +275,19 @@ struct PersonCard: View {
     let isConnected: Bool
     var isPending: Bool = false   // [1/3] one-sided pairing — dim, "pending"
     let lastSeenText: String?
+    var showLocationHint: Bool = false      // [build6] zero-location → add-location hint
+    var disambiguator: String? = nil        // [build6] same-name suffix line
+    var hideConnectionStatus: Bool = false  // [build6] suppress pairing row for link contacts
     let onTap: () -> Void
     let onEdit: () -> Void
+    var onAddLocation: () -> Void = {}       // [build6] hint tap → edit path
+
+    /// [build6] Avatar fallback for emoji-less contacts (Build 5 leaves emoji "").
+    /// First letter of the name, uppercased; a neutral ✦ when the name is empty.
+    private var monogram: String {
+        let trimmed = person.name.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.first.map { String($0).uppercased() } ?? "✦"
+    }
 
     var body: some View {
         HStack(spacing: 16) {
@@ -231,8 +297,17 @@ struct PersonCard: View {
                     .fill(Color(hex: "#9b7fc0").opacity(isSelected ? 0.32 : 0.15))
                     .frame(width: 60, height: 60)
                     .blur(radius: 12)
-                Text(person.emoji)
-                    .font(.system(size: 30))
+                Group {
+                    if person.emoji.isEmpty {
+                        // [build6] Monogram fallback — emoji-less link contact.
+                        Text(monogram)
+                            .font(.system(size: 26, weight: .semibold, design: .serif))
+                            .foregroundColor(DesignTokens.Color.accentSoft)
+                    } else {
+                        Text(person.emoji)
+                            .font(.system(size: 30))
+                    }
+                }
                     .frame(width: 60, height: 60)
                     .background(DesignTokens.Color.backgroundLift)
                     .cornerRadius(18)
@@ -251,15 +326,36 @@ struct PersonCard: View {
                     .font(.system(size: 17, weight: .semibold))
                     .foregroundColor(DesignTokens.Color.textPrimary)
 
-                Text(distanceText
-                     ?? (person.displayAddress.isEmpty
-                         ? person.locationDisplayName
-                         : person.displayAddress))
-                    .font(.system(size: 11))
-                    .foregroundColor(DesignTokens.Color.textMuted)
-                    .lineLimit(1)
+                // [build6] Location line. Priority: zero-location HINT (also kills
+                // the bogus null-island distance / name-echo) → same-name
+                // disambiguator → today's distance/address line.
+                if showLocationHint {
+                    Button(action: onAddLocation) {
+                        Text("add location for accurate compass · add now ✦")
+                            .font(.system(size: 11, design: .serif).italic())
+                            .foregroundColor(DesignTokens.Color.accentSoft)
+                            .lineLimit(1)
+                    }
+                    .buttonStyle(.plain)
+                } else if let disambiguator {
+                    Text(disambiguator)
+                        .font(.system(size: 11))
+                        .foregroundColor(DesignTokens.Color.textMuted)
+                        .lineLimit(1)
+                } else {
+                    Text(distanceText
+                         ?? (person.displayAddress.isEmpty
+                             ? person.locationDisplayName
+                             : person.displayAddress))
+                        .font(.system(size: 11))
+                        .foregroundColor(DesignTokens.Color.textMuted)
+                        .lineLimit(1)
+                }
 
                 // Connection status — green linked · amber pending · grey unlinked
+                // [build6] Suppressed for LINK contacts (senderID set) — pairing-era
+                // row; would wrongly read "not yet linked". Removed entirely in build 8.
+                if !hideConnectionStatus {
                 HStack(spacing: 5) {
                     Circle()
                         .fill(isConnected ? Color(hex: "#5dcaa5")
@@ -277,6 +373,7 @@ struct PersonCard: View {
                         .lineLimit(1)
                 }
                 .padding(.top, 1)
+                }   // [build6] end if !hideConnectionStatus
             }
             // [1/3] Scenario 4 — a pending (one-sided) connection reads dim.
             .opacity(isPending ? 0.55 : 1.0)
