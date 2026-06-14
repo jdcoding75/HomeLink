@@ -12,6 +12,7 @@ _Updated this session: Phase 2 progress + findings pass — builds 1–4b shippe
 _Findings pass 2: builds 5–6 + display-name/shortCode fix DONE & device-verified; sharpened the build-9 bucket finding (pings-table vs messages-table seam); banked hint legibility, Sarah dev-seed, duplicate-users, onboarding-emoji, share-sheet, and send-sound-distortion notes._
 _Session lock-up: builds 5–9 (safe half) shipped & ledgered; CRITICAL link-send-`#if DEBUG` / delivery-backbone finding banked; bucket finding RESOLVED (sender-agnostic, local); 3 locked bucket decisions; back-half re-sequenced (11b cutover → 9b delivery-retire → 10 onboarding → 11 tests → 12 web → cleanup); build-9 left-intentionally flags + findings-pass-3 notes. CLAUDE.md: standing build patterns added._
 _Build 12 reframed: SHOW-THE-MESSAGE static web page (fetch+display via getMessage(id), no animation) pulled to pre-launch; the animated-in-browser version stays Phase 3._
+_Build 12 wording refreshed: contained / Claude-buildable static page (Joshua has no HTML experience); animated browser version remains Phase 3._
 
 ---
 
@@ -420,17 +421,18 @@ decision-heavy, fresh-mind work.**
   `pointward` repo / GitHub Pages). For a recipient **WITHOUT the app**: the page
   fetches the message via the existing anon `getMessage(id)` Supabase function (built
   in build 2) and **DISPLAYS it** — emoji, message text, sender name — in a calm,
-  branded layout, with a "get the app to send one back" invitation below. This
-  delivers the emotional payload (someone thought of you + what they said) WITHOUT the
-  app and WITHOUT rebuilding any animation. **Rationale:** most new users arrive via a
-  received link; showing the message before the install flips arrival from a toll gate
-  ("install to see it") to a gift ("that's lovely — get the app to reply"). Static
-  HTML/CSS reading data we already store; **zero risk to the app** (separate repo /
-  language). The **ANIMATED** version (recreating the instrument animation in the
-  browser) stays **DEFERRED to Phase 3** — that's the deep fidelity/time hole; the
-  static show-the-message version captures most of the emotional value at a fraction
-  of the cost. **Pull forward to pre-launch** so the day-1 test-with-others experience
-  is good for no-app recipients.
+  branded layout, with a "get the app to send one back" invitation below. Delivers the
+  emotional payload (someone thought of you + what they said) WITHOUT the app and
+  WITHOUT rebuilding any animation. **Rationale:** most new users arrive via a received
+  link, so showing the message before install flips arrival from a toll gate ("install
+  to see it") to a gift ("that's lovely — get the app to reply"). Static HTML/CSS
+  reading already-stored data; **zero risk to the app** (separate repo / language;
+  Joshua has no HTML experience but the page is contained and Claude-buildable). The
+  **ANIMATED** browser version (recreating the instrument animation in the browser)
+  stays **DEFERRED to Phase 3** — the deep fidelity/time hole; the static
+  show-the-message version captures most of the emotional value at a fraction of the
+  cost. **Pull forward to pre-launch** so the day-1 test-with-others experience is good
+  for no-app recipients.
 - **cleanup pass** — tighten/consolidate transitional logic (the mirror-write
   bridge etc.), **hard-delete** the commented code, test audit, final TRUTH cleanup.
 
