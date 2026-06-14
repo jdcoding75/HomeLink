@@ -45,21 +45,27 @@ enum DevTools {
         SupabaseService.connectedFriendID = mockFriendID
         if SupabaseService.localUserID == nil { SupabaseService.localUserID = mockMeID }
 
-        if let existing = people.person(forPairedUserID: mockFriendID) {
-            // Sarah already exists (a prior launch) — just re-select her and the
-            // connection; do NOT re-seed history, or thoughts pile up every launch.
-            people.select(existing)
-        } else {
-            let sarah = Person(
-                name: mockName, emoji: mockEmoji,
-                latitude: mockCoord.latitude, longitude: mockCoord.longitude,
-                displayAddress: "New York, NY", locationDisplayName: "New York",
-                pairedUserID: mockFriendID.uuidString, tagline: mockTagline)
-            people.insertFromInvite(sarah)
+        // [build9] Sarah repointed off pairing: dedup + insert via the link-era
+        // upsertContact (senderID-keyed). It mirror-writes pairedUserID = senderID,
+        // so the legacy delivery recipient + the connected-status still work, and
+        // `person(forSenderID:)` is now her lookup key (no more person(forPairedUserID:)).
+        let isNew = people.person(forSenderID: mockFriendID.uuidString) == nil
+        let sarah = people.upsertContact(senderID: mockFriendID.uuidString,
+                                         displayName: mockName)
+        // upsertContact creates a location-less, emoji-less contact — give the dev
+        // mock her full identity (NYC, emoji, tagline) so the compass points at her.
+        if let sarah {
+            sarah.emoji               = mockEmoji
+            sarah.latitude            = mockCoord.latitude
+            sarah.longitude           = mockCoord.longitude
+            sarah.displayAddress      = "New York, NY"
+            sarah.locationDisplayName = "New York"
+            sarah.tagline             = mockTagline
+            try? people.save()
             people.select(sarah)
-            // Seed history once, only when Sarah is first created.
-            if withHistory, let pings { injectMockHistory(pings: pings) }
         }
+        // Seed history once, only when Sarah is FIRST created.
+        if isNew, withHistory, let pings { injectMockHistory(pings: pings) }
     }
 
     /// Five mixed-instrument thoughts to partially fill the bucket — good for
@@ -247,7 +253,7 @@ enum DevTools {
     /// distance display can be tested without travelling. 1° lat ≈ 111.2 km.
     @MainActor
     static func setMockDistance(farAway: Bool, people: PeopleManager, compass: CompassManager) {
-        guard let sarah = people.person(forPairedUserID: mockFriendID) else { return }
+        guard let sarah = people.person(forSenderID: mockFriendID.uuidString) else { return }
         let km = farAway ? 5000.0 : 0.5
         sarah.latitude  = mockCoord.latitude + km / 111.2
         sarah.longitude = mockCoord.longitude

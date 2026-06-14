@@ -84,13 +84,15 @@ struct RootView: View {
         // .animation(.easeOut(duration: 0.8), value: pings.mutualMoment != nil)
         // Our own lock edge can complete the mutual moment too — their
         // pointing report may have arrived seconds before we settled.
-        .onChange(of: compass.state.isLocked) { _, locked in
-            guard locked, let raw = compass.rawBearingToTarget else { return }
-            pings.checkMutualPointing(
-                myAbsoluteBearing: raw,
-                myAlignmentError: BearingCalculator.alignmentError(
-                    relativeBearing: compass.state.bearingDegrees))
-        }
+        // [build9] mutual-pointing retired (pure pairing) — the lock no longer
+        // feeds checkMutualPointing.
+        // .onChange(of: compass.state.isLocked) { _, locked in
+        //     guard locked, let raw = compass.rawBearingToTarget else { return }
+        //     pings.checkMutualPointing(
+        //         myAbsoluteBearing: raw,
+        //         myAlignmentError: BearingCalculator.alignmentError(
+        //             relativeBearing: compass.state.bearingDegrees))
+        // }
         .onAppear {
             people.configure(with: modelContext)
             #if DEBUG
@@ -236,23 +238,22 @@ struct RootView: View {
         }
         Task { await SupabaseService.shared.touchLastSeen() }   // "active recently"
         Task {
-            // Discover connections made from either side and bind them to
-            // the correct person cards (owner_person_id when known).
-            var partner = SupabaseService.connectedFriendID
-            do {
-                let connections = try await SupabaseService.shared.refreshConnections()
-                await MainActor.run {
-                    for connection in connections {
-                        people.bindConnection(friendID: connection.partnerID,
-                                              toPersonID: connection.myPersonID)
-                    }
-                }
-                partner = connections.first?.partnerID ?? partner
-            } catch {
-                // Offline at launch — realtime still opens (it reconnects);
-                // bindings refresh on the next foreground.
-                rootLog.error("realtime: connection discovery failed: \(error.localizedDescription, privacy: .public)")
-            }
+            // [build9] pairing DISCOVER retired (refreshConnections + bindConnection).
+            // `partner` is now just the cached connectedFriendID (delivery fallback
+            // for the pings realtime — left intact).
+            let partner = SupabaseService.connectedFriendID
+            // do {
+            //     let connections = try await SupabaseService.shared.refreshConnections()
+            //     await MainActor.run {
+            //         for connection in connections {
+            //             people.bindConnection(friendID: connection.partnerID,
+            //                                   toPersonID: connection.myPersonID)
+            //         }
+            //     }
+            //     partner = connections.first?.partnerID ?? partner
+            // } catch {
+            //     rootLog.error("realtime: connection discovery failed: …")
+            // }
 
             // OFFLINE CATCH-UP: sweep every paired person for thoughts that
             // arrived while we were away — newest becomes the catch, the
@@ -290,40 +291,11 @@ struct RootView: View {
                         pings.lastFeltAt = .now
                     }
                 },
-                onPointed: { bearing in
-                    Task { @MainActor in
-                        let name = partner.flatMap { p in
-                            people.people.first { $0.pairedUserID == p.uuidString }?.name
-                        } ?? "someone"
-                        // Ambient presence — the compass edge glows; their
-                        // bearing feeds the mutual-pointing check.
-                        pings.presenceFelt(name: name, bearing: bearing)
-                        // If WE are already resting on them, this may be the
-                        // mutual moment — the compass screen completes the check.
-                        if let raw = compass.rawBearingToTarget {
-                            pings.checkMutualPointing(
-                                myAbsoluteBearing: raw,
-                                myAlignmentError: BearingCalculator.alignmentError(
-                                    relativeBearing: compass.state.bearingDegrees))
-                        }
-                    }
-                },
-                onPaired: { connection in
-                    Task { @MainActor in
-                        rootLog.info("pairing: claim detected over realtime — celebrating ✦")
-                        // [build8] bindConnection plumbing kept (data layer = build 9);
-                        // the inviter-celebration RENDER trigger is stripped.
-                        people.bindConnection(friendID: connection.partnerID,
-                                              toPersonID: connection.myPersonID)
-                        // celebratePerson = people.people.first {
-                        //     $0.pairedUserID == connection.partnerID.uuidString
-                        // }
-                        // // Don't interrupt a pairing flow already on screen
-                        // if pairRequest == nil && !showInviterCelebration {
-                        //     showInviterCelebration = true
-                        // }
-                    }
-                }
+                // [build9] mutual-pointing + pairing-claim retired → no-op closures
+                // (kept in the signature; the realtime pairing streams that fired
+                // them are commented in SupabaseService.startRealtime).
+                onPointed: { _ in },
+                onPaired: { _ in }
             )
         }
     }

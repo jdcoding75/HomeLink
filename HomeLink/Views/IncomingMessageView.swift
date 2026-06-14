@@ -169,6 +169,12 @@ struct IncomingMessageView: View {
                         // is interrupted before completion.
                         people.upsertContact(senderID: result.senderID.uuidString,
                                              displayName: result.senderDisplayName)
+                        // [build9] Record the opened message into the unified
+                        // (sender-agnostic) bucket. Previously /m/ opens were NEVER
+                        // recorded — only short-code "rest" were — so opened link
+                        // messages were missing from history. remoteID = message.id
+                        // dedups against a later short-code claim of the same message.
+                        pings.recordCaught(historyPing(from: result))
                     } else {
                         phase = .notFound
                     }
@@ -205,6 +211,26 @@ struct IncomingMessageView: View {
             remoteID:    nil,                                  // a message is NOT a ping
             senderStyle: instrumentStyle(from: m).rawValue,
             message:     m.content,                            // nil/empty reads fine
+            tagline:     nil,
+            isTest:      false)
+    }
+
+    /// [build9] The opened message as a unified-bucket history entry. remoteID =
+    /// message.id so a later short-code claim of the SAME message dedups (no
+    /// duplicate). Distinct from `receivedPing` (which feeds the receipt with
+    /// remoteID nil — "a message is NOT a ping").
+    private func historyPing(from m: Message) -> PingManager.ReceivedPing {
+        let name = (m.senderDisplayName?.trimmingCharacters(in: .whitespaces)).flatMap {
+            $0.isEmpty ? nil : $0
+        } ?? "someone"
+        let emoji = (m.emoji?.isEmpty == false ? m.emoji! : CuratedEmoji.defaultEmoji)
+        return PingManager.ReceivedPing(
+            fromName:    name,
+            emoji:       emoji,
+            timestamp:   .now,
+            remoteID:    m.id,
+            senderStyle: instrumentStyle(from: m).rawValue,
+            message:     m.content,
             tagline:     nil,
             isTest:      false)
     }

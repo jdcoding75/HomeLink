@@ -15,6 +15,9 @@ final class Person {
     var longitude:           Double
     var displayAddress:      String
     var locationDisplayName: String
+    /// [build9] UNUSED — never read anywhere (the planned dynamic-live-location
+    /// mode was never built). Left in place: commenting a SwiftData stored property
+    /// is a lightweight migration for zero benefit. Retire in a schema-cleanup pass.
     var isDynamic:           Bool
     var pairedUserID:        String?
     var tagline:             String?

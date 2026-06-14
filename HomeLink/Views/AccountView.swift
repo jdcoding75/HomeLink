@@ -330,6 +330,10 @@ struct AccountView: View {
 
 // MARK: - Pairing celebration
 
+// [build9] Pairing celebration retired — now fully orphaned (its callers — the
+// /pair accept sheet + the inviter celebration — were stripped in build 8).
+// Reversible via #if false / #endif. Full deletion is a later cleanup pass.
+#if false
 /// The moment two compasses link — a full-screen ritual, not a popup.
 /// Two compass faces drift in from opposite edges, meet at the center,
 /// and the connection settles in around them.
@@ -487,6 +491,7 @@ struct PairingCelebrationView: View {
         withAnimation(.easeOut(duration: 0.5).delay(2.0))  { showButton   = true }
     }
 }
+#endif
 
 // removed — see SESSION_LOG.md for history (AccountView disabled via #if false)
 #if false
@@ -497,6 +502,8 @@ struct PairingCelebrationView: View {
 }
 #endif
 
+// [build9] Celebration preview disabled with its (retired) view.
+#if false
 #Preview("Celebration") {
     PairingCelebrationView(
         person: Person(
@@ -508,3 +515,4 @@ struct PairingCelebrationView: View {
     )
     .preferredColorScheme(.dark)
 }
+#endif

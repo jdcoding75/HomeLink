@@ -928,12 +928,11 @@ struct CompassView: View {
 
     var body: some View {
         decoratedRoot
-        .task(id: people.selectedPerson) { await loadCompassThoughts() }
+        // [build9] Unified bucket is sender-agnostic → reload keys off caughtHistory
+        // (the local source), not selectedPerson. Runs once on appear + on change.
+        .task(id: pings.caughtHistory.count) { await loadCompassThoughts() }
         .onChange(of: pings.queueCount) { _, _ in
             Task { await loadCompassThoughts() }   // a new thought just landed
-        }
-        .onChange(of: pings.caughtHistory.count) { _, _ in
-            Task { await loadCompassThoughts() }   // [2/5] a thought was caught → history
         }
         .onChange(of: pings.replayRequest) { _, req in
             // When the app-wide replay finishes (request clears), fade in the
@@ -2292,7 +2291,9 @@ struct CompassView: View {
     /// that person. The most emotional moment in the app.
     private func replayThought(_ rec: SupabaseService.PingRecord) {
         withAnimation(AnimationSystem.easeOutCubic(0.3)) { showThoughtsDrawer = false }
-        pendingReplayCaption = "from \(compass.state.personName) · \(Self.timeAgo(rec.createdAt))"
+        // [build9] Sender-agnostic bucket → attribute to the item's OWN sender,
+        // falling back to the tracked person only when the record carries no name.
+        pendingReplayCaption = "from \(rec.fromName ?? compass.state.personName) · \(Self.timeAgo(rec.createdAt))"
         // [swipe] Pass the FULL sorted list (unread-first) so the replay can
         // swipe between thoughts; start at the tapped one.
         let list = sortedThoughts
@@ -2301,7 +2302,7 @@ struct CompassView: View {
             PingManager.ReplayItem(emoji: $0.emoji,
                                    bearingDegrees: compass.state.bearingDegrees,
                                    styleRaw: $0.senderStyle,
-                                   fromName: compass.state.personName,
+                                   fromName: $0.fromName ?? compass.state.personName,
                                    message: $0.message,        // AUDIT [5/6]
                                    tagline: $0.tagline)
         }
@@ -2310,45 +2311,28 @@ struct CompassView: View {
         }
     }
 
-    /// Recent RECEIVED thoughts from the currently-tracked person, newest first.
-    /// [2/5] Merges SERVER history (real thoughts, per-person) with LOCAL caught
-    /// history (dev test thoughts + an offline fallback) so every caught thought
-    /// shows in the bucket — deduped by id, newest first.
+    /// [build9] The UNIFIED, SENDER-AGNOSTIC bucket: EVERY thought sent to you,
+    /// newest first — regardless of the currently-selected person. Built purely
+    /// from LOCAL `caughtHistory` (capped 50): there is NO server "messages sent to
+    /// me" query (the `messages` table is sender-keyed, no recipient column), so the
+    /// old `fetchPings(with: pairedUserID)` server call + the per-person
+    /// `fromName == selectedPerson` filter are both GONE. /m/ opens (build 9),
+    /// short-code claims, and legacy pings all record into `caughtHistory`, so this
+    /// local set is now the complete record. `isTest` dev thoughts still pass.
     private func loadCompassThoughts() async {
-        guard let person = people.selectedPerson else {
-            compassThoughts = mergedLocalHistory(serverRecords: [], person: nil)
-            thoughtsLoaded = true
-            return
-        }
-        let me = SupabaseService.localUserID
-        var server: [SupabaseService.PingRecord] = []
-        if let pid = person.pairedUserID.flatMap(UUID.init) {
-            server = await SupabaseService.shared.fetchPings(with: pid)
-                .filter { $0.toUser.uuidString == me?.uuidString }   // addressed to me
-        }
-        compassThoughts = mergedLocalHistory(serverRecords: server, person: person)
-        thoughtsLoaded = true
-    }
-
-    /// [2/5] Fold the local caught-history into the server records. Test thoughts
-    /// always show; locally-caught real thoughts show only under their own
-    /// person. Server rows win on dedupe (they carry the canonical opened state).
-    private func mergedLocalHistory(serverRecords: [SupabaseService.PingRecord],
-                                    person: Person?) -> [SupabaseService.PingRecord] {
         let me = SupabaseService.localUserID ?? UUID()
-        let pid = person?.pairedUserID.flatMap(UUID.init) ?? me
-        let serverIDs = Set(serverRecords.map(\.id))
-        let local = pings.caughtHistory
-            .filter { $0.isTest || $0.fromName == person?.name }
-            .compactMap { rp -> SupabaseService.PingRecord? in
+        compassThoughts = pings.caughtHistory
+            .map { rp -> SupabaseService.PingRecord in
                 let id = rp.remoteID ?? rp.id
-                if serverIDs.contains(id) { return nil }   // server copy wins
                 return SupabaseService.PingRecord(
-                    id: id, fromUser: pid, toUser: me, emoji: rp.emoji,
+                    id: id, fromUser: me, toUser: me, emoji: rp.emoji,
                     createdAt: rp.timestamp, openedAt: rp.timestamp,
-                    senderStyle: rp.senderStyle, message: rp.message, tagline: rp.tagline)
+                    senderStyle: rp.senderStyle, message: rp.message,
+                    tagline: rp.tagline,
+                    fromName: rp.fromName)   // each item keeps its OWN sender
             }
-        return (serverRecords + local).sorted { $0.createdAt > $1.createdAt }
+            .sorted { $0.createdAt > $1.createdAt }
+        thoughtsLoaded = true
     }
 
     private static func timeAgo(_ date: Date) -> String {

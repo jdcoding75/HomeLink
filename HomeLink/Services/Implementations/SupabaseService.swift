@@ -897,6 +897,10 @@ final class SupabaseService: ObservableObject {
         let senderStyle: String?
         let message: String?          // [5/5] optional note
         let tagline: String?          // sender's per-person tagline
+        /// [build9] LOCAL-ONLY sender display name for the unified (sender-agnostic)
+        /// bucket. NOT in CodingKeys → nil from server rows; set when building the
+        /// bucket from local caughtHistory so each item shows its OWN sender.
+        var fromName: String? = nil
 
         enum CodingKeys: String, CodingKey {
             case id
@@ -1107,15 +1111,18 @@ final class SupabaseService: ObservableObject {
         let feltUpdates = channel.postgresChange(
             UpdateAction.self, schema: "public", table: "pings",
             filter: "from_user=eq.\(me.uuidString)")
-        let pointingChanges = partner.map { p in
-            channel.postgresChange(
-                AnyAction.self, schema: "public", table: "compass_bearings",
-                filter: "user_id=eq.\(p.uuidString)")
-        }
-        // Someone redeemed one of MY codes → friend fills in → celebrate live
-        let connectionClaims = channel.postgresChange(
-            UpdateAction.self, schema: "public", table: "connections",
-            filter: "owner=eq.\(me.uuidString)")
+        // [build9] PAIRING streams retired — compass_bearings (mutual-pointing) +
+        // connections (claim celebrate). The pings/felt DELIVERY streams above stay.
+        // (Clears the compass_bearings + connections postgresChange deprecations.)
+        // let pointingChanges = partner.map { p in
+        //     channel.postgresChange(
+        //         AnyAction.self, schema: "public", table: "compass_bearings",
+        //         filter: "user_id=eq.\(p.uuidString)")
+        // }
+        // // Someone redeemed one of MY codes → friend fills in → celebrate live
+        // let connectionClaims = channel.postgresChange(
+        //     UpdateAction.self, schema: "public", table: "connections",
+        //     filter: "owner=eq.\(me.uuidString)")
 
         await channel.subscribe()
         log.info("realtime: consolidated channel subscribed (partner: \(partner?.uuidString ?? "none", privacy: .public))")
@@ -1147,39 +1154,40 @@ final class SupabaseService: ObservableObject {
                 }
             }
         }
-        if let pointingChanges {
-            Task { [log] in
-                for await change in pointingChanges {
-                    // Carry their reported bearing when we can decode it —
-                    // feeds the mutual-pointing check. nil keeps the glow.
-                    var bearing: Double?
-                    switch change {
-                    case .insert(let action):
-                        bearing = (try? action.decodeRecord(decoder: JSONDecoder()) as PointingEvent)?.bearing
-                    case .update(let action):
-                        bearing = (try? action.decodeRecord(decoder: JSONDecoder()) as PointingEvent)?.bearing
-                    default:
-                        break
-                    }
-                    log.info("realtime: partner pointing event (bearing=\(bearing.map { String(Int($0)) } ?? "?", privacy: .public)°)")
-                    onPointed(bearing)
-                }
-            }
-        }
-        Task { [log] in
-            for await update in connectionClaims {
-                do {
-                    let row: ConnectionRow = try update.decodeRecord(decoder: JSONDecoder())
-                    guard let friend = row.friend else { continue }
-                    log.info("realtime: connection claimed ✦ partner=\(friend.uuidString, privacy: .public)")
-                    Self.connectedFriendID = friend
-                    onPaired(DiscoveredConnection(partnerID: friend,
-                                                  myPersonID: row.ownerPersonID))
-                } catch {
-                    log.error("realtime: connection claim DECODE FAILED: \(error.localizedDescription, privacy: .public)")
-                }
-            }
-        }
+        // [build9] PAIRING stream loops retired (compass_bearings + connections).
+        // onPointed / onPaired closures are now never invoked (left in the signature
+        // so the caller is unchanged; they compile but no longer fire).
+        // if let pointingChanges {
+        //     Task { [log] in
+        //         for await change in pointingChanges {
+        //             var bearing: Double?
+        //             switch change {
+        //             case .insert(let action):
+        //                 bearing = (try? action.decodeRecord(decoder: JSONDecoder()) as PointingEvent)?.bearing
+        //             case .update(let action):
+        //                 bearing = (try? action.decodeRecord(decoder: JSONDecoder()) as PointingEvent)?.bearing
+        //             default:
+        //                 break
+        //             }
+        //             log.info("realtime: partner pointing event …")
+        //             onPointed(bearing)
+        //         }
+        //     }
+        // }
+        // Task { [log] in
+        //     for await update in connectionClaims {
+        //         do {
+        //             let row: ConnectionRow = try update.decodeRecord(decoder: JSONDecoder())
+        //             guard let friend = row.friend else { continue }
+        //             Self.connectedFriendID = friend
+        //             onPaired(DiscoveredConnection(partnerID: friend,
+        //                                           myPersonID: row.ownerPersonID))
+        //         } catch {
+        //             log.error("realtime: connection claim DECODE FAILED: …")
+        //         }
+        //     }
+        // }
+        _ = onPointed; _ = onPaired   // [build9] retained in signature, no longer fired
     }
 
     func stopListening() async {
@@ -1230,27 +1238,29 @@ final class SupabaseService: ObservableObject {
     /// Report that our compass just locked onto the paired person.
     /// Written only on lock edges (throttled by the caller) — never per heading.
     func reportPointing(bearing: Double) async {
-        guard let client, let me = await currentUserID else { return }
-        struct Row: Codable {
-            let userID: UUID
-            let bearing: Double
-            let updatedAt: String
-            enum CodingKeys: String, CodingKey {
-                case userID    = "user_id"
-                case bearing
-                case updatedAt = "updated_at"
-            }
-        }
-        do {
-            try await client
-                .from("compass_bearings")
-                .upsert(Row(userID: me, bearing: bearing,
-                            updatedAt: ISO8601DateFormatter().string(from: .now)))
-                .execute()
-            log.info("pointing: bearing reported ✓ (\(Int(bearing), privacy: .public)°)")
-        } catch {
-            log.error("pointing: bearing report FAILED: \(error.localizedDescription, privacy: .public)")
-        }
+        // [build9] RETIRED (pure pairing, mutual-pointing) — no-op. compass_bearings
+        // write commented; the realtime read stream is also retired. Kept as a
+        // no-op stub so the (also-stripped) CompassManager caller compiles.
+        // guard let client, let me = await currentUserID else { return }
+        // struct Row: Codable {
+        //     let userID: UUID
+        //     let bearing: Double
+        //     let updatedAt: String
+        //     enum CodingKeys: String, CodingKey {
+        //         case userID    = "user_id"
+        //         case bearing
+        //         case updatedAt = "updated_at"
+        //     }
+        // }
+        // do {
+        //     try await client
+        //         .from("compass_bearings")
+        //         .upsert(Row(userID: me, bearing: bearing,
+        //                     updatedAt: ISO8601DateFormatter().string(from: .now)))
+        //         .execute()
+        // } catch {
+        //     log.error("pointing: bearing report FAILED: …")
+        // }
     }
 
     /// The "notify me when someone points toward me" preference, server-side
