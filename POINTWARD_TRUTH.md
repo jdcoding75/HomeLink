@@ -16,6 +16,7 @@ _Build 12 wording refreshed: contained / Claude-buildable static page (Joshua ha
 _SEND MODEL LOCKED: two-path send (connected → DIRECT, re-keyed pairedUserID→senderID, channel NOT retired; not-connected → "open in Pointward" universal LINK; cases 2+3 collapse; cold-start light fill-in; no double-send). 11b reframed to "implement the two-path send"; 9b reframed to retire dead pairing plumbing ONLY (PATH-1 channel survives). Build 12 CTA locked to "open in Pointward — free."_
 _COMPREHENSIVE LOCK-DOWN (back-half design fully resolved): IDENTIFIER BACKBONE framing; CONNECTION-SIGNAL build spec (the gap, two new local stores S1/S2, `link_connections` migration + `record_connection` RPC, 10 cases, 4 resolved decisions, auth-timing correct-by-design) STAGED A→B→C with the family-test gate AFTER C; ONBOARDING/ARRIVAL north-star (message-first, 3 doors, showcase/paywall out of the gate, just-in-time identity); WEB PAGE locked design + canonical pitch + 3-tier animation ladder; PATH-1 push / ~30-day lifespan + save/delete / growth; standing prioritization principle; parked/deferred consolidated._
 _Build 12 web page BUILT · DEPLOYED · LIVE-TESTED (pointward-website `2d319d4`, 404.html path-style, anon `get_message`, DARK-PURPLE brand superseding "warm cream", shipped copy, does NOT mark_opened, install button = TestFlight placeholder pending external review; two invite surfaces locked). Stage B build-spec LOCKED (`reports/stage_b_buildspec.md`)._
+_Onboarding walk-through banked (Build 10 North-Star): DROP the pairing-code screen (absorbed; loopFlick-guard caution); NAME PRE-FILL LOCKED (recipient's fill-in pre-filled with the sender's label for them, warm + editable, no "is this you?"); ADDRESS/LOCATION at onboarding FOR CONSIDERATION (need-at-all / Apple-home-autofill / as-is — resolve "what is it for?" + address-vs-rough-location first)._
 
 ---
 
@@ -609,6 +610,35 @@ the dead connection-code screen is removed + repositioned as part of THIS redesi
   entry toll).
 - **IDENTITY just-in-time:** capture sign-in / name at the **moment of action (reply)**,
   not upfront — the same moment the connection record forms.
+
+**Walk-through decisions (this session):**
+- **DROP THE PAIRING-CODE SCREEN (confirmed).** Remove the dead connection-code entry
+  screen — useless post-pairing, one less click. **ABSORBED into the Build 10 redesign**
+  (not a separate build). ⚠️ **CAUTION at build:** the subtractive audit flagged a
+  **`loopFlick` animation-guard concern** when removing it — remove **carefully**, not a
+  blind delete (re-verify the page-coupled animation guards).
+- **NAME PRE-FILL (LOCKED — Joshua likes it).** In the recipient's just-in-time name
+  fill-in, **PRE-FILL the name with whatever the SENDER addressed them as** — the name
+  travels with the message (a mirror of `sender_display_name`). Shown **warmly** (it's
+  the affectionate name someone used for *you*), with **"edit"** beneath. Half the time
+  it's their real name (one less click); the other half a nickname (still fine, even
+  sweet); **editable always.** **Never worse, often better.** **No "is this you?"
+  hedging** — just show it with an edit affordance. Small plumbing: carry the **sender's
+  label for the person** alongside the message (same channel as the connection signal).
+- **ADDRESS / LOCATION AT ONBOARDING — FOR CONSIDERATION (open, decide during Build 10).**
+  Three options on the table:
+  - **(a) DON'T require an address at onboarding at all** (lean — minimal mandatory =
+    sign-in + name; ask location **contextually** if/when the compass needs it, not as an
+    entry toll);
+  - **(b) AUTO-POPULATE from the Apple/device home address** (needs **CONTACTS
+    permission** — an invasive-feeling prompt + trust cost; weigh against (a));
+  - **(c) keep AS-IS** (manual entry).
+  - **DEEPER question to resolve FIRST: what is location/address even FOR?** The compass
+    "points toward people" — does it need a typed **STREET ADDRESS**, or just **ROUGH /
+    DEVICE LOCATION** (direction + distance)? If rough location suffices, there may be
+    **no address field at all** — just a gentler **Location** permission, contextually.
+    **Sequence:** what is it for? → address vs. rough location? → required vs.
+    contextual? → only then, how to fill.
 
 ### ⭐ WEB PAGE (Build 12) — BUILT · DEPLOYED · LIVE-TESTED ✅
 **STATUS:** the show-the-message page is **DONE and deployed** to the separate
