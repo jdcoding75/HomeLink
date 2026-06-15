@@ -102,6 +102,7 @@ struct RootView: View {
             ensureDemoPersonIfAppropriate()   // [5/6] Alex when no one's added yet
             startCompassIfNeeded()
             startRealtimePings()
+            syncConnections()   // [phase2 stage B] drain (S2) + stamp connected contacts
             skinStore.enforceTier(subscription.tier)   // free = Minimal, always
             instrumentStore.enforceTier(subscription.tier)   // free = compass, always
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
@@ -132,6 +133,7 @@ struct RootView: View {
             switch phase {
             case .active:
                 startRealtimePings()
+                syncConnections()   // [phase2 stage B] drain (S2) + stamp on foreground
                 compass.resumeFromForeground()   // battery: sensors back on [5/8]
                 // The badge counts unread thoughts server-side; opening the
                 // app is the moment to clear it.
@@ -227,6 +229,19 @@ struct RootView: View {
         // }
         // rootLog.info("deeplink: pair request for \(code, privacy: .public)")
         // pairRequest = PairRequest(code: code)
+    }
+
+    /// [phase2 stage B] The sender-side connection reconciliation: drain any (S2)
+    /// pending connection writes (backstop for the on-sign-in drain), then read my
+    /// connections and stamp the matching local contacts' senderID (enables Stage-C
+    /// PATH 1). No-op when signed out. Idempotent — safe to run on every active.
+    private func syncConnections() {
+        guard SupabaseService.localUserID != nil else { return }
+        Task { @MainActor in
+            await SupabaseService.shared.drainPendingConnections()
+            let rows = await SupabaseService.shared.fetchMyConnections()
+            people.stampConnections(rows)
+        }
     }
 
     /// Phase 2: discover pairings, stamp presence, and open the single

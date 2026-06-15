@@ -298,6 +298,10 @@ final class SupabaseService: ObservableObject {
         }
         Self.localUserID = me
         log.info("auth: user ensured ✓ id=\(me.uuidString, privacy: .public)")
+        // [phase2 stage B] (S2) primary drain — now signed in, write any connections
+        // queued while signed OUT (the fresh-install /m/ open path). Covers both the
+        // onboarding + settings sign-in paths (both route through ensureUser).
+        await drainPendingConnections()
         // APNs may have delivered the device token BEFORE sign-in completed —
         // registration was skipped then; flush the cached token now.
         await registerCachedDeviceTokenIfNeeded()
@@ -1075,6 +1079,69 @@ final class SupabaseService: ObservableObject {
             log.info("messages: mark_opened ✓ id=\(id.uuidString, privacy: .public)")
         } catch {
             log.error("messages: mark_opened failed: \(error.localizedDescription, privacy: .public)")
+        }
+    }
+
+    // MARK: - Connection signal (Phase 2 Stage B)
+
+    /// A row from `link_connections` (the bilateral connection signal), as read by the
+    /// SENDER (RLS returns only rows where `sender_id = me`). `via_message_id` is the
+    /// join key back to the sender's local `SentLink` → the right contact to stamp.
+    struct LinkConnection: Decodable {
+        let connectedUserID: UUID
+        let viaMessageID: UUID?
+        let connectedAt: Date
+        enum CodingKeys: String, CodingKey {
+            case connectedUserID = "connected_user_id"
+            case viaMessageID    = "via_message_id"
+            case connectedAt     = "connected_at"
+        }
+    }
+
+    /// The receiver records "I connected to the sender of this message." The
+    /// `record_connection` RPC is authenticated-only + forces `connected_user_id =
+    /// auth.uid()`, so a signed-OUT caller no-ops server-side (safe to call anyway).
+    /// Returns true on a clean execute (so the S2 sweep can keep failures for retry).
+    @discardableResult
+    func recordConnection(messageID: UUID) async -> Bool {
+        guard let client else { return false }
+        do {
+            try await client
+                .rpc("record_connection", params: ["p_message_id": messageID.uuidString])
+                .execute()
+            log.info("connection: record_connection ✓ msg=\(messageID.uuidString, privacy: .public)")
+            return true
+        } catch {
+            log.error("connection: record_connection failed: \(error.localizedDescription, privacy: .public)")
+            return false
+        }
+    }
+
+    /// The SENDER reads who has connected to them (RLS scopes to own rows). Empty on
+    /// failure / signed-out — never throws to the caller.
+    func fetchMyConnections() async -> [LinkConnection] {
+        guard let client, let me = await currentUserID else { return [] }
+        do {
+            let rows: [LinkConnection] = try await client
+                .from("link_connections")
+                .select()
+                .eq("sender_id", value: me.uuidString)   // belt + suspenders (RLS already scopes)
+                .execute().value
+            log.info("connection: fetched \(rows.count) connection(s)")
+            return rows
+        } catch {
+            log.error("connection: fetchMyConnections failed: \(error.localizedDescription, privacy: .public)")
+            return []
+        }
+    }
+
+    /// (S2) Post-sign-in sweep: write the connection for every `/m/` the receiver
+    /// opened while signed OUT. No-op when signed out; idempotent (the RPC's
+    /// on-conflict-do-nothing); a failed write stays in the queue for next launch.
+    func drainPendingConnections() async {
+        guard Self.localUserID != nil else { return }
+        for id in PendingConnections.all {
+            if await recordConnection(messageID: id) { PendingConnections.remove(id) }
         }
     }
 

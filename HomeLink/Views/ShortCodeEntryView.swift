@@ -169,6 +169,11 @@ struct ShortCodeEntryView: View {
         if let sender = newest ?? rest.first {
             people.upsertContact(senderID: sender.senderID.uuidString,
                                  displayName: sender.senderDisplayName)
+            // [phase2 stage B] record the connection to the claimed sender. The
+            // claimer is in-app = signed in, so this writes immediately. All claimed
+            // messages share one senderID → use any one's id as `via`.
+            let viaID = sender.id
+            Task { await SupabaseService.shared.recordConnection(messageID: viaID) }
         }
 
         guard let newest else {

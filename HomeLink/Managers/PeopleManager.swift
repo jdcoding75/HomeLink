@@ -316,6 +316,34 @@ final class PeopleManager: ObservableObject {
         try? context.save()
     }
 
+    /// [phase2 stage B] Stamp local contacts with the receiver's `senderID` once they
+    /// connect. For each connection row `(connectedUserID = Y, viaMessageID = X)`: map
+    /// X → the local contact via the (S1) `SentLink`, then set `senderID = Y` (+
+    /// `pairedUserID = Y` mirror, so PATH-1's direct channel works). Idempotent (skips
+    /// already-stamped); skips a row whose `via` is nil or whose `SentLink` is missing
+    /// (e.g. sent from another device). Enables Stage-C PATH 1 (not built here).
+    func stampConnections(_ rows: [SupabaseService.LinkConnection]) {
+        guard let context = modelContext else { return }
+        var didChange = false
+        for row in rows {
+            guard let via = row.viaMessageID else {
+                continue   // no join key (deleted message → via set null) — skip
+            }
+            guard let link = try? context.fetch(
+                FetchDescriptor<SentLink>(predicate: #Predicate { $0.messageID == via })).first
+            else {
+                continue   // no SentLink (sent from another device / pruned) — skip
+            }
+            guard let person = people.first(where: { $0.id == link.personID }) else { continue }
+            guard (person.senderID ?? "").isEmpty else { continue }   // already stamped
+            let y = row.connectedUserID.uuidString
+            person.senderID    = y
+            person.pairedUserID = y                                    // mirror → PATH-1 channel
+            didChange = true
+        }
+        if didChange { try? context.save(); fetchAll() }
+    }
+
     enum PeopleError: Error, LocalizedError {
         case upgradeRequired
         var errorDescription: String? { "Unlock Pointward to add more people — one-time purchase, no subscription." }

@@ -175,6 +175,12 @@ struct IncomingMessageView: View {
                         // messages were missing from history. remoteID = message.id
                         // dedups against a later short-code claim of the same message.
                         pings.recordCaught(historyPing(from: result))
+                        // [phase2 stage B] (S2 + connection signal) record that I
+                        // connected to this sender — at FETCH, regardless of auth.
+                        // Queue locally (drained post-sign-in if signed out), AND
+                        // fire the RPC now (no-ops server-side when unauthenticated).
+                        PendingConnections.append(result.id)
+                        Task { await SupabaseService.shared.recordConnection(messageID: result.id) }
                     } else {
                         phase = .notFound
                     }
