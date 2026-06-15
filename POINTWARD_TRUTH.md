@@ -13,6 +13,7 @@ _Findings pass 2: builds 5–6 + display-name/shortCode fix DONE & device-verifi
 _Session lock-up: builds 5–9 (safe half) shipped & ledgered; CRITICAL link-send-`#if DEBUG` / delivery-backbone finding banked; bucket finding RESOLVED (sender-agnostic, local); 3 locked bucket decisions; back-half re-sequenced (11b cutover → 9b delivery-retire → 10 onboarding → 11 tests → 12 web → cleanup); build-9 left-intentionally flags + findings-pass-3 notes. CLAUDE.md: standing build patterns added._
 _Build 12 reframed: SHOW-THE-MESSAGE static web page (fetch+display via getMessage(id), no animation) pulled to pre-launch; the animated-in-browser version stays Phase 3._
 _Build 12 wording refreshed: contained / Claude-buildable static page (Joshua has no HTML experience); animated browser version remains Phase 3._
+_SEND MODEL LOCKED: two-path send (connected → DIRECT, re-keyed pairedUserID→senderID, channel NOT retired; not-connected → "open in Pointward" universal LINK; cases 2+3 collapse; cold-start light fill-in; no double-send). 11b reframed to "implement the two-path send"; 9b reframed to retire dead pairing plumbing ONLY (PATH-1 channel survives). Build 12 CTA locked to "open in Pointward — free."_
 
 ---
 
@@ -338,6 +339,46 @@ yet:** `connectedFriendID`, `sendRemote`, the **pings** realtime insert/felt str
 `upsertContact` **mirror-write** (`pairedUserID = senderID`). Retiring any of these
 before the link send is un-gated to release ships **an app that cannot deliver a
 message.** Un-gating the link send (build **11b**) is the prerequisite cutover.
+> **Refined by the SEND MODEL below:** the direct-delivery channel is NOT retired —
+> it SURVIVES (re-keyed `pairedUserID → senderID`) as **PATH 1**. Only genuinely-dead
+> pairing plumbing retires. The "retire delivery backbone" wording is superseded.
+
+### ⭐ SEND MODEL — LOCKED (link era) (Joshua, this session)
+**Replaces the 11b-audit's incorrect "link-only for all sends."** A send chooses ONE
+of TWO paths by the recipient's connection state — **they are ALTERNATIVES, never both
+(NO double-send).**
+
+**PATH 1 — CONNECTED contact** (a mutual `senderID` contact: they have the app and
+have opened a link from me before, so a contact exists keyed on `senderID`):
+- → **DIRECT delivery** — the thought lands in their Pointward + a push ("a thought is
+  waiting"). **NO link, NO share sheet.** The clean everyday experience; the compass
+  still shows them, directed send preserved.
+- → **MECHANISM:** the existing direct channel (legacy `sendRemote`/`pings`)
+  **SURVIVES** but is **RE-KEYED `pairedUserID → senderID`** (same migration pattern as
+  Sarah + the bucket). **It is NOT retired.**
+
+**PATH 2 — NOT-YET-CONNECTED** (covers BOTH "no app" AND "has app but not connected to
+me" — **these two cases COLLAPSE into one path**):
+- → send the **LINK** (the `/m/<id>` universal link + share sheet).
+- → CTA says **"OPEN IN POINTWARD"** — **never "download."** iOS universal-link routing
+  handles it transparently: no app → installs then opens; has app → opens directly.
+  Either way the receive flow finds no mapped contact and runs **Build-5
+  auto-create/connect**. ("Open" is lower-friction + more honest — they're already
+  half-in; "download" discourages.)
+- → **CASE-3 SOLVED BY NOT DETECTING:** don't try to detect whether a recipient has the
+  app (iOS privacy makes it unreliable) — the universal link + "open in Pointward"
+  framing makes detection **unnecessary**. The link is universal for everyone
+  not-yet-connected.
+
+**COLD-START** (sender has NO person to send to):
+- → a **LIGHT, just-in-time "who's this for?"** fill-in appears **ONLY** when there's
+  no person to attach (captures/creates the person as part of that one send — the
+  sender-side mirror of Build-5's receiver-side auto-create). Once contacts exist,
+  sending stays light (select existing → send); the fill-in does **NOT** appear.
+  **Never make it heavy or always-present.**
+
+**Consequences for the build order:** 11b and 9b are reframed against this locked
+model (see the build order below).
 
 ### Three LOCKED bucket decisions (Joshua, this session)
 1. **Replay-from-history does NOT flip opened** — replay = re-feel, not consume.
@@ -407,13 +448,19 @@ decision-heavy, fresh-mind work.**
 - **8** ✅ DONE — strip pairing UI `[26c59ff]`
 - **9 (safe half)** ✅ DONE — unified bucket + pure-pairing retirement + Sarah
   repoint `[2919f1f]`
-- **11b — UN-GATE the link send to release** (remove the `#if DEBUG` on
-  `devCreateAndShareLink`). **THE PIVOT CUTOVER** — changes how every send is
-  delivered; needs focused QA + a deliberate readiness decision. **Fresh-mind
-  work. Prerequisite for retiring the delivery backbone.**
-- **9b — retire the DELIVERY BACKBONE** (`connectedFriendID` / `sendRemote` / pings
-  realtime / `syncMissedThoughts` / `pairedUserID` send-read / the mirror-write) —
-  **ONLY after 11b proves the link send works in release.**
+- **11b — IMPLEMENT THE TWO-PATH SEND** (per the locked SEND MODEL above) — **THE
+  PIVOT CUTOVER, not "un-gate a flag."** Decide at send time: **connected → DIRECT**
+  (the existing channel, **re-keyed `pairedUserID → senderID`**); **not-connected →
+  un-gated LINK** (`/m/` + share sheet). Decision-heavy; build against the locked
+  model. **Next concrete step BEFORE building:** a design-audit confirming the direct
+  channel can be cleanly re-keyed `pairedUserID → senderID` and mapping exactly what
+  11b must change. (Reminder: the link send is gated across 3 files / 4 sites, and the
+  legacy `sendRemote` is the PATH-1 channel — it stays, re-keyed, never double-fired.)
+- **9b — retire genuinely-DEAD pairing plumbing ONLY** (NOT the direct-delivery
+  channel — that survives as PATH 1, re-keyed to `senderID`). The earlier "retire the
+  delivery backbone" wording is **SUPERSEDED** by the locked SEND MODEL. Only the dead
+  pairing bits (`connections` remnants, etc.) retire; the pings direct channel +
+  realtime receive STAY (re-keyed).
 - **10 — onboarding rewrite** (decision-heavy; see Onboarding Notes). Also touches
   `redeem`/`createInvite` (deferred B1) and `myPairingCode` (B5).
 - **11 — Phase 2 test suite** (automated scenarios).
@@ -421,8 +468,10 @@ decision-heavy, fresh-mind work.**
   `pointward` repo / GitHub Pages). For a recipient **WITHOUT the app**: the page
   fetches the message via the existing anon `getMessage(id)` Supabase function (built
   in build 2) and **DISPLAYS it** — emoji, message text, sender name — in a calm,
-  branded layout, with a "get the app to send one back" invitation below. Delivers the
-  emotional payload (someone thought of you + what they said) WITHOUT the app and
+  branded layout, with the **LOCKED CTA "open in Pointward — free"** below (NOT
+  "download" — rationale: lower friction + the honest universal install-or-open, per
+  the SEND MODEL). Delivers the emotional payload (someone thought of you + what they
+  said) WITHOUT the app and
   WITHOUT rebuilding any animation. **Rationale:** most new users arrive via a received
   link, so showing the message before install flips arrival from a toll gate ("install
   to see it") to a gift ("that's lovely — get the app to reply"). Static HTML/CSS
