@@ -698,13 +698,12 @@ struct CompassView: View {
                 .animation(.easeInOut(duration: 0.4), value: pings.sendFailedNotice)
             }
 
-            #if DEBUG
-            // [phase2 build3] DEV ONLY — link create failed. The flight already
+            // [phase2 stage A] LIVE — link create failed. The flight already
             // played (sacred); offer a quiet, tappable retry. Mirrors the
             // sendFailedNotice capsule. Never blocks; auto-clears via re-run.
             if let linkFailure = pings.linkFailedNotice {
                 VStack {
-                    Button { pings.devRetryLinkSend() } label: {
+                    Button { pings.retryLinkSend() } label: {
                         HStack(spacing: 6) {
                             Image(systemName: "link")
                                 .font(.system(size: 10))
@@ -730,7 +729,6 @@ struct CompassView: View {
                 .transition(.opacity.combined(with: .move(edge: .top)))
                 .animation(.easeInOut(duration: 0.4), value: pings.linkFailedNotice)
             }
-            #endif
 
             // (felt-receipt text capsule retired — replaced by the symbolic
             //  caught confirmation above; view kept for reference)
@@ -1864,42 +1862,46 @@ struct CompassView: View {
         }
         // HapticEngine.thoughtReleased()   // retired — style haptic fires at launch
 
-        // Real delivery when paired. The SELECTED person's partner id wins —
-        // the global connectedFriendID is only a fallback (with several
-        // paired people it can point at someone else entirely).
-        let recipient = people.selectedPerson?.pairedUserID.flatMap(UUID.init)
-                        ?? SupabaseService.connectedFriendID
-        if let recipient {
-            CompassView.log.info("send: \(token, privacy: .public) → \(recipient.uuidString, privacy: .public) as \(style.rawValue, privacy: .public)")
-            pings.sendRemote(to: recipient,
-                             emoji: sendRemoteEmoji(for: token),
-                             style: style,
-                             message: outgoingMessage.isEmpty ? nil : outgoingMessage,
-                             tagline: people.selectedPerson?.tagline)
-        } else {
-            CompassView.log.info("send: local only — no paired recipient")
-        }
+        // [phase2 stage A] LEGACY direct send (sendRemote → pings) COMMENTED OUT to
+        // remove the double-send once the link send below is un-gated. This is
+        // PATH-1's channel — it returns (re-keyed pairedUserID → senderID) in Stage C,
+        // for CONNECTED contacts only. Until then a send is LINK-ONLY (PATH 2).
+        // (pings.sendRemote stays DEFINED in PingManager — it just has no caller here.)
+        // let recipient = people.selectedPerson?.pairedUserID.flatMap(UUID.init)
+        //                 ?? SupabaseService.connectedFriendID
+        // if let recipient {
+        //     CompassView.log.info("send: \(token) → \(recipient.uuidString) as \(style.rawValue)")
+        //     pings.sendRemote(to: recipient,
+        //                      emoji: sendRemoteEmoji(for: token),
+        //                      style: style,
+        //                      message: outgoingMessage.isEmpty ? nil : outgoingMessage,
+        //                      tagline: people.selectedPerson?.tagline)
+        // } else {
+        //     CompassView.log.info("send: local only — no paired recipient")
+        // }
 
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) {
             playSendSound(token)
             // HapticEngine.thoughtLaunched()   // retired — single .light at launch
         }
 
-        #if DEBUG
-        // [phase2 build3] DEV ONLY — additive link-based send. The animation
-        // above has ALREADY fired (sacred, never blocked); this stores the
-        // thought as a /m/[id] message in the BACKGROUND and presents the share
-        // sheet so Joshua can test it. GUARDRAIL: DEBUG-gated + never auto-shares,
-        // so no dead link can reach a real recipient before Build 4. The old
-        // pairing sendRemote above is untouched and still runs.
-        pings.devCreateAndShareLink(
+        // [phase2 stage A] LINK SEND — LIVE (PATH-2 "a link for everyone"). The
+        // animation above has ALREADY fired (sacred, never blocked); this stores the
+        // thought as a /m/[id] message in the BACKGROUND and presents the share sheet.
+        // The recipient is whoever opens the link (sender-keyed). (S1) records the
+        // sent-link → contact mapping so Stage B/C can stamp the right contact.
+        let cid = people.selectedPerson?.id   // capture BEFORE the async callback
+        pings.createAndShareLink(
             content: outgoingMessage.isEmpty ? nil : outgoingMessage,
             emoji: sendRemoteEmoji(for: token),
             instrument: style.rawValue,                       // wire style (matches pings.sender_style)
             senderName: people.profile?.displayName ?? UserProfile.snapshot?.displayName ?? "",
             shortCode: people.profile?.shortCode.nilIfEmpty
-                       ?? UserProfile.snapshot?.shortCode ?? "")
-        #endif
+                       ?? UserProfile.snapshot?.shortCode ?? "",
+            personID: cid,
+            onStored: { id in
+                if let cid { people.recordSentLink(messageID: id, personID: cid) }
+            })
         // Cleanup moved to SenderAnimationView.onComplete (duration varies by style)
         // DispatchQueue.main.asyncAfter(deadline: .now() + 1.6) {
         //     flightToken = nil

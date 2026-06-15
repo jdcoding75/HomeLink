@@ -1,14 +1,11 @@
 // ShareSheet.swift
 // Pointward › Utilities
 //
-// ⚠️ DEBUG ONLY — wrapped in `#if DEBUG` so it cannot compile into a release /
-// TestFlight build. Phase 2 Build 3 GUARDRAIL: /m/[id] links are NOT openable
-// until Build 4, so the share sheet must never appear in a path a real
-// recipient could be sent from. Keeping the presenter itself DEBUG-only means
-// there is no way to ship it. Joshua tests the sheet in dev and chooses whether
-// to actually send anything.
+// [phase2 stage A] LIVE — the imperative share-sheet presenter for the link send
+// (PATH-2 "a link for everyone"). The Build-3 `#if DEBUG` guardrail ("/m/ links
+// aren't openable until Build 4") is obsolete — links open since 4a + the web page
+// is live. NEVER auto-shares: the user picks the destination.
 
-#if DEBUG
 import UIKit
 
 enum ShareSheet {
@@ -38,4 +35,3 @@ enum ShareSheet {
         top.present(activity, animated: true)
     }
 }
-#endif

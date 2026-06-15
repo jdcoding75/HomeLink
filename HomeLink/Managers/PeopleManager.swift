@@ -303,6 +303,19 @@ final class PeopleManager: ObservableObject {
         return person
     }
 
+    /// [phase2 stage A] (S1) Record that a sent link's message went to a local
+    /// contact — `messageID → personID`. Stage B/C reads this to map a returned
+    /// connection back to the right contact and stamp its `senderID` (no duplicate).
+    /// Idempotent on `messageID` (a re-fired send / retry won't double-insert).
+    func recordSentLink(messageID: UUID, personID: UUID) {
+        guard let context = modelContext else { return }
+        let existing = try? context.fetch(
+            FetchDescriptor<SentLink>(predicate: #Predicate { $0.messageID == messageID }))
+        guard (existing ?? []).isEmpty else { return }
+        context.insert(SentLink(messageID: messageID, personID: personID))
+        try? context.save()
+    }
+
     enum PeopleError: Error, LocalizedError {
         case upgradeRequired
         var errorDescription: String? { "Unlock Pointward to add more people — one-time purchase, no subscription." }

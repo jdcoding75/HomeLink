@@ -290,14 +290,13 @@ final class PingManager: ObservableObject {
         }
     }
 
-    #if DEBUG
     // ════════════════════════════════════════════════════════════════════
-    // [phase2 build3] LINK-BASED SEND — DEV ONLY (DEBUG-gated)
+    // [phase2 stage A] LINK-BASED SEND — LIVE (un-gated; PATH-2 "a link for everyone")
     // ════════════════════════════════════════════════════════════════════
-    // GUARDRAIL: /m/[id] links are not openable until Build 4, so this whole
-    // path is `#if DEBUG` — it cannot ship to TestFlight/release, and it NEVER
-    // auto-shares (Joshua picks the destination in the share sheet). It runs
-    // ADDITIVELY, alongside the old sendRemote, and never blocks the animation.
+    // The Build-3 `#if DEBUG` guardrail ("/m/ links aren't openable until Build 4")
+    // is obsolete — links open since 4a, the web page is live, and the legacy
+    // sendRemote double-send is removed. This is now the live release send path.
+    // It NEVER auto-shares (the user picks the destination in the share sheet).
 
     /// "couldn't create your link — retry" — the message insert failed. The
     /// animation already played (sacred); this is a quiet, non-blocking notice
@@ -308,8 +307,14 @@ final class PingManager: ObservableObject {
     /// Store the just-sent thought as a `messages` row, then present the share
     /// sheet with the /m/[id] link + the short-code fallback. Background work —
     /// the caller has already kicked off the (uninterrupted) send animation.
-    func devCreateAndShareLink(content: String?, emoji: String, instrument: String,
-                               senderName: String, shortCode: String) {
+    /// `onStored` fires with the new message id once the insert succeeds — the
+    /// caller records the (S1) SentLink (messageID → local contact) so Stage B/C
+    /// can stamp the right contact. (PingManager has no ModelContext by design;
+    /// the SwiftData write lives in PeopleManager.)
+    func createAndShareLink(content: String?, emoji: String, instrument: String,
+                            senderName: String, shortCode: String,
+                            personID: UUID? = nil,
+                            onStored: ((UUID) -> Void)? = nil) {
         let run: () -> Void = { [weak self] in
             guard let self else { return }
             self.linkFailedNotice = nil
@@ -318,6 +323,8 @@ final class PingManager: ObservableObject {
                     let id = try await SupabaseService.shared.insertMessage(
                         content: content, emoji: emoji, instrument: instrument,
                         senderDisplayName: senderName.isEmpty ? nil : senderName)
+                    // (S1) record the sent-link → contact mapping (if a contact was attached).
+                    if personID != nil { onStored?(id) }
                     let link = MessageLink.url(for: id)
                     let text = MessageLink.shareText(senderName: senderName,
                                                      link: link, shortCode: shortCode)
@@ -334,8 +341,7 @@ final class PingManager: ObservableObject {
     }
 
     /// Re-run the last link send (the retry affordance on linkFailedNotice).
-    func devRetryLinkSend() { lastLinkSend?() }
-    #endif
+    func retryLinkSend() { lastLinkSend?() }
 
     func showFelt(name: String) {
         feltNotice = "\(name) felt your thought ✓"

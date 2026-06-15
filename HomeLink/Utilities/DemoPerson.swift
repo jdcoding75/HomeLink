@@ -20,7 +20,7 @@ enum DemoPerson {
     /// Stable sentinel id — lets us recognise the demo card everywhere
     /// (badge, hint, "is this real data?") without a schema migration.
     static let id = UUID(uuidString: "A1EC0DE0-0000-4000-8000-000000000001")!
-    static let name     = "Alex"
+    static let name     = "Alex Demo"
     static let emoji    = "🌟"
     static let tagline  = "near is a feeling ✦"
     /// San Francisco.
