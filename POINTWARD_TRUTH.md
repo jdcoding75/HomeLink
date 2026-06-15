@@ -17,6 +17,7 @@ _SEND MODEL LOCKED: two-path send (connected → DIRECT, re-keyed pairedUserID�
 _COMPREHENSIVE LOCK-DOWN (back-half design fully resolved): IDENTIFIER BACKBONE framing; CONNECTION-SIGNAL build spec (the gap, two new local stores S1/S2, `link_connections` migration + `record_connection` RPC, 10 cases, 4 resolved decisions, auth-timing correct-by-design) STAGED A→B→C with the family-test gate AFTER C; ONBOARDING/ARRIVAL north-star (message-first, 3 doors, showcase/paywall out of the gate, just-in-time identity); WEB PAGE locked design + canonical pitch + 3-tier animation ladder; PATH-1 push / ~30-day lifespan + save/delete / growth; standing prioritization principle; parked/deferred consolidated._
 _Build 12 web page BUILT · DEPLOYED · LIVE-TESTED (pointward-website `2d319d4`, 404.html path-style, anon `get_message`, DARK-PURPLE brand superseding "warm cream", shipped copy, does NOT mark_opened, install button = TestFlight placeholder pending external review; two invite surfaces locked). Stage B build-spec LOCKED (`reports/stage_b_buildspec.md`)._
 _Onboarding walk-through banked (Build 10 North-Star): DROP the pairing-code screen (absorbed; loopFlick-guard caution); NAME PRE-FILL LOCKED (recipient's fill-in pre-filled with the sender's label for them, warm + editable, no "is this you?"); ADDRESS/LOCATION at onboarding FOR CONSIDERATION (need-at-all / Apple-home-autofill / as-is — resolve "what is it for?" + address-vs-rough-location first)._
+_PRODUCT DIRECTION DUMP banked (future work, decided-vs-for-thought): APP CONCEPT/positioning (primary=emotional-connection via intent+meaning; secondary=anti-card-app); HELP/FAQ/HOW-TO + About (Settings-top, optional, the explorable home for the onboarding showcase); SETTINGS-tab review project (+ planned: Help, "turn off send-actions" advanced toggle [check-if-exists], structured feedback picker, "catch in bucket" toggle default-OFF); OCCASION notifications (parked); LAUNCH/MONETIZATION (seed-free-then-monetize principle endorsed; founding-cohort + propagating-free-Pro direction; specifics open for a dedicated session)._
 
 ---
 
@@ -714,6 +715,81 @@ working:** a real `/m/<id>` renders the real message; a bad id shows the empty s
 The problems worth pausing for are **"looks crappy / people won't use it"** — NOT
 exact-config details (fade timing, caps), which are *good* problems that wait for real
 usage. More use → more people → don't pause for edge-perfection.
+
+---
+
+# ⭐⭐ PRODUCT DIRECTION DUMP (this session — future work; decided-vs-for-thought)
+
+### ⭐ APP CONCEPT / POSITIONING (canonical — for About + App Store copy)
+- **PRIMARY — emotional connection:** elevate the good feeling of a text / emoji to a
+  higher level by increasing the **INTENT** put into a send and the **MEANING** for the
+  receiver — via **directionality, intentional sending, and animations.**
+- **SECONDARY — special occasions:** a reaction *against* card apps (monthly fees, high
+  cost, low customization, clunky desktop, snail-mail delay, or impersonal email).
+
+### ⭐ HELP / FAQ / HOW-TO + ABOUT (future build)
+A help / how-to system, **accessed from SETTINGS (top), OPTIONAL** (watch if you want,
+never forced). It is **the EXPLORABLE HOME the onboarding showcase content moves into**
+(see the North-Star: showcase out of the gate → an explorable section). Contains **ALL
+functionality explained — requirements AND value/why** (the how-to carries the concept:
+e.g. *"send with wind = blow into the mic"* + **WHY** the action adds intent / meaning).
+- **FAQ (troubleshooting), e.g.:**
+  - *"the compass doesn't point toward the person"* → the app needs an **address** to
+    find the pointed location's GPS; ensure the correct address is on that contact in
+    the **People** tab.
+  - *"do you really give to charity?"* → **yes**; findable on the charity site under
+    donor name **"Pointward."**
+  - *"I can't send a message"* → you must **select an emoji OR explicitly tap the
+    no-emoji option**; some sends require **point-and-lock** toward the recipient
+    (compass) or a **directional gesture** (flick, turn bow / rocket); **most require a
+    send action** (blow into the mic for wind, tap for rocket, etc.).
+- **HOW-TO / full capabilities:** **press on the compass screen to change the
+  animation**; step-by-step send sequences; **address & why it matters**; how to **VIEW
+  messages (the bucket)** + how to **SAVE / DELETE / how they persist.**
+- **Carries the APP CONCEPT (above) woven in** — function + value together.
+
+### ⭐ SETTINGS TAB — REVIEW PROJECT (parallel to the onboarding pass)
+Settings already has content. **Do a FULL walk-through / catalogue** (same method as the
+onboarding screen pass): walk what's there, catalogue, then plan additions / removals.
+**PLANNED ADDITIONS (from this dump):**
+- **Help / FAQ / How-To at the TOP.**
+- **ADVANCED — "turn off send-actions":** skip the blow / tap / flick / point-lock;
+  auto-play the send sequence. ⚠️ **CHECK IF THIS ALREADY EXISTS before building.**
+- **FEEDBACK / comments:** *"Pointward's first app — suggestions welcome."* A
+  **STRUCTURED category picker that DOUBLES as education** (the categories teach the
+  anatomy of a thought-stream): new emoji / tagline suggestions · emoji + animation ·
+  animation send mechanism · send + receipt action screens · general app visuals · app
+  efficiency · report bug · note.
+- **"CATCH THOUGHTS IN BUCKET" toggle** — **build the capability, DEFAULT OFF, do NOT
+  surface on screens yet** (until the receipt mechanism is better designed; future
+  receipt options may improve for the end user).
+
+### ⭐ OCCASION FEATURES (future idea — parked)
+**Birthday / anniversary NOTIFICATIONS** prompting the user to send a Pointward item —
+ties to the secondary "special occasions" use case. Parked as a future engagement /
+growth idea.
+
+### ⭐ LAUNCH / MONETIZATION STRATEGY (direction banked; specifics = dedicated discussion)
+**PRINCIPLE (endorsed):** **seed the network FREE before monetizing.** An
+emotional-connection app is **worthless to a new user if no one they know is on it**, so
+charging before the network exists would kill it. **Be generous early** (cheap when few
+users); **monetize only once the product is genuinely valuable to that user** (connected
++ engaged).
+**DIRECTION (Claude's lean — for a later decision):**
+- **Founding cohort** (e.g. first 100) get **Pro FREE permanently** (gratitude +
+  lock-in).
+- **Free Pro PROPAGATES one hop** — invite someone, they (and maybe their first ~2
+  connections) get Pro free — so **free-ness travels along connections**, incentivizing
+  the **CONNECTING** behavior the network needs. A small viral start.
+- **Don't enforce the paywall while the network is sparse** — ideally **per-user** (a
+  user doesn't hit a wall until they have real connections / engagement), rather than a
+  **global threshold** (hard to define / communicate).
+**OPEN (for a dedicated session):** exact cohort size; how many hops free propagates;
+how the paywall threshold is defined; abuse / tracking of "free" status; revenue timing.
+**Joshua's variants captured:** first-100-free; invitees-free-up-to-5; first-100 + their
+first-2-connections-free; paywall down only when "enough connected."
+
+---
 
 ### Build-9 LEFT-INTENTIONALLY (flagged; for the cleanup pass / focused follow-ups)
 - **4 PeopleManager pairing funcs** (`addFromInvite` / `bindConnection` /
