@@ -205,10 +205,32 @@ struct IncomingMessageView: View {
 
     // MARK: - Message → receipt inputs
 
+    /// [display-polish] Shared arrival-name precedence for BOTH receivedPing and
+    /// historyPing — every receipt caption reads `ping.fromName`, so resolving it
+    /// in one place updates them all. Precedence:
+    ///   1. the recipient's OWN local label for this sender — `person(forSenderID:)`
+    ///      (e.g. "Husband"); the immutable senderID is the match key.
+    ///   2. the sender's snapshot name (`sender_display_name`) — baseline.
+    ///   3. "someone" — last resort (genuinely unknown / no name anywhere).
+    /// This fixes the "Someone" arrivals (e.g. a sender with a NULL display_name)
+    /// AND delivers the local-name enhancement, in one helper.
+    private func resolvedSenderName(for m: Message) -> String {
+        // 1. recipient's local contact label (trimmed, non-empty)
+        if let local = people.person(forSenderID: m.senderID.uuidString)?.name
+            .trimmingCharacters(in: .whitespaces), !local.isEmpty {
+            return local
+        }
+        // 2. sender's snapshot name (trimmed, non-empty)
+        if let snap = m.senderDisplayName?.trimmingCharacters(in: .whitespaces), !snap.isEmpty {
+            return snap
+        }
+        // 3. last resort
+        return "someone"
+    }
+
     private func receivedPing(from m: Message) -> PingManager.ReceivedPing {
-        let name = (m.senderDisplayName?.trimmingCharacters(in: .whitespaces)).flatMap {
-            $0.isEmpty ? nil : $0
-        } ?? "someone"
+        // [display-polish] was: senderDisplayName ?? "someone" — now local-name-first
+        let name = resolvedSenderName(for: m)
         let emoji = (m.emoji?.isEmpty == false ? m.emoji! : CuratedEmoji.defaultEmoji)
         return PingManager.ReceivedPing(
             fromName:    name,
@@ -226,9 +248,8 @@ struct IncomingMessageView: View {
     /// duplicate). Distinct from `receivedPing` (which feeds the receipt with
     /// remoteID nil — "a message is NOT a ping").
     private func historyPing(from m: Message) -> PingManager.ReceivedPing {
-        let name = (m.senderDisplayName?.trimmingCharacters(in: .whitespaces)).flatMap {
-            $0.isEmpty ? nil : $0
-        } ?? "someone"
+        // [display-polish] same precedence as receivedPing (shared helper)
+        let name = resolvedSenderName(for: m)
         let emoji = (m.emoji?.isEmpty == false ? m.emoji! : CuratedEmoji.defaultEmoji)
         return PingManager.ReceivedPing(
             fromName:    name,

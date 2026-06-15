@@ -52,7 +52,8 @@ struct PeopleListView: View {
                                 showLocationHint: needsLocation(person),
                                 disambiguator: disambiguator(for: person, dupes: dupes),
                                 hideConnectionStatus: isLinkContact(person),
-                                hasOpenedReceipt: people.contactsWithOpenedReceipt.contains(person.id)
+                                hasOpenedReceipt: people.contactsWithOpenedReceipt.contains(person.id),
+                                isLinkConnected: isLinkConnected(person)
                             ) {
                                 // Tap card → select + open the detail view
                                 people.select(person)
@@ -175,6 +176,14 @@ struct PeopleListView: View {
         !(person.senderID ?? "").isEmpty
     }
 
+    /// [display-polish] A connection exists when this contact carries a senderID
+    /// (received from them, or — post-Stage-C — they opened your thought). Drives
+    /// the "connected ✦" indicator. Same signal as `isLinkContact`; named for the
+    /// connection-status call site (nil senderID → no indicator, never a false negative).
+    private func isLinkConnected(_ person: Person) -> Bool {
+        !(person.senderID ?? "").isEmpty
+    }
+
     /// No real address set → the contact card shows the gentle add-location hint
     /// (and the bogus null-island distance/name line is suppressed).
     private func needsLocation(_ person: Person) -> Bool {
@@ -280,6 +289,7 @@ struct PersonCard: View {
     var disambiguator: String? = nil        // [build6] same-name suffix line
     var hideConnectionStatus: Bool = false  // [build6] suppress pairing row for link contacts
     var hasOpenedReceipt: Bool = false       // [stageC] they opened a thought I sent → "opened ✦"
+    var isLinkConnected: Bool = false        // [display-polish] senderID set → show "connected ✦"
     let onTap: () -> Void
     let onEdit: () -> Void
     var onAddLocation: () -> Void = {}       // [build6] hint tap → edit path
@@ -300,15 +310,19 @@ struct PersonCard: View {
                     .frame(width: 60, height: 60)
                     .blur(radius: 12)
                 Group {
-                    if person.emoji.isEmpty {
-                        // [build6] Monogram fallback — emoji-less link contact.
-                        Text(monogram)
-                            .font(.system(size: 26, weight: .semibold, design: .serif))
-                            .foregroundColor(DesignTokens.Color.accentSoft)
-                    } else {
-                        Text(person.emoji)
-                            .font(.system(size: 30))
-                    }
+                    // [display-polish] Standardize the contact icon on the INITIAL —
+                    // stop displaying the per-person emoji (vestigial since the
+                    // onboarding emoji-picker cut; inconsistent across contacts). The
+                    // monogram was already the fallback for emoji-less link contacts;
+                    // it is now the ONE icon for all. person.emoji FIELD kept.
+                    // if person.emoji.isEmpty {
+                    Text(monogram)
+                        .font(.system(size: 26, weight: .semibold, design: .serif))
+                        .foregroundColor(DesignTokens.Color.accentSoft)
+                    // } else {
+                    //     Text(person.emoji)
+                    //         .font(.system(size: 30))
+                    // }
                 }
                     .frame(width: 60, height: 60)
                     .background(DesignTokens.Color.backgroundLift)
@@ -383,7 +397,22 @@ struct PersonCard: View {
                         .lineLimit(1)
                 }
                 .padding(.top, 1)
-                }   // [build6] end if !hideConnectionStatus
+                } else if isLinkConnected {
+                    // [display-polish] LINK-era connection indicator — re-surfaces the
+                    // green idiom for senderID contacts (the pairing row above is
+                    // suppressed for them). senderID nil → render NOTHING (no false
+                    // "not yet linked"); calm by default.
+                    HStack(spacing: 5) {
+                        Circle()
+                            .fill(Color(hex: "#5dcaa5"))
+                            .frame(width: 6, height: 6)
+                        Text("connected ✦")
+                            .font(.system(size: 10))
+                            .foregroundColor(Color(hex: "#5dcaa5"))
+                            .lineLimit(1)
+                    }
+                    .padding(.top, 1)
+                }   // [build6] end if !hideConnectionStatus / [display-polish] else link indicator
             }
             // [1/3] Scenario 4 — a pending (one-sided) connection reads dim.
             .opacity(isPending ? 0.55 : 1.0)

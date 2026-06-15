@@ -40,6 +40,13 @@ struct PersonDetailView: View {
         person.pairedUserID.flatMap(UUID.init)
     }
 
+    /// [display-polish] First letter of the name, uppercased; neutral ✦ when empty.
+    /// Matches PeopleListView.PersonCard.monogram so the contact icon is consistent.
+    private var detailMonogram: String {
+        let trimmed = person.name.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.first.map { String($0).uppercased() } ?? "✦"
+    }
+
     var body: some View {
         NavigationStack {
             ZStack {
@@ -53,8 +60,17 @@ struct PersonDetailView: View {
                                 .fill(Color(hex: "#9b7fc0").opacity(0.20))
                                 .frame(width: 84, height: 84)
                                 .blur(radius: 16)
-                            Text(person.emoji)
-                                .font(.system(size: 48))
+                            // [display-polish] Standardize the contact icon on the
+                            // INITIAL (matches PeopleListView.PersonCard). Stops showing
+                            // the per-person emoji as the avatar (vestigial since the
+                            // onboarding emoji-picker cut) AND fixes the blank avatar for
+                            // emoji-less link contacts (this header had no monogram
+                            // fallback). UserProfile.emoji / person.emoji FIELDS kept.
+                            // Text(person.emoji)
+                            //     .font(.system(size: 48))
+                            Text(detailMonogram)
+                                .font(.system(size: 40, weight: .semibold, design: .serif))
+                                .foregroundColor(DesignTokens.Color.accentSoft)
                         }
                         .padding(.top, 20)
                         .padding(.bottom, 10)
