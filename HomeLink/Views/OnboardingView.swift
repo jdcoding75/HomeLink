@@ -58,14 +58,17 @@ struct OnboardingView: View {
                 // [1/4] NEW ORDER: hero · sign in · about you (self profile) ·
                 // your code · instruments · pro · giving · let's go.
                 TabView(selection: $page) {
-                    heroScreen.tag(0)
-                    signInScreen.tag(1)        // sign in before your profile
-                    aboutYouScreen.tag(2)      // [1/4] YOUR profile
-                    yourCodeScreen.tag(3)      // [1/4] share your code
-                    instrumentsScreen.tag(4)
-                    proScreen.tag(5)
-                    givingScreen.tag(6)
-                    letsGoScreen.tag(7)
+                    // [build10 first-pass] trimmed 8 → 5 screens, re-indexed 0–4.
+                    // CUT: hero (merged into sign-in bg), yourCode (pairing-era),
+                    // letsGo (dead "all set"). See reports/onboarding_removal_audit.md.
+                    // heroScreen.tag(0)
+                    signInScreen.tag(0)        // sign in before your profile (now first; compass bg)
+                    aboutYouScreen.tag(1)      // YOUR profile
+                    // yourCodeScreen.tag(3)   // CUT — pairing-era connection code
+                    instrumentsScreen.tag(2)
+                    proScreen.tag(3)
+                    givingScreen.tag(4)
+                    // letsGoScreen.tag(7)     // CUT — dead "you're all set"; giving now finishes
                 }
                 .tabViewStyle(.page(indexDisplayMode: .never))
                 .animation(.easeInOut(duration: 0.4), value: page)
@@ -75,13 +78,13 @@ struct OnboardingView: View {
             }
 
             // Skip — only the showcase screens (instruments · pro · giving)
-            // jump to the finish. The profile + code screens carry their own.
-            if (4...6).contains(page) {
+            // jump to the finish. The profile screen carries its own. [build10: re-indexed 2…4 → finish]
+            if (2...4).contains(page) {
                 VStack {
                     HStack {
                         Spacer()
                         Button("skip") {
-                            withAnimation(.easeInOut(duration: 0.4)) { page = 7 }
+                            finishToApp()   // [build10] letsGo cut → skip finishes straight to the app
                         }
                         .font(.system(size: 13))
                         .foregroundColor(DesignTokens.Color.textMuted)
@@ -128,7 +131,7 @@ struct OnboardingView: View {
 
     private var pageDots: some View {
         HStack(spacing: 7) {
-            ForEach(0..<8, id: \.self) { i in
+            ForEach(0..<5, id: \.self) { i in   // [build10] 8 → 5 screens
                 Circle()
                     .fill(i == page ? Self.lavender : DesignTokens.Color.borderMid)
                     .frame(width: i == page ? 7 : 5, height: i == page ? 7 : 5)
@@ -157,6 +160,10 @@ struct OnboardingView: View {
     @State private var heroTagline = false
     @State private var heroButton  = false
 
+    // [build10 first-pass] "Begin" splash CUT — its compass moves to the sign-in
+    // screen's background (one fewer tap; the emotional compass survives). The
+    // `heroBearing` @State is reused by the sign-in background. Reversible via #if.
+    #if false
     private var heroScreen: some View {
         VStack(spacing: 0) {
             Spacer()
@@ -221,8 +228,9 @@ struct OnboardingView: View {
             }
         }
     }
+    #endif
 
-    // MARK: - Screen 2 · Sign in with Apple
+    // MARK: - Screen 1 · Sign in with Apple (now first; carries the compass bg)
 
     @State private var signInBusy   = false
     @State private var signedIn     = SupabaseService.localUserID != nil
@@ -230,8 +238,17 @@ struct OnboardingView: View {
     @State private var currentNonce = ""
 
     private var signInScreen: some View {
-        VStack(spacing: 0) {
-            Spacer()
+        ZStack {
+            // [build10] the merged "Begin" compass — dimmed/blurred BACKGROUND, offset
+            // up so the white Apple button + serif title stay legible.
+            miniCompass(skin: .vintage, bearing: heroBearing, locked: false, size: 280)
+                .opacity(0.35)
+                .blur(radius: 1.5)
+                .offset(y: -150)
+                .allowsHitTesting(false)
+
+            VStack(spacing: 0) {
+                Spacer()
 
             if signedIn {
                 // Success moment — soft green check, then onward
@@ -287,7 +304,7 @@ struct OnboardingView: View {
 
                 // The escape hatch — the compass works fully offline
                 Button {
-                    withAnimation(.easeInOut(duration: 0.4)) { page = 2 }
+                    withAnimation(.easeInOut(duration: 0.4)) { page = 1 }   // [build10] → aboutYou (re-indexed)
                 } label: {
                     Text("use offline only →")
                         .font(.system(size: 13))
@@ -306,8 +323,9 @@ struct OnboardingView: View {
             if signedIn {
                 nextButton
             }
-        }
-        .animation(.easeOut(duration: 0.4), value: signedIn)
+            }   // [build10] close VStack
+            .animation(.easeOut(duration: 0.4), value: signedIn)
+        }   // [build10] close ZStack (merged compass bg)
     }
 
     private func handleAppleResult(_ result: Result<ASAuthorization, Error>) {
@@ -336,8 +354,8 @@ struct OnboardingView: View {
                     HapticEngine.connectionFelt()
                     // Brief success moment, then onward
                     DispatchQueue.main.asyncAfter(deadline: .now() + 1.3) {
-                        if page == 1 {
-                            withAnimation(.easeInOut(duration: 0.4)) { page = 2 }
+                        if page == 0 {   // [build10] sign-in is now tag 0
+                            withAnimation(.easeInOut(duration: 0.4)) { page = 1 }   // → aboutYou
                         }
                     }
                 } catch {
@@ -433,7 +451,7 @@ struct OnboardingView: View {
     /// 2-second pause on each instrument, looping while the screen shows.
     private func cycleInstruments() {
         DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
-            guard page == 4 else { return }   // instruments is page 4 now
+            guard page == 2 else { return }   // [build10] instruments re-indexed 4 → 2
             withAnimation(.easeInOut(duration: 0.35)) {
                 carouselIndex = (carouselIndex + 1) % Instrument.allCases.count
             }
@@ -685,7 +703,7 @@ struct OnboardingView: View {
 
             Spacer()
 
-            nextButton
+            finishButton   // [build10] giving is now the LAST screen → finish to the app
         }
         .onAppear {
             withAnimation(.easeInOut(duration: 2.4).repeatForever(autoreverses: true)) {
@@ -719,9 +737,12 @@ struct OnboardingView: View {
                     TextField("your name", text: $name)
                         .formInput()
 
+                    // [build10] emoji picker CUT (off-registry default; redesign call).
+                    // `emoji` stays at its "❤️" default; UserProfile.emoji is KEPT
+                    // (PersonDetailView reads it, falling back to person.emoji).
                     // Your emoji — tap to change (the full picker)
-                    fieldLabel("your emoji")
-                    EmojiPickerRow(selected: $emoji)
+                    // fieldLabel("your emoji")
+                    // EmojiPickerRow(selected: $emoji)
 
                     // Where you are — MKLocalSearch autocomplete
                     fieldLabel("where you are")
@@ -881,11 +902,14 @@ struct OnboardingView: View {
         }
 
         HapticEngine.connectionFelt()
-        withAnimation(.easeInOut(duration: 0.4)) { page = 3 }
+        withAnimation(.easeInOut(duration: 0.4)) { page = 2 }   // [build10] → instruments (yourCode cut)
     }
 
-    // MARK: - Screen 4 · Your connection code
-
+    // MARK: - Screen · Your connection code  [build10 CUT — pairing-era, link model]
+    // The whole screen + its mint/share helpers are stripped (reversible via #if).
+    // createProfileInvite / setProfileCode / pairLink become orphaned — left for the
+    // pairing-data cleanup pass.
+    #if false
     private var yourCodeScreen: some View {
         VStack(spacing: 0) {
             Spacer()
@@ -994,11 +1018,13 @@ struct OnboardingView: View {
             }
         }
     }
+    #endif
 
-    // MARK: - Screen 8 · Let's go
+    // MARK: - Screen · Let's go  [build10 CUT — dead "all set"; giving now finishes]
 
     @State private var letsGoGlow = false
 
+    #if false
     private var letsGoScreen: some View {
         VStack(spacing: 0) {
             Spacer()
@@ -1047,12 +1073,30 @@ struct OnboardingView: View {
             }
         }
     }
+    #endif
 
     private var nextButton: some View {
         Button {
             withAnimation(.easeInOut(duration: 0.4)) { page += 1 }
         } label: {
             Text("next →")
+                .font(DesignTokens.Font.label)
+                .foregroundColor(DesignTokens.Color.textPrimary)
+                .padding(.horizontal, 44)
+                .padding(.vertical, 14)
+                .background(DesignTokens.Color.accentStrong)
+                .cornerRadius(DesignTokens.Radius.button)
+        }
+        .padding(.bottom, 40)
+    }
+
+    /// [build10] The LAST showcase screen (giving) finishes straight to the app —
+    /// the cut "you're all set" screen's completion lands here.
+    private var finishButton: some View {
+        Button {
+            finishToApp()
+        } label: {
+            Text("enter Pointward →")
                 .font(DesignTokens.Font.label)
                 .foregroundColor(DesignTokens.Color.textPrimary)
                 .padding(.horizontal, 44)
