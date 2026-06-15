@@ -15,6 +15,7 @@ _Build 12 reframed: SHOW-THE-MESSAGE static web page (fetch+display via getMessa
 _Build 12 wording refreshed: contained / Claude-buildable static page (Joshua has no HTML experience); animated browser version remains Phase 3._
 _SEND MODEL LOCKED: two-path send (connected → DIRECT, re-keyed pairedUserID→senderID, channel NOT retired; not-connected → "open in Pointward" universal LINK; cases 2+3 collapse; cold-start light fill-in; no double-send). 11b reframed to "implement the two-path send"; 9b reframed to retire dead pairing plumbing ONLY (PATH-1 channel survives). Build 12 CTA locked to "open in Pointward — free."_
 _COMPREHENSIVE LOCK-DOWN (back-half design fully resolved): IDENTIFIER BACKBONE framing; CONNECTION-SIGNAL build spec (the gap, two new local stores S1/S2, `link_connections` migration + `record_connection` RPC, 10 cases, 4 resolved decisions, auth-timing correct-by-design) STAGED A→B→C with the family-test gate AFTER C; ONBOARDING/ARRIVAL north-star (message-first, 3 doors, showcase/paywall out of the gate, just-in-time identity); WEB PAGE locked design + canonical pitch + 3-tier animation ladder; PATH-1 push / ~30-day lifespan + save/delete / growth; standing prioritization principle; parked/deferred consolidated._
+_Build 12 web page BUILT · DEPLOYED · LIVE-TESTED (pointward-website `2d319d4`, 404.html path-style, anon `get_message`, DARK-PURPLE brand superseding "warm cream", shipped copy, does NOT mark_opened, install button = TestFlight placeholder pending external review; two invite surfaces locked). Stage B build-spec LOCKED (`reports/stage_b_buildspec.md`)._
 
 ---
 
@@ -444,8 +445,35 @@ the COMMON path, not an edge.
 - **STAGE A — no schema, ships now:** un-gate the link send (3 files / 4 sites — see
   `reports/build11b_audit.md`) + **remove the unconditional legacy `sendRemote`** (kills
   double-send) + add (S1) `SentLink` recording. = **PATH-2 "a link for everyone."**
-- **STAGE B — the signal:** the migration + receiver write/sweep (S2) + sender
-  read/stamp. Contacts start getting `senderID`-stamped.
+- **STAGE B — the signal — ✅ BUILD-SPEC LOCKED** (`reports/stage_b_buildspec.md`;
+  build-ready, no new decisions). Three independently-testable steps:
+  - **(1) MIGRATION `20260615000000_link_connections.sql`** — ADDITIVE: table
+    `link_connections(sender_id, connected_user_id, via_message_id, connected_at;
+    PK(sender_id, connected_user_id)` idempotent) + index + RLS (sender reads own) + RPC
+    `record_connection(p_message_id)` (authenticated-only, SECURITY DEFINER, forces
+    `connected_user_id = auth.uid()`, reads `sender_id` from the message,
+    on-conflict-do-nothing). Touches no existing table's data. ⚠️ **JOSHUA APPLIES**
+    (`supabase login`; like builds 2/4a) — client code can ship ahead; **signal dormant
+    until applied.**
+  - **(2) RECEIVER WRITE + SWEEP:** `SupabaseService.recordConnection(messageID)` (mirrors
+    `markMessageOpened`); hook at IncomingMessageView open (fire at **fetch/upsertContact**,
+    NOT at the opened-flip) + ShortCodeEntryView claim; **(S2) `PendingConnections`**
+    UserDefaults `[UUID]` appended on every `/m/` open; `drainPendingConnections()` on
+    **sign-in success (primary)** + launch-while-authed (backstop) — covers the
+    fresh-install-unauthed-open case.
+  - **(3) SENDER READ + STAMP:** `fetchMyConnections()` → `PeopleManager.stampConnections()`
+    reads Stage A's **S1 `SentLink`** (`messageID→personID`), stamps `Person.senderID =
+    connected_user_id` (+ `pairedUserID` mirror). Idempotent; run at launch / scenePhase
+    active. The S1 link guarantees **one contact to stamp** (no duplicate).
+  - **EDGES handled:** forwarding (first-opener-wins v1), two-contacts-one-person (rare,
+    manual merge), self-send skip, message-deleted (`via` set null → skip stamp), offline
+    (retry), receiver-also-sender (independent rows), SentLink-missing (skip+log).
+  - **PATH 1 send-decision + read-receipt SURFACING are STAGE C** (Stage B only makes the
+    stamping/signal work).
+  - **⚠️ LIMITATION (named, not blocking):** `SentLink` + contacts are LOCAL SwiftData
+    (no sync) → stamping is **PER-DEVICE**; a 2nd device of the same sender can't stamp
+    (the contact stays link-only there). An existing per-device limitation, not new;
+    flag for a future sync decision; fine for launch.
 - **STAGE C — PATH 1 + receipts:** flip `sendThought` to the two-path decision
   (`senderID` set → PATH 1 direct, re-keyed; else PATH 2 link) + surface poll
   read-receipts.
@@ -546,10 +574,12 @@ decision-heavy, fresh-mind work.**
   this redesign, not a separate build). Also touches `redeem`/`createInvite` (B1) and
   `myPairingCode` (B5).
 - **11 — Phase 2 test suite** (automated scenarios).
-- **12 — SHOW-THE-MESSAGE web page** (`pointward.app/m/[id]`, separate `pointward` repo
-  / GitHub Pages) — read message id from URL → anon `getMessage(id)` → render. **Build
-  AFTER the link send works (Stage A).** Full locked design + canonical pitch + the
-  3-tier animation ladder are in **WEB PAGE (Build 12) — LOCKED DESIGN** below.
+- **12 — SHOW-THE-MESSAGE web page** ✅ **BUILT · DEPLOYED · LIVE-TESTED**
+  (`pointward.app/m/[id]`, in the separate **pointward-website** repo — commit
+  `2d319d4` — live on GitHub Pages). Renders a real `/m/<id>` via anon `getMessage`;
+  empty state for a bad id. **One open dependency:** the install button uses a
+  TestFlight-link placeholder (no public link until external review / App Store). Full
+  status + shipped design/copy in **WEB PAGE (Build 12)** below.
 - **cleanup pass** — tighten/consolidate transitional logic (the mirror-write
   bridge etc.), **hard-delete** the commented code, test audit, final TRUTH cleanup.
 
@@ -580,24 +610,49 @@ the dead connection-code screen is removed + repositioned as part of THIS redesi
 - **IDENTITY just-in-time:** capture sign-in / name at the **moment of action (reply)**,
   not upfront — the same moment the connection record forms.
 
-### ⭐ WEB PAGE (Build 12) — LOCKED DESIGN + canonical pitch
-- **Design (mockup session):** **message-first calm center** (emoji + serif message +
-  "from [sender]"); top tease *"[sender] sent you a thought ✦ it moves when it
-  arrives"*; gentle **shimmer** (emoji float + halo + twinkle + button light-sweep);
-  **faint peripheral instrument hints** (low-opacity real instrument stills/loops at
-  build — don't crowd the message); a quiet **short-code fallback** at the bottom. Warm
-  cream palette (confirm vs brand).
-- **CANONICAL INVITATION PITCH (LATEST — supersedes ALL earlier phrasings):**
-  - **HERO:** *"see the full animation — the way [sender] intended ✦"*
-  - **BONUSES:** send one back · send custom animations to others in a few clicks ·
-    save it · and more
-  - **CLOSE:** free
-  - **BUTTON:** *"open in Pointward"* — **NOT "download"; do NOT repeat "free" on the
-    button** (it's in the bonuses).
-  - _(Joshua: locked for now; will refine at build.)_
-- **Wiring (the real, do-once work):** read message id from URL → anon `getMessage(id)`
-  → render. Look/copy is **cheap to change anytime after wiring.** Build **AFTER the
-  link send works (Stage A).**
+### ⭐ WEB PAGE (Build 12) — BUILT · DEPLOYED · LIVE-TESTED ✅
+**STATUS:** the show-the-message page is **DONE and deployed** to the separate
+**pointward-website** repo (commit `2d319d4`, "add show-the-message page (404.html,
+path-style /m/<id>)"), live on **GitHub Pages at pointward.app**. **Live-tested
+working:** a real `/m/<id>` renders the real message; a bad id shows the empty state.
+**First production proof** that a static page fetches Pointward messages anonymously.
+- **SERVING:** **`404.html` at the repo root.** GitHub Pages has no SPA / path-wildcard,
+  so path-style `/m/<id>` links resolve via the 404.html fallback (reads the id from the
+  path, renders). **No app-side link-format change** (chosen over a `?id=` query form,
+  which would've forced an app change).
+- **DATA:** the anon **`get_message` RPC** (`POST …/rest/v1/rpc/get_message`, body
+  `{"p_id":"<uuid>"}`, array-wrapped → `rows[0]`; fields `emoji` / `content` /
+  `sender_display_name`; `[]` for unknown / expired). CORS verified from the page
+  origin. The anon key is public / shippable.
+- **BRAND: DARK PURPLE** (matches the live `index.html`: bg `#0d0d14`, text `#e8e0f0`,
+  accents `#3a2e50` / `#7c6b8e` / `#c4a8d4`). **SUPERSEDES the earlier "warm cream
+  palette" note** (placeholder, written before the real palette was known). Shimmer /
+  glow look better on dark.
+- **COPY (as shipped):** kicker *"[sender] sent you a thought ✦ it moves when it
+  arrives"*; glowing / floating emoji; serif message; *"from [sender]"*; **HERO** *"see
+  the full animation — the way [sender] intended ✦"*; **bonuses** *send one back · send
+  custom animations to others · save it · and more*; **button "Open Pointward"**;
+  **trust-line** *"free · no ads · for real"* (truthful — Pointward monetizes via the
+  paywall, NOT ads; keep that promise); quiet short-code fallback; faint drifting
+  instrument hints.
+- **DOES NOT `mark_opened`:** the web page **displays but does NOT flip opened** —
+  preserving the locked definition (*read = opened IN FULL IN-APP, the way the sender
+  intended*; a web glance is not a read). **The audit's "optional `mark_opened`" was
+  deliberately DECLINED.**
+- **⚠️ ONE OPEN DEPENDENCY:** both "Open / get Pointward" buttons use
+  **`TESTFLIGHT_LINK_PLACEHOLDER`.** Joshua has **not** done external TestFlight review,
+  so no public install link exists yet. The page **fetches / displays real messages
+  TODAY** — only the install **destination** waits. Swap in the real link after external
+  TestFlight review (→ public link) OR at App Store launch. **Routing (locked):**
+  straight-to-install (no landing-page hop) for least friction.
+- **TWO INVITE SURFACES (locked):** (1) the **share-sheet message text** in the
+  recipient's Messages thread (*"[sender] sent you a custom animated message ✦ tap to
+  preview"*) + the **iOS auto-preview card** (shapeable via the page's `og:` meta tags —
+  already added); (2) **this web page.** Surface 1 entices the tap; surface 2 catches
+  the no-app tap.
+- **Wiring is DONE** (the real, do-once work): message id from URL → anon
+  `getMessage(id)` → render. Look / copy is **cheap to change anytime** now that it's
+  wired.
 - **THREE-TIER ANIMATION LADDER:**
   - **T1 (now):** static + cheap CSS shimmer + simple peripheral hints.
   - **T2 (between Phase 2/3, END of the list):** recreate **simplified
