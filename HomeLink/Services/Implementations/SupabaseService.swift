@@ -1145,6 +1145,27 @@ final class SupabaseService: ObservableObject {
         }
     }
 
+    /// [phase2 stage C] Read-receipts (POLL — messages is not in realtime). The ids of
+    /// MY sent messages the recipient has OPENED IN FULL (the `opened` flag flips only
+    /// at the receipt's natural completion — the locked "opened = in-app full open").
+    /// RLS ("messages read own", auth.uid() = sender_id) scopes this to my own rows.
+    func fetchOpenedSentMessageIDs() async -> [UUID] {
+        guard let client, let me = await currentUserID else { return [] }
+        struct Row: Decodable { let id: UUID }
+        do {
+            let rows: [Row] = try await client
+                .from("messages")
+                .select("id")
+                .eq("sender_id", value: me.uuidString)
+                .eq("opened", value: true)
+                .execute().value
+            return rows.map(\.id)
+        } catch {
+            log.error("receipt: fetchOpenedSentMessageIDs failed: \(error.localizedDescription, privacy: .public)")
+            return []
+        }
+    }
+
     /// Realtime shape of a partner's compass_bearings row.
     struct PointingEvent: Codable {
         let userID: UUID

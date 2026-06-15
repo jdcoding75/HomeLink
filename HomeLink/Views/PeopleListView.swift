@@ -51,7 +51,8 @@ struct PeopleListView: View {
                                 lastSeenText: lastSeenText(for: person),
                                 showLocationHint: needsLocation(person),
                                 disambiguator: disambiguator(for: person, dupes: dupes),
-                                hideConnectionStatus: isLinkContact(person)
+                                hideConnectionStatus: isLinkContact(person),
+                                hasOpenedReceipt: people.contactsWithOpenedReceipt.contains(person.id)
                             ) {
                                 // Tap card → select + open the detail view
                                 people.select(person)
@@ -278,6 +279,7 @@ struct PersonCard: View {
     var showLocationHint: Bool = false      // [build6] zero-location → add-location hint
     var disambiguator: String? = nil        // [build6] same-name suffix line
     var hideConnectionStatus: Bool = false  // [build6] suppress pairing row for link contacts
+    var hasOpenedReceipt: Bool = false       // [stageC] they opened a thought I sent → "opened ✦"
     let onTap: () -> Void
     let onEdit: () -> Void
     var onAddLocation: () -> Void = {}       // [build6] hint tap → edit path
@@ -322,9 +324,17 @@ struct PersonCard: View {
 
             // Info
             VStack(alignment: .leading, spacing: 3) {
-                Text(person.name)
-                    .font(.system(size: 17, weight: .semibold))
-                    .foregroundColor(DesignTokens.Color.textPrimary)
+                HStack(spacing: 6) {
+                    Text(person.name)
+                        .font(.system(size: 17, weight: .semibold))
+                        .foregroundColor(DesignTokens.Color.textPrimary)
+                    // [stageC] read-receipt — they opened (in full) a thought I sent.
+                    if hasOpenedReceipt {
+                        Text("opened ✦")
+                            .font(.system(size: 10, weight: .medium))
+                            .foregroundColor(DesignTokens.Color.accentSoft)
+                    }
+                }
 
                 // [build6] Location line. Priority: zero-location HINT (also kills
                 // the bogus null-island distance / name-echo) → same-name

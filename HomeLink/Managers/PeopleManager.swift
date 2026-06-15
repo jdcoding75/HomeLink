@@ -13,6 +13,10 @@ final class PeopleManager: ObservableObject {
     @Published var selectedPerson: Person?
     /// YOUR profile — created in onboarding, shared when people connect with you.
     @Published var profile:        UserProfile?
+    /// [phase2 stage C] Local `Person.id`s who have OPENED (in full) a thought I sent
+    /// them — drives the "opened ✦" read-receipt on the People list / card. Re-derived
+    /// from the poll each launch / foreground (no model field; resets + refills).
+    @Published private(set) var contactsWithOpenedReceipt: Set<UUID> = []
 
     private let subscriptionManager: SubscriptionManager
     private var modelContext: ModelContext?
@@ -342,6 +346,21 @@ final class PeopleManager: ObservableObject {
             didChange = true
         }
         if didChange { try? context.save(); fetchAll() }
+    }
+
+    /// [phase2 stage C] Map the ids of my OPENED sent messages → the contacts I sent
+    /// them to (via the S1 `SentLink`), and publish the set for the "opened ✦"
+    /// read-receipt indicator. Re-derived wholesale each poll (idempotent).
+    func refreshReadReceipts(openedMessageIDs: [UUID]) {
+        guard let context = modelContext else { return }
+        var ids = Set<UUID>()
+        for mid in openedMessageIDs {
+            if let link = try? context.fetch(
+                FetchDescriptor<SentLink>(predicate: #Predicate { $0.messageID == mid })).first {
+                ids.insert(link.personID)
+            }
+        }
+        if ids != contactsWithOpenedReceipt { contactsWithOpenedReceipt = ids }
     }
 
     enum PeopleError: Error, LocalizedError {

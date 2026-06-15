@@ -1885,23 +1885,39 @@ struct CompassView: View {
             // HapticEngine.thoughtLaunched()   // retired — single .light at launch
         }
 
-        // [phase2 stage A] LINK SEND — LIVE (PATH-2 "a link for everyone"). The
-        // animation above has ALREADY fired (sacred, never blocked); this stores the
-        // thought as a /m/[id] message in the BACKGROUND and presents the share sheet.
-        // The recipient is whoever opens the link (sender-keyed). (S1) records the
-        // sent-link → contact mapping so Stage B/C can stamp the right contact.
-        let cid = people.selectedPerson?.id   // capture BEFORE the async callback
-        pings.createAndShareLink(
-            content: outgoingMessage.isEmpty ? nil : outgoingMessage,
-            emoji: sendRemoteEmoji(for: token),
-            instrument: style.rawValue,                       // wire style (matches pings.sender_style)
-            senderName: people.profile?.displayName ?? UserProfile.snapshot?.displayName ?? "",
-            shortCode: people.profile?.shortCode.nilIfEmpty
-                       ?? UserProfile.snapshot?.shortCode ?? "",
-            personID: cid,
-            onStored: { id in
-                if let cid { people.recordSentLink(messageID: id, personID: cid) }
-            })
+        // [phase2 stage C] TWO-PATH SEND — mutually exclusive (NO double-send). The
+        // animation above has ALREADY fired (sacred, never blocked).
+        //   PATH 1 — CONNECTED contact (senderID stamped by Stage B = a real users.id)
+        //            → DIRECT delivery on the existing pings channel, RE-KEYED to
+        //            senderID. Lands in their Pointward + push. NO link, NO share sheet.
+        //   PATH 2 — not-yet-connected → the link + share sheet (Stage A), recording
+        //            the (S1) SentLink so the connection can later stamp the contact.
+        // (The old unconditional sendRemote block above stays commented — this is the
+        //  NEW, conditional, senderID-keyed direct send.)
+        if let sid = people.selectedPerson?.senderID,
+           let rid = UUID(uuidString: sid) {
+            CompassView.log.info("send: PATH 1 (direct) \(token, privacy: .public) → \(rid.uuidString, privacy: .public) as \(style.rawValue, privacy: .public)")
+            pings.sendRemote(to: rid,
+                             emoji: sendRemoteEmoji(for: token),
+                             style: style,
+                             message: outgoingMessage.isEmpty ? nil : outgoingMessage,
+                             tagline: people.selectedPerson?.tagline)
+        } else {
+            // PATH 2 — link send (sender-keyed; recipient is whoever opens the link).
+            let cid = people.selectedPerson?.id   // capture BEFORE the async callback
+            CompassView.log.info("send: PATH 2 (link) \(token, privacy: .public) — not-yet-connected")
+            pings.createAndShareLink(
+                content: outgoingMessage.isEmpty ? nil : outgoingMessage,
+                emoji: sendRemoteEmoji(for: token),
+                instrument: style.rawValue,                   // wire style (matches pings.sender_style)
+                senderName: people.profile?.displayName ?? UserProfile.snapshot?.displayName ?? "",
+                shortCode: people.profile?.shortCode.nilIfEmpty
+                           ?? UserProfile.snapshot?.shortCode ?? "",
+                personID: cid,
+                onStored: { id in
+                    if let cid { people.recordSentLink(messageID: id, personID: cid) }
+                })
+        }
         // Cleanup moved to SenderAnimationView.onComplete (duration varies by style)
         // DispatchQueue.main.asyncAfter(deadline: .now() + 1.6) {
         //     flightToken = nil
