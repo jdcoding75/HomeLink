@@ -7,7 +7,7 @@
 > is the top of the hierarchy. When they conflict with reality, the live code +
 > this document win.
 
-_Last updated: Session 8 (structural-truth pass) · Phase 2 canon reconciliation — link-based model, scope, senderID, deep-link deferred to P3. · IDENTITY CORRECTION: not forking — the two `users` rows are 2 Apple IDs (Joshua + wife), identity IS stable, hardening deprioritized; banked the display-polish batch (arrival-name, connection-indicator, contact-icon) as active small work._
+_Last updated: Session 8 (structural-truth pass) · Phase 2 canon reconciliation — link-based model, scope, senderID, deep-link deferred to P3. · IDENTITY CORRECTION: not forking — the two `users` rows are 2 Apple IDs (Joshua + wife), identity IS stable, hardening deprioritized; banked the display-polish batch (arrival-name, connection-indicator, contact-icon) as active small work. · SESSION CLOSE: Stage A/B/C + display polish all COMMITTED (clean tree, HEAD `90422fd`); banked the CLEAN-RESET PROTOCOL for next session (churn-fogged device state — reset before verifying) + open items (stuck "connected" banner, display clean-verify, old-copy cleanup, double-tap cold-start audit)._
 _Updated this session: Phase 2 progress + findings pass — builds 1–4b shipped & verified, per-person history-bucket finding (coupled to build 9), re-sequenced build order 5–11, onboarding + infrastructure notes banked._
 _Findings pass 2: builds 5–6 + display-name/shortCode fix DONE & device-verified; sharpened the build-9 bucket finding (pings-table vs messages-table seam); banked hint legibility, Sarah dev-seed, duplicate-users, onboarding-emoji, share-sheet, and send-sound-distortion notes._
 _Session lock-up: builds 5–9 (safe half) shipped & ledgered; CRITICAL link-send-`#if DEBUG` / delivery-backbone finding banked; bucket finding RESOLVED (sender-agnostic, local); 3 locked bucket decisions; back-half re-sequenced (11b cutover → 9b delivery-retire → 10 onboarding → 11 tests → 12 web → cleanup); build-9 left-intentionally flags + findings-pass-3 notes. CLAUDE.md: standing build patterns added._
@@ -574,9 +574,10 @@ Stage A + B both committed (`d49f503`, `3e02eba`) and now device-verified.
     shows the re-tappable-link fallback is insufficient. (The commented pairing machinery
     stays recoverable per never-delete, but there's **no plan to surface it.**)
 
-### ⭐ DISPLAY-POLISH BATCH — ACTIVE small work (all low-risk, audited, build together)
-Three ready, display-only improvements — the current active small work (replaces the
-identity-fork as the priority; identity is stable, hardening deferred). All audited:
+### ⭐ DISPLAY-POLISH BATCH — ✅ BUILT + COMMITTED (`90422fd`) — needs clean device verify
+Three display-only improvements — **built, Release-compiles, 248 tests green, committed**
+(`reports/display_polish_build.md`). Identity is stable, hardening deferred. **Still needs
+a CLEAN device check** (the churn blocked it — see NEXT SESSION below):
 1. **ARRIVAL NAME** (`reports/arrival_name_audit.md`): `IncomingMessageView` —
    `receivedPing` (208–211) + `historyPing` (228–231). Add a **name-precedence** helper:
    (1) recipient's **LOCAL contact name** via `people.person(forSenderID:)` [the "Husband"
@@ -588,12 +589,70 @@ identity-fork as the priority; identity is stable, hardening deferred). All audi
    contacts — **re-surface it driven by `senderID`** (`isLinkContact = senderID set`) as
    **"connected ✦"** (green **#5dcaa5**); render **nothing for nil** (no false "not yet
    linked"). Display-only. (This IS finding #3 above — the connection-status indicator.)
-3. **CONTACT ICON:** standardize on the **INITIAL**, drop the per-person **emoji**
-   (vestigial since the onboarding emoji-picker cut; inconsistent, adds nothing). Update
-   `PersonDetailView:338` (reads `UserProfile.emoji`) → use the initial. **OPEN:** confirm
-   whether to **fully remove** `UserProfile.emoji` or **just stop displaying** it
-   (ties to the banked "[build 8/10] Onboarding emoji + `UserProfile.emoji`" audit — don't
-   cut the field blind; default to stop-displaying unless the audit shows it's orphaned).
+3. **CONTACT ICON → INITIAL:** standardize the avatar on the INITIAL, stop displaying the
+   per-person emoji. ⚠️ The cited `PersonDetailView:338` was the **WRONG target** — that
+   line is `prepareInvite()`'s `ownerEmoji` (the **invite payload**, pairing-era), NOT the
+   displayed icon — **left intact.** The real avatars were fixed: **`PersonDetailView:56`**
+   (header; had NO monogram fallback → emoji-less contacts showed BLANK — now the initial,
+   also fixes that gap) + **`PeopleListView.PersonCard`** (list avatar → initial-only;
+   emoji branch commented). `UserProfile.emoji` / `Person.emoji` **FIELDS KEPT** (only
+   their use as the icon removed; `UserProfile.emoji` still feeds the invite at `:338`, so
+   removal is not clean). Ties to the banked "[build 8/10] onboarding-emoji" field audit.
+
+### ⭐ NEXT SESSION — START CLEAN (open items + reset protocol)
+
+**STATUS: all committed, clean tree.** Committed this session: Stage A (`d49f503`),
+product dump (`e64833a`), Stage B (`3e02eba`) + device-verified two-phone, Stage B
+findings (`66828f2`), onboarding 8→5 trim (`550adcc`), identity correction + display-batch
+bank (`c5774c2`), Stage C two-path + read-receipts (`8a8f74f`), display polish
+(arrival-name + connection indicator + contact-icon→initial) (`90422fd`). **Nothing
+uncommitted.**
+
+**WHY START CLEAN.** The afternoon's device testing got **CHURN-FOGGED**: repeated
+deletes/reinstalls, two Apple IDs (Joshua + wife), recreated contacts, mismatched builds
+across two phones. **Most "bugs" seen are likely CHURN ARTIFACTS, not regressions** — but
+the device/server state is too messy to tell real from artifact. **Reset to a known-clean
+state before verifying anything.**
+
+**CLEAN-RESET PROTOCOL (do at the START of next session):**
+1. **Delete Pointward from BOTH phones** (Joshua's + wife's).
+2. **Supabase:** `delete from link_connections;` (clean connection slate). Optionally clear
+   test `messages` / `pings`. ⚠️ **LEAVE `users` / `auth.users` accounts INTACT — do NOT
+   delete them.** Deleting auth rows is what caused the identity-fork confusion;
+   recreating risks new forks. **Identity is stable when accounts are left alone.**
+3. **Fresh-install the CURRENT committed build** (Stage A/B/C + display polish, HEAD
+   `90422fd`) to **BOTH** phones via Xcode (so both phones run the SAME build — kills the
+   mismatched-build artifact).
+4. **Sign in:** Joshua as his Apple ID, wife as hers — ⚠️ **have the WIFE SET A DISPLAY
+   NAME this time** (her account's NULL `display_name` is the root of the "someone"
+   arrivals).
+5. **Recreate ONE clean contact** for her ("Jessica") on Joshua's phone.
+6. **Form ONE clean connection:** Joshua sends → she opens → connection forms → his
+   contact stamps her `senderID`.
+7. **THEN verify methodically (baby steps), one thing at a time:**
+   - Arrival shows her name (local label "Jessica" or her now-set display name), **NOT
+     "someone"**.
+   - Green **"connected ✦"** appears on her contact (`senderID` stamped).
+   - Contacts show **initials**, no emoji, no blank avatars.
+   - **Stage C PATH 1:** a send to the connected contact goes **DIRECT (no share sheet)** —
+     the clean Stage-C verify the churn muddied.
+   - **No double-send** (`pings` / `messages` row counts).
+
+**OPEN ITEMS / BUGS TO CHASE (on the clean slate):**
+1. **"[Name] connected" STUCK BANNER** — e.g. "Jessica connected" popped, wouldn't
+   dismiss, only opened the contact on tap. Likely a **notification-dismiss bug**; may
+   relate to / conflict with the "remove the cold added-you notification" decision + the
+   connection-indicator work. **Investigate clean.**
+2. **Display batch needs CLEAN device verification** — committed on build-strength
+   (Release + 248 tests), but the churn prevented a clean device check.
+3. **Per-device limitation (again):** recreated contacts after reinstall may have **nil
+   `senderID`** (no green) until re-connected — **expected**; ties to the future
+   restore-from-server refinement.
+4. **"someone who loves you" caption + bucket-catch** = confirmed **OLD-PHASE
+   copy/mechanism**, **NOT touched this session** — note for the eventual receipt /
+   old-surface cleanup pass.
+5. **Double-tap link bug** (link needed 2 taps) = **universal-link cold-start race**
+   (separate read-only audit, **medium priority** — per the identity audit §5).
 
 ### Three LOCKED bucket decisions (Joshua, this session)
 1. **Replay-from-history does NOT flip opened** — replay = re-feel, not consume.
