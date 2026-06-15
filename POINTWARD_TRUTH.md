@@ -7,7 +7,7 @@
 > is the top of the hierarchy. When they conflict with reality, the live code +
 > this document win.
 
-_Last updated: Session 8 (structural-truth pass) · Phase 2 canon reconciliation — link-based model, scope, senderID, deep-link deferred to P3._
+_Last updated: Session 8 (structural-truth pass) · Phase 2 canon reconciliation — link-based model, scope, senderID, deep-link deferred to P3. · IDENTITY CORRECTION: not forking — the two `users` rows are 2 Apple IDs (Joshua + wife), identity IS stable, hardening deprioritized; banked the display-polish batch (arrival-name, connection-indicator, contact-icon) as active small work._
 _Updated this session: Phase 2 progress + findings pass — builds 1–4b shipped & verified, per-person history-bucket finding (coupled to build 9), re-sequenced build order 5–11, onboarding + infrastructure notes banked._
 _Findings pass 2: builds 5–6 + display-name/shortCode fix DONE & device-verified; sharpened the build-9 bucket finding (pings-table vs messages-table seam); banked hint legibility, Sarah dev-seed, duplicate-users, onboarding-emoji, share-sheet, and send-sound-distortion notes._
 _Session lock-up: builds 5–9 (safe half) shipped & ledgered; CRITICAL link-send-`#if DEBUG` / delivery-backbone finding banked; bucket finding RESOLVED (sender-agnostic, local); 3 locked bucket decisions; back-half re-sequenced (11b cutover → 9b delivery-retire → 10 onboarding → 11 tests → 12 web → cleanup); build-9 left-intentionally flags + findings-pass-3 notes. CLAUDE.md: standing build patterns added._
@@ -503,7 +503,10 @@ Stage A + B both committed (`d49f503`, `3e02eba`) and now device-verified.
 1. **Arrival shows "Someone sent you a thought" instead of the sender's name.** The
    message carries `sender_display_name` ("John") but the arrival shows generic
    **"Someone"** — the name is IN the data, not displayed. **BUG:** arrival must show
-   `sender_display_name`. **ENHANCEMENT (Joshua likes; secondary / if-easy):** if the
+   `sender_display_name`. **ROOT CAUSE confirmed:** the wife's `users.display_name` is
+   **NULL** (she never set a name at onboarding) → reinforces require-display-name-at-
+   onboarding + the **recipient-local-name** precedence (display-polish batch #1).
+   **ENHANCEMENT (Joshua likes; secondary / if-easy):** if the
    RECIPIENT has a local contact for the sender (e.g. she has him as "Husband"), prefer
    **HER local name** over his self-entered name — show the relationship name each side
    chose. Depends on a local contact existing (the connection signal now creates one).
@@ -570,6 +573,27 @@ Stage A + B both committed (`d49f503`, `3e02eba`) and now device-verified.
     link method work — **it just did** (connection verified). Revisit only if real usage
     shows the re-tappable-link fallback is insufficient. (The commented pairing machinery
     stays recoverable per never-delete, but there's **no plan to surface it.**)
+
+### ⭐ DISPLAY-POLISH BATCH — ACTIVE small work (all low-risk, audited, build together)
+Three ready, display-only improvements — the current active small work (replaces the
+identity-fork as the priority; identity is stable, hardening deferred). All audited:
+1. **ARRIVAL NAME** (`reports/arrival_name_audit.md`): `IncomingMessageView` —
+   `receivedPing` (208–211) + `historyPing` (228–231). Add a **name-precedence** helper:
+   (1) recipient's **LOCAL contact name** via `people.person(forSenderID:)` [the "Husband"
+   enhancement], (2) `m.senderDisplayName` [baseline], (3) `"someone"` [last resort]. ONE
+   shared helper; updates **ALL** receipt captions (they read `ping.fromName`). **Fixes the
+   "Someone" arrivals** (root cause = wife's null `display_name`; see Identity gotcha).
+2. **CONNECTION INDICATOR** (`reports/connection_indicator_audit.md`): `PeopleListView`
+   ONLY. The green "connected" indicator **already EXISTS** but is hidden for link
+   contacts — **re-surface it driven by `senderID`** (`isLinkContact = senderID set`) as
+   **"connected ✦"** (green **#5dcaa5**); render **nothing for nil** (no false "not yet
+   linked"). Display-only. (This IS finding #3 above — the connection-status indicator.)
+3. **CONTACT ICON:** standardize on the **INITIAL**, drop the per-person **emoji**
+   (vestigial since the onboarding emoji-picker cut; inconsistent, adds nothing). Update
+   `PersonDetailView:338` (reads `UserProfile.emoji`) → use the initial. **OPEN:** confirm
+   whether to **fully remove** `UserProfile.emoji` or **just stop displaying** it
+   (ties to the banked "[build 8/10] Onboarding emoji + `UserProfile.emoji`" audit — don't
+   cut the field blind; default to stop-displaying unless the audit shows it's orphaned).
 
 ### Three LOCKED bucket decisions (Joshua, this session)
 1. **Replay-from-history does NOT flip opened** — replay = re-feel, not consume.
@@ -915,11 +939,29 @@ your messages will see you ✦").
   lists `/pair/*`, `/join/*`, **AND `/m/*`** (live, verified via curl).
 - **iOS caches AASA hard** — device link tests may require delete+reinstall to
   pick up `/m/*`.
-- **Identity edge:** app delete+reinstall (and/or `-skipOnboarding`) can create a
-  **DUPLICATE `users` row** (a null-name orphan was created this way). Joshua's
-  real account (messages + name "John") = `users.id 3ef2a987-…`, short_code
-  **DS2CVW**. Investigate whether normal returning-user sign-in can also duplicate
-  identities (build 2 / identity hardening).
+- **Identity — NOT forking (audit premise was WRONG; identity IS stable in practice).**
+  The identity-stability audit (`reports/identity_stability_audit.md`) flagged a
+  "CRITICAL" reinstall fork, **but its premise was wrong.** The two `users` rows are
+  **TWO DIFFERENT APPLE IDs**, not one forked identity — confirmed by their **different
+  `apple_user_id`** values:
+  - Joshua's main: `3ef2a987…` / short_code **DS2CVW** / name **"John"** — 16 msgs · 1 conn · 46 tokens.
+  - His **WIFE's**: `b3d85a30…` / **Y9HNEF** / name **NULL** — 0 msgs · 0 conns · 6 tokens.
+  Joshua's reinstall **correctly re-resolved to his SAME account** (kept all 16 messages)
+  → `users.id` / `senderID` **is stable** across reinstall. **No fork. No orphan to merge**
+  (the second row is the wife, a real user — **do NOT merge/delete**). The IDENTIFY-first
+  (read-only) step caught the wrong premise *before* any delicate RLS/migration touch —
+  worked as intended.
+- **Identity hardening = OPTIONAL/LATER (deprioritized).** The audit's fix
+  (`apple_user_id` UNIQUE anchor + `ensure_identity` RPC + `auth_id` decouple + RLS
+  rewrite) is **defensive hardening** against edge cases (e.g. `auth.users`-row deletion,
+  Apple provider-config change), **NOT an urgent pre-family-test fix.** Revisit only if
+  **real forking is ever observed in normal use.** (`users.id = auth.uid()`; `apple_user_id`
+  is stored but not used as a resolution key — that's the hardening surface if ever needed.)
+- **Wife's NULL `display_name` explains the "Someone" arrivals** (she has no name set) →
+  reinforces **require-display-name-at-onboarding** + the arrival-name fix (display-polish
+  batch #1 below).
+- **The duplicate contact Joshua's wife saw was NOT identity-forking** — re-examine
+  separately (likely reinstall-churn / contact-matching), **LOWER priority.**
 - **`-skipOnboarding` launch arg** exists (now unchecked) — remember it when
   testing onboarding (build 10), or it skips the thing under test.
 - **Retention:** time-based expiry ("x days") **NOT** implemented (`created_at`
@@ -940,11 +982,13 @@ your messages will see you ✦").
   `pairedUserID`, so `testSkipOnboardingInjectsSarah` passes unchanged).
   `setMockDistance` repointed to `person(forSenderID:)`. Sarah remains
   **⚠️ DO-NOT-REMOVE**.
-- **[build 2 / identity hardening] Duplicate `users` rows.** App delete+reinstall
-  and/or `-skipOnboarding` can create a duplicate / null-name `users` row (orphan
-  observed). Joshua's real account = `users.id 3ef2a987-…`, short_code **DS2CVW**,
-  name "John". Investigate whether **normal returning-user sign-in** can also
-  duplicate identities.
+- **[build 2 / identity hardening — RESOLVED: no fork] "Duplicate `users` rows" was a
+  MISREAD.** The two rows are **two different Apple IDs** (Joshua `3ef2a987…`/DS2CVW/"John"
+  + WIFE `b3d85a30…`/Y9HNEF/null-name) — **different `apple_user_id`s**, not a forked
+  identity. Normal returning-user sign-in **re-resolves to the SAME account** (Joshua's
+  reinstall kept all 16 msgs). Identity is **stable**; hardening is **optional/later**
+  (see Infrastructure/Gotchas → "Identity — NOT forking"). The wife's null name (never
+  onboarded with a display_name) is the **"Someone"-arrival** source, not an orphan.
 - **[build 8 or 10 audit] Onboarding emoji screen + `UserProfile.emoji`.** Joshua
   wants the emoji-selection screen removed (purposeless onboarding distraction). **Do
   NOT cut blind** — first audit what consumes `UserProfile.emoji`; if orphaned,
