@@ -14,6 +14,7 @@ _Session lock-up: builds 5–9 (safe half) shipped & ledgered; CRITICAL link-sen
 _Build 12 reframed: SHOW-THE-MESSAGE static web page (fetch+display via getMessage(id), no animation) pulled to pre-launch; the animated-in-browser version stays Phase 3._
 _Build 12 wording refreshed: contained / Claude-buildable static page (Joshua has no HTML experience); animated browser version remains Phase 3._
 _SEND MODEL LOCKED: two-path send (connected → DIRECT, re-keyed pairedUserID→senderID, channel NOT retired; not-connected → "open in Pointward" universal LINK; cases 2+3 collapse; cold-start light fill-in; no double-send). 11b reframed to "implement the two-path send"; 9b reframed to retire dead pairing plumbing ONLY (PATH-1 channel survives). Build 12 CTA locked to "open in Pointward — free."_
+_COMPREHENSIVE LOCK-DOWN (back-half design fully resolved): IDENTIFIER BACKBONE framing; CONNECTION-SIGNAL build spec (the gap, two new local stores S1/S2, `link_connections` migration + `record_connection` RPC, 10 cases, 4 resolved decisions, auth-timing correct-by-design) STAGED A→B→C with the family-test gate AFTER C; ONBOARDING/ARRIVAL north-star (message-first, 3 doors, showcase/paywall out of the gate, just-in-time identity); WEB PAGE locked design + canonical pitch + 3-tier animation ladder; PATH-1 push / ~30-day lifespan + save/delete / growth; standing prioritization principle; parked/deferred consolidated._
 
 ---
 
@@ -378,7 +379,86 @@ me" — **these two cases COLLAPSE into one path**):
   **Never make it heavy or always-present.**
 
 **Consequences for the build order:** 11b and 9b are reframed against this locked
-model (see the build order below).
+model (see the build order below + the connection-signal spec).
+
+### ⭐ IDENTIFIER BACKBONE (framing principle)
+The identity layer is the set of **stable joints** — tightly defined, expensive to
+change, therefore **kept stable**. Everything else builds on top and may flex; the
+identity layer must never need re-architecting.
+- **sender `users.id`** — written as `messages.sender_id` (immutable account id).
+- **receiver `users.id`** — exists once they sign in (the opt-in threshold).
+- **message id** — `messages.id` (the `/m/<id>` PK): **the JOIN KEY** tying the
+  sender's local contact ↔ the receiver who opened it.
+- **the connection record** — `link_connections` (below): links sender ↔ receiver
+  via the message they opened.
+
+### ⭐ CONNECTION SIGNAL + PATH 1 + READ-RECEIPT — BUILD SPEC
+_Full spec: `reports/connection_signal_build_spec.md` (all 10 cases). Summary:_
+
+**THE GAP:** contact auto-create is **one-directional** — the receiver gets the
+sender's id on open; **the sender never learns the receiver connected.** So PATH 1
+(direct delivery) is **blocked until a connection signal exists.** `senderID` IS
+deliverable (a real `users.id`); the `pairedUserID → senderID` re-key is **near-free**
+(Build-5 mirror-write already equalises them).
+
+**TWO NEW LOCAL STORES (the hidden build cost):**
+- **(S1) sender `SentLink` (`messageID → local contact`)** — `sendThought` currently
+  **discards the message id**; it must be stored so the RIGHT contact gets stamped
+  when the receiver's id returns (prevents a duplicate name-only + id-only contact).
+- **(S2) receiver pending-connection list (opened-message ids)** — drives the
+  **post-sign-in sweep** (the fresh-install open is unauthenticated — see below).
+
+**MIGRATION (the one warranted):** a lean new table — do **NOT** reuse the pairing
+`connections` table:
+`link_connections(sender_id, connected_user_id, via_message_id, connected_at,
+PRIMARY KEY(sender_id, connected_user_id))` + index + RLS (`select using auth.uid() =
+sender_id`) + RPC `record_connection(p_message_id)` (**authenticated-only**, SECURITY
+DEFINER, forces `connected_user_id = auth.uid()`, reads `sender_id` from the message
+row → unforgeable). `mark_opened` stays anon (web views); `record_connection` is
+auth-only. Apply needs `supabase login` (Joshua applies, like builds 2 / 4a).
+
+**ALL 10 CASES** are spec'd in the report. In brief: authed-open writes the
+connection; **fresh-install unauthed-open → post-sign-in sweep (S2)**; idempotent on
+repeat / multi-sender (the PK); the sender stamps the right contact via (S1) +
+`via_message_id` (no dup); **read-receipt = POLL `messages.opened`** (messages is not
+in realtime — not push); never-opens → clean **PATH-2 fallback**; un-gate + a two-path
+`if/else` (no double-send); the cold-start fill-in creates the contact to stamp;
+forwarding / self-send / deletion edges handled.
+
+**FOUR RESOLVED DECISIONS (Joshua):**
+1. **Link-forwarding → first-opener-wins for v1** (forwarding is the user's action; a
+   forward that installs is a *win*; recoverable via rename).
+2. **Read-receipts → POLL** ("next time you look" is fine; live push = Phase 3).
+3. **STAGING A→B→C** (below).
+4. **Sign in with Apple** — the tap+consent is **Apple-mandated** (no bypass), but
+   it's near-minimal (one tap + FaceID, no forms) and **JUST-IN-TIME** (asked at "send
+   one back," not upfront) — that placement IS the friction win. No alt sign-in methods.
+
+**AUTH-TIMING — CORRECT BY DESIGN, not a gap:** open-but-never-sign-in = no persistent
+benefits, and **that's fine** — sign-in IS the opt-in threshold; they opted out; the
+thoughts sit in `messages`, claimable later via short-code. The fresh-install `/m/`
+open happens **before** sign-in (the cover shows over onboarding), so (S2)'s sweep is
+the COMMON path, not an edge.
+
+**STAGING (each stage independently sound; no edges dropped):**
+- **STAGE A — no schema, ships now:** un-gate the link send (3 files / 4 sites — see
+  `reports/build11b_audit.md`) + **remove the unconditional legacy `sendRemote`** (kills
+  double-send) + add (S1) `SentLink` recording. = **PATH-2 "a link for everyone."**
+- **STAGE B — the signal:** the migration + receiver write/sweep (S2) + sender
+  read/stamp. Contacts start getting `senderID`-stamped.
+- **STAGE C — PATH 1 + receipts:** flip `sendThought` to the two-path decision
+  (`senderID` set → PATH 1 direct, re-keyed; else PATH 2 link) + surface poll
+  read-receipts.
+- **⚠️ FAMILY-TEST GATE = AFTER STAGE C, not A.** Test users are friends/family (no
+  patience for sloppy); Stage-A link-every-time (even to your wife) feels clunky for
+  close contacts you message often. **Test when it's GOOD** (post-C: direct delivery
+  for connected contacts), not at first-shippable.
+- **RESIDUAL UNKNOWNS (named, not blockers):** forwarding mis-stamp (accept v1);
+  poll-not-push receipts (Phase 3 if live wanted); two-contacts-one-person (rare,
+  manual merge); the sweep needs sign-in + relaunch (fine — sign-in is the threshold).
+
+> **This SUPERSEDES the earlier "9b retire delivery backbone" framing:** the direct
+> channel **STAYS (re-keyed)** as PATH 1; only genuinely-dead pairing plumbing retires.
 
 ### Three LOCKED bucket decisions (Joshua, this session)
 1. **Replay-from-history does NOT flip opened** — replay = re-feel, not consume.
@@ -448,45 +528,107 @@ decision-heavy, fresh-mind work.**
 - **8** ✅ DONE — strip pairing UI `[26c59ff]`
 - **9 (safe half)** ✅ DONE — unified bucket + pure-pairing retirement + Sarah
   repoint `[2919f1f]`
-- **11b — IMPLEMENT THE TWO-PATH SEND** (per the locked SEND MODEL above) — **THE
-  PIVOT CUTOVER, not "un-gate a flag."** Decide at send time: **connected → DIRECT**
-  (the existing channel, **re-keyed `pairedUserID → senderID`**); **not-connected →
-  un-gated LINK** (`/m/` + share sheet). Decision-heavy; build against the locked
-  model. **Next concrete step BEFORE building:** a design-audit confirming the direct
-  channel can be cleanly re-keyed `pairedUserID → senderID` and mapping exactly what
-  11b must change. (Reminder: the link send is gated across 3 files / 4 sites, and the
-  legacy `sendRemote` is the PATH-1 channel — it stays, re-keyed, never double-fired.)
+- **11b — IMPLEMENT THE TWO-PATH SEND** (per the locked SEND MODEL + connection-signal
+  spec above) — **THE PIVOT CUTOVER.** Now **STAGED A→B→C** (the design-audit is DONE —
+  `reports/connection_signal_build_spec.md`):
+  - **A** (no schema, ships): un-gate the link + remove the unconditional legacy send +
+    add (S1) `SentLink`. = PATH-2 "a link for everyone."
+  - **B**: the `link_connections` migration + receiver write/sweep (S2) + sender stamp.
+  - **C**: two-path `if/else` (connected → DIRECT re-keyed; else LINK) + poll receipts.
+  - **⚠️ Family-test gate is AFTER C** (link-every-time feels clunky to close contacts).
 - **9b — retire genuinely-DEAD pairing plumbing ONLY** (NOT the direct-delivery
   channel — that survives as PATH 1, re-keyed to `senderID`). The earlier "retire the
   delivery backbone" wording is **SUPERSEDED** by the locked SEND MODEL. Only the dead
   pairing bits (`connections` remnants, etc.) retire; the pings direct channel +
   realtime receive STAY (re-keyed).
-- **10 — onboarding rewrite** (decision-heavy; see Onboarding Notes). Also touches
-  `redeem`/`createInvite` (deferred B1) and `myPairingCode` (B5).
+- **10 — onboarding rewrite** — see **ONBOARDING / ARRIVAL NORTH-STAR** below (the
+  earlier "subtractive cut" of the dead connection-code screen is **ABSORBED** into
+  this redesign, not a separate build). Also touches `redeem`/`createInvite` (B1) and
+  `myPairingCode` (B5).
 - **11 — Phase 2 test suite** (automated scenarios).
-- **12 — SHOW-THE-MESSAGE web page** (`pointward.app/m/[id]`, in the SEPARATE
-  `pointward` repo / GitHub Pages). For a recipient **WITHOUT the app**: the page
-  fetches the message via the existing anon `getMessage(id)` Supabase function (built
-  in build 2) and **DISPLAYS it** — emoji, message text, sender name — in a calm,
-  branded layout, with the **LOCKED CTA "open in Pointward — free"** below (NOT
-  "download" — rationale: lower friction + the honest universal install-or-open, per
-  the SEND MODEL). Delivers the emotional payload (someone thought of you + what they
-  said) WITHOUT the app and
-  WITHOUT rebuilding any animation. **Rationale:** most new users arrive via a received
-  link, so showing the message before install flips arrival from a toll gate ("install
-  to see it") to a gift ("that's lovely — get the app to reply"). Static HTML/CSS
-  reading already-stored data; **zero risk to the app** (separate repo / language;
-  Joshua has no HTML experience but the page is contained and Claude-buildable). The
-  **ANIMATED** browser version (recreating the instrument animation in the browser)
-  stays **DEFERRED to Phase 3** — the deep fidelity/time hole; the static
-  show-the-message version captures most of the emotional value at a fraction of the
-  cost. **Pull forward to pre-launch** so the day-1 test-with-others experience is good
-  for no-app recipients.
+- **12 — SHOW-THE-MESSAGE web page** (`pointward.app/m/[id]`, separate `pointward` repo
+  / GitHub Pages) — read message id from URL → anon `getMessage(id)` → render. **Build
+  AFTER the link send works (Stage A).** Full locked design + canonical pitch + the
+  3-tier animation ladder are in **WEB PAGE (Build 12) — LOCKED DESIGN** below.
 - **cleanup pass** — tighten/consolidate transitional logic (the mirror-write
   bridge etc.), **hard-delete** the commented code, test audit, final TRUTH cleanup.
 
 > b10 / 11b are the **decision-heavy / fresh-mind** builds; b9 safe-half was the
 > last mechanical chunk (front-loaded deliberately).
+
+### ⭐ ONBOARDING / ARRIVAL NORTH-STAR (Build 10 vision)
+**Arrival path determines the experience.** (Absorbs the earlier "subtractive cut" —
+the dead connection-code screen is removed + repositioned as part of THIS redesign.)
+
+- **MESSAGE-ARRIVERS (tapped a link):** the **message plays FIRST, unblocked — the
+  thought IS the welcome, NO onboarding gate.** If the link opened the INSTALLED app,
+  they're already converted — no hard sell. After the message, **three calm,
+  non-blocking doors:** (1) **"send one back ✦"** (→ just-in-time sign-in/name at THIS
+  moment — the same moment the connection record forms); (2) **"learn more"** (→
+  optional showcase); (3) a **graceful warm exit** — copy: *"Got the message, I'm good
+  for now."* (respecting a leaver builds more goodwill + return-likelihood than a
+  pitch; on-brand). **Offer, never ambush/interstitial.**
+- **DISCOVERY-ARRIVERS (App Store / ad):** minimal mandatory core = **SIGN IN +
+  DISPLAY NAME** (the name travels in links); **location optional.**
+- **SHOWCASE** (instrument carousel / "ways to send" / the cool-but-ad-like content):
+  **GOOD content, WRONG place** — move OUT of the blocking flow into an **explorable
+  section/tab** ("how it works" / "explore"), discoverable (a skippable "tour?" or a
+  clear tab), **not a gate.**
+- **PAYWALL + charity:** move OUT of onboarding to **CONTEXTUAL moments** — the paywall
+  at the point of **using a premium instrument** (monetize at desire, not as an
+  entry toll).
+- **IDENTITY just-in-time:** capture sign-in / name at the **moment of action (reply)**,
+  not upfront — the same moment the connection record forms.
+
+### ⭐ WEB PAGE (Build 12) — LOCKED DESIGN + canonical pitch
+- **Design (mockup session):** **message-first calm center** (emoji + serif message +
+  "from [sender]"); top tease *"[sender] sent you a thought ✦ it moves when it
+  arrives"*; gentle **shimmer** (emoji float + halo + twinkle + button light-sweep);
+  **faint peripheral instrument hints** (low-opacity real instrument stills/loops at
+  build — don't crowd the message); a quiet **short-code fallback** at the bottom. Warm
+  cream palette (confirm vs brand).
+- **CANONICAL INVITATION PITCH (LATEST — supersedes ALL earlier phrasings):**
+  - **HERO:** *"see the full animation — the way [sender] intended ✦"*
+  - **BONUSES:** send one back · send custom animations to others in a few clicks ·
+    save it · and more
+  - **CLOSE:** free
+  - **BUTTON:** *"open in Pointward"* — **NOT "download"; do NOT repeat "free" on the
+    button** (it's in the bonuses).
+  - _(Joshua: locked for now; will refine at build.)_
+- **Wiring (the real, do-once work):** read message id from URL → anon `getMessage(id)`
+  → render. Look/copy is **cheap to change anytime after wiring.** Build **AFTER the
+  link send works (Stage A).**
+- **THREE-TIER ANIMATION LADDER:**
+  - **T1 (now):** static + cheap CSS shimmer + simple peripheral hints.
+  - **T2 (between Phase 2/3, END of the list):** recreate **simplified
+    onboarding-grade** instrument animations in CSS/SVG — **POC ONE instrument first**
+    (possibly as an onboarding-screen trial) to gauge easy-vs-painful before committing
+    to all.
+  - **T3 (Phase 3):** the full in-app animation rebuilt in the browser.
+  - ⚠️ The onboarding minis are **100% native SwiftUI — NOT web-portable.** Recreation,
+    not reuse; use them as **visual reference** only.
+
+### ⭐ PATH-1 NOTIFICATION + LIFESPAN + GROWTH
+- **PATH 1 push:** reuse the **EXISTING notification setup** (already mocked up). Copy
+  TBD at build. The push is **PART of the experience** (pulls them in to see the
+  animated arrival), not just transport.
+- **LIFESPAN + SAVE/DELETE:** ordinary thoughts **fade ~30 days**; the recipient can
+  easily **SAVE** (keep past fade) or **DELETE** — type-agnostic, in-app only.
+  **PRINCIPLE:** if cheap + low-risk + not-feedback-dependent → **JUST BUILD IT** (no
+  heavy test setups); exact fade timing / cap details don't matter until real usage
+  reveals problems. Possibly **Phase-2-able** — decide at build. **Special packs/cards**
+  (super-animations) = more permanence + likely **app-required** (the web gets ordinary
+  thoughts only).
+- **GROWTH (a noted dynamic, not a to-do):** no-app receivers convert via **accumulated
+  thoughts** (the *relationship* converts them, not marketing) + the short-code claim
+  **hands them the whole piled-up set on install** = a rewarding first experience.
+  **Conversion threshold = sign-in.**
+
+### ⭐ STANDING PRIORITIZATION PRINCIPLE (Joshua)
+**Cheap + low-risk + not-feedback-dependent → just build it** (no long test setups).
+The problems worth pausing for are **"looks crappy / people won't use it"** — NOT
+exact-config details (fade timing, caps), which are *good* problems that wait for real
+usage. More use → more people → don't pause for edge-perfection.
 
 ### Build-9 LEFT-INTENTIONALLY (flagged; for the cleanup pass / focused follow-ups)
 - **4 PeopleManager pairing funcs** (`addFromInvite` / `bindConnection` /
@@ -603,6 +745,20 @@ your messages will see you ✦").
   code, test audit (remove dead pairing tests **only after confirming not-live**; ADD
   coverage for the link-model paths), final doc cleanup. (Now an explicit step in the
   back-half build order.)
+
+### ⭐ PARKED / DEFERRED (session lock-down — keep visible)
+- **Build-6 styling pass (post-pairing):** location-hint legibility (too small on
+  device) + launch-opens-to-most-recent-SENDER (vs last-selected) — style against the
+  post-pairing card.
+- **Build-9 bucket device re-verify** (sender-agnostic) — a clean install wiped test
+  history before confirmation; **will self-verify during later multi-sender use**, no
+  special staging.
+- **Build-12 reframe committed twice** (`a7c360c` + `baaf5d6`) — squash / note at the
+  cleanup pass.
+- **Cleanup-pass roster (consolidated):** the 4 app-orphaned PeopleManager funcs +
+  `PairingScenarioTests` migration (see *Build-9 LEFT-INTENTIONALLY*); the dormant
+  mutual-pointing cluster; the SupabaseService orphans; **gitignore `reports/`**; Xcode
+  warnings (**stay Swift 5 through launch** — don't flip to Swift 6 pre-launch).
 
 ### Phase 2 Scope & Decisions (this session)
 - **Scope — explicitly EXCLUDED** (animation-chat / parked; NOT part of the
