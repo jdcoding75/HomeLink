@@ -18,8 +18,7 @@ _COMPREHENSIVE LOCK-DOWN (back-half design fully resolved): IDENTIFIER BACKBONE 
 _Build 12 web page BUILT · DEPLOYED · LIVE-TESTED (pointward-website `2d319d4`, 404.html path-style, anon `get_message`, DARK-PURPLE brand superseding "warm cream", shipped copy, does NOT mark_opened, install button = TestFlight placeholder pending external review; two invite surfaces locked). Stage B build-spec LOCKED (`reports/stage_b_buildspec.md`)._
 _Onboarding walk-through banked (Build 10 North-Star): DROP the pairing-code screen (absorbed; loopFlick-guard caution); NAME PRE-FILL LOCKED (recipient's fill-in pre-filled with the sender's label for them, warm + editable, no "is this you?"); ADDRESS/LOCATION at onboarding FOR CONSIDERATION (need-at-all / Apple-home-autofill / as-is — resolve "what is it for?" + address-vs-rough-location first)._
 _PRODUCT DIRECTION DUMP banked (future work, decided-vs-for-thought): APP CONCEPT/positioning (primary=emotional-connection via intent+meaning; secondary=anti-card-app); HELP/FAQ/HOW-TO + About (Settings-top, optional, the explorable home for the onboarding showcase); SETTINGS-tab review project (+ planned: Help, "turn off send-actions" advanced toggle [check-if-exists], structured feedback picker, "catch in bucket" toggle default-OFF); OCCASION notifications (parked); LAUNCH/MONETIZATION (seed-free-then-monetize principle endorsed; founding-cohort + propagating-free-Pro direction; specifics open for a dedicated session)._
-
----
+_STAGE B VERIFIED end-to-end (two-phone test, 2 real Apple IDs → link_connections row formed — the back-channel is PROVEN). Findings banked: arrival shows "Someone" not sender_display_name (BUG) + recipient-local-name enhancement; Plane v1-not-v2 wrong-animation regression (careful audit-first, future); connection-status indicator (driven by senderID, pairs with Stage C); don't-seed-Alex-into-People; remove "[John] added you" notification (pairing-era); widget surface + Phase-3 live-location payoff; address-on-add PARKED + contacts-permission RESOLVED (ask only on pick-from-contacts) + send-channel fork (open); MANUAL PAIRING RESOLVED — do NOT re-add (re-tappable link is the fallback)._
 
 ## What Pointward Is
 
@@ -447,8 +446,8 @@ the COMMON path, not an edge.
 - **STAGE A — no schema, ships now:** un-gate the link send (3 files / 4 sites — see
   `reports/build11b_audit.md`) + **remove the unconditional legacy `sendRemote`** (kills
   double-send) + add (S1) `SentLink` recording. = **PATH-2 "a link for everyone."**
-- **STAGE B — the signal — ✅ BUILD-SPEC LOCKED** (`reports/stage_b_buildspec.md`;
-  build-ready, no new decisions). Three independently-testable steps:
+- **STAGE B — the signal — ✅ BUILT + DEVICE-VERIFIED** (committed; two-phone test
+  passed — see *STAGE B VERIFIED* below). Three independently-testable steps:
   - **(1) MIGRATION `20260615000000_link_connections.sql`** — ADDITIVE: table
     `link_connections(sender_id, connected_user_id, via_message_id, connected_at;
     PK(sender_id, connected_user_id)` idempotent) + index + RLS (sender reads own) + RPC
@@ -489,6 +488,88 @@ the COMMON path, not an edge.
 
 > **This SUPERSEDES the earlier "9b retire delivery backbone" framing:** the direct
 > channel **STAYS (re-keyed)** as PATH 1; only genuinely-dead pairing plumbing retires.
+
+### ⭐ STAGE B VERIFIED + TWO-PHONE TEST FINDINGS (this session)
+
+**STAGE B — VERIFIED END-TO-END ✅.** Two-phone test (Joshua + wife, **2 real Apple
+IDs**, Xcode-installed both phones): A sends a thought to a real contact → B opens the
+`/m/` link (signed in as **her own** Apple ID) → a **`link_connections` row
+(sender = A, connected_user = B, via_message = X) FORMED.** The bilateral connection
+signal works end-to-end on real devices. **The hardest, most-uncertain piece of the
+pivot — the back-channel telling the SENDER the recipient connected — is proven.**
+Stage A + B both committed (`d49f503`, `3e02eba`) and now device-verified.
+
+**BUGS SURFACED (pre-existing — the test revealed them; separate from Stage B):**
+1. **Arrival shows "Someone sent you a thought" instead of the sender's name.** The
+   message carries `sender_display_name` ("John") but the arrival shows generic
+   **"Someone"** — the name is IN the data, not displayed. **BUG:** arrival must show
+   `sender_display_name`. **ENHANCEMENT (Joshua likes; secondary / if-easy):** if the
+   RECIPIENT has a local contact for the sender (e.g. she has him as "Husband"), prefer
+   **HER local name** over his self-entered name — show the relationship name each side
+   chose. Depends on a local contact existing (the connection signal now creates one).
+2. **⚠️ WRONG ANIMATION VERSION:** sent with Plane → arrival played **Plane v1**, but
+   **Plane v2 was LOCKED** as the gold-standard in the animation work. Send/receive is
+   resolving the OLD v1, not v2 — a **real regression.** ⚠️ Animation files are in the
+   *"never touch without care"* set → needs a **CAREFUL AUDIT-FIRST** investigation
+   (where the version is resolved on send/receive, why v1), **NOT a casual fix.** Future
+   session.
+
+**NEW FEATURE / UX FINDINGS:**
+3. **CONNECTION-STATUS INDICATOR** (re-derived from use; ties to the old pairing
+   "green line"): after a connection forms there's **no visual that you're linked.**
+   RE-ADD an indicator on the People list / contact, **DRIVEN BY the `senderID` field
+   Stage B stamps** (set = connected → show; nil = not). Value both ways: know you ARE
+   linked (direct delivery / PATH-1 available) and know you are NOT (sends still go as
+   links; an engagement signal). Surfaces data Stage B already creates. Small build;
+   **PAIRS NATURALLY WITH STAGE C** (both read `senderID`).
+4. **DON'T SEED ALEX DEMO INTO THE PEOPLE LIST:** having the demo as a contact invites
+   the *"just send to the demo"* crutch instead of the real first-person flow. The
+   demo's place = **SHOWING how it works** (onboarding / help), **not** occupying a
+   People-list slot.
+5. **REMOVE the cold "[John] added you" NOTIFICATION** (fires when you add a person):
+   mechanical / off-brand (LinkedIn-style), the opposite of Pointward's intimate vibe.
+   The link model connects via sent **THOUGHTS** (the message is the invite; opening
+   forms the connection). The "add → notify" path is a **PAIRING-ERA leftover** — remove
+   it; connect the nice way via a real thought. Likely a contained removal — flag for a
+   build.
+6. **WIDGET — surface it + Phase-3 payoff:** a widget exists; users may not know. Add it
+   to the Help / How-To content (it's kind of cool). **Boring NOW** (static
+   location-to-location), but **genuinely cool in PHASE 3** with real / live location
+   (how far away someone actually is, live). Surface low-key now; value grows with
+   Phase 3.
+
+**ADDRESS / CONTACTS / SEND-CHANNEL CLUSTER (decisions + parks):**
+7. **ADDRESS-ON-ADD-PERSON — PARKED** pending real use (Joshua expects to keep
+   flip-flopping → **stop re-deciding in the moment**; nail it down deliberately after
+   usage). **Lean:** if picking from iPhone Contacts WITH an address, use it; else
+   proceed with **NO forced location** (don't force a typed address). **CONSTRAINT:**
+   keep the ability to add / pick / change address regardless (questioning
+   *forced-upfront*, not removing the capability).
+8. **CONTACTS PERMISSION — RESOLVED:** ask **ONLY when the user explicitly chooses
+   "pick from Contacts"** (vs. manual entry) when adding a person. The user opted in →
+   the prompt is expected / self-explanatory, not an invasive upfront wall.
+   Contextual-ask principle applied. (Pick-from-contacts can then pre-fill address +
+   possibly a send-handle.)
+9. **SEND-CHANNEL FORK (open question):** should a `Person` store a send-channel (phone
+   number / handle), pre-filled from Contacts, so *"send to Wife"* texts the link
+   **DIRECTLY** vs. the manual share-sheet (the clunky Stage-A step)? Smoother, free
+   from Contacts — **BUT** needs Contacts permission + a stored-handle dependency; the
+   link model deliberately **avoids needing handles** (share any channel at send-time).
+   Decide deliberately, with the address nail-down. (Note: the share-sheet clunkiness
+   itself is **fixed by Stage C** — direct delivery to connected contacts, no share
+   sheet.)
+
+**MANUAL PAIRING — RESOLVED (do NOT re-add):**
+10. The fallback for "the connection didn't happen" is **NOT manual pairing codes** — the
+    RECEIVER simply **taps the SAME message link AGAIN** in their Messages thread and
+    follows the install. The link **PERSISTS** in the conversation (it's a text) →
+    inherently **re-tappable**; the fallback is **built into the medium** (this is WHY
+    links beat pairing). So do **NOT** keep / surface manual pairing for fallback.
+    **Supersedes** the brief "keep manual pairing as an option" lean. **PRINCIPLE:**
+    don't re-add retired complexity for hypothetical fallback worries before seeing the
+    link method work — **it just did** (connection verified). Revisit only if real usage
+    shows the re-tappable-link fallback is insufficient. (The commented pairing machinery
+    stays recoverable per never-delete, but there's **no plan to surface it.**)
 
 ### Three LOCKED bucket decisions (Joshua, this session)
 1. **Replay-from-history does NOT flip opened** — replay = re-feel, not consume.
