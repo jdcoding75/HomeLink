@@ -1302,6 +1302,35 @@ final class SupabaseService: ObservableObject {
         }
     }
 
+    /// [unread-badge fix · Option A] Bulk read-receipt: mark ALL of MY unopened
+    /// pings opened — called on app foreground so the server "unread" count
+    /// (`pings.opened_at IS NULL` for `to_user = me`, which the Edge Function badges
+    /// on) drops to 0 and the badge stops climbing. The per-ping `markPingOpened`
+    /// (on full reveal) stays as-is; this is the broader "acknowledge on open" sweep.
+    /// DESIGN (Joshua): badge = "unseen since last open" — opening the app
+    /// acknowledges thoughts, so `opened_at` here means "seen/acknowledged", not
+    /// strictly "felt in full" (accepted trade-off; also shifts the sender's
+    /// "opened ✦" receipt to fire on app-open). Keyed to the signed-in user.
+    /// ⚠️ RLS: needs `pings` to permit a recipient UPDATE of `opened_at` (today
+    /// `pings` has no RLS policy in-repo → RLS off → allowed, same as markPingOpened).
+    /// The log surfaces a block ("FAILED") if a policy is ever added without UPDATE.
+    func markAllMyPingsOpened() async {
+        guard let client, let me = await currentUserID else { return }
+        do {
+            try await withRetry(label: "markAllMyPingsOpened") {
+                try await client
+                    .from("pings")
+                    .update(["opened_at": ISO8601DateFormatter().string(from: .now)])
+                    .eq("to_user", value: me.uuidString)
+                    .is("opened_at", value: nil)
+                    .execute()
+            }
+            log.info("pings: marked all opened ✓ (to_user=\(me.uuidString.prefix(8), privacy: .public))")
+        } catch {
+            log.error("pings: markAllMyPingsOpened FAILED: \(error.localizedDescription, privacy: .public)")
+        }
+    }
+
     /// All pings between me and one partner, newest first (ping history).
     func fetchPings(with partner: UUID) async -> [PingRecord] {
         guard let client, let me = await currentUserID else { return [] }

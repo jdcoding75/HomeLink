@@ -150,6 +150,14 @@ struct RootView: View {
                 compass.resumeFromForeground()   // battery: sensors back on [5/8]
                 // The badge counts unread thoughts server-side; opening the
                 // app is the moment to clear it.
+                // [unread-badge fix · Option A] Drive the SERVER count to 0 too —
+                // otherwise the next push re-inflates the badge to the (ever-growing)
+                // unopened-pings count. Mark all my unopened pings opened on
+                // foreground ("seen/acknowledged on open"), then clear the local
+                // badge. Only when signed in. Fire-and-forget.
+                if SupabaseService.localUserID != nil {
+                    Task { await SupabaseService.shared.markAllMyPingsOpened() }
+                }
                 UNUserNotificationCenter.current().setBadgeCount(0)
                 // Replay a device token that arrived signed-out or failed
                 // to upload — keeps push delivery alive across sign-ins.
