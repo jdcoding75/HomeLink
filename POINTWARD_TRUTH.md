@@ -7,7 +7,7 @@
 > is the top of the hierarchy. When they conflict with reality, the live code +
 > this document win.
 
-_Last updated: Session 8 (structural-truth pass) · Phase 2 canon reconciliation — link-based model, scope, senderID, deep-link deferred to P3. · IDENTITY CORRECTION: not forking — the two `users` rows are 2 Apple IDs (Joshua + wife), identity IS stable, hardening deprioritized; banked the display-polish batch (arrival-name, connection-indicator, contact-icon) as active small work. · SESSION CLOSE: Stage A/B/C + display polish all COMMITTED (clean tree, HEAD `90422fd`); banked the CLEAN-RESET PROTOCOL for next session (churn-fogged device state — reset before verifying) + open items (stuck "connected" banner, display clean-verify, old-copy cleanup, double-tap cold-start audit). · CLEAN TWO-PHONE TEST DONE: verified connection/green-indicator/PATH-1-direct/initials clean; RESOLVED the notification model (notify only when connected → named push → tap opens app → plays the arrival; link IS the awareness for unconnected); prioritized next-session list led by **[HIGH] PATH-1 push not firing when app-closed (code gap, not permission)** + **[HIGH] share-text "[John]" copy/name**. · BUG FOLD: re-homed the open bug list under its phases — FINISH 11b/Stage C (#1 push, #2 share-text, #3 envelope name, #15 display-verify), BUILD 9b (#4 forced-send/added-you, #5 legacy connect screen), BUILD 10 (#6 onboarding name-not-persist [root of "Someone"], #7 Settings profile, #9 old-copy cleanup), separate double-tap audit (#8); added **REMAINING BUGS (unphased)** catch-all — animation territory (#12 Plane v1/v2, #13 aiming-order, #14 send-sound) + notes (#10 Alex-demo, #11 first-send warm-up). · PRE-TEST BATCH: **5 fixes BUILT + uncommitted** (#8 double-tap cold-launch, #2 share-text named copy, #3 envelope "from [name]", #4 forced-send-on-add removed, #5 legacy connect screen removed) — all Release+248-green, batched for ONE clean two-phone test before commit; benched push `index.ts` (#1) awaits Joshua redeploy. Banked the obstacle-removal status (stuck "[name] connected" banner = NO live code, likely stale notification) + the 5-step clean test plan (commit the batch only if all pass). · ⭐ SESSION CLOSE — BATCH + PUSH COMMITTED & DEVICE-VERIFIED: app batch `d03eb3e` (5 fixes) + push fn `feafe7a` all passed the clean two-phone test; **PATH-1 push works END-TO-END** (named "John sent you a thought ✦" on a closed phone → tap → arrival played) — the send model's last functional gap is CLOSED (the boot bug meant the function NEVER booted before). NEW findings (all phone-free): #1 PersonDetailView still pairing-driven (load-bearing tap→compose bug), #2 unread count never clears, #3 sender-reinstall re-stamp gap, #4 connection-sync lag, #5 stray `rapid-action` Edge Function (delete), double-tap = iOS Messages behavior (RESOLVED, not a bug). Runway is ALL phone-free: PersonDetailView fix, unread-clear, 9b cleanup, Build 10 + #6, Phase-2 tests._
+_Last updated: Session 8 (structural-truth pass) · Phase 2 canon reconciliation — link-based model, scope, senderID, deep-link deferred to P3. · IDENTITY CORRECTION: not forking — the two `users` rows are 2 Apple IDs (Joshua + wife), identity IS stable, hardening deprioritized; banked the display-polish batch (arrival-name, connection-indicator, contact-icon) as active small work. · SESSION CLOSE: Stage A/B/C + display polish all COMMITTED (clean tree, HEAD `90422fd`); banked the CLEAN-RESET PROTOCOL for next session (churn-fogged device state — reset before verifying) + open items (stuck "connected" banner, display clean-verify, old-copy cleanup, double-tap cold-start audit). · CLEAN TWO-PHONE TEST DONE: verified connection/green-indicator/PATH-1-direct/initials clean; RESOLVED the notification model (notify only when connected → named push → tap opens app → plays the arrival; link IS the awareness for unconnected); prioritized next-session list led by **[HIGH] PATH-1 push not firing when app-closed (code gap, not permission)** + **[HIGH] share-text "[John]" copy/name**. · BUG FOLD: re-homed the open bug list under its phases — FINISH 11b/Stage C (#1 push, #2 share-text, #3 envelope name, #15 display-verify), BUILD 9b (#4 forced-send/added-you, #5 legacy connect screen), BUILD 10 (#6 onboarding name-not-persist [root of "Someone"], #7 Settings profile, #9 old-copy cleanup), separate double-tap audit (#8); added **REMAINING BUGS (unphased)** catch-all — animation territory (#12 Plane v1/v2, #13 aiming-order, #14 send-sound) + notes (#10 Alex-demo, #11 first-send warm-up). · PRE-TEST BATCH: **5 fixes BUILT + uncommitted** (#8 double-tap cold-launch, #2 share-text named copy, #3 envelope "from [name]", #4 forced-send-on-add removed, #5 legacy connect screen removed) — all Release+248-green, batched for ONE clean two-phone test before commit; benched push `index.ts` (#1) awaits Joshua redeploy. Banked the obstacle-removal status (stuck "[name] connected" banner = NO live code, likely stale notification) + the 5-step clean test plan (commit the batch only if all pass). · ⭐ SESSION CLOSE — BATCH + PUSH COMMITTED & DEVICE-VERIFIED: app batch `d03eb3e` (5 fixes) + push fn `feafe7a` all passed the clean two-phone test; **PATH-1 push works END-TO-END** (named "John sent you a thought ✦" on a closed phone → tap → arrival played) — the send model's last functional gap is CLOSED (the boot bug meant the function NEVER booted before). NEW findings (all phone-free): #1 PersonDetailView still pairing-driven (load-bearing tap→compose bug), #2 unread count never clears, #3 sender-reinstall re-stamp gap, #4 connection-sync lag, #5 stray `rapid-action` Edge Function (delete), double-tap = iOS Messages behavior (RESOLVED, not a bug). Runway is ALL phone-free: PersonDetailView fix, unread-clear, 9b cleanup, Build 10 + #6, Phase-2 tests. · SESSION CONTINUED: PersonDetailView reconcile (`73cceaa`, senderID-primary isConnected + ungated compose, device-verified) + unread-badge Option A (`7c0f956`, markAllMyPingsOpened on foreground, "marked all opened ✓") both COMMITTED & verified — findings #1+#2 CLOSED. **9b CLEANUP AUDIT DONE** (5-batch removal plan; 2 catches — `connectedFriendID` is LOAD-BEARING/preserve, `claimOutcome`+tests now app-orphaned → Joshua decides retire-vs-keep). Animation (#12/#13/#14) queued-not-started (don't run animation+9b builds together). 9b removals START next session._
 _Updated this session: Phase 2 progress + findings pass — builds 1–4b shipped & verified, per-person history-bucket finding (coupled to build 9), re-sequenced build order 5–11, onboarding + infrastructure notes banked._
 _Findings pass 2: builds 5–6 + display-name/shortCode fix DONE & device-verified; sharpened the build-9 bucket finding (pings-table vs messages-table seam); banked hint legibility, Sarah dev-seed, duplicate-users, onboarding-emoji, share-sheet, and send-sound-distortion notes._
 _Session lock-up: builds 5–9 (safe half) shipped & ledgered; CRITICAL link-send-`#if DEBUG` / delivery-backbone finding banked; bucket finding RESOLVED (sender-agnostic, local); 3 locked bucket decisions; back-half re-sequenced (11b cutover → 9b delivery-retire → 10 onboarding → 11 tests → 12 web → cleanup); build-9 left-intentionally flags + findings-pass-3 notes. CLAUDE.md: standing build patterns added._
@@ -910,6 +910,70 @@ bug (#2), **9b** dead-pairing cleanup, **Build 10** onboarding rewrite + **#6** 
 **Phase-2 test suite (#11)**, **cleanup pass** (incl. the `rapid-action` stray,
 `MessageComposerView`, gitignore `reports/`). **Two-phone testing is NOT needed to progress
 these** — device checks come individually at each item's end.
+
+### ⭐ SESSION CONTINUED — contact/unread fixes + 9b AUDIT DONE + open threads
+
+**COMMITTED THIS SESSION (beyond the batch + push):**
+- **PersonDetailView reconcile (`73cceaa`)** — `isConnected` now **senderID-primary**, compose
+  row **ungated**. **Device-verified:** a connected contact shows **"Connected ✓"** + message
+  history + reachable compose (was wrongly "not yet linked"). Closes finding #1.
+- **Unread-badge fix Option A (`7c0f956`)** — `SupabaseService.markAllMyPingsOpened()` on
+  foreground + the kept `setBadgeCount(0)`. **On-device log "marked all opened ✓"** (no RLS
+  block; `pings` has no RLS → inherits `markPingOpened`'s permission). **Badge = "unseen since
+  open"**; `opened_at` now means **seen/acknowledged** (so the sender's "opened ✦" receipt
+  fires on app-open — accepted trade-off). Closes finding #2. _(Both verified committed —
+  HEAD `7c0f956`; tree clean.)_
+
+**⭐ 9b CLEANUP AUDIT — DONE** (`reports/ninebee_cleanup_audit.md`) — removal plan ready.
+PRESERVE-LIST confirmed (PATH-1 survives, re-keyed to senderID): `pings` / `sendRemote` /
+`sendPing` / realtime+felt / `syncMissedThoughts` / `Person.senderID` / push chain /
+`markPingOpened` / `markAllMyPingsOpened` / `stampConnections` / `link_connections` / the
+connection signal.
+- **⚠️ CATCH 1 — `connectedFriendID` is LOAD-BEARING** (read LIVE by `PingView` send-timing,
+  `:1094/1171/1195`) → **do NOT remove**; only drop the PersonDetailView *clause* referencing
+  it (B5).
+- **⚠️ CATCH 2 — `claimOutcome` + its tests are now APP-ORPHANED** (`redeem`'s callers are all
+  `#if false`) → TRUTH's earlier "redeem/claimOutcome tests STAY" is **SUPERSEDED.** **DECISION
+  for Joshua next session:** retire `redeem`+`claimOutcome`+tests together, **OR** keep
+  `claimOutcome` as a tested pure-function island. _(Recommend retire-together.)_
+- **RECOMMENDED REMOVAL ORDER (5 batches; won't tangle; each builds + tests green):**
+  - **B1 — dead VIEWS hard-delete:** `ConnectView.swift` (incl. the now-orphaned
+    `MessageComposerView`), `PairAcceptView.swift`, RootView `#if false 518-679`, AccountView
+    `#if false` blocks, PersonDetailView's `#if false` invite code. _(Confirm AccountView's
+    Settings presenter is gone first.)_ Zero behavior change (all already `#if false`).
+  - **B2 — SupabaseService pairing API + DI:** `redeemCode` / `createProfileInvite` /
+    `lookupInvite` / `insertFromInvite` / `redeem`(+`claimOutcome` per decision);
+    `PairingServiceProtocol` / `MockPairingService` + the ServiceContainer field (declared +
+    assigned but **never read**).
+  - **B3 — PeopleManager funcs + TEST migration:** migrate **`SkipOnboardingTests:51` →
+    `person(forSenderID:)`** (1 line; Sarah's mirror keeps them equal); retire/split
+    `PairingScenarioTests` (18 tests); then delete `addFromInvite` / `bindConnection` /
+    `insertFromInvite` / `person(forPairedUserID:)`. **Test count will change.**
+  - **B4 — mutual-pointing unwire (NEED-CARE, own batch):** the cluster is DORMANT-WIRED (live
+    code that never fires because `reportPointing` is a no-op). PingManager state +
+    `presenceFelt` + `checkMutualPointing` → NotificationHandler **"pointing" branch (⚠️ KEEP
+    the live thought/PATH-1 `else` branch)** → CompassManager `reportPointingIfNeeded` / timer
+    → CompassView **edge-glow (`:897-909`)** → `reportPointing` no-op stub. **Build +
+    device-glance** (CompassView touched).
+  - **B5 — PersonDetailView `isConnected` simplify:** drop `connectedNow` + the
+    `connectedFriendID` clause → collapses to senderID-only.
+  - **Server-side (Joshua):** delete the `rapid-action` stray Edge Function; retire the Edge
+    Function's `compass_bearings`/"pointing" branch (with B4).
+
+**OPEN THREADS / NOT STARTED:**
+- **ANIMATION — queued, NOT started:** a prompt was drafted/sent to a separate animation chat
+  but **not worked through** (no audit reviewed, no build — effectively un-started). Items:
+  **#12 Plane v1-not-v2 [priority]**, #13 aiming-order, #14 send-sound (**verify in RELEASE
+  first**). ⚠️ **Do NOT run an animation BUILD and a 9b BUILD in the repo simultaneously.**
+- **NOTES:** **unfeelable-backlog** (missed pings older than the newest aren't replayable —
+  future item); `markPingOpened`/`markAllMyPingsOpened` would need a **recipient-UPDATE RLS
+  policy IF `pings` RLS is ever enabled** (today it's off).
+- **Pending device checks (opportunistic, single-phone/recipient):** the unread visual
+  badge-clear (recipient backlog → open → badge clears + stays clear).
+
+**REMAINING WORK:** the **9b removals (B1–B5, plan above — START next session)**, **Build 10**
+onboarding + **#6** name-persist, **Settings-tab review**, **Phase-2 test suite (#11)**, final
+cleanup (hard-delete remaining commented code, gitignore `reports/`).
 
 ### Three LOCKED bucket decisions (Joshua, this session)
 1. **Replay-from-history does NOT flip opened** — replay = re-feel, not consume.
