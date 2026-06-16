@@ -7,7 +7,7 @@
 > is the top of the hierarchy. When they conflict with reality, the live code +
 > this document win.
 
-_Last updated: Session 8 (structural-truth pass) · Phase 2 canon reconciliation — link-based model, scope, senderID, deep-link deferred to P3. · IDENTITY CORRECTION: not forking — the two `users` rows are 2 Apple IDs (Joshua + wife), identity IS stable, hardening deprioritized; banked the display-polish batch (arrival-name, connection-indicator, contact-icon) as active small work. · SESSION CLOSE: Stage A/B/C + display polish all COMMITTED (clean tree, HEAD `90422fd`); banked the CLEAN-RESET PROTOCOL for next session (churn-fogged device state — reset before verifying) + open items (stuck "connected" banner, display clean-verify, old-copy cleanup, double-tap cold-start audit). · CLEAN TWO-PHONE TEST DONE: verified connection/green-indicator/PATH-1-direct/initials clean; RESOLVED the notification model (notify only when connected → named push → tap opens app → plays the arrival; link IS the awareness for unconnected); prioritized next-session list led by **[HIGH] PATH-1 push not firing when app-closed (code gap, not permission)** + **[HIGH] share-text "[John]" copy/name**. · BUG FOLD: re-homed the open bug list under its phases — FINISH 11b/Stage C (#1 push, #2 share-text, #3 envelope name, #15 display-verify), BUILD 9b (#4 forced-send/added-you, #5 legacy connect screen), BUILD 10 (#6 onboarding name-not-persist [root of "Someone"], #7 Settings profile, #9 old-copy cleanup), separate double-tap audit (#8); added **REMAINING BUGS (unphased)** catch-all — animation territory (#12 Plane v1/v2, #13 aiming-order, #14 send-sound) + notes (#10 Alex-demo, #11 first-send warm-up)._
+_Last updated: Session 8 (structural-truth pass) · Phase 2 canon reconciliation — link-based model, scope, senderID, deep-link deferred to P3. · IDENTITY CORRECTION: not forking — the two `users` rows are 2 Apple IDs (Joshua + wife), identity IS stable, hardening deprioritized; banked the display-polish batch (arrival-name, connection-indicator, contact-icon) as active small work. · SESSION CLOSE: Stage A/B/C + display polish all COMMITTED (clean tree, HEAD `90422fd`); banked the CLEAN-RESET PROTOCOL for next session (churn-fogged device state — reset before verifying) + open items (stuck "connected" banner, display clean-verify, old-copy cleanup, double-tap cold-start audit). · CLEAN TWO-PHONE TEST DONE: verified connection/green-indicator/PATH-1-direct/initials clean; RESOLVED the notification model (notify only when connected → named push → tap opens app → plays the arrival; link IS the awareness for unconnected); prioritized next-session list led by **[HIGH] PATH-1 push not firing when app-closed (code gap, not permission)** + **[HIGH] share-text "[John]" copy/name**. · BUG FOLD: re-homed the open bug list under its phases — FINISH 11b/Stage C (#1 push, #2 share-text, #3 envelope name, #15 display-verify), BUILD 9b (#4 forced-send/added-you, #5 legacy connect screen), BUILD 10 (#6 onboarding name-not-persist [root of "Someone"], #7 Settings profile, #9 old-copy cleanup), separate double-tap audit (#8); added **REMAINING BUGS (unphased)** catch-all — animation territory (#12 Plane v1/v2, #13 aiming-order, #14 send-sound) + notes (#10 Alex-demo, #11 first-send warm-up). · PRE-TEST BATCH: **5 fixes BUILT + uncommitted** (#8 double-tap cold-launch, #2 share-text named copy, #3 envelope "from [name]", #4 forced-send-on-add removed, #5 legacy connect screen removed) — all Release+248-green, batched for ONE clean two-phone test before commit; benched push `index.ts` (#1) awaits Joshua redeploy. Banked the obstacle-removal status (stuck "[name] connected" banner = NO live code, likely stale notification) + the 5-step clean test plan (commit the batch only if all pass)._
 _Updated this session: Phase 2 progress + findings pass — builds 1–4b shipped & verified, per-person history-bucket finding (coupled to build 9), re-sequenced build order 5–11, onboarding + infrastructure notes banked._
 _Findings pass 2: builds 5–6 + display-name/shortCode fix DONE & device-verified; sharpened the build-9 bucket finding (pings-table vs messages-table seam); banked hint legibility, Sarah dev-seed, duplicate-users, onboarding-emoji, share-sheet, and send-sound-distortion notes._
 _Session lock-up: builds 5–9 (safe half) shipped & ledgered; CRITICAL link-send-`#if DEBUG` / delivery-backbone finding banked; bucket finding RESOLVED (sender-agnostic, local); 3 locked bucket decisions; back-half re-sequenced (11b cutover → 9b delivery-retire → 10 onboarding → 11 tests → 12 web → cleanup); build-9 left-intentionally flags + findings-pass-3 notes. CLAUDE.md: standing build patterns added._
@@ -762,6 +762,84 @@ double-tap audit. These have **no phase home** — they ride a different track:
 - **#11 — First-send-only animation breakup/noise** — 1st send after launch stutters, 2nd
   is clean: a **cold-start / warm-up** pattern (asset/first-run priming), not a logic bug;
   observe. (If pursued → animation territory.)
+
+### ⭐ PRE-TEST BATCH — 5 FIXES BUILT (uncommitted) + CLEAN TEST PLAN
+_The NEXT-SESSION PRIORITIES above are now BUILT (the HIGH/MED items #1–#5/#8). All sit
+**uncommitted** in the working tree (HEAD `c7cfcc7`), batched for **one** clean two-phone
+test before commit. Each built green (Release + 248 tests) with its own report under
+`reports/`._
+
+**THE BATCH (built, Release + 248 tests green, NONE committed — commit AFTER the test):**
+- **#8 DOUBLE-TAP** (cold-launch first-tap routing): NEW `SceneDelegate` + `PendingLink`
+  capture the `/m/` link at the **scene boundary**; `RootView` pending-slot +
+  `presentPendingMessageIfReady()` gates on `!showSplash` (generalizes the debug 1 s defer).
+  Push-tap **NOT** rewired (it's a ping → plays via PingManager's own queue — confirmed
+  correct). Files: `PendingLink.swift` (new), `SceneDelegate.swift` (new), `AppDelegate.swift`,
+  `RootView.swift`. _(report: `double_tap_fix_build.md`)_
+- **#2 SHARE-TEXT**: `MessageLink.shareText` → designed named pitch **"[sender] sent you a
+  custom animated message ✦ tap to preview"** (was generic "Someone sent you a thought");
+  empty-name → warm generic. File: `MessageLink.swift`. _(report: `share_text_fix_build.md`)_
+- **#3 ENVELOPE-NAME**: the arrival envelope shows **"from [name]"** (reuses
+  `resolvedSenderName`: local-label → `display_name` → "someone"), faded in mid-beat from
+  the existing fetch. File: `IncomingMessageView.swift`. _(report: `envelope_name_build.md`)_
+- **#4 FORCED-SEND-ON-ADD removed** (kills #4a + #4b): `AddPersonView` no longer
+  auto-presents the invite share sheet; add = create contact + dismiss. No forced share, no
+  "I added you" SMS. File: `AddPersonView.swift`. _(report: `contact_connect_cleanup_build.md`)_
+- **#5 LEGACY CONNECT SCREEN removed**: `PersonDetailView`'s "connect with [name]" pairing
+  CTA + code-entry `#if false`'d; tap a not-yet-connected contact → straight to compose
+  (existing select→compass path). File: `PersonDetailView.swift`. _(same report)_
+
+> Also uncommitted: the **benched push function edit** (`send-ping-notification/index.ts` —
+> #1: named "[name] sent you a thought ✦" banner + `users.display_name` source, retires
+> "someone who loves you"). It needs **Joshua to redeploy** (`supabase functions deploy …`)
+> + the webhook/APNs-secrets live (per `path1_push_audit.md`) — server-side, separate from
+> the client batch's git commit.
+
+**OBSTACLE-REMOVAL STATUS** (what sabotaged the LAST two-phone test):
+- ✅ **Forced-send-on-add** (stray links to daughter Joanna) — FIXED (#4).
+- ✅ **Legacy "connect with [name]" detour** — FIXED (#5).
+- ✅ **Mismatched builds / churn-fog** — addressed by the clean-reset (delete+reinstall BOTH
+  on the SAME build).
+- ✅ **"Someone" arrivals** — names set (John + Jessica-via-SQL); #2/#3 surface them.
+- ⚠️ **Stuck "[name] connected" banner** — **NO live client code found**
+  (`contact_connect_cleanup_audit.md` §4). Likely a **STALE DELIVERED iOS notification**
+  (churn residue). **ACTION:** clear Notification Center on the reset; watch if it recurs;
+  capture the payload via **Console** if it does. **No code to remove.**
+
+**FOLLOW-UP FLAGS (not blocking the test):**
+- `MessageComposerView` (`ConnectView.swift`) now **orphaned** by #5 → confirm + retire in
+  the cleanup pass.
+- `PersonDetailView`'s linked **"Connected ✓"** card is still **pairing-driven**
+  (`isConnected = pairedUserID == connectedFriendID`); reconciling it onto `senderID` (to
+  match the link-era **"connected ✦"**) is a future consistency item.
+- The **NAMED surfaces** (push banner / share text / envelope) all depend on
+  `users.display_name` being set → the **onboarding name-persist bug (#6)** is the upstream
+  fix so FUTURE users' names save (**Build 10**). Today's test uses manually-set names.
+
+**⭐ CLEAN TWO-PHONE TEST PLAN (one unobstructed shot; needs Jess's phone):**
+- **SETUP:** delete Pointward on **BOTH** phones → fresh-install the current build (with the
+  batch) via Xcode → both sign in (Joshua = **John**, Jess = **Jessica**). **Clear
+  Notification Center** on both (banner watch). Open the Edge Function logs (dashboard →
+  Edge Functions → `send-ping-notification` → Logs) for the push step.
+- **STEP 0 — app cold-launches NORMALLY on both** (no black screen) — verifies the
+  `SceneDelegate` didn't break launch. _(If black screen: remove
+  `configurationForConnecting` from `AppDelegate` — reversible.)_
+- **STEP 1 —** create **"Jessica"** contact on Joshua's phone (manual; no Contacts
+  permission; skip address) → confirm **NO forced share sheet** (#4 ✓) → send her a thought
+  → PATH-2 link → the **share-sheet text reads "John sent you a custom animated message ✦
+  tap to preview"** (#2 ✓) → share the link to her phone.
+- **STEP 2 —** Jess's app **FULLY CLOSED** → she taps the link → **opens to the arrival on
+  the FIRST tap** (#8 ✓) → the **envelope shows "from John"** (#3 ✓). Her opening **forms
+  the connection**.
+- **STEP 3 —** Joshua foregrounds → the **"Jess" contact shows green "connected ✦"** (+ a
+  `link_connections` row). **Tapping the contact goes straight to compose, NO "connect with
+  X" screen** (#5 ✓).
+- **STEP 4 —** Jess's app **FULLY CLOSED** → Joshua sends again (now connected → **PATH-1
+  direct**) → a **NAMED push "John sent you a thought ✦"** fires on her closed phone (watch
+  logs **③ tokens / ⑤ APNs**) → she taps it → **opens to the arrival** (#8 push-tap). _[The
+  benched push smoke test — `APNS_SANDBOX=true` for dev builds.]_
+- **STEP 5 —** if all pass: **COMMIT the batch** (5 fixes) + the push function edit. If any
+  fail: **diagnose before committing.**
 
 ### Three LOCKED bucket decisions (Joshua, this session)
 1. **Replay-from-history does NOT flip opened** — replay = re-feel, not consume.
