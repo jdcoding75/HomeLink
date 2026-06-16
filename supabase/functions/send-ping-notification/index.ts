@@ -132,18 +132,31 @@ async function sendPush(toUser: string, aps: Record<string, unknown>): Promise<R
   return new Response(JSON.stringify({ sent: results }), { status: 200 });
 }
 
-// The RECIPIENT's name for the sender — their own person card label,
-// stored on the connection row they own (owner = recipient, friend = sender).
-// Falls back to the sender-side person_name, then null.
-async function nameOfSender(senderId: string, recipientId: string): Promise<string | null> {
-  const { data: ownRows } = await supabase
-    .from("connections")
-    .select("person_name")
-    .eq("owner", recipientId)
-    .eq("friend", senderId)
-    .limit(1);
-  if (ownRows?.[0]?.person_name) return ownRows[0].person_name;
+// [link-era] Resolve the SENDER's display name from public.users — pairing-
+// independent, works for ANY sender. The old `connections` lookup is DEAD in the
+// link era (no pairing rows) → it always returned null → the "someone who loves
+// you" fallback (bug #9). The recipient's own LOCAL label isn't on the server (it
+// lives in the app's SwiftData); the in-app arrival applies that local-label
+// precedence (resolvedSenderName). Here we give the PUSH BANNER the sender's
+// self-chosen name. `recipientId` is no longer used server-side.
+async function nameOfSender(senderId: string, _recipientId: string): Promise<string | null> {
+  const { data: row } = await supabase
+    .from("users")
+    .select("display_name")
+    .eq("id", senderId)
+    .maybeSingle();
+  if (row?.display_name) return row.display_name;
   return null;
+  // [pre-link-era — RETIRED] read the recipient's person-card label off the dead
+  // pairing `connections` table (owner = recipient, friend = sender):
+  // const { data: ownRows } = await supabase
+  //   .from("connections")
+  //   .select("person_name")
+  //   .eq("owner", recipientId)
+  //   .eq("friend", senderId)
+  //   .limit(1);
+  // if (ownRows?.[0]?.person_name) return ownRows[0].person_name;
+  // return null;
 }
 
 Deno.serve(async (req) => {
@@ -194,8 +207,11 @@ Deno.serve(async (req) => {
     }
 
     // ── Pings: insert → notify the recipient ───────────────────────────────
-    // First unread = full notification; a backlog collapses into a count so
-    // we never spam multiple full alerts.
+    // [Jess model] EVERY connected (PATH-1) thought announces itself with its own
+    // NAMED banner — regardless of the unread count. (The old "only the first unread
+    // announces, the rest go badge-only/silent" rule is removed below: it suppressed
+    // the banner whenever unread > 1, and a recipient whose unread never clears would
+    // then NEVER see a banner — only the badge climbing.) The badge still increments.
     if (!record.to_user) return new Response("no recipient", { status: 400 });
 
     const { count } = await supabase
@@ -213,11 +229,19 @@ Deno.serve(async (req) => {
     console.log(`ping: ${record.from_user} → ${record.to_user} ` +
       `emoji=${record.emoji} style=${record.sender_style} id=${record.id} unread=${unread}`);
 
-    // The payload the app needs either way — felt receipts (opened_at)
-    // and the SENDER's catch animation when the push is the only path.
-    const payload = {
+    // The data the app needs either way — felt receipts (opened_at) and the
+    // SENDER's catch animation when the push is the only path.
+    // [bootfix] renamed `payload` → `pushData`: the outer `const payload =
+    // await req.json()` (the webhook envelope) already owns `payload` in this
+    // scope, so a second `const payload` here was a duplicate declaration that
+    // crashed boot ("Identifier 'payload' has already been declared"). Same
+    // object/fields — only the local name changed.
+    const pushData = {
       pingEmoji: record.emoji ?? "💜",
-      fromName: senderName ?? "someone who loves you",
+      // [link-era] was: senderName ?? "someone who loves you"  ← bug #9 old-phase copy.
+      // Now a neutral last-resort name (matches the app's resolvedSenderName /
+      // pointing-branch convention) when the sender truly has no display_name.
+      fromName: senderName ?? "someone",
       pingId: record.id ?? null,
       senderStyle: record.sender_style ?? null,
       fromUserId: record.from_user ?? null,
@@ -232,24 +256,40 @@ Deno.serve(async (req) => {
       ? `${record.tagline} ✦`
       : (record.message ?? "A feeling is coming your way…");
 
-    // QUEUE NOTIFICATION RULE: only the FIRST unread announces itself.
-    // A backlog updates the badge silently — no banner, no sound.
-    if (unread > 1) {
-      console.log(`ping: ${unread} unread — badge-only update`);
-      return await sendPush(record.to_user, {
-        aps: { badge: unread },
-        ...payload,
-      });
-    }
+    // [Jess model] The banner is NAMED: "<sender> sent you a thought ✦". Only when
+    // the sender truly has no name (users.display_name null — the onboarding #6 bug)
+    // do we fall back to a gentle generic — NEVER "Pointward", NEVER "someone who
+    // loves you" (bug #9).
+    const notifTitle = senderName
+      ? `${senderName} sent you a thought ✦`
+      : "A thought is on its way ✦";
 
-    // Personal when there's a tagline/message; the gentle pull otherwise.
+    // [always-alert fix] SILENT badge-only branch REMOVED — every PATH-1 thought
+    // gets a visible named banner now (the badge below still reflects `unread`).
+    // The old branch sent `aps: { badge }` with NO `alert`, so iOS showed no banner /
+    // no Notification-Center entry; with a stuck-high unread it suppressed EVERY
+    // banner. (Note: `pushToDevice` always sends `apns-push-type: alert` — there was
+    // no background/content-available push here to preserve.) Reversible.
+    // [pre-fix] QUEUE NOTIFICATION RULE: only the FIRST unread announces itself.
+    // [pre-fix] A backlog updates the badge silently — no banner, no sound.
+    // if (unread > 1) {
+    //   console.log(`ping: ${unread} unread — badge-only update`);
+    //   return await sendPush(record.to_user, {
+    //     aps: { badge: unread },
+    //     ...pushData,
+    //   });
+    // }
+
+    // Every PATH-1 thought → a VISIBLE NAMED alert (badge still rides along).
     return await sendPush(record.to_user, {
       aps: {
-        alert: { title: "Pointward", body: notifBody },
+        // [pre-Jess-model] generic title:
+        // alert: { title: "Pointward", body: notifBody },
+        alert: { title: notifTitle, body: notifBody },
         sound: "default",
         badge: unread,
       },
-      ...payload,
+      ...pushData,
     });
   } catch (e) {
     console.error(`handler error: ${e}`);
