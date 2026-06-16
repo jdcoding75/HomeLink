@@ -31,13 +31,23 @@ struct PersonDetailView: View {
     @State private var linkCopied = false
 
     private var isConnected: Bool {
+        // [reconcile] LINK-ERA TRUTH first: a stamped senderID = connected — matches
+        // PeopleListView's "connected ✦" (was: pairing-only, which a senderID contact's
+        // pairedUserID rarely satisfied → wrongly "not yet linked").
+        if !(person.senderID ?? "").isEmpty { return true }
+        // [transitional — legacy pairing fallback; connectedNow is DEAD post-#5; remove
+        //  both, with connectedFriendID, at the 9b dead-pairing cleanup]
         if connectedNow { return true }
         guard let friend = SupabaseService.connectedFriendID else { return false }
         return person.pairedUserID == friend.uuidString
     }
 
     private var partnerID: UUID? {
-        person.pairedUserID.flatMap(UUID.init)
+        // [reconcile] derive from the LINK-ERA key first; pairedUserID is the legacy
+        // mirror. Behavior-identical for stamped contacts (pairedUserID == senderID);
+        // robust if senderID is set but pairedUserID is nil.
+        // [pre-reconcile] person.pairedUserID.flatMap(UUID.init)
+        (person.senderID ?? person.pairedUserID).flatMap(UUID.init)
     }
 
     /// [display-polish] First letter of the name, uppercased; neutral ✦ when empty.
@@ -97,10 +107,15 @@ struct PersonDetailView: View {
                         // The compass is the stage; tapping replays there. The
                         // old expandable trail (thoughtsSection / trailRow /
                         // PingHistoryView) is kept defined below but unused.
-                        if isConnected, partnerID != nil {
-                            thoughtsCountRow
-                                .padding(.horizontal, 24)
-                        }
+                        // [reconcile] UNGATED from isConnected — the compose row is the
+                        // path to send (PATH-1 direct for connected, PATH-2 link for
+                        // not-yet-connected), so it must show for EVERY contact. The
+                        // row's count degrades safely (no partnerID → no history fetch →
+                        // label reads "thoughts"); its action is select→compass→compose
+                        // and never touches partnerID.
+                        // [pre-reconcile] if isConnected, partnerID != nil {
+                        thoughtsCountRow
+                            .padding(.horizontal, 24)
 
                         Spacer(minLength: 40)
                     }
