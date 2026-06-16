@@ -42,7 +42,8 @@ struct AddPersonView: View {
 
     // Contacts / invite
     @State private var showContactPicker = false
-    @State private var showInviteShare = false
+    // [cleanup #4a/#4b] forced invite-share on add — REMOVED (add = create + dismiss).
+    // @State private var showInviteShare = false
 
     // Unlock / error
     @State private var showUnlock = false
@@ -87,10 +88,12 @@ struct AddPersonView: View {
             }
             .ignoresSafeArea()
         }
-        .sheet(isPresented: $showInviteShare, onDismiss: { dismiss() }) {
-            ActivityShareSheet(items: [inviteMessage])
-                .presentationDetents([.medium, .large])
-        }
+        // [cleanup #4a/#4b] forced invite-share sheet on add — REMOVED. Adding a
+        // person no longer auto-presents a share / sends an "I added you" SMS.
+        // .sheet(isPresented: $showInviteShare, onDismiss: { dismiss() }) {
+        //     ActivityShareSheet(items: [inviteMessage])
+        //         .presentationDetents([.medium, .large])
+        // }
     }
 
     // MARK: - Header
@@ -466,9 +469,14 @@ struct AddPersonView: View {
 
         do {
             try people.addPerson(person)
-            HapticEngine.connectionFelt()
-            // Offer to invite them — the sheet's onDismiss closes this view
-            showInviteShare = true
+            HapticEngine.connectionFelt()   // cosmetic "added" haptic (kept)
+            // [cleanup #4a/#4b] Add = JUST create the contact, then close. The
+            // pairing-era forced invite-share (which sent the cold "I added you on
+            // Pointward" SMS — #4b) is removed. The link model invites via a real
+            // sent THOUGHT, not an "added you" ping.
+            // [pre-cleanup] Offer to invite them — the sheet's onDismiss closes this view
+            // showInviteShare = true
+            dismiss()
         } catch {
             saveError = error.localizedDescription
         }
@@ -511,9 +519,11 @@ struct AddPersonView: View {
         return fallback
     }
 
-    private var inviteMessage: String {
-        "I added you on Pointward \(emoji) — my compass now always points your way. Get Pointward and add me back: https://pointward.app"
-    }
+    // [cleanup #4b] the cold "I added you on Pointward" SMS — REMOVED (was the body
+    // of the forced invite-share above). The link model invites via a real thought.
+    // private var inviteMessage: String {
+    //     "I added you on Pointward \(emoji) — my compass now always points your way. Get Pointward and add me back: https://pointward.app"
+    // }
 
     // MARK: - Helpers
 

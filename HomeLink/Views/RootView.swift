@@ -37,6 +37,12 @@ struct RootView: View {
     // longer routes; build 9 removes the data layer. See reports/build8_report.md.
     // @State private var pairRequest: PairRequest? = nil   // from universal links
     @State private var messageOpenRequest: MessageOpenRequest? = nil   // /m/<id> links (4a)
+    // [double-tap fix · Layer 2] The shared cold-launch pending slot. handleIncomingURL,
+    // the short-code path, the DEBUG -openMessageID path, AND the SceneDelegate's
+    // cold-launch capture all write a message id here; presentPendingMessageIfReady()
+    // promotes it to `messageOpenRequest` once the root is stable. Observed so a
+    // SceneDelegate capture that lands after onAppear still triggers a re-check.
+    @ObservedObject private var pendingLink = PendingLink.shared
     #if DEBUG
     @State private var didDebugOpenMessage = false   // one-shot scaffold guard
     #endif
@@ -105,8 +111,15 @@ struct RootView: View {
             syncConnections()   // [phase2 stage B] drain (S2) + stamp connected contacts
             skinStore.enforceTier(subscription.tier)   // free = Minimal, always
             instrumentStore.enforceTier(subscription.tier)   // free = compass, always
+            // [double-tap fix · Layer 2] (a) data layer is configured — try now
+            // (presents immediately for a WARM launch; no-ops while the splash is up).
+            presentPendingMessageIfReady()
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
                 withAnimation(.easeOut(duration: 0.6)) { showSplash = false }
+                // [double-tap fix · Layer 2] (b) splash cleared → the hierarchy can
+                // host the cover. A COLD-launch pending /m/ id presents HERE, on the
+                // first tap (replaces the DEBUG path's one-off +1.0s defer).
+                presentPendingMessageIfReady()
             }
         }
         .onChange(of: hasCompletedOnboarding) { _, done in
@@ -185,8 +198,17 @@ struct RootView: View {
         // (Posted by ShortCodeEntryView with object: the message UUID.)
         .onReceive(NotificationCenter.default.publisher(for: .pointwardOpenMessage)) { note in
             if let id = note.object as? UUID {
-                messageOpenRequest = MessageOpenRequest(id: id)
+                // [double-tap fix · Layer 2] same single funnel as /m/ links.
+                // [pre-fix] messageOpenRequest = MessageOpenRequest(id: id)
+                PendingLink.shared.set(id)
+                presentPendingMessageIfReady()
             }
+        }
+        // [double-tap fix · Layer 2] Re-check readiness whenever the pending slot
+        // changes — covers a SceneDelegate cold-launch capture that lands AFTER
+        // onAppear has already run (the slot is set from outside the SwiftUI funnels).
+        .onChange(of: pendingLink.messageID) { _, id in
+            if id != nil { presentPendingMessageIfReady() }
         }
         // ([5/6] replay cover moved onto the TabView in MainTabView —
         //  presenting from here failed while a child sheet was up)
@@ -208,9 +230,12 @@ struct RootView: View {
         // pair guard; the pair/join path below is completely unchanged.
         if let messageID = MessageLink.messageID(from: url) {
             rootLog.info("deeplink: message open \(messageID.uuidString, privacy: .public)")
-            // QUEUE-as-state: held until RootView presents it (cold-launch safe,
-            // mirrors pairRequest). The fetch then runs async inside the cover.
-            messageOpenRequest = MessageOpenRequest(id: messageID)
+            // [double-tap fix · Layer 2] Funnel through the pending slot + the
+            // ready-gate instead of presenting directly — so a COLD-launch first
+            // tap presents as soon as the root is stable (not too early → dropped).
+            // [pre-fix] messageOpenRequest = MessageOpenRequest(id: messageID)
+            PendingLink.shared.set(messageID)
+            presentPendingMessageIfReady()
             return
         }
         // [build8] /pair + /join deep-link routing stripped (pairing-era). The /m/
@@ -381,13 +406,30 @@ struct RootView: View {
               let id = UUID(uuidString: CommandLine.arguments[i + 1]) else { return }
         didDebugOpenMessage = true
         rootLog.info("DEBUG: open message via -openMessageID \(id.uuidString, privacy: .public)")
-        // Defer so the splash + data layer settle first (mirrors real cold-launch
-        // timing before the cover presents).
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-            messageOpenRequest = MessageOpenRequest(id: id)
-        }
+        // [double-tap fix · Layer 2] Route through the SAME pending slot + ready-gate
+        // as the real link path (the event-driven settle now handles the "wait for
+        // splash + data layer" the old one-off +1.0s defer did by hand).
+        // [pre-fix]
+        // DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+        //     messageOpenRequest = MessageOpenRequest(id: id)
+        // }
+        PendingLink.shared.set(id)
+        presentPendingMessageIfReady()
     }
     #endif
+
+    // [double-tap fix · Layer 2] Promote the cold-launch pending /m/ id to the
+    // presented cover ONLY when the root can host it: splash gone, no cover already
+    // up. Idempotent + re-entrant — safe to call from onAppear, the splash flip, the
+    // pending-slot onChange, and each funnel. The atomic take() means a not-yet-ready
+    // call never consumes the id (it returns early before taking).
+    private func presentPendingMessageIfReady() {
+        guard !showSplash else { return }               // wait for the launch splash
+        guard messageOpenRequest == nil else { return }  // don't stomp an open cover
+        guard let id = PendingLink.shared.take() else { return }
+        rootLog.info("deeplink: presenting pending message \(id.uuidString, privacy: .public)")
+        messageOpenRequest = MessageOpenRequest(id: id)
+    }
 }
 
 // MARK: - Post-onboarding connect prompt (shown once, ever)

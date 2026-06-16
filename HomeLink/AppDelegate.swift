@@ -24,6 +24,21 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
         return true
     }
 
+    // [double-tap fix · Layer 1] Point new scenes at our minimal SceneDelegate so
+    // it can capture a COLD-launch /m/<id> universal link from the scene's
+    // connectionOptions (which SwiftUI's .onContinueUserActivity can miss on first
+    // launch). SwiftUI's WindowGroup still hosts the UI — SceneDelegate never
+    // touches the window. See reports/double_tap_link_audit.md.
+    func application(
+        _ application: UIApplication,
+        configurationForConnecting connectingSceneSession: UISceneSession,
+        options: UIScene.ConnectionOptions
+    ) -> UISceneConfiguration {
+        let config = UISceneConfiguration(name: nil, sessionRole: connectingSceneSession.role)
+        config.delegateClass = SceneDelegate.self
+        return config
+    }
+
     /// [1/5] Logs the local end of the push chain and re-requests permission
     /// if it was never determined — surfaces "DENIED" or "notDetermined" so a
     /// silent-notifications report is diagnosable without a device round-trip.

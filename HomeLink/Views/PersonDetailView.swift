@@ -130,10 +130,13 @@ struct PersonDetailView: View {
             historyRecords = await SupabaseService.shared.fetchPings(with: partnerID)
             historyLoaded = true
         }
-        // iMessage composer for the personal invite (primary share path)
-        .sheet(isPresented: $showMessageComposer) {
-            MessageComposerView(body: personInvite ?? "")
-        }
+        // [cleanup #5] iMessage composer for the pairing invite — DISABLED (its only
+        // trigger, the connect CTA, is gone). ⚠️ MessageComposerView (ConnectView.swift)
+        // was kept live ONLY for this flow → it is now ORPHANED (flag for the cleanup
+        // pass; not removed here). Reversible: uncomment with the connect block.
+        // .sheet(isPresented: $showMessageComposer) {
+        //     MessageComposerView(body: personInvite ?? "")
+        // }
         // A felt receipt just landed (realtime UPDATE on our sent ping) —
         // refresh so the grey dot turns into the lavender pair live.
         .onChange(of: pings.lastFeltAt) { _, _ in
@@ -206,6 +209,13 @@ struct PersonDetailView: View {
                         .foregroundColor(DesignTokens.Color.textMuted)
                 }
 
+                // [cleanup #5] pairing-era "connect with [name]" CTA + the expanded
+                // invite / iMessage / share / manual-code-entry UI DISABLED. Tapping a
+                // not-yet-linked contact no longer detours through a pairing screen —
+                // the card tap / thoughtsCountRow already does select → compass →
+                // compose. The link model connects via a real sent THOUGHT, not a
+                // pairing code. Reversible: remove the #if false / #endif.
+                #if false
                 if !showConnectOptions {
                     Button {
                         withAnimation(.easeOut(duration: 0.25)) { showConnectOptions = true }
@@ -324,6 +334,10 @@ struct PersonDetailView: View {
                             .foregroundColor(.red)
                     }
                 }
+                #endif
+                // [cleanup #5] not-yet-linked now shows ONLY the calm "not yet linked"
+                // status above — no pairing action. (Sending still works via the link
+                // path from the compass; the connected state shows the green card.)
             }
             .padding(16)
             .background(DesignTokens.Color.backgroundCard)
@@ -335,6 +349,10 @@ struct PersonDetailView: View {
         }
     }
 
+    // [cleanup #5] prepareInvite() (createInvite pairing invite) + connect() (manual
+    // code redeem) — ORPHANED now the not-yet-linked connect CTA is disabled. Kept
+    // behind #if false for reversibility; delete at the cleanup pass.
+    #if false
     /// Create the invite tied to this exact person (name + emoji travel
     /// with it; owner_person_id re-links the card when they accept).
     private func prepareInvite() {
@@ -401,6 +419,7 @@ struct PersonDetailView: View {
             }
         }
     }
+    #endif
 
     // MARK: - Expandable memory trail
 

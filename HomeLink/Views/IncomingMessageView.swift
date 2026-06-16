@@ -52,6 +52,11 @@ struct IncomingMessageView: View {
     @State private var flipGate = OpenedFlipGate()
     @State private var started = false
     @State private var pulse = false
+    // [envelope-name] The resolved sender name shown ON the envelope beat. Set the
+    // moment the (single, existing) fetch lands — mid-beat — via resolvedSenderName
+    // (local label → senderDisplayName → "someone"). Display-only; does not gate the
+    // arrival sequence/timing. nil until the message resolves (then it fades in).
+    @State private var resolvedName: String? = nil
 
     /// Minimum on-screen time for the incoming beat (the fetch may finish sooner;
     /// if it takes LONGER, the beat keeps breathing until it resolves).
@@ -103,7 +108,18 @@ struct IncomingMessageView: View {
                     .font(.system(size: 18, design: .serif).italic())
                     .foregroundColor(DesignTokens.Color.textPrimary)
                     .opacity(0.9)
+
+                // [envelope-name] The arrival's natural "who's this from" surface.
+                // Fades in once the message resolves (resolvedName); reuses the SAME
+                // resolvedSenderName precedence as the receipt caption — local label
+                // ("Jessica"/"Husband") → senderDisplayName → "someone". Reserve the
+                // line's height so the envelope/text don't jump when it appears.
+                Text(resolvedName.map { "from \($0)" } ?? " ")
+                    .font(.system(size: 14, design: .serif).italic())
+                    .foregroundColor(Self.lavender)
+                    .opacity(resolvedName == nil ? 0 : 0.85)
             }
+            .animation(.easeIn(duration: 0.5), value: resolvedName)
         }
         .onAppear {
             withAnimation(.easeInOut(duration: 1.1).repeatForever(autoreverses: true)) {
@@ -154,7 +170,17 @@ struct IncomingMessageView: View {
         Task {
             // Fetch + beat run concurrently; we advance on whichever is LONGER,
             // so the beat is never cut short and a slow fetch is covered.
-            async let fetched = fetch()
+            // [envelope-name] same single fetch — but surface the resolved sender
+            // name on the envelope the moment the message lands (mid-beat). The phase
+            // flip below is UNCHANGED (still gated on `await fetched`); this only adds
+            // an early, display-only name assignment. Reuses resolvedSenderName.
+            async let fetched: Message? = {
+                let m = await fetch()
+                await MainActor.run {
+                    if let m { resolvedName = resolvedSenderName(for: m) }
+                }
+                return m
+            }()
             try? await Task.sleep(for: .seconds(Self.beatDuration))
             let result = await fetched
             await MainActor.run {

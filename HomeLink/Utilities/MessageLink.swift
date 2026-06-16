@@ -31,15 +31,26 @@ enum MessageLink {
         return UUID(uuidString: parts[1])
     }
 
-    /// Warm, Pointward-voiced share copy: the link plus the short-code fallback
-    /// so a no-app recipient can open Pointward and type the code. e.g.
-    ///   "Sarah sent you a thought 💭  https://pointward.app/m/…
-    ///    · no app? open Pointward and enter ABC234"
-    /// The code is omitted if we don't have one (degrades to link-only).
+    /// Warm, Pointward-voiced share copy: the DESIGNED canonical invite line (with
+    /// the sender's NAME) + the link + the short-code fallback so a no-app recipient
+    /// can open Pointward and type the code. e.g.
+    ///   "Sarah sent you a custom animated message ✦ tap to preview
+    ///    https://pointward.app/m/…  · no app? open Pointward and enter ABC234"
+    /// The code is omitted if we don't have one (degrades to link-only). The sender
+    /// name is the recipient-facing display name, resolved at the call site
+    /// (people.profile?.displayName ?? UserProfile.snapshot?.displayName ?? "").
     static func shareText(senderName: String, link: String, shortCode: String) -> String {
-        let name = senderName.trimmingCharacters(in: .whitespaces).isEmpty
-            ? "Someone" : senderName
-        var text = "\(name) sent you a thought 💭  \(link)"
+        let trimmed = senderName.trimmingCharacters(in: .whitespaces)
+        // [share-text fix] The SMS preview is the recipient's first impression
+        // (TRUTH "two invite surfaces" — surface 1 entices the tap). Use the
+        // designed warm copy WITH the name; the generic is a LAST RESORT only when
+        // the sender truly has no display name — NOT the default.
+        // [pre-fix] generic-by-default, no "animated/preview" hook:
+        // let name = trimmed.isEmpty ? "Someone" : senderName
+        // var text = "\(name) sent you a thought 💭  \(link)"
+        var text = trimmed.isEmpty
+            ? "Someone sent you a thought ✦ tap to preview  \(link)"
+            : "\(trimmed) sent you a custom animated message ✦ tap to preview  \(link)"
         let code = shortCode.trimmingCharacters(in: .whitespaces)
         if !code.isEmpty {
             text += "  · no app? open Pointward and enter \(code)"
