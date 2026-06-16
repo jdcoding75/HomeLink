@@ -7,7 +7,7 @@
 > is the top of the hierarchy. When they conflict with reality, the live code +
 > this document win.
 
-_Last updated: Session 8 (structural-truth pass) · Phase 2 canon reconciliation — link-based model, scope, senderID, deep-link deferred to P3. · IDENTITY CORRECTION: not forking — the two `users` rows are 2 Apple IDs (Joshua + wife), identity IS stable, hardening deprioritized; banked the display-polish batch (arrival-name, connection-indicator, contact-icon) as active small work. · SESSION CLOSE: Stage A/B/C + display polish all COMMITTED (clean tree, HEAD `90422fd`); banked the CLEAN-RESET PROTOCOL for next session (churn-fogged device state — reset before verifying) + open items (stuck "connected" banner, display clean-verify, old-copy cleanup, double-tap cold-start audit). · CLEAN TWO-PHONE TEST DONE: verified connection/green-indicator/PATH-1-direct/initials clean; RESOLVED the notification model (notify only when connected → named push → tap opens app → plays the arrival; link IS the awareness for unconnected); prioritized next-session list led by **[HIGH] PATH-1 push not firing when app-closed (code gap, not permission)** + **[HIGH] share-text "[John]" copy/name**._
+_Last updated: Session 8 (structural-truth pass) · Phase 2 canon reconciliation — link-based model, scope, senderID, deep-link deferred to P3. · IDENTITY CORRECTION: not forking — the two `users` rows are 2 Apple IDs (Joshua + wife), identity IS stable, hardening deprioritized; banked the display-polish batch (arrival-name, connection-indicator, contact-icon) as active small work. · SESSION CLOSE: Stage A/B/C + display polish all COMMITTED (clean tree, HEAD `90422fd`); banked the CLEAN-RESET PROTOCOL for next session (churn-fogged device state — reset before verifying) + open items (stuck "connected" banner, display clean-verify, old-copy cleanup, double-tap cold-start audit). · CLEAN TWO-PHONE TEST DONE: verified connection/green-indicator/PATH-1-direct/initials clean; RESOLVED the notification model (notify only when connected → named push → tap opens app → plays the arrival; link IS the awareness for unconnected); prioritized next-session list led by **[HIGH] PATH-1 push not firing when app-closed (code gap, not permission)** + **[HIGH] share-text "[John]" copy/name**. · BUG FOLD: re-homed the open bug list under its phases — FINISH 11b/Stage C (#1 push, #2 share-text, #3 envelope name, #15 display-verify), BUILD 9b (#4 forced-send/added-you, #5 legacy connect screen), BUILD 10 (#6 onboarding name-not-persist [root of "Someone"], #7 Settings profile, #9 old-copy cleanup), separate double-tap audit (#8); added **REMAINING BUGS (unphased)** catch-all — animation territory (#12 Plane v1/v2, #13 aiming-order, #14 send-sound) + notes (#10 Alex-demo, #11 first-send warm-up)._
 _Updated this session: Phase 2 progress + findings pass — builds 1–4b shipped & verified, per-person history-bucket finding (coupled to build 9), re-sequenced build order 5–11, onboarding + infrastructure notes banked._
 _Findings pass 2: builds 5–6 + display-name/shortCode fix DONE & device-verified; sharpened the build-9 bucket finding (pings-table vs messages-table seam); banked hint legibility, Sarah dev-seed, duplicate-users, onboarding-emoji, share-sheet, and send-sound-distortion notes._
 _Session lock-up: builds 5–9 (safe half) shipped & ledgered; CRITICAL link-send-`#if DEBUG` / delivery-backbone finding banked; bucket finding RESOLVED (sender-agnostic, local); 3 locked bucket decisions; back-half re-sequenced (11b cutover → 9b delivery-retire → 10 onboarding → 11 tests → 12 web → cleanup); build-9 left-intentionally flags + findings-pass-3 notes. CLAUDE.md: standing build patterns added._
@@ -686,8 +686,12 @@ connection is set"_). One awareness mechanism per path:
   the "wake them" mechanism; both paths land on the **same animated arrival.** This
   resolves the earlier "notification or message?" open question.
 
-**⭐ NEXT-SESSION PRIORITIES (prioritized; led by the push gap):**
-1. **[HIGH] PATH 1 direct-send PUSH NOT FIRING when app closed.** Confirmed a **CODE gap,
+**⭐ NEXT-SESSION PRIORITIES (prioritized; led by the push gap).** Each item is now also
+**FOLDED into its phase home** (see *Re-sequenced Build Order* + *REMAINING BUGS
+(unphased)* below) so work is organized by phase; this list keeps the cross-cutting
+priority order. Phase tag appended to each `→`.
+1. **[HIGH] PATH 1 direct-send PUSH NOT FIRING when app closed.** `→ FINISH 11b/STAGE C
+   (keystone).` Confirmed a **CODE gap,
    NOT permission** (Jess had notifications ALLOWED + 6 `device_tokens`, app closed → NO
    push, NO message → she was **totally unaware**). Direct delivery lands in-app but
    doesn't notify when closed. **Read-only audit of the send→push path for PATH 1:** does
@@ -696,40 +700,68 @@ connection is set"_). One awareness mechanism per path:
    token? **The fix delivers exactly Jess's model.** SPEC: named push → tap opens app →
    plays the arrival.
 2. **[HIGH] Share/invitation MESSAGE TEXT says "Someone sent you a thought" not "[John]".**
-   The designed warm copy ("[John] sent you a custom animated message ✦ tap to preview")
+   `→ FINISH 11b/STAGE C.` The designed warm copy ("[John] sent you a custom animated message ✦ tap to preview")
    isn't live — the outgoing SMS uses generic text + doesn't pull `display_name`. Wire the
    designed copy + sender name into the share message body (`createAndShareLink` /
    ShareSheet). **The first impression the recipient sees.**
-3. **[MED] Name on the ENVELOPE (decided).** The in-app arrival is name-free; put the
+3. **[MED] Name on the ENVELOPE (decided).** `→ FINISH 11b/STAGE C.` The in-app arrival is name-free; put the
    resolved sender name (`resolvedSenderName`: local-label → `display_name` → "someone") on
    the **ENVELOPE** — the arrival's natural "who's this from" surface.
-4. **[MED] Forced-send-on-contact-add friction (hit 3×).** Adding a contact **forces a
+4. **[MED] Forced-send-on-contact-add friction (hit 3×).** `→ BUILD 9b` (with "remove
+   [John] added-you notification"). Adding a contact **forces a
    send** to complete → Joshua repeatedly sent stray links (to daughter Joanna).
    Contact-add must **just add the contact, no forced send.** Ties to "remove cold
    added-you notification / no auto-send on add." **Actively sabotages testing —
    prioritize.**
-5. **[MED] Legacy "connect with [name]" pairing screen** still surfaces on tapping a
+5. **[MED] Legacy "connect with [name]" pairing screen** `→ BUILD 9b.` Still surfaces on tapping a
    not-yet-connected contact (bypassable via "done", so clutter not block). **Retire it** —
    tapping a contact should go **straight to compose.** Pairing-era-leftover cleanup.
 6. **[MED] Onboarding name-not-persisting + skip-transition lingering screen (likely ONE
-   bug).** Wife's typed name saved as **NULL** (suspect skip fired **before** the name
+   bug).** `→ BUILD 10` (ROOT of the wife's NULL display_name → "Someone" arrivals).
+   Wife's typed name saved as **NULL** (suspect skip fired **before** the name
    committed); same step's text field **LINGERS** after skip (non-blocking only because the
    skip button sits at top — a lucky near-miss). Likely a **re-index artifact**; check the
    name-entry commit-on-advance + transition teardown in `OnboardingView`. _(This is the
    root of the wife's NULL `display_name` → the "someone" arrivals.)_
-7. **[MED] Settings needs a PROFILE section.** No way to view/edit your own display name or
+7. **[MED] Settings needs a PROFILE section.** `→ BUILD 10` (ties to the Settings-tab
+   review project). No way to view/edit your own display name or
    address (hit twice — Joshua + wife both **set-blind**, can't confirm). Slots into the
    Settings-tab review project.
-8. **[LOW-MED] Double-tap link bug** (reconfirmed clean): the `/m/` link in Messages takes
+8. **[LOW-MED] Double-tap link bug** `→ SEPARATE SMALL AUDIT` (read-only, per identity §5).
+   Reconfirmed clean: the `/m/` link in Messages takes
    **2 taps not 1.** Universal-link cold-start race. Separate read-only audit (per identity
    audit §5: verify cold-launch `userActivity` replay covers the **FIRST** `/m/` open).
-9. **[NOTE] "someone who loves you" caption + bucket-catch** = **OLD-PHASE
-   copy/mechanism, not touched** — for the eventual receipt / old-surface cleanup pass.
-10. **[NOTE] Alex Demo disappeared** once a real contact was added — likely intended;
-    confirm.
+9. **[NOTE] "someone who loves you" caption + bucket-catch** `→ BUILD 10` (old-surface
+   copy cleanup). = **OLD-PHASE copy/mechanism, not touched** — for the eventual receipt /
+   old-surface cleanup pass.
+10. **[NOTE] Alex Demo disappeared** once a real contact was added — `→ REMAINING BUGS
+    (unphased) / NOTES` — likely intended; confirm.
 11. **[NOTE] First-send-only animation breakup/noise** (clean: stutters on the **1st** send
-    after launch, **2nd** is clean) — cold-start/warm-up pattern; **animation territory,
-    careful.**
+    after launch, **2nd** is clean) — `→ REMAINING BUGS (unphased) / NOTES` —
+    cold-start/warm-up pattern; **animation territory, careful.**
+
+### ⭐ REMAINING BUGS (unphased) — no phase home (stragglers)
+The bugs above are folded into their phase homes (11b/Stage C · 9b · 10) + the separate
+double-tap audit. These have **no phase home** — they ride a different track:
+
+**ANIMATION TERRITORY** (⚠️ the *"never touch without care"* set — careful, AUDIT-FIRST,
+**batched separately** in an animation-chat session, NOT in the Phase-2 build line):
+- **#12 — Plane v1-not-v2 regression.** Sent with Plane → arrival played **Plane v1**, but
+  **Plane v2 is LOCKED** as gold-standard. Send/receive resolves the OLD version — a real
+  regression. Needs a careful audit of where the version is resolved on send/receive.
+- **#13 — Animation aiming-order** (load emoji **before** aim feels broken): the
+  emoji-then-aim sequencing reads wrong in the send mechanic. Animation-chat; audit-first.
+- **#14 — Send-sound distortion.** ⚠️ Reported under a **DEBUG** build — **VERIFY in a
+  release/TestFlight build BEFORE treating as real** (likely a debug-mode artifact). If
+  real in release → animation-chat (sound files are animation territory). If debug-only →
+  ignore.
+
+**NOTES** (confirm / observe — not necessarily real work):
+- **#10 — Alex Demo disappears** when a real contact is added — **likely intended**
+  behavior (the demo steps aside for real people); **confirm**, don't assume a bug.
+- **#11 — First-send-only animation breakup/noise** — 1st send after launch stutters, 2nd
+  is clean: a **cold-start / warm-up** pattern (asset/first-run priming), not a logic bug;
+  observe. (If pursued → animation territory.)
 
 ### Three LOCKED bucket decisions (Joshua, this session)
 1. **Replay-from-history does NOT flip opened** — replay = re-feel, not consume.
@@ -807,15 +839,26 @@ decision-heavy, fresh-mind work.**
   - **B**: the `link_connections` migration + receiver write/sweep (S2) + sender stamp.
   - **C**: two-path `if/else` (connected → DIRECT re-keyed; else LINK) + poll receipts.
   - **⚠️ Family-test gate is AFTER C** (link-every-time feels clunky to close contacts).
+  - **🐞 FOLDED BUGS (finish the send model's experience):** #1 PATH-1 push not firing
+    app-closed [HIGH — keystone] · #2 share/invitation text "Someone" → "[John]" [HIGH] ·
+    #3 name on the envelope [MED] · #15 display-polish batch clean device verify [owed].
+    (See *CLEAN TWO-PHONE TEST → NEXT-SESSION PRIORITIES*.)
 - **9b — retire genuinely-DEAD pairing plumbing ONLY** (NOT the direct-delivery
   channel — that survives as PATH 1, re-keyed to `senderID`). The earlier "retire the
   delivery backbone" wording is **SUPERSEDED** by the locked SEND MODEL. Only the dead
   pairing bits (`connections` remnants, etc.) retire; the pings direct channel +
   realtime receive STAY (re-keyed).
+  - **🐞 FOLDED BUGS:** #5 legacy "connect with [name]" screen (bypassable; retire →
+    tap-to-compose) · #4 forced-send-on-contact-add + remove the cold "[John] added you"
+    notification.
 - **10 — onboarding rewrite** — see **ONBOARDING / ARRIVAL NORTH-STAR** below (the
   earlier "subtractive cut" of the dead connection-code screen is **ABSORBED** into
   this redesign, not a separate build). Also touches `redeem`/`createInvite` (B1) and
   `myPairingCode` (B5).
+  - **🐞 FOLDED BUGS:** #6 onboarding name-not-persisting + skip lingering-screen
+    (re-index artifact; **ROOT of the wife's NULL display_name → "Someone" arrivals**) ·
+    #7 Settings profile section (self name/address; Settings-review project) · #9 "someone
+    who loves you" caption + bucket-catch old-phase copy cleanup.
 - **11 — Phase 2 test suite** (automated scenarios).
 - **12 — SHOW-THE-MESSAGE web page** ✅ **BUILT · DEPLOYED · LIVE-TESTED**
   (`pointward.app/m/[id]`, in the separate **pointward-website** repo — commit
