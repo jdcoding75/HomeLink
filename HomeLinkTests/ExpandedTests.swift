@@ -583,15 +583,9 @@ final class NotificationRoutingTests: XCTestCase {
         XCTAssertEqual(pm.queueCount, 2)
     }
 
-    func testPointingPayloadRoutesToPresenceNotQueue() {
-        UserDefaults.standard.set(true, forKey: "notifyPointing")
-        let pm = PingManager(networkService: MockNetworkService())
-        // Mirror the handler's pointing branch.
-        pm.presenceFelt(name: "Mum")
-        XCTAssertNotNil(pm.partnerPointingAt)
-        XCTAssertEqual(pm.partnerPointingName, "Mum")
-        XCTAssertEqual(pm.queueCount, 0, "presence must never enter the thought queue")
-    }
+    // [9b · B4] testPointingPayloadRoutesToPresenceNotQueue removed — it tested
+    // presenceFelt / partnerPointingAt / partnerPointingName, the mutual-pointing cluster
+    // retired this batch. (The live thought-payload test below stays.)
 
     func testThoughtPayloadRequiresEmojiAndFromName() {
         // The handler guards on both keys; a payload missing either is dropped.

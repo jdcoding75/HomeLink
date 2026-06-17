@@ -23,10 +23,9 @@ final class PingManager: ObservableObject {
     /// (Toast retired — the ambient presence glow replaced it. Kept.)
     @Published var pointingNotice: String?
 
-    /// Ambient presence: the partner's needle is resting on us. The compass
-    /// edge glows faintly from their direction — no badge, no alert, no text.
-    @Published var partnerPointingAt: Date?
-    @Published var partnerPointingName: String = "someone"
+    // [9b · B4] partnerPointingAt / partnerPointingName removed with the
+    // mutual-pointing cluster (set only by the deleted presenceFelt; read only by the
+    // deleted CompassView edge-glow).
 
     // ── Thought queue ────────────────────────────────────────────────────
     /// Received thoughts waiting to be watched. Max 10; oldest drops off.
@@ -491,18 +490,8 @@ final class PingManager: ObservableObject {
         }
     }
 
-    /// Ambient presence arrived — their needle is resting on us.
-    /// `bearing` is THEIR reported absolute bearing (toward us), when the
-    /// event carried one — feeds the mutual-pointing check.
-    func presenceFelt(name: String, bearing: Double? = nil) {
-        // [2/6] Ambient presence is ALWAYS ON now (the Settings toggle is gone).
-        // We always update state here so the mutual-pointing check keeps a fresh
-        // bearing + timestamp; the once-per-person-per-day throttle on the
-        // VISIBLE glow lives at the glow-activation site in CompassView.
-        partnerPointingName = name
-        partnerPointingAt = .now
-        partnerPointingBearing = bearing
-    }
+    // [9b · B4] presenceFelt removed — its only caller was NotificationHandler's dead
+    // "pointing" branch; it set the mutual-pointing state (also removed).
 
     // ── Replay, app-wide ─────────────────────────────────────────────────
     /// Set from any tab; RootView presents the full-screen replay overlay.
@@ -557,39 +546,10 @@ final class PingManager: ObservableObject {
     /// listening to this refetch and flip their dot to "felt".
     @Published var lastFeltAt: Date?
 
-    // ── Mutual pointing — the most magical moment ────────────────────────
-    /// Their last reported absolute bearing (toward us), from realtime/push.
-    @Published var partnerPointingBearing: Double?
-    /// Set when BOTH needles rest on each other within 15° — golden moment.
-    @Published var mutualMoment: Date?
-    private var lastMutualMoment: Date = .distantPast
-
-    /// Called with OUR absolute bearing toward them + our alignment error
-    /// whenever either side's pointing state changes. Requires their
-    /// pointing report to be fresh (within 90 s) so the moment is genuinely
-    /// simultaneous. Throttled to once per 5 minutes.
-    func checkMutualPointing(myAbsoluteBearing: Double, myAlignmentError: Double) {
-        guard myAlignmentError <= 15,
-              let theirBearing = partnerPointingBearing,
-              let theirStamp = partnerPointingAt,
-              Date.now.timeIntervalSince(theirStamp) < 90,
-              Date.now.timeIntervalSince(lastMutualMoment) > 300   // once per 5 min
-        else { return }
-        // Their bearing should be (roughly) the reciprocal of ours
-        let reciprocal = (myAbsoluteBearing + 180).truncatingRemainder(dividingBy: 360)
-        let diff = BearingCalculator.alignmentError(relativeBearing: theirBearing - reciprocal)
-        guard diff <= 15 else {
-            log.debug("mutual: not reciprocal (their=\(Int(theirBearing), privacy: .public)° vs expected=\(Int(reciprocal), privacy: .public)°, off \(Int(diff), privacy: .public)°)")
-            return
-        }
-        lastMutualMoment = .now
-        log.info("mutual: ✦ BOTH POINTING — golden moment (off by \(Int(diff), privacy: .public)°)")
-        mutualMoment = .now
-        Task {
-            try? await Task.sleep(nanoseconds: 3_000_000_000)
-            mutualMoment = nil
-        }
-    }
+    // [9b · B4] Mutual-pointing cluster REMOVED — partnerPointingBearing, mutualMoment,
+    // lastMutualMoment, and checkMutualPointing (the latter had NO live caller; the
+    // RootView triggers were already commented). The source (reportPointing) was a no-op,
+    // so none of this ever fired. (lastFeltAt above is the LIVE felt-receipt stream — kept.)
 
     /// Called when an arrival animation completes. Waiting thoughts do NOT
     /// auto-play — the badge shows the count and the user taps to catch the

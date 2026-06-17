@@ -79,8 +79,7 @@ struct CompassView: View {
     // Person switcher sheet (tap the name)
     @State private var showPersonSwitcher = false
 
-    // Ambient presence — partner's needle resting on us → edge glow
-    @State private var presenceGlowVisible = false
+    // [9b · B4] presenceGlowVisible removed with the mutual-pointing edge-glow.
 
     // [1/6] Thought history — lives on the compass now. Bottom-left icon opens
     // a drawer of recent thoughts; tapping one replays it on the compass while
@@ -782,12 +781,8 @@ struct CompassView: View {
                     .transition(.opacity)
             }
 
-            // ── Ambient presence — their needle is resting on us ──────────────
-            if presenceGlowVisible {
-                presenceGlow
-                    .allowsHitTesting(false)
-                    .transition(.opacity)
-            }
+            // [9b · B4] ambient-presence edge-glow layer REMOVED (presenceGlowVisible
+            // never became true — see the removed onChange + the no-op pointing source).
 
             // ── "✦ Pro" indicator — top right, tap → Pro tab [6/6] ─────
             if proOn {
@@ -894,26 +889,10 @@ struct CompassView: View {
         .overlay(alignment: .topTrailing) { cancelButton }
         .animation(.spring(response: 0.4, dampingFraction: 0.7), value: selectedToken != nil)
         // ── Reactions to state changes ────────────────────────────────────────
-        .onChange(of: pings.partnerPointingAt) { _, stamp in
-            guard stamp != nil else { return }
-            // Mutual: we're locked on them while they rest on us — always honored.
-            if compass.state.isLocked {
-                HapticEngine.connectionFelt()
-            }
-            // [2/6] Ambient presence is ALWAYS ON, but the visible glow is a
-            // once-per-person-per-day surprise — never annoying, always welcome.
-            // Resets at local midnight. (Bearing/timestamp already updated for
-            // the mutual-pointing check regardless.)
-            let key = "lastAmbientGlow_\(pings.partnerPointingName)"
-            let last = UserDefaults.standard.object(forKey: key) as? Date
-            if let last, Calendar.current.isDate(last, inSameDayAs: .now) { return }
-            UserDefaults.standard.set(Date.now, forKey: key)
-            withAnimation(.easeIn(duration: 1.2)) { presenceGlowVisible = true }
-            // The glow breathes for a while, then drifts away
-            DispatchQueue.main.asyncAfter(deadline: .now() + 9.0) {
-                withAnimation(.easeOut(duration: 2.0)) { presenceGlowVisible = false }
-            }
-        }
+        // [9b · B4] ambient-presence edge-glow onChange REMOVED — it was keyed on
+        // pings.partnerPointingAt, which never changed (the mutual-pointing source,
+        // reportPointing, is a no-op), so the glow never fired. The compass's core
+        // reactions below (lock handling, drawer, overlays) are untouched.
         .onChange(of: compass.state.isLocked)        { _, locked in handleLock(locked) }
         // [1/6] Thought history on the compass — icon, drawer, replay caption.
         // [3/5] Moved top-left (below the nav bar), clear of the send controls.
@@ -2120,35 +2099,8 @@ struct CompassView: View {
 
     // MARK: - Ambient presence glow
 
-    /// Warm lavender light breathing in from the partner's edge of the
-    /// screen — they're pointing at us right now. No text, no badge…
-    /// unless we're pointing back: then the moment is named.
-    private var presenceGlow: some View {
-        let rad = compass.state.bearingDegrees * .pi / 180
-        return ZStack {
-            RadialGradient(
-                colors: [Color(hex: "#c4a8d4").opacity(steadyLock ? 0.34 : 0.22), .clear],
-                center: UnitPoint(x: 0.5 + 0.60 * sin(rad),
-                                  y: 0.5 - 0.60 * cos(rad)),
-                startRadius: 10,
-                endRadius: 380
-            )
-            .ignoresSafeArea()
-
-            // Both needles resting on each other — a shared moment
-            if compass.state.isLocked {
-                VStack {
-                    Spacer()
-                    Text("pointing at each other ✦")
-                        .font(.system(size: 13, design: .serif).italic())
-                        .foregroundColor(Color(hex: "#e0ccee"))
-                        .shadow(color: Color(hex: "#9b7fc0").opacity(0.8), radius: 8)
-                        .padding(.bottom, 64)
-                }
-                .transition(.opacity)
-            }
-        }
-    }
+    // [9b · B4] presenceGlow (the mutual-pointing edge-glow visual) REMOVED — it was
+    // only rendered by the deleted presenceGlowVisible/onChange path, which never fired.
 
     // MARK: - [1/6] Thought history on the compass
 

@@ -51,12 +51,10 @@ final class NotificationHandler: NSObject, ObservableObject {
     func handlePayload(_ userInfo: [AnyHashable: Any]) {
         log.info("push: payload received — keys: \(userInfo.keys.map { "\($0)" }.joined(separator: ","), privacy: .public)")
 
-        // "Pointing" pushes become ambient presence — the compass edge glow
-        if userInfo["type"] as? String == "pointing" {
-            log.info("push: pointing presence from \(userInfo["fromName"] as? String ?? "someone", privacy: .public)")
-            pingManager.presenceFelt(name: userInfo["fromName"] as? String ?? "someone")
-            return
-        }
+        // [9b · B4] dead "pointing" presence branch removed — no pointing pushes exist
+        // (the source, reportPointing, is a no-op). The THOUGHT / PATH-1 branch below is
+        // the LIVE path and is UNCHANGED. (parsePush still returns nil for a stray
+        // "pointing" payload, so one would be harmlessly ignored.)
         guard let parsed = Self.parsePush(userInfo) else {
             log.warning("push: payload missing pingEmoji/fromName — ignored")
             return

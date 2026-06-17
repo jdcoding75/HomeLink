@@ -1045,35 +1045,9 @@ final class SupabaseService: ObservableObject {
         }
     }
 
-    // MARK: - Pointing (compass locked on them)
-
-    /// Report that our compass just locked onto the paired person.
-    /// Written only on lock edges (throttled by the caller) — never per heading.
-    func reportPointing(bearing: Double) async {
-        // [build9] RETIRED (pure pairing, mutual-pointing) — no-op. compass_bearings
-        // write commented; the realtime read stream is also retired. Kept as a
-        // no-op stub so the (also-stripped) CompassManager caller compiles.
-        // guard let client, let me = await currentUserID else { return }
-        // struct Row: Codable {
-        //     let userID: UUID
-        //     let bearing: Double
-        //     let updatedAt: String
-        //     enum CodingKeys: String, CodingKey {
-        //         case userID    = "user_id"
-        //         case bearing
-        //         case updatedAt = "updated_at"
-        //     }
-        // }
-        // do {
-        //     try await client
-        //         .from("compass_bearings")
-        //         .upsert(Row(userID: me, bearing: bearing,
-        //                     updatedAt: ISO8601DateFormatter().string(from: .now)))
-        //         .execute()
-        // } catch {
-        //     log.error("pointing: bearing report FAILED: …")
-        // }
-    }
+    // [9b · B4] reportPointing no-op stub REMOVED — its only caller
+    // (CompassManager.reportPointingIfNeeded) is gone with the mutual-pointing cluster.
+    // The `compass_bearings` write was already retired (build9).
 
     /// The "notify me when someone points toward me" preference, server-side
     /// so the push Edge Function can respect it even when the app is closed.

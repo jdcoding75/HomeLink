@@ -24,12 +24,8 @@ final class CompassManager: NSObject, ObservableObject {
     private var targetPerson: Person?
     private var wasLocked = false
     private var lockedSince: Date = .distantFuture        // steady-gaze tracking
-    private var lastPointingReport: Date = .distantPast   // throttle bearing writes
-    // AUTO-PUSH FIX: the 1° heading throttle stops updateCompassState from
-    // firing while the phone is held perfectly still — exactly the steady
-    // gaze the presence signal needs. This timer re-checks every 2 s while
-    // locked, independent of heading events.
-    private var presenceTimer: Timer?
+    // [9b · B4] lastPointingReport + presenceTimer removed with the mutual-pointing
+    // report path (reportPointingIfNeeded / startPresenceTimer).
     private let lockThresholdDegrees: Double  = 5.0
     private let farFromHomeThresholdKm: Double = 500.0
 
@@ -106,50 +102,11 @@ final class CompassManager: NSObject, ObservableObject {
         return skinStore.activeSkin
     }
 
-    /// Re-evaluates the steady-lock condition every 2 s while locked —
-    /// heading events alone stop arriving when the phone is held still.
-    private func startPresenceTimer() {
-        stopPresenceTimer()
-        presenceTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] _ in
-            MainActor.assumeIsolated {
-                guard let self else { return }
-                guard self.wasLocked,
-                      let target = self.targetPerson,
-                      let userLocation = self.userLocation else { return }
-                if Date.now.timeIntervalSince(self.lockedSince) >= 10 {
-                    let bearing = BearingCalculator.bearing(from: userLocation.coordinate,
-                                                            to: target.coordinate)
-                    self.reportPointingIfNeeded(target: target, bearing: bearing)
-                }
-            }
-        }
-    }
-
-    private func stopPresenceTimer() {
-        presenceTimer?.invalidate()
-        presenceTimer = nil
-    }
-
-    /// Steady-lock only, paired-person only, at most once per FIVE minutes —
-    /// the silent presence signal behind the partner's edge glow.
-    ///
-    /// LOCATION POLICY:
-    /// REQUIRES_REAL: true (mutual pointing is the one feature that needs it)
-    /// FAKE_STRATEGY: not applicable — skip entirely when seeded
-    /// DEGRADES_TO: feature simply does not fire
-    /// MUTUAL_ONLY: true
-    private func reportPointingIfNeeded(target: Person, bearing: Double) {
-        // [build7] REAL-LOCATION GUARD — never report a SEEDED bearing. Build 5
-        // mirror-writes pairedUserID = senderID, so the pairing gate alone could
-        // trip on a link contact; require a real bearing (rawBearingToTarget != nil).
-        guard rawBearingToTarget != nil else { return }
-        guard let friend = SupabaseService.connectedFriendID,
-              target.pairedUserID == friend.uuidString,
-              Date.now.timeIntervalSince(lastPointingReport) > 300
-        else { return }
-        lastPointingReport = .now
-        Task { await SupabaseService.shared.reportPointing(bearing: bearing) }
-    }
+    // [9b · B4] startPresenceTimer / stopPresenceTimer / reportPointingIfNeeded REMOVED —
+    // the whole mutual-pointing report path. The presenceTimer's SOLE job was driving
+    // reportPointingIfNeeded → SupabaseService.reportPointing (a no-op), so removing it
+    // loses no live behavior. (Heading/lock updates arrive via the location-manager
+    // delegate, unaffected.)
 
     func stop() {
         locationManager.stopUpdatingLocation()
@@ -191,7 +148,7 @@ final class CompassManager: NSObject, ObservableObject {
         guard targetPerson != nil else { return }
         locationManager.stopUpdatingHeading()
         locationManager.stopUpdatingLocation()
-        stopPresenceTimer()
+        // [9b · B4] stopPresenceTimer() removed (presenceTimer retired with mutual-pointing).
         #if DEBUG
         stopMockHeadingTimer()   // never let a test toggle spin in the background
         #endif
@@ -280,19 +237,12 @@ final class CompassManager: NSObject, ObservableObject {
         let bearingDiff  = min(relativeBearing, 360 - relativeBearing)
         let isNowLocked  = bearingDiff <= lockThresholdDegrees
         if isNowLocked && !wasLocked {
-            HapticEngine.connectionFelt()
+            HapticEngine.connectionFelt()   // lock haptic — LIVE, kept
             lockedSince = .now
-            startPresenceTimer()      // steady-gaze checks survive a still phone
         }
-        if !isNowLocked && wasLocked {
-            stopPresenceTimer()
-        }
-        // Ambient presence: only after the needle has RESTED on them for
-        // 10+ seconds — a held gaze, not a glance. Throttled to 5 minutes.
-        // (reportPointing self-guards on real location — never fires for seeded.)
-        if isNowLocked, Date.now.timeIntervalSince(lockedSince) >= 10 {
-            reportPointingIfNeeded(target: target, bearing: absoluteBearing)
-        }
+        // [9b · B4] startPresenceTimer/stopPresenceTimer + the reportPointingIfNeeded
+        // ambient-presence call removed — the mutual-pointing source (reportPointing) is
+        // a no-op, so this only fed dead pointing reports. Lock haptic/state above stay.
         wasLocked = isNowLocked
         let activeSkin = resolvedSkin(for: target)
         state = CompassState(
