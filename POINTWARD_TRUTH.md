@@ -7,7 +7,7 @@
 > is the top of the hierarchy. When they conflict with reality, the live code +
 > this document win.
 
-_Last updated: Session 8 (structural-truth pass) · Phase 2 canon reconciliation — link-based model, scope, senderID, deep-link deferred to P3. · IDENTITY CORRECTION: not forking — the two `users` rows are 2 Apple IDs (Joshua + wife), identity IS stable, hardening deprioritized; banked the display-polish batch (arrival-name, connection-indicator, contact-icon) as active small work. · SESSION CLOSE: Stage A/B/C + display polish all COMMITTED (clean tree, HEAD `90422fd`); banked the CLEAN-RESET PROTOCOL for next session (churn-fogged device state — reset before verifying) + open items (stuck "connected" banner, display clean-verify, old-copy cleanup, double-tap cold-start audit). · CLEAN TWO-PHONE TEST DONE: verified connection/green-indicator/PATH-1-direct/initials clean; RESOLVED the notification model (notify only when connected → named push → tap opens app → plays the arrival; link IS the awareness for unconnected); prioritized next-session list led by **[HIGH] PATH-1 push not firing when app-closed (code gap, not permission)** + **[HIGH] share-text "[John]" copy/name**. · BUG FOLD: re-homed the open bug list under its phases — FINISH 11b/Stage C (#1 push, #2 share-text, #3 envelope name, #15 display-verify), BUILD 9b (#4 forced-send/added-you, #5 legacy connect screen), BUILD 10 (#6 onboarding name-not-persist [root of "Someone"], #7 Settings profile, #9 old-copy cleanup), separate double-tap audit (#8); added **REMAINING BUGS (unphased)** catch-all — animation territory (#12 Plane v1/v2, #13 aiming-order, #14 send-sound) + notes (#10 Alex-demo, #11 first-send warm-up). · PRE-TEST BATCH: **5 fixes BUILT + uncommitted** (#8 double-tap cold-launch, #2 share-text named copy, #3 envelope "from [name]", #4 forced-send-on-add removed, #5 legacy connect screen removed) — all Release+248-green, batched for ONE clean two-phone test before commit; benched push `index.ts` (#1) awaits Joshua redeploy. Banked the obstacle-removal status (stuck "[name] connected" banner = NO live code, likely stale notification) + the 5-step clean test plan (commit the batch only if all pass). · ⭐ SESSION CLOSE — BATCH + PUSH COMMITTED & DEVICE-VERIFIED: app batch `d03eb3e` (5 fixes) + push fn `feafe7a` all passed the clean two-phone test; **PATH-1 push works END-TO-END** (named "John sent you a thought ✦" on a closed phone → tap → arrival played) — the send model's last functional gap is CLOSED (the boot bug meant the function NEVER booted before). NEW findings (all phone-free): #1 PersonDetailView still pairing-driven (load-bearing tap→compose bug), #2 unread count never clears, #3 sender-reinstall re-stamp gap, #4 connection-sync lag, #5 stray `rapid-action` Edge Function (delete), double-tap = iOS Messages behavior (RESOLVED, not a bug). Runway is ALL phone-free: PersonDetailView fix, unread-clear, 9b cleanup, Build 10 + #6, Phase-2 tests. · SESSION CONTINUED: PersonDetailView reconcile (`73cceaa`, senderID-primary isConnected + ungated compose, device-verified) + unread-badge Option A (`7c0f956`, markAllMyPingsOpened on foreground, "marked all opened ✓") both COMMITTED & verified — findings #1+#2 CLOSED. **9b CLEANUP AUDIT DONE** (5-batch removal plan; 2 catches — `connectedFriendID` is LOAD-BEARING/preserve, `claimOutcome`+tests now app-orphaned → Joshua decides retire-vs-keep). Animation (#12/#13/#14) queued-not-started (don't run animation+9b builds together). 9b removals START next session. · ⭐ 9b DEAD-PAIRING CLEANUP COMPLETE: B1 dead views (`abc9e77`) + B2 invite-accept API/DI (`6c7f8c5`) + B3+B5 PeopleManager funcs/tests/isConnected (`9883a60`) + B4 mutual-pointing unwire (`04e80d6`, NotificationHandler thought/PATH-1 branch byte-identical, device-glance passed) all COMMITTED; `rapid-action` stray Edge Function deleted; tests 246→227. The LIVE pairing-code-gen subsystem STAYS (sign-in mints a code via myPairingCode → connections) = separate post-9b item (around/after Build 10). Surfaced: arrival-preview mystery prompt, history-replay-should-be-full-animation, trailing leftovers. **LINK-ERA PIVOT SUBSTANTIALLY COMPLETE.** NEXT: Build 10 (onboarding + #6 name-persist). · ⭐ BUILD 10 DECISIONS LOCKED (Joshua, pre-build): governing principle = **friction-free for most + require info only WHEN IT'S USED** (path-split is a consequence, not a rule). NAME required at the **send-moment** (sender has one → satisfies #6; receiver not asked) + self-explaining copy + Apple pre-fill (never relied on; flow GUARANTEES display_name) + edit-per-message; no Contacts-for-name. LOCATION **don't force it** (felt-directionality not a receiver requirement now; Phase-3 live location makes manual moot → keep light). EDUCATION/showcase lives in **Settings**, OFFERED not forced (after first receive, or optional onboard screen). STILL OPEN: patch-vs-rebuild the paged TabView; 3-doors rendering; drop the sign-in myPairingCode mint. (Audit: `reports/build10_onboarding_audit.md`.)_
+_Last updated: Session 8 (structural-truth pass) · Phase 2 canon reconciliation — link-based model, scope, senderID, deep-link deferred to P3. · IDENTITY CORRECTION: not forking — the two `users` rows are 2 Apple IDs (Joshua + wife), identity IS stable, hardening deprioritized; banked the display-polish batch (arrival-name, connection-indicator, contact-icon) as active small work. · SESSION CLOSE: Stage A/B/C + display polish all COMMITTED (clean tree, HEAD `90422fd`); banked the CLEAN-RESET PROTOCOL for next session (churn-fogged device state — reset before verifying) + open items (stuck "connected" banner, display clean-verify, old-copy cleanup, double-tap cold-start audit). · CLEAN TWO-PHONE TEST DONE: verified connection/green-indicator/PATH-1-direct/initials clean; RESOLVED the notification model (notify only when connected → named push → tap opens app → plays the arrival; link IS the awareness for unconnected); prioritized next-session list led by **[HIGH] PATH-1 push not firing when app-closed (code gap, not permission)** + **[HIGH] share-text "[John]" copy/name**. · BUG FOLD: re-homed the open bug list under its phases — FINISH 11b/Stage C (#1 push, #2 share-text, #3 envelope name, #15 display-verify), BUILD 9b (#4 forced-send/added-you, #5 legacy connect screen), BUILD 10 (#6 onboarding name-not-persist [root of "Someone"], #7 Settings profile, #9 old-copy cleanup), separate double-tap audit (#8); added **REMAINING BUGS (unphased)** catch-all — animation territory (#12 Plane v1/v2, #13 aiming-order, #14 send-sound) + notes (#10 Alex-demo, #11 first-send warm-up). · PRE-TEST BATCH: **5 fixes BUILT + uncommitted** (#8 double-tap cold-launch, #2 share-text named copy, #3 envelope "from [name]", #4 forced-send-on-add removed, #5 legacy connect screen removed) — all Release+248-green, batched for ONE clean two-phone test before commit; benched push `index.ts` (#1) awaits Joshua redeploy. Banked the obstacle-removal status (stuck "[name] connected" banner = NO live code, likely stale notification) + the 5-step clean test plan (commit the batch only if all pass). · ⭐ SESSION CLOSE — BATCH + PUSH COMMITTED & DEVICE-VERIFIED: app batch `d03eb3e` (5 fixes) + push fn `feafe7a` all passed the clean two-phone test; **PATH-1 push works END-TO-END** (named "John sent you a thought ✦" on a closed phone → tap → arrival played) — the send model's last functional gap is CLOSED (the boot bug meant the function NEVER booted before). NEW findings (all phone-free): #1 PersonDetailView still pairing-driven (load-bearing tap→compose bug), #2 unread count never clears, #3 sender-reinstall re-stamp gap, #4 connection-sync lag, #5 stray `rapid-action` Edge Function (delete), double-tap = iOS Messages behavior (RESOLVED, not a bug). Runway is ALL phone-free: PersonDetailView fix, unread-clear, 9b cleanup, Build 10 + #6, Phase-2 tests. · SESSION CONTINUED: PersonDetailView reconcile (`73cceaa`, senderID-primary isConnected + ungated compose, device-verified) + unread-badge Option A (`7c0f956`, markAllMyPingsOpened on foreground, "marked all opened ✓") both COMMITTED & verified — findings #1+#2 CLOSED. **9b CLEANUP AUDIT DONE** (5-batch removal plan; 2 catches — `connectedFriendID` is LOAD-BEARING/preserve, `claimOutcome`+tests now app-orphaned → Joshua decides retire-vs-keep). Animation (#12/#13/#14) queued-not-started (don't run animation+9b builds together). 9b removals START next session. · ⭐ 9b DEAD-PAIRING CLEANUP COMPLETE: B1 dead views (`abc9e77`) + B2 invite-accept API/DI (`6c7f8c5`) + B3+B5 PeopleManager funcs/tests/isConnected (`9883a60`) + B4 mutual-pointing unwire (`04e80d6`, NotificationHandler thought/PATH-1 branch byte-identical, device-glance passed) all COMMITTED; `rapid-action` stray Edge Function deleted; tests 246→227. The LIVE pairing-code-gen subsystem STAYS (sign-in mints a code via myPairingCode → connections) = separate post-9b item (around/after Build 10). Surfaced: arrival-preview mystery prompt, history-replay-should-be-full-animation, trailing leftovers. **LINK-ERA PIVOT SUBSTANTIALLY COMPLETE.** NEXT: Build 10 (onboarding + #6 name-persist). · ⭐ BUILD 10 DECISIONS LOCKED (Joshua, pre-build): governing principle = **friction-free for most + require info only WHEN IT'S USED** (path-split is a consequence, not a rule). NAME required at the **send-moment** (sender has one → satisfies #6; receiver not asked) + self-explaining copy + Apple pre-fill (never relied on; flow GUARANTEES display_name) + edit-per-message; no Contacts-for-name. LOCATION **don't force it** (felt-directionality not a receiver requirement now; Phase-3 live location makes manual moot → keep light). EDUCATION/showcase lives in **Settings**, OFFERED not forced (after first receive, or optional onboard screen). STILL OPEN: patch-vs-rebuild the paged TabView; 3-doors rendering; drop the sign-in myPairingCode mint. (Audit: `reports/build10_onboarding_audit.md`.) · ⭐ BUILD 10 DESIGN SESSION (decisions + REASONING banked): governing principle now = friction-free + require-when-used + TUTORIAL-AS-SETUP (refinement: honest upfront ask when no clear use-moment, e.g. notifications). Locked: NAME at send-moment (Apple .fullName pre-fill is trivial — already requested, just discarded), LOCATION 3-option (skip/type/use-current; "use current" = the Phase-3 on-ramp; sends carry NO location confirmed), SIGN-IN-FIRST for fresh installer (commitment momentum), unified first-open showcase (Demo Dan; link-arriver message-first then showcase-as-tap), education in Settings, notifications upfront, add-person Contacts-autofill (has-address → skip location), graceful exit safe (name lives at send), RETIRE the pairing code (half-dead/unredeemable → stop showing; full retirement = own audit-first task around B10), PATCH-not-rebuild trending. Prep-audit findings banked (no location in sends, mystery-prompt=arrival-preview [closed], no history delete, screen inventory reuse/relocate/delete). STILL OPEN: the link-arriver send-back path (last design piece) + patch-vs-rebuild._
 _Updated this session: Phase 2 progress + findings pass — builds 1–4b shipped & verified, per-person history-bucket finding (coupled to build 9), re-sequenced build order 5–11, onboarding + infrastructure notes banked._
 _Findings pass 2: builds 5–6 + display-name/shortCode fix DONE & device-verified; sharpened the build-9 bucket finding (pings-table vs messages-table seam); banked hint legibility, Sarah dev-seed, duplicate-users, onboarding-emoji, share-sheet, and send-sound-distortion notes._
 _Session lock-up: builds 5–9 (safe half) shipped & ledgered; CRITICAL link-send-`#if DEBUG` / delivery-backbone finding banked; bucket finding RESOLVED (sender-agnostic, local); 3 locked bucket decisions; back-half re-sequenced (11b cutover → 9b delivery-retire → 10 onboarding → 11 tests → 12 web → cleanup); build-9 left-intentionally flags + findings-pass-3 notes. CLAUDE.md: standing build patterns added._
@@ -1196,54 +1196,111 @@ the dead connection-code screen is removed + repositioned as part of THIS redesi
     **Sequence:** what is it for? → address vs. rough location? → required vs.
     contextual? → only then, how to fill.
 
-### ⭐ BUILD 10 — DECISIONS LOCKED (Joshua, pre-build)
-_Resolves the "for consideration" items above. Reference for the #6 root-cause + fix spec +
-the full touch-map: `reports/build10_onboarding_audit.md`._
+### ⭐ BUILD 10 — DECISIONS + REASONING (design session complete except the link-arriver path)
+_The full design session. Audit references: `reports/build10_onboarding_audit.md` (#6 root +
+touch-map) + `reports/build10_prep_audit.md` (open-fact verification + screen inventory)._
 
-**⭐ GOVERNING PRINCIPLE — FRICTION-FREE FOR MOST + require info only WHEN IT'S USED**
-(just-in-time / capture-at-point-of-use). The TEST for every onboarding field: *"is this needed
-for what they're about to do? if not, don't ask yet."* The **link-arriver-vs-fresh-installer
-PATH determines the TIMING automatically** (it determines what the user does first), so the
-path-split is a **CONSEQUENCE of the principle, not a separate rule.**
+**⭐ GOVERNING PRINCIPLE — friction-free for most + require info only WHEN IT'S USED
+(just-in-time) + TUTORIAL-AS-SETUP** (each setup step teaches its own *why*). **WHY:** the user
+already has the app, so setup can afford to educate — every ask doubles as "that's what this
+does." Field test: *"is this needed for what they're about to do?"* The
+**link-arriver-vs-fresh-installer PATH-SPLIT is a CONSEQUENCE of the principle** (it sets the
+timing), **not a separate rule.** **REFINEMENT:** require-when-used applies when there's a CLEAR
+use-moment; when there isn't one (notifications), an honest **upfront** ask is fine.
 
-1. **NAME — LOCKED:**
-   - **Required at the SEND-MOMENT** (when it's first used). A sender always has a name →
-     **satisfies #6**; a receiver/viewer is **NOT asked.** Path falls out automatically: **fresh
-     installer** (sends first) → asked in onboarding; **link-arriver** (receives first) →
-     **deferred to "send one back."**
-   - **Self-explaining copy at the ask:** *"Your name — this is how you'll show up on this notice
-     and all the ones you send. You won't need to do this again. (You can edit it on any message
-     if you want.)"*
-   - **Edit-per-message available** (per-recipient flexibility, invisible if unused).
-   - **Apple Sign-in name = a free PRE-FILL** when offered (one-tap confirm/edit), but **NEVER
-     relied on** (unreliable on reinstall/edit) — the flow still **GUARANTEES
-     `users.display_name`** (the #6 fix). **Do NOT use Contacts permission** to grab a name
-     (invasive; against the principle).
+**LOCKED DECISIONS (with reasoning):**
 
-2. **LOCATION — LOCKED: DON'T FORCE IT** (yours or a contact's). Two independent reasons:
-   - **(a) NOW:** location is more the **SENDER's felt directionality** (sending *toward* someone
-     they love) than a receiver requirement; setting a **CONTACT's** location = an intentional
-     loving act; one's **OWN** = optional; degrades gracefully (seeded bearing). Ask
-     **contextually** if/when the compass needs it — **never an entry toll.**
-   - **(b) PHASE 3:** location goes **LIVE** (real/actual "where people actually are") → manual
-     entry becomes **MOOT/obsolete.** So manual location is a temporary **Phase-2 bridge** —
-     don't force it AND **keep it LIGHT** (don't over-invest/polish a field Phase 3 supersedes).
-   - **STANDING:** watch real usage — if people actually care or struggle, revisit; **don't
-     pre-solve.**
+- **NAME — required at the SEND-MOMENT** (sender always has one → satisfies #6; receiver/viewer
+  not asked). **WHY:** the name travels in every message; null name = "Someone"/#6. Path falls
+  out: fresh installer (sends first) → asked in onboarding; link-arriver (receives first) →
+  deferred to "send one back." Self-explaining copy: *"Your name — how you'll show up on this
+  notice and all you send; won't ask again; edit on any message if you want."* Edit-per-message.
+  **Apple pre-fill:** sign-in ALREADY requests `.fullName` but discards it → Build 10 reads
+  `credential.fullName` at the callback to pre-fill (**TRIVIAL — verified**). Never relied on
+  (reinstall/edit) — the flow **GUARANTEES `users.display_name`**. **NO Contacts-for-name**
+  (invasive).
+- **LOCATION — DON'T FORCE.** Setup offers **THREE options: Skip** (seeded bearing,
+  friction-free default) / **Type in** / **Use current location** (one-time allow → real
+  coordinate). **WHY don't force:** (a) it's the SENDER's felt directionality (pointing toward a
+  loved one), not a receiver requirement — your own location is just the **ORIGIN** for the aim,
+  the part users care least about; (b) Phase-3 live location makes manual entry moot. **"Use
+  current location" = the first INCREMENT / on-ramp to Phase 3** (builds the permission +
+  get-coordinate plumbing now, one-time; Phase 3 extends to live). Backward-inference from a
+  send **RULED OUT** (a send carries at most direction, not DISTANCE → can't reconstruct a
+  location). **AUDIT-CONFIRMED: sends carry NO location at all** → a contact's location is a
+  local recipient-set act, never transmitted. Deny → seeded fallback. One location prompt
+  (primed), not per-time.
+- **SIGN-IN PLACEMENT — fresh installer: SIGN-IN FIRST**, then setup (name→location), then
+  showcase (provisional). **WHY:** get the small commitment early at peak download-intent
+  (**commitment momentum** — the rest becomes "continuing," not "deciding to start"); a fresh
+  installer already opted-in by downloading, so "value-first" (for cold traffic) doesn't apply.
+  **Link-arriver:** real message first → view/explore WITHOUT sign-in → sign-in only at "send
+  one back."
+- **SHOWCASE (Demo Dan / unified first-open) — ONE mechanism on first-app-open.** Fresh
+  installer: showcase demo (**provisional** — may dissolve into the tutorial-as-setup teaching;
+  don't over-invest). Link-arriver: their REAL message plays first, THEN the showcase is a **TAP**
+  (offered, not auto) — **WHY:** they came to read the message; nothing plays before they've read
+  it. **Demo Dan** = the empty-state placeholder, replaced once a real contact exists.
+- **EDUCATION — lives in Settings** ("How to Use / Optimize / Features / About"), offered not
+  forced (after a first receive, or an optional onboard screen). Showcase relocates here, out of
+  the gate.
+- **NOTIFICATIONS — keep UPFRONT** (as now): standard yes/no → Apple's screen, no custom copy.
+  **WHY:** no crisp just-in-time trigger (unlike location/contacts), so forcing a fake
+  just-in-time moment is worse than an honest upfront ask.
+- **ADD-PERSON FLOW — offer Contacts autofill** (name + address IF present). If the contact HAS
+  an address → **SKIP the location screen**; if NOT → prompt location (just-in-time, only when
+  missing). Contacts surfaces ONLY for users who add-a-person that way (an option, not a step).
+  **"Often-solution, not all-solution"** — common case frictionless, gap case asks; degrade
+  gracefully.
+- **GRACEFUL EXIT — link-arriver can "I'm good for now" and leave.** SAFE because the name
+  requirement lives at the SEND-moment — if they later send, they're caught then. Exit loses
+  nothing.
+- **PATCH-NOT-REBUILD — trending** (Build 10 = self-contained additive pieces: #6 fix,
+  first-open showcase, one-field setup, add-person flow). Audit-confirmed most screens REUSABLE.
+  The one thing a rebuild buys: the swipeable paged `TabView` is #6's swipe-bypass ROOT — a
+  non-paged flow dissolves it structurally. **STILL OPEN:** patch-the-paged-flow vs.
+  rebuild-non-paged.
+- **PAIRING-CODE — RETIRE IT.** **WHY:** audit confirms it's **HALF-DEAD** — show-your-code
+  works but ENTER-a-code-to-connect (redemption) was deleted in 9b → a shown code is
+  **UNREDEEMABLE** → the Settings "your code" is **misleading dead UI.** Not a failover; a
+  vestige. Build 10 should **STOP showing the code.** Full retirement (mint + Settings +
+  `connections` plumbing) = its **OWN audit-first task** (this area surprised us twice in 9b —
+  `myPairingCode` live, `connectedFriendID` load-bearing), sequenced **around** Build 10, NOT
+  blended into the onboarding rewrite. **Don't wire anything new to pairing codes.**
 
-3. **SHOWCASE / EDUCATION — LOCKED:** lives in **SETTINGS** as *"How to Use / Optimize /
-   Features / About"* (the explorable home — **showcase OUT of the gate**). **APPEARS =
-   OFFERED** (never forced): **after a new person receives a message** (a calm "learn more"
-   door), OR as an **optional** onboard screen for the fresh installer. Permanent home =
-   Settings; friction-free for those who just want to send/receive.
+**#6 NAME-PERSIST (the bug Build 10 fixes) — root + fix (audit-confirmed):** three causes —
+**(A)** the free-swipe paged TabView lets users swipe past the name screen → `saveAboutYou`
+never fires; **(B)** `finishToApp` only sets `hasCompletedOnboarding`, doesn't commit the
+profile; **(C)** the SERVER `display_name` write is gated on a geocoded address (optional) →
+name-only profile writes LOCAL `displayName` but leaves `users.display_name` NULL. `ensureUser`
+does NOT set `display_name` (confirmed). **TWO `display_name` stores split:** LOCAL
+(`people.profile.displayName`) feeds send/share/envelope; SERVER (`users.display_name`) feeds the
+PATH-1 push banner. **Fix:** write `display_name` UNCONDITIONALLY (not gated on geocode), don't
+let swipe bypass the commit, `finishToApp` guarantees it, + the Apple-name pre-fill. **Add a
+test** (none guards #6 today).
 
-**STILL OPEN (decide tomorrow, fresh — NOT resolved):**
-- ⭐ **STRUCTURAL:** patch the paged TabView in place **vs. REBUILD non-paged** (rebuild
-  structurally dissolves #6's swipe-bypass + the lingering field; the North-Star implies
-  rebuild; bigger lift).
-- **The 3-doors exact rendering** (sheet vs. screen; the graceful-exit copy).
-- **Drop the `myPairingCode()` sign-in mint now** (the post-9b code-gen tail) **vs. leave** for
-  that separate item.
+**AUDIT FINDINGS (`reports/build10_prep_audit.md`):**
+- Sends carry **NO location** (confirmed — contact location is local-set only).
+- **Mystery prompt = the ARRIVAL-PREVIEW feature** (sender-side post-send glimpse + the Settings
+  toggle; intentional, not a bug, not 9b). **Identified, closed.**
+- **NO received-history delete** exists (only a silent 50-item FIFO cap; the per-item delete is
+  for **CustomThought** templates, not history). TRUTH's PATH-1 save/delete/~30-day-fade is
+  **NOT built** → net-new feature if wanted (later, not Build 10).
+- Apple name already requested (`.fullName`) but discarded → pre-fill is **trivial** (read
+  `credential.fullName`).
+- **Screen inventory:** REUSE `signInScreen` (+fullName +display_name guarantee),
+  `aboutYouScreen` name field + `addressAutocompleteField`, the `InstrumentPreview` carousel (→
+  Settings). RELOCATE showcase/paywall/charity out of the gate (move the finish off
+  `givingScreen`). DELETE orphans (`compassScreen`/`thoughtScreen`/`proScreenSkins`/
+  `CompletionMoment` + `alignConcept`/`loopFlick` — delete screen+helper together) + the
+  `#if false` hero/yourCode/letsGo.
+
+**STILL OPEN (fresh head):**
+- ⭐ **#2 the LINK-ARRIVER send-back path** (full walkthrough: tap → read message → "send one
+  back" with name + sign-in framed as **REPLYING, not signing up**; absorbs the showcase-as-tap
+  + the reply-not-signup feel). **The last design piece.**
+- **Patch-vs-rebuild** structural call (lean **patch**; rebuild's one win = killing the
+  swipe-bypass).
 
 ### ⭐ WEB PAGE (Build 12) — BUILT · DEPLOYED · LIVE-TESTED ✅
 **STATUS:** the show-the-message page is **DONE and deployed** to the separate
