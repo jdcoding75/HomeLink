@@ -190,7 +190,12 @@ final class SupabaseService: ObservableObject {
     /// [1/4] Mirror YOUR profile into public.users — best-effort, so it no-ops
     /// silently on databases that haven't added the profile columns yet. Split
     /// into homogeneous updates to avoid a heterogeneous-JSON dependency.
-    func updateUserProfile(name: String, emoji: String, latitude: Double, longitude: Double) async {
+    /// [#6 fix C] lat/lng are now OPTIONAL — `display_name` + `emoji` are written
+    /// UNCONDITIONALLY (a name-only profile, no address, MUST still set display_name;
+    /// the geocode-gating was the root of the NULL-display_name / "Someone" bug). The
+    /// location update runs only when BOTH coordinates are present.
+    func updateUserProfile(name: String, emoji: String,
+                           latitude: Double? = nil, longitude: Double? = nil) async {
         guard let client, let me = await currentUserID else { return }
         do {
             try await client
@@ -198,11 +203,13 @@ final class SupabaseService: ObservableObject {
                 .update(["display_name": name, "emoji": emoji])
                 .eq("id", value: me.uuidString)
                 .execute()
-            try await client
-                .from("users")
-                .update(["latitude": latitude, "longitude": longitude])
-                .eq("id", value: me.uuidString)
-                .execute()
+            if let latitude, let longitude {
+                try await client
+                    .from("users")
+                    .update(["latitude": latitude, "longitude": longitude])
+                    .eq("id", value: me.uuidString)
+                    .execute()
+            }
         } catch {
             log.warning("profile: users mirror skipped (columns missing?) — \(error.localizedDescription, privacy: .public)")
         }

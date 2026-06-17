@@ -32,6 +32,9 @@ struct OnboardingView: View {
 
     // Screen 6 — the form
     @State private var name:  String = ""
+    // [#6 fix] last name committed via commitProfile() — makes the commit idempotent
+    // across the button path, commit-on-leave, and finishToApp (skips redundant writes).
+    @State private var lastCommittedName: String = ""
     @State private var emoji: String = "❤️"
     @State private var addressText: String = ""
     @StateObject private var autocomplete = AddressAutocompleteService()
@@ -72,6 +75,18 @@ struct OnboardingView: View {
                 }
                 .tabViewStyle(.page(indexDisplayMode: .never))
                 .animation(.easeInOut(duration: 0.4), value: page)
+                // [#6 fix A] COMMIT-ON-LEAVE: the page TabView is free-swipeable, so a user
+                // can swipe past the name step without tapping "continue →". Whenever we
+                // LEAVE the name page (old == 1), commit the profile (idempotent) so a typed
+                // name is never lost to a swipe — and dismiss the keyboard so the field
+                // doesn't linger across the page transition (#6 cause 4).
+                .onChange(of: page) { old, _ in
+                    if old == 1 {
+                        commitProfile()
+                        UIApplication.shared.sendAction(
+                            #selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+                    }
+                }
 
                 pageDots
                     .padding(.bottom, 14)
@@ -339,6 +354,19 @@ struct OnboardingView: View {
                   let idToken = String(data: tokenData, encoding: .utf8) else {
                 signInError = "Sign in didn't complete — try again."
                 return
+            }
+            // [build10] Apple offers `fullName` only on the FIRST authorization (the
+            // `.fullName` scope is requested above). PRE-FILL the name field with it
+            // (one-tap confirm/edit on the next step) — only when the field is empty, so
+            // a user edit is never clobbered. NEVER relied on (nil on reinstall/edit);
+            // the #6 fix still GUARANTEES display_name regardless.
+            if name.trimmingCharacters(in: .whitespaces).isEmpty,
+               let full = credential.fullName {
+                let assembled = [full.givenName, full.familyName]
+                    .compactMap { $0?.trimmingCharacters(in: .whitespaces) }
+                    .filter { !$0.isEmpty }
+                    .joined(separator: " ")
+                if !assembled.isEmpty { name = assembled }
             }
             signInBusy = true
             signInError = nil
@@ -871,25 +899,33 @@ struct OnboardingView: View {
         }
     }
 
-    /// Save YOUR profile to SwiftData (+ mirror to Supabase), request the
-    /// natural permissions, then advance to your code.
-    private func saveAboutYou() {
+    /// [#6 fix] Commit the profile — LOCAL save + the SERVER `display_name` write,
+    /// UNCONDITIONALLY (a name guarantees `users.display_name`, address or not). Idempotent
+    /// via `lastCommittedName` (re-runs only when the name changed) so the button path +
+    /// commit-on-leave + finishToApp can all call it without redundant writes. The #6 root
+    /// was the server write being gated on a geocoded address (`if let geocoded`) — gone.
+    private func commitProfile() {
         let trimmed = name.trimmingCharacters(in: .whitespaces)
-        guard !trimmed.isEmpty else { return }
+        guard !trimmed.isEmpty, trimmed != lastCommittedName else { return }
+        lastCommittedName = trimmed
 
         var geocoded: GeocodedLocation? = nil
         if case .success(let location) = geocodeState { geocoded = location }
-        people.saveProfile(name: trimmed, emoji: emoji, geocoded: geocoded)
+        people.saveProfile(name: trimmed, emoji: emoji, geocoded: geocoded)   // LOCAL
 
-        // Mirror to Supabase users (best-effort) when a location was set.
-        if let geocoded {
-            Task {
-                await SupabaseService.shared.updateUserProfile(
-                    name: trimmed, emoji: emoji,
-                    latitude: geocoded.coordinate.latitude,
-                    longitude: geocoded.coordinate.longitude)
-            }
+        // SERVER mirror — display_name + emoji ALWAYS; lat/lng only when geocoded.
+        Task {
+            await SupabaseService.shared.updateUserProfile(
+                name: trimmed, emoji: emoji,
+                latitude: geocoded?.coordinate.latitude,
+                longitude: geocoded?.coordinate.longitude)
         }
+    }
+
+    /// Save YOUR profile, request the natural permissions, then advance.
+    private func saveAboutYou() {
+        guard !name.trimmingCharacters(in: .whitespaces).isEmpty else { return }
+        commitProfile()   // [#6 fix C] writes display_name unconditionally
 
         // Permissions, at the natural moment.
         locationManager.requestWhenInUseAuthorization()
@@ -1133,6 +1169,7 @@ struct OnboardingView: View {
     }
 
     private func finishToApp() {
+        commitProfile()   // [#6 fix B] guarantee any typed name is committed before finishing
         hasCompletedOnboarding = true
     }
 
