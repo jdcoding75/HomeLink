@@ -46,8 +46,12 @@ struct IncomingMessageView: View {
     // [phase2 build5] Auto-create the sender as a contact on a valid message.
     @EnvironmentObject var people:  PeopleManager
 
-    private enum Phase { case incoming, receipt, landing, notFound }
+    private enum Phase { case incoming, receipt, landing, composeBack, notFound }
     @State private var phase: Phase = .incoming
+    // [build10 shot2] Guest entry: a link-arriver who taps a landing door enters the
+    // app WITHOUT the fresh-installer onboarding. RootView routes on this flag
+    // (alongside hasCompletedOnboarding). Never set on the fresh-installer path.
+    @AppStorage("enteredViaLink") private var enteredViaLink = false
     @State private var message: Message? = nil
     @State private var flipGate = OpenedFlipGate()
     @State private var started = false
@@ -93,20 +97,71 @@ struct IncomingMessageView: View {
                 if let message {
                     LinkArriverLandingView(
                         senderName: resolvedSenderName(for: message),
-                        onSendBack: {
-                            // TODO (Shot 2): real compose-straight-back to the sender.
-                            // Placeholder: dismiss into the app + open the compass (the
-                            // existing send surface). markAllMyPingsOpened etc. unaffected.
-                            NotificationCenter.default.post(name: .pointwardOpenCompass, object: nil)
-                            onFinished()
-                        },
-                        onDismiss: { onFinished() }            // ← quiet exit (the old behavior)
+                        onSendBack: { beginComposeBack(for: message) },   // door 1 → reply
+                        onDismiss:  { enterAppAsGuest() }                 // door 3 → quiet guest entry
+                    )
+                    .transition(.opacity)
+                }
+            // [build10 shot2] COMPOSE-BACK (door 1, signed-out arriver): minimal identity
+            // (sign-in + name) before replying. A signed-IN arriver skips this — see
+            // beginComposeBack(). The arrival sequence above is untouched.
+            case .composeBack:
+                if let message {
+                    ComposeBackView(
+                        senderName: resolvedSenderName(for: message),
+                        onEntered: { enterAppComposing(with: message) }
                     )
                     .transition(.opacity)
                 }
             }
         }
         .onAppear { begin() }
+    }
+
+    // MARK: - [build10 shot2] Landing door routing
+
+    /// Door 3 — "I'm good for now": enter the app as a guest (NOT the onboarding
+    /// gate). hasCompletedOnboarding is deliberately NOT set — they never onboarded;
+    /// enteredViaLink routes them into MainTabView. The sender already exists as an
+    /// auto-created contact (from the arrival), so they land pointing back at them.
+    private func enterAppAsGuest() {
+        enteredViaLink = true
+        onFinished()
+    }
+
+    /// Door 1 — "Send one back to [Name]". Signed-IN arriver replies immediately
+    /// (no sign-in/name step needed — they already have an identity). Signed-OUT
+    /// arriver goes through ComposeBackView (sign-in + name) first.
+    private func beginComposeBack(for message: Message) {
+        if SupabaseService.localUserID != nil {
+            enterAppComposing(with: message)
+        } else {
+            withAnimation(.easeInOut(duration: 0.4)) { phase = .composeBack }
+        }
+    }
+
+    /// Enter the app COMPOSING a reply: select the sender as the compass target,
+    /// fire the fill-via-link aim (read the sender's stored location → real bearing,
+    /// else leave seeded), mark the guest flag, and dismiss into the app.
+    private func enterAppComposing(with message: Message) {
+        let sid = message.senderID.uuidString
+        if let sender = people.person(forSenderID: sid) {   // auto-created at arrival
+            people.select(sender)
+            compass.start(tracking: sender)
+        }
+        // FILL-VIA-LINK: pull the sender's stored coords (when set) so the compass
+        // aims at the REAL sender; null/zero → the seeded bearing stands.
+        Task {
+            if let profile = await SupabaseService.shared.fetchPublicProfile(of: message.senderID),
+               let updated = people.applySenderLocation(senderID: sid,
+                                                         latitude: profile.latitude,
+                                                         longitude: profile.longitude) {
+                await MainActor.run { compass.start(tracking: updated) }   // re-aim with real coords
+            }
+        }
+        enteredViaLink = true
+        NotificationCenter.default.post(name: .pointwardOpenCompass, object: nil)
+        onFinished()
     }
 
     // MARK: - The incoming beat (envelope, before it opens)

@@ -204,11 +204,13 @@ enum DevTools {
         SupabaseService.connectedFriendID = nil
         UserDefaults.standard.removeObject(forKey: injectFlagKey)
         UserDefaults.standard.set(false, forKey: "hasCompletedOnboarding")
+        UserDefaults.standard.set(false, forKey: "enteredViaLink")   // [build10 shot2]
     }
 
     /// Show onboarding again but KEEP existing data.
     static func clearOnboardingFlagOnly() {
         UserDefaults.standard.set(false, forKey: "hasCompletedOnboarding")
+        UserDefaults.standard.set(false, forKey: "enteredViaLink")   // [build10 shot2]
     }
 
     // ── [4/5] Surgical local wipe ────────────────────────────────────────
@@ -222,6 +224,7 @@ enum DevTools {
         "connectedFriendID",        // the paired friend
         "pairingCode",              // pairing data
         "hasCompletedOnboarding",   // onboarding flag
+        "enteredViaLink",           // [build10 shot2] link-arriver guest entry flag
         "apnsDeviceToken",          // device push token
         "seenPingIDs",              // received-thought ledger
         "pendingThoughtQueue",      // unread bucket queue

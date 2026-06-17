@@ -1086,6 +1086,36 @@ final class SupabaseService: ObservableObject {
             .execute()
     }
 
+    // [build10 shot2] FILL-VIA-LINK — a connected user's PUBLIC profile, read by id.
+    // Same wide-open `users` SELECT (RLS `using(true)`) the `fetchLastSeen(of:)` read
+    // below already relies on — just more columns. Used by the link-arriver compose-back
+    // to aim the compass back at the SENDER (sender_id from the arrived message).
+    // latitude/longitude are OPTIONAL (Home Location is optional → often null) — the
+    // caller falls through to the seeded bearing when absent. Read-only, best-effort.
+    nonisolated struct PublicProfile: Decodable {
+        let displayName: String?
+        let emoji: String?
+        let latitude: Double?
+        let longitude: Double?
+        enum CodingKeys: String, CodingKey {
+            case displayName = "display_name"
+            case emoji
+            case latitude
+            case longitude
+        }
+    }
+
+    func fetchPublicProfile(of user: UUID) async -> PublicProfile? {
+        guard let client else { return nil }
+        let rows: [PublicProfile]? = try? await client
+            .from("users")
+            .select("display_name, emoji, latitude, longitude")
+            .eq("id", value: user.uuidString)
+            .limit(1)
+            .execute().value
+        return rows?.first
+    }
+
     /// A partner's last_seen, for "active recently / last seen 2 hours ago".
     func fetchLastSeen(of user: UUID) async -> Date? {
         struct Row: Codable {

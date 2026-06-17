@@ -248,6 +248,22 @@ final class PeopleManager: ObservableObject {
         return person
     }
 
+    /// [build10 shot2] FILL-VIA-LINK: stamp a known location onto the auto-created
+    /// SENDER contact so the compose-back compass can aim at the REAL sender (instead
+    /// of the seeded bearing). Coordinates come from `users[sender_id]` (read via
+    /// SupabaseService.fetchPublicProfile) — present only when that user set a Home
+    /// Location. No-op when the contact is missing or the coords are absent/zero
+    /// (the caller leaves the seeded bearing). Returns the updated contact.
+    @discardableResult
+    func applySenderLocation(senderID: String, latitude: Double?, longitude: Double?) -> Person? {
+        guard let lat = latitude, let lng = longitude, !(lat == 0 && lng == 0) else { return nil }
+        guard let person = person(forSenderID: senderID) else { return nil }
+        person.latitude  = lat
+        person.longitude = lng
+        try? save()
+        return person
+    }
+
     /// [phase2 stage A] (S1) Record that a sent link's message went to a local
     /// contact — `messageID → personID`. Stage B/C reads this to map a returned
     /// connection back to the right contact and stamp its `senderID` (no duplicate).

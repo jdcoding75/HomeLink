@@ -24,6 +24,12 @@ struct RootView: View {
     @EnvironmentObject var instrumentStore: InstrumentStore
 
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
+    // [build10 shot2] A link-arriver who taps a landing door ("I'm good for now" /
+    // "Send one back") enters the app WITHOUT running the fresh-installer onboarding
+    // tour. This guest flag lets RootView route them into MainTabView past the
+    // onboarding gate. It is SEPARATE from hasCompletedOnboarding (they never onboarded);
+    // set only by the post-link-arrival landing, never by the fresh-installer path.
+    @AppStorage("enteredViaLink") private var enteredViaLink = false
 
     @Environment(\.modelContext) private var modelContext
 
@@ -59,9 +65,12 @@ struct RootView: View {
     var body: some View {
         ZStack {
             Group {
-                if hasCompletedOnboarding {
+                if hasCompletedOnboarding || enteredViaLink {
                     // Even with no people (e.g. all deleted), stay in the main app —
                     // CompassView shows a warm empty state instead of re-running onboarding.
+                    // [build10 shot2] `enteredViaLink` lets a link-arriver in without the
+                    // onboarding tour (verified safe: the main app tolerates a not-onboarded,
+                    // unauthenticated user — empty state / sender-pointing, no crash).
                     MainTabView(geocodingService: appEnv.geocodingService)
                 } else {
                     OnboardingView(geocodingService: appEnv.geocodingService)
