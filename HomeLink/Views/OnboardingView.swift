@@ -61,17 +61,18 @@ struct OnboardingView: View {
                 // [1/4] NEW ORDER: hero · sign in · about you (self profile) ·
                 // your code · instruments · pro · giving · let's go.
                 TabView(selection: $page) {
-                    // [build10 first-pass] trimmed 8 → 5 screens, re-indexed 0–4.
-                    // CUT: hero (merged into sign-in bg), yourCode (pairing-era),
-                    // letsGo (dead "all set"). See reports/onboarding_removal_audit.md.
-                    // heroScreen.tag(0)
+                    // [build10 shot3a] trimmed to 3 screens, re-indexed 0–2.
+                    // CUT earlier: hero (merged into sign-in bg), yourCode (pairing-era),
+                    // letsGo (dead "all set"). CUT now (shot3a): proScreen (paywall) +
+                    // givingScreen (charity) — out of the launch flow (paywall fires
+                    // contextually; charity is post-launch). Their view code is kept
+                    // dormant (#if false) for later relocation. instrumentsScreen is now
+                    // the LAST step → finishes to the app.
                     signInScreen.tag(0)        // sign in before your profile (now first; compass bg)
                     aboutYouScreen.tag(1)      // YOUR profile
-                    // yourCodeScreen.tag(3)   // CUT — pairing-era connection code
-                    instrumentsScreen.tag(2)
-                    proScreen.tag(3)
-                    givingScreen.tag(4)
-                    // letsGoScreen.tag(7)     // CUT — dead "you're all set"; giving now finishes
+                    instrumentsScreen.tag(2)   // showcase — now the LAST step (finishes)
+                    // proScreen.tag(3)        // CUT (shot3a) — paywall out of flow (dormant #if false)
+                    // givingScreen.tag(4)     // CUT (shot3a) — charity out of flow (dormant #if false)
                 }
                 .tabViewStyle(.page(indexDisplayMode: .never))
                 .animation(.easeInOut(duration: 0.4), value: page)
@@ -92,9 +93,9 @@ struct OnboardingView: View {
                     .padding(.bottom, 14)
             }
 
-            // Skip — only the showcase screens (instruments · pro · giving)
-            // jump to the finish. The profile screen carries its own. [build10: re-indexed 2…4 → finish]
-            if (2...4).contains(page) {
+            // Skip — only the showcase screen (instruments) jumps to the finish.
+            // The profile screen carries its own. [build10 shot3a: pro/giving cut → only page 2]
+            if page == 2 {
                 VStack {
                     HStack {
                         Spacer()
@@ -146,7 +147,7 @@ struct OnboardingView: View {
 
     private var pageDots: some View {
         HStack(spacing: 7) {
-            ForEach(0..<5, id: \.self) { i in   // [build10] 8 → 5 screens
+            ForEach(0..<3, id: \.self) { i in   // [build10 shot3a] → 3 screens
                 Circle()
                     .fill(i == page ? Self.lavender : DesignTokens.Color.borderMid)
                     .frame(width: i == page ? 7 : 5, height: i == page ? 7 : 5)
@@ -168,82 +169,14 @@ struct OnboardingView: View {
         .frame(width: size, height: size)
     }
 
-    // MARK: - Screen 1 · Hero
+    // MARK: - Screen 1 · Hero  [build10 — CUT, merged into the sign-in background]
 
+    // [build10 first-pass] "Begin" splash CUT — its compass moved to the sign-in
+    // screen's background (one fewer tap; the emotional compass survives). Only
+    // `heroBearing` survives — it is REUSED by the sign-in background compass.
+    // [shot3a] The dead `#if false` heroScreen view + heroBreath/heroTagline/heroButton
+    // state were hard-deleted (dead pairing/first-pass scaffold, zero live refs).
     @State private var heroBearing: Double = 150
-    @State private var heroBreath  = false
-    @State private var heroTagline = false
-    @State private var heroButton  = false
-
-    // [build10 first-pass] "Begin" splash CUT — its compass moves to the sign-in
-    // screen's background (one fewer tap; the emotional compass survives). The
-    // `heroBearing` @State is reused by the sign-in background. Reversible via #if.
-    #if false
-    private var heroScreen: some View {
-        VStack(spacing: 0) {
-            Spacer()
-
-            ZStack {
-                Circle()
-                    .fill(Self.glow.opacity(heroBreath ? 0.30 : 0.16))
-                    .frame(width: 300, height: 300)
-                    .blur(radius: 38)
-                miniCompass(skin: .vintage, bearing: heroBearing,
-                            locked: heroButton, size: 280)
-            }
-
-            Text("Pointward")
-                .font(.system(size: 40, weight: .semibold, design: .serif))
-                .foregroundColor(DesignTokens.Color.textPrimary)
-                .padding(.top, 18)
-
-            VStack(spacing: 3) {
-                Text("your emotional instrument")
-                    .font(.system(size: 15, design: .serif).italic())
-                    .foregroundColor(Self.lavender)
-                Text("point toward the people you love")
-                    .font(.system(size: 12, design: .serif).italic())
-                    .foregroundColor(Self.lavender.opacity(0.7))
-            }
-            .opacity(heroTagline ? 1 : 0)
-            .padding(.top, 6)
-            // (previous: "a compass for the people you love")
-
-            Spacer()
-
-            Button {
-                withAnimation(.easeInOut(duration: 0.4)) { page = 1 }
-            } label: {
-                Text("begin →")
-                    .font(DesignTokens.Font.label)
-                    .foregroundColor(DesignTokens.Color.textPrimary)
-                    .padding(.horizontal, 44)
-                    .padding(.vertical, 14)
-                    .background(DesignTokens.Color.accentStrong)
-                    .cornerRadius(DesignTokens.Radius.button)
-            }
-            .opacity(heroButton ? 1 : 0)
-            .padding(.bottom, 40)
-        }
-        .onAppear {
-            withAnimation(.easeInOut(duration: 2.2).repeatForever(autoreverses: true)) {
-                heroBreath = true
-            }
-            // The needle wanders, then settles NNW
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
-                withAnimation(.spring(response: 1.8, dampingFraction: 0.55)) {
-                    heroBearing = -22.5   // NNW
-                }
-            }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                withAnimation(.easeIn(duration: 0.8)) { heroTagline = true }
-            }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-                withAnimation(.easeIn(duration: 0.7)) { heroButton = true }
-            }
-        }
-    }
-    #endif
 
     // MARK: - Screen 1 · Sign in with Apple (now first; carries the compass bg)
 
@@ -471,7 +404,7 @@ struct OnboardingView: View {
 
             Spacer()
 
-            nextButton
+            finishButton   // [build10 shot3a] instruments is now the LAST step → finish to the app
         }
         .onAppear { cycleInstruments() }
     }
@@ -487,151 +420,20 @@ struct OnboardingView: View {
         }
     }
 
-    // MARK: - Screen 2 (previous) · The compass — superseded, kept
+    // [build10 shot3a] Screen 2 (previous) "the compass" — orphaned (defined-but-
+    // unmounted) showcase concept + its sole-use alignConcept() helper + conceptRight/
+    // conceptLocked state — HARD-DELETED (grep-confirmed zero live refs).
 
-    @State private var conceptRight: Double = 200
-    @State private var conceptLocked = false
+    // [build10 shot3a] Screen 3 (previous) "send a thought / the flick" — orphaned
+    // (defined-but-unmounted) demo + its sole-use loopFlick() helper + flickPressed/
+    // flickProgress state — HARD-DELETED (grep-confirmed zero live refs).
 
-    private var compassScreen: some View {
-        VStack(spacing: 0) {
-            Spacer()
-
-            // The real behavior: the face is fixed (N at top), only the
-            // needle moves — it finds the person and settles.
-            ZStack {
-                SkinFaceView(skin: .minimal, bearing: conceptRight, locked: conceptLocked,
-                             quietMode: false, pingRingActive: false)
-                NeedleView(bearing: conceptRight, skin: .minimal, locked: conceptLocked)
-            }
-            .frame(width: 240, height: 240)
-            .scaleEffect(190.0 / 240.0)
-            .frame(width: 190, height: 190)
-            .shadow(color: Self.glow.opacity(conceptLocked ? 0.45 : 0), radius: 22)
-
-            Text("your compass always knows which way")
-                .font(.system(size: 26, weight: .semibold, design: .serif))
-                .foregroundColor(DesignTokens.Color.textPrimary)
-                .padding(.top, 36)
-
-            Text("point your compass toward\nthe people that matter")
-                .font(.system(size: 14, design: .serif).italic())
-                .foregroundColor(Self.lavender.opacity(0.85))
-                .multilineTextAlignment(.center)
-                .padding(.top, 8)
-
-            Spacer()
-
-            nextButton
-        }
-        .onAppear { alignConcept() }
-    }
-
-    private func alignConcept() {
-        conceptLocked = false
-        conceptRight = Double.random(in: -120 ... -40)
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.7) {
-            withAnimation(.spring(response: 1.6, dampingFraction: 0.6)) {
-                conceptRight = 40   // the needle finds them and settles
-            }
-        }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.9) {
-            withAnimation(.easeIn(duration: 0.5)) { conceptLocked = true }
-        }
-        // Loop the moment
-        DispatchQueue.main.asyncAfter(deadline: .now() + 4.5) {
-            if page == 1 && !showCompletion { alignConcept() }
-        }
-    }
-
-    // MARK: - Screen 3 · Send a thought (the flick — most visual mechanic)
-
-    @State private var flickPressed = false
-    @State private var flickProgress: CGFloat = 0
-
-    private var thoughtScreen: some View {
-        VStack(spacing: 0) {
-            Spacer()
-
-            // The flick, staged: 💜 waits in its pocket, gets pressed,
-            // then launches across the stage on a curve with a trail
-            ZStack {
-                let start   = CGSize(width: -60, height: 80)
-                let end     = CGSize(width: 120, height: -150)
-                let control = CGSize(width: 10, height: -190)
-
-                // The pocket — where the thought is loaded
-                Capsule()
-                    .fill(DesignTokens.Color.backgroundCard)
-                    .frame(width: 56, height: 22)
-                    .overlay(Capsule().stroke(DesignTokens.Color.borderMid, lineWidth: 1))
-                    .offset(x: start.width, y: start.height + 16)
-
-                // The fingertip beneath, pressing
-                Circle()
-                    .fill(Color(hex: "#ece4f5").opacity(0.6))
-                    .frame(width: 18, height: 18)
-                    .offset(x: start.width, y: start.height + (flickPressed ? 12 : 16))
-                    .animation(.easeInOut(duration: 0.25), value: flickPressed)
-
-                // Trail — soft lavender circles hanging on the path
-                ForEach(0..<6, id: \.self) { i in
-                    Circle()
-                        .fill(Self.lavender.opacity(0.35))
-                        .frame(width: 8, height: 8)
-                        .blur(radius: 2)
-                        .opacity(flickProgress > 0 ? 1 - Double(flickProgress) * 0.9 : 0)
-                        .modifier(CurvedFlightEffect(progress: flickProgress, start: start,
-                                                     control: control, end: end))
-                        .animation(AnimationSystem.easeOutCubic(0.9)
-                                    .delay(0.05 * Double(i + 1)), value: flickProgress)
-                }
-
-                // The thought itself
-                Text("💜")
-                    .font(.system(size: 30))
-                    .scaleEffect(flickPressed ? 0.82 : 1.0)
-                    .scaleEffect(1 + flickProgress * 0.5)   // grows as it travels
-                    .opacity(1 - Double(flickProgress) * 0.85)
-                    .shadow(color: Self.glow.opacity(0.8), radius: 10)
-                    .modifier(CurvedFlightEffect(progress: flickProgress, start: start,
-                                                 control: control, end: end))
-                    .animation(.easeInOut(duration: 0.25), value: flickPressed)
-                    .animation(AnimationSystem.easeOutCubic(0.9), value: flickProgress)
-            }
-            .frame(height: 250)
-
-            Text("load · aim · launch")
-                .font(.system(size: 26, weight: .semibold, design: .serif))
-                .foregroundColor(DesignTokens.Color.textPrimary)
-                .padding(.top, 26)
-
-            Text("pro instruments unlock new ways to send")
-                .font(.system(size: 14, design: .serif).italic())
-                .foregroundColor(Self.lavender.opacity(0.85))
-                .padding(.top, 8)
-
-            Spacer()
-
-            nextButton
-        }
-        .onAppear { loopFlick() }
-    }
-
-    private func loopFlick() {
-        var snap = Transaction(); snap.disablesAnimations = true
-        withTransaction(snap) { flickProgress = 0; flickPressed = false }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { flickPressed = true }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.1) {
-            flickPressed = false
-            flickProgress = 1
-        }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 3.2) {
-            if page == 3 && !showCompletion { loopFlick() }
-        }
-    }
-
-    // MARK: - Screen 4 · Pro teaser
-
+    // MARK: - Screen 4 · Pro teaser  [build10 shot3a — CUT from the launch flow]
+    // Paywall removed from onboarding (free/open at launch; the paywall fires
+    // contextually at premium-instrument use). The view is kept DORMANT (#if false,
+    // reversible) for that relocation — its InstrumentPreview content is reused later.
+    // proScreenSkins (orphan skins variant, never mounted) was HARD-DELETED.
+    #if false
     private var proScreen: some View {
         VStack(spacing: 0) {
             Spacer()
@@ -673,28 +475,14 @@ struct OnboardingView: View {
             nextButton
         }
     }
+    #endif
 
-    // (previous Pro teaser — three compass skins — superseded, kept)
-    private var proScreenSkins: some View {
-        VStack(spacing: 0) {
-            HStack(alignment: .center, spacing: 16) {
-                miniCompass(skin: .minimal, bearing: -22.5, size: 92)
-                    .shadow(color: Self.glow.opacity(0.3), radius: 12)
-                miniCompass(skin: .vintage, bearing: -22.5, locked: true, size: 132)
-                    .shadow(color: Self.glow.opacity(0.5), radius: 18)
-                miniCompass(skin: .heart, bearing: -22.5, size: 92)
-                    .shadow(color: Self.glow.opacity(0.3), radius: 12)
-            }
-            Text("funny distances · custom emojis ·\nhold to send · and the gecko 🦎")
-                .font(.system(size: 14, design: .serif).italic())
-                .foregroundColor(Self.lavender.opacity(0.85))
-                .multilineTextAlignment(.center)
-                .padding(.top, 8)
-        }
-    }
-
-    // MARK: - Screen 5 · Giving back
-
+    // MARK: - Screen 5 · Giving back  [build10 shot3a — CUT from the launch flow]
+    // Charity removed from onboarding (post-launch concern). The view + givingBreath
+    // state are kept DORMANT (#if false, reversible) for a later relocation
+    // (Settings/Giving). finishButton (used here previously) now lives on the
+    // instruments screen — the new last step — and stays compiled/live.
+    #if false
     @State private var givingBreath = false
 
     private var givingScreen: some View {
@@ -731,7 +519,7 @@ struct OnboardingView: View {
 
             Spacer()
 
-            finishButton   // [build10] giving is now the LAST screen → finish to the app
+            finishButton
         }
         .onAppear {
             withAnimation(.easeInOut(duration: 2.4).repeatForever(autoreverses: true)) {
@@ -739,11 +527,12 @@ struct OnboardingView: View {
             }
         }
     }
+    #endif
 
     // MARK: - Screen 3 · About you (YOUR profile)
 
-    @State private var codeReady: String? = nil
-    @State private var codeBusy = false
+    // [build10 shot3a] codeReady/codeBusy state HARD-DELETED — used only by the
+    // (now-deleted) yourCodeScreen pairing-code screen.
 
     private var aboutYouScreen: some View {
         ScrollView {
@@ -773,7 +562,7 @@ struct OnboardingView: View {
                     // EmojiPickerRow(selected: $emoji)
 
                     // Where you are — MKLocalSearch autocomplete
-                    fieldLabel("where you are")
+                    fieldLabel("Home Location")   // [build10 shot3a] relabel (was "where you are")
                     addressAutocompleteField
 
                     Text("your location lets people you connect with point\ntoward you — share only what you're comfortable with")
@@ -941,175 +730,15 @@ struct OnboardingView: View {
         withAnimation(.easeInOut(duration: 0.4)) { page = 2 }   // [build10] → instruments (yourCode cut)
     }
 
-    // MARK: - Screen · Your connection code  [build10 CUT — pairing-era, link model]
-    // The whole screen + its mint/share helpers are stripped (reversible via #if).
-    // createProfileInvite / setProfileCode / pairLink become orphaned — left for the
-    // pairing-data cleanup pass.
-    #if false
-    private var yourCodeScreen: some View {
-        VStack(spacing: 0) {
-            Spacer()
+    // [build10 shot3a] Screen "Your connection code" (pairing-era) + its mint/share
+    // helpers (shareCodeMessage / mintCodeIfNeeded, the latter holding the dangling
+    // createProfileInvite call) — HARD-DELETED. Was dead `#if false`; the link model
+    // replaced the connection-code screen. (The live pairing-code-gen subsystem —
+    // myPairingCode on sign-in — is a SEPARATE concern, untouched here.)
 
-            Text("your connection code ✦")
-                .font(.system(size: 27, weight: .semibold, design: .serif))
-                .foregroundColor(DesignTokens.Color.textPrimary)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, 24)
-
-            Text("share this with people you love")
-                .font(.system(size: 14, design: .serif).italic())
-                .foregroundColor(Self.lavender.opacity(0.85))
-                .padding(.top, 8)
-                .padding(.bottom, 30)
-
-            // The code, big, on a soft lavender card
-            ZStack {
-                RoundedRectangle(cornerRadius: 18)
-                    .fill(Self.lavender.opacity(0.10))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 18)
-                            .stroke(Self.lavender.opacity(0.45), lineWidth: 1)
-                    )
-                    .shadow(color: Self.glow.opacity(0.3), radius: 14)
-
-                if let code = codeReady {
-                    Text(code.replacingOccurrences(of: "-", with: " · "))
-                        .font(.system(size: 34, weight: .semibold, design: .monospaced))
-                        .foregroundColor(DesignTokens.Color.textPrimary)
-                        .minimumScaleFactor(0.6)
-                        .lineLimit(1)
-                        .padding(.horizontal, 20)
-                } else if codeBusy {
-                    ProgressView().tint(Self.lavender)
-                } else {
-                    Text("sign in to get your code")
-                        .font(.system(size: 14, design: .serif).italic())
-                        .foregroundColor(DesignTokens.Color.textMuted)
-                }
-            }
-            .frame(height: 100)
-            .padding(.horizontal, 36)
-
-            // Share
-            if let code = codeReady {
-                ShareLink(item: Self.shareCodeMessage(code: code)) {
-                    HStack(spacing: 8) {
-                        Text("📱")
-                        Text("share my code")
-                    }
-                    .font(DesignTokens.Font.label)
-                    .foregroundColor(DesignTokens.Color.textPrimary)
-                    .frame(maxWidth: .infinity)
-                    .padding(DesignTokens.Spacing.md)
-                    .background(DesignTokens.Color.accentStrong)
-                    .cornerRadius(DesignTokens.Radius.button)
-                }
-                .padding(.horizontal, 36)
-                .padding(.top, 26)
-            }
-
-            Spacer()
-
-            Button {
-                withAnimation(.easeInOut(duration: 0.4)) { page = 4 }
-            } label: {
-                Text(codeReady == nil ? "continue →" : "I'll share later →")
-                    .font(.system(size: 14))
-                    .foregroundColor(DesignTokens.Color.textMuted)
-            }
-            .padding(.bottom, 10)
-
-            Text("you can always find your code in Settings")
-                .font(.system(size: 11, design: .serif).italic())
-                .foregroundColor(DesignTokens.Color.textDim)
-                .padding(.bottom, 36)
-        }
-        .onAppear { mintCodeIfNeeded() }
-    }
-
-    /// The pre-filled share message for your code.
-    private static func shareCodeMessage(code: String) -> String {
-        "come find me on Pointward ✦ 🧭\n\(AppLinks.pairLink(code: code))"
-    }
-
-    /// Mint YOUR connection code, carrying your profile, once signed in.
-    private func mintCodeIfNeeded() {
-        guard codeReady == nil, !codeBusy else { return }
-        guard SupabaseService.localUserID != nil else { return }   // offline → no code
-        codeBusy = true
-        Task {
-            defer { codeBusy = false }
-            let profile = people.profile
-            let lat = (profile?.hasLocation == true) ? profile?.latitude : nil
-            let lng = (profile?.hasLocation == true) ? profile?.longitude : nil
-            do {
-                let code = try await SupabaseService.shared.createProfileInvite(
-                    name: profile?.displayName ?? name.trimmingCharacters(in: .whitespaces),
-                    emoji: profile?.emoji ?? emoji,
-                    latitude: lat, longitude: lng)
-                codeReady = code
-                people.setProfileCode(code)
-            } catch {
-                // Stays on "sign in to get your code"; not fatal to onboarding.
-            }
-        }
-    }
-    #endif
-
-    // MARK: - Screen · Let's go  [build10 CUT — dead "all set"; giving now finishes]
-
-    @State private var letsGoGlow = false
-
-    #if false
-    private var letsGoScreen: some View {
-        VStack(spacing: 0) {
-            Spacer()
-
-            ZStack {
-                Circle()
-                    .fill(Self.glow.opacity(letsGoGlow ? 0.30 : 0.14))
-                    .frame(width: 200, height: 200)
-                    .blur(radius: 32)
-                Text(emoji)
-                    .font(.system(size: 78))
-                    .scaleEffect(letsGoGlow ? 1.05 : 1.0)
-                    .shadow(color: Self.glow.opacity(0.7), radius: 22)
-            }
-
-            Text("you're all set ✦")
-                .font(.system(size: 28, weight: .semibold, design: .serif))
-                .foregroundColor(DesignTokens.Color.textPrimary)
-                .padding(.top, 24)
-
-            Text("point toward the people you love")
-                .font(.system(size: 14, design: .serif).italic())
-                .foregroundColor(Self.lavender.opacity(0.85))
-                .padding(.top, 8)
-
-            Spacer()
-
-            Button {
-                finishToApp()
-            } label: {
-                Text("enter Pointward →")
-                    .font(DesignTokens.Font.label)
-                    .foregroundColor(DesignTokens.Color.textPrimary)
-                    .frame(maxWidth: .infinity)
-                    .padding(DesignTokens.Spacing.md)
-                    .background(DesignTokens.Color.accentStrong)
-                    .cornerRadius(DesignTokens.Radius.button)
-                    .shadow(color: Self.glow.opacity(0.5), radius: 12)
-            }
-            .padding(.horizontal, 36)
-            .padding(.bottom, 40)
-        }
-        .onAppear {
-            withAnimation(.easeInOut(duration: 2.0).repeatForever(autoreverses: true)) {
-                letsGoGlow = true
-            }
-        }
-    }
-    #endif
+    // [build10 shot3a] Screen "Let's go" (dead "you're all set" + letsGoGlow state) —
+    // HARD-DELETED. Was dead `#if false`; the flow now finishes at the instruments
+    // (showcase) step via finishButton → finishToApp().
 
     private var nextButton: some View {
         Button {
@@ -1232,81 +861,6 @@ struct OnboardingView: View {
     }
 }
 
-// MARK: - Completion moment
-
-/// "your compass is set ✦" — the emoji glows, the needle settles toward
-/// them, a soft haptic lands, and the app opens.
-private struct CompletionMoment: View {
-
-    let name: String
-    let emoji: String
-    let onDone: () -> Void
-
-    @State private var needle: Double = 140
-    @State private var glow      = false
-    @State private var nameShown = false
-    @State private var setShown  = false
-
-    private static let lavender = Color(hex: "#c4a8d4")
-    private static let purple   = Color(hex: "#9b7fc0")
-
-    var body: some View {
-        VStack(spacing: 0) {
-            Spacer()
-
-            if nameShown {
-                Text(name)
-                    .font(.system(size: 30, weight: .semibold, design: .serif))
-                    .foregroundColor(DesignTokens.Color.textPrimary)
-                    .transition(.opacity)
-                    .padding(.bottom, 22)
-            }
-
-            ZStack {
-                Circle()
-                    .fill(Self.purple.opacity(glow ? 0.32 : 0.12))
-                    .frame(width: 220, height: 220)
-                    .blur(radius: 32)
-
-                Text(emoji)
-                    .font(.system(size: 80))
-                    .scaleEffect(glow ? 1.06 : 1.0)
-                    .shadow(color: Self.purple.opacity(0.8), radius: 22)
-
-                // The needle finds them
-                NeedleView(bearing: needle, skin: .minimal, locked: glow)
-                    .frame(width: 240, height: 240)
-                    .scaleEffect(1.15)
-                    .opacity(0.85)
-            }
-
-            if setShown {
-                Text("your compass is set ✦")
-                    .font(.system(size: 15, design: .serif).italic())
-                    .foregroundColor(Self.lavender)
-                    .transition(.opacity)
-                    .padding(.top, 26)
-            }
-
-            Spacer()
-        }
-        .onAppear {
-            withAnimation(.spring(response: 1.4, dampingFraction: 0.6)) {
-                needle = -20
-            }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1.1) {
-                HapticEngine.connectionFelt()   // the settle
-                withAnimation(.easeInOut(duration: 1.8).repeatForever(autoreverses: true)) {
-                    glow = true
-                }
-                withAnimation(.easeIn(duration: 0.5)) { nameShown = true }
-            }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-                withAnimation(.easeIn(duration: 0.5)) { setShown = true }
-            }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 3.4) {
-                onDone()
-            }
-        }
-    }
-}
+// [build10 shot3a] CompletionMoment ("your compass is set ✦") — HARD-DELETED.
+// Orphaned private struct: grep-confirmed zero references (definition only); it was
+// tied to the cut letsGoScreen/post-finish moment and never instantiated.
