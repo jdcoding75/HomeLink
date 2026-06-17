@@ -28,7 +28,6 @@ struct OnboardingView: View {
     // MARK: - Flow state
 
     @State private var page = 0
-    @State private var showCompletion = false
 
     // Screen 6 — the form
     @State private var name:  String = ""
@@ -774,28 +773,11 @@ struct OnboardingView: View {
 
     // MARK: - Completion
 
-    private func startCompletion() {
-        guard let location = geocodedLocation else { return }
-        let person = Person(
-            name:    name.trimmingCharacters(in: .whitespaces),
-            emoji:   emoji,
-            geocoded: location,
-            tagline: nil
-        )
-        try? people.addPerson(person)
-
-        // Permissions, at the natural moment
-        locationManager.requestWhenInUseAuthorization()
-        if !notificationsRequested {
-            Task {
-                _ = try? await UNUserNotificationCenter.current()
-                    .requestAuthorization(options: [.alert, .sound, .badge])
-            }
-            notificationsRequested = true
-        }
-
-        withAnimation(.easeInOut(duration: 0.5)) { showCompletion = true }
-    }
+    // [build10 minor cleanup] startCompletion() + showCompletion (@State) HARD-DELETED —
+    // orphaned after Shot 3a removed alignConcept/loopFlick: startCompletion had zero
+    // callers and showCompletion was write-only (set only here, read nowhere). The live
+    // finish path is finishButton → finishToApp() (below). geocodedLocation is KEPT
+    // (still live in the address-geocode path).
 
     private func finishToApp() {
         commitProfile()   // [#6 fix B] guarantee any typed name is committed before finishing
