@@ -112,7 +112,7 @@ struct ComposeBackView: View {
 
     private var nameStep: some View {
         VStack(spacing: 16) {
-            Text("what should \(senderName) call you?")
+            Text("How should your name appear to \(senderName)?")
                 .font(.system(size: 22, weight: .semibold, design: .serif))
                 .foregroundColor(DesignTokens.Color.textPrimary)
                 .multilineTextAlignment(.center)

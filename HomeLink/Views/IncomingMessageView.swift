@@ -88,6 +88,17 @@ struct IncomingMessageView: View {
                     // fired at FETCH (see begin() → people.upsertContact). It is
                     // silent by design — no prompt hangs here (TRUTH principle #6).
                     .transition(.opacity)
+                    // [build10 fixbatch 2a] "Message from [Name]" — a clear sender label on
+                    // the arrival, OVERLAID on the receipt (ReceiptView/the animation is NOT
+                    // touched). Top, subtle, non-interactive so it never blocks the receipt's
+                    // tap-to-finish. Reinforces who it's from (the name is editable per message).
+                    .overlay(alignment: .top) {
+                        Text("Message from \(resolvedSenderName(for: message))")
+                            .font(.system(size: 13, design: .serif).italic())
+                            .foregroundColor(DesignTokens.Color.textMuted)
+                            .padding(.top, 16)
+                            .allowsHitTesting(false)
+                    }
                 }
             // [build10] LINK-ARRIVER LANDING — the "what next" moment. Previously the
             // receipt's onFinished dismissed the cover straight into the app; now it

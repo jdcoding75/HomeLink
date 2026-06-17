@@ -137,15 +137,19 @@ struct LinkArriverLandingView: View {
 
                 Spacer()
 
+                // [build10 fixbatch 2b] The showcase's PRIMARY exit now routes INTO THE APP
+                // (the same guest dismiss-into-app the other doors use, via onDismiss) —
+                // previously it returned to the landing doors. So "See what Pointward is" →
+                // showcase → enter the app, not back to the menu.
                 Button {
-                    withAnimation(.easeInOut(duration: 0.3)) { showShowcase = false }
+                    onDismiss()
                 } label: {
-                    Text("back")
+                    Text("enter Pointward →")
                         .font(DesignTokens.Font.label)
                         .foregroundColor(DesignTokens.Color.textPrimary)
                         .frame(maxWidth: .infinity)
                         .padding(DesignTokens.Spacing.md)
-                        .background(DesignTokens.Color.backgroundCard)
+                        .background(DesignTokens.Color.accentStrong)
                         .cornerRadius(DesignTokens.Radius.button)
                 }
                 .padding(.horizontal, 32)

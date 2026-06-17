@@ -60,16 +60,16 @@ struct OnboardingView: View {
                 // [1/4] NEW ORDER: hero · sign in · about you (self profile) ·
                 // your code · instruments · pro · giving · let's go.
                 TabView(selection: $page) {
-                    // [build10 shot3a] trimmed to 3 screens, re-indexed 0–2.
+                    // [build10 fixbatch] trimmed to 2 screens, re-indexed 0–1.
                     // CUT earlier: hero (merged into sign-in bg), yourCode (pairing-era),
-                    // letsGo (dead "all set"). CUT now (shot3a): proScreen (paywall) +
-                    // givingScreen (charity) — out of the launch flow (paywall fires
-                    // contextually; charity is post-launch). Their view code is kept
-                    // dormant (#if false) for later relocation. instrumentsScreen is now
-                    // the LAST step → finishes to the app.
+                    // letsGo (dead "all set"), proScreen (paywall), givingScreen (charity).
+                    // CUT now (fixbatch): instrumentsScreen — the informational "three ways
+                    // to connect" MARKETING screen (no input, purely informational) — out of
+                    // the launch flow; kept dormant (#if false) for later relocation to
+                    // Settings/About. aboutYouScreen is now the LAST step → finishes to the app.
                     signInScreen.tag(0)        // sign in before your profile (now first; compass bg)
-                    aboutYouScreen.tag(1)      // YOUR profile
-                    instrumentsScreen.tag(2)   // showcase — now the LAST step (finishes)
+                    aboutYouScreen.tag(1)      // YOUR profile — now the LAST step (finishes)
+                    // instrumentsScreen.tag(2) // CUT (fixbatch) — marketing screen out of flow (dormant #if false)
                     // proScreen.tag(3)        // CUT (shot3a) — paywall out of flow (dormant #if false)
                     // givingScreen.tag(4)     // CUT (shot3a) — charity out of flow (dormant #if false)
                 }
@@ -92,24 +92,10 @@ struct OnboardingView: View {
                     .padding(.bottom, 14)
             }
 
-            // Skip — only the showcase screen (instruments) jumps to the finish.
-            // The profile screen carries its own. [build10 shot3a: pro/giving cut → only page 2]
-            if page == 2 {
-                VStack {
-                    HStack {
-                        Spacer()
-                        Button("skip") {
-                            finishToApp()   // [build10] letsGo cut → skip finishes straight to the app
-                        }
-                        .font(.system(size: 13))
-                        .foregroundColor(DesignTokens.Color.textMuted)
-                        .padding(.trailing, 22)
-                        .padding(.top, 14)
-                    }
-                    Spacer()
-                }
-                .transition(.opacity)
-            }
+            // [build10 fixbatch] Skip button REMOVED — it existed only to skip the showcase
+            // (instruments) screen to the finish. With the marketing screen cut, there is no
+            // showcase step to skip: the flow is sign-in → about-you (which finishes). The
+            // sign-in screen has "use offline only" and about-you has "continue →" (now finish).
         }
         .preferredColorScheme(.dark)
         .sheet(isPresented: $showContactPicker) {
@@ -146,7 +132,7 @@ struct OnboardingView: View {
 
     private var pageDots: some View {
         HStack(spacing: 7) {
-            ForEach(0..<3, id: \.self) { i in   // [build10 shot3a] → 3 screens
+            ForEach(0..<2, id: \.self) { i in   // [build10 fixbatch] → 2 screens (marketing cut)
                 Circle()
                     .fill(i == page ? Self.lavender : DesignTokens.Color.borderMid)
                     .frame(width: i == page ? 7 : 5, height: i == page ? 7 : 5)
@@ -335,8 +321,12 @@ struct OnboardingView: View {
         return hash.map { String(format: "%02x", $0) }.joined()
     }
 
-    // MARK: - Screen 3 · The four instruments
-
+    // MARK: - Screen 3 · The four instruments  [build10 fixbatch — CUT from the flow]
+    // The informational "three ways to connect" MARKETING screen (instrument carousel +
+    // Connector/Expresser/Special-Moments copy) — no input, purely informational. Removed
+    // from the TabView; kept DORMANT (#if false, reversible) for later relocation to
+    // Settings/About. carouselIndex + cycleInstruments + experienceLine ride with it.
+    #if false
     @State private var carouselIndex = 0
 
     private var instrumentsScreen: some View {
@@ -418,6 +408,7 @@ struct OnboardingView: View {
             cycleInstruments()
         }
     }
+    #endif
 
     // [build10 shot3a] Screen 2 (previous) "the compass" — orphaned (defined-but-
     // unmounted) showcase concept + its sole-use alignConcept() helper + conceptRight/
@@ -561,7 +552,7 @@ struct OnboardingView: View {
                     // EmojiPickerRow(selected: $emoji)
 
                     // Where you are — MKLocalSearch autocomplete
-                    fieldLabel("Home Location")   // [build10 shot3a] relabel (was "where you are")
+                    fieldLabel("Home Location (optional but recommended)")   // [build10 shot3a] relabel; [fixbatch] +optional hint
                     addressAutocompleteField
 
                     Text("your location lets people you connect with point\ntoward you — share only what you're comfortable with")
@@ -710,7 +701,7 @@ struct OnboardingView: View {
         }
     }
 
-    /// Save YOUR profile, request the natural permissions, then advance.
+    /// Save YOUR profile, request the natural permissions, then FINISH.
     private func saveAboutYou() {
         guard !name.trimmingCharacters(in: .whitespaces).isEmpty else { return }
         commitProfile()   // [#6 fix C] writes display_name unconditionally
@@ -726,7 +717,9 @@ struct OnboardingView: View {
         }
 
         HapticEngine.connectionFelt()
-        withAnimation(.easeInOut(duration: 0.4)) { page = 2 }   // [build10] → instruments (yourCode cut)
+        // [build10 fixbatch] instruments (marketing) cut → aboutYou is the LAST step.
+        // finishToApp() re-commits (idempotent) → the #6 display_name guarantee holds.
+        finishToApp()
     }
 
     // [build10 shot3a] Screen "Your connection code" (pairing-era) + its mint/share
