@@ -510,7 +510,7 @@ private struct CapsuleBody: View {
 private struct BulletShape: Shape {
     func path(in rect: CGRect) -> Path {
         var p = Path()
-        let w = rect.width, h = rect.height
+        let h = rect.height   // [cleanup] dropped unused `let w = rect.width` (geometry unchanged)
         let noseH = h * 0.42
         p.move(to: CGPoint(x: rect.minX, y: rect.maxY - h * 0.05))
         p.addLine(to: CGPoint(x: rect.minX, y: rect.minY + noseH))

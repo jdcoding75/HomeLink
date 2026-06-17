@@ -23,7 +23,8 @@ final class CompassManager: NSObject, ObservableObject {
     private var smoothedHeading: Double = 0
     private var targetPerson: Person?
     private var wasLocked = false
-    private var lockedSince: Date = .distantFuture        // steady-gaze tracking
+    // [cleanup] lockedSince removed — it became write-only after B4 removed its readers
+    // (reportPointingIfNeeded / startPresenceTimer).
     // [9b · B4] lastPointingReport + presenceTimer removed with the mutual-pointing
     // report path (reportPointingIfNeeded / startPresenceTimer).
     private let lockThresholdDegrees: Double  = 5.0
@@ -238,7 +239,6 @@ final class CompassManager: NSObject, ObservableObject {
         let isNowLocked  = bearingDiff <= lockThresholdDegrees
         if isNowLocked && !wasLocked {
             HapticEngine.connectionFelt()   // lock haptic — LIVE, kept
-            lockedSince = .now
         }
         // [9b · B4] startPresenceTimer/stopPresenceTimer + the reportPointingIfNeeded
         // ambient-presence call removed — the mutual-pointing source (reportPointing) is

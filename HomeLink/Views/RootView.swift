@@ -444,12 +444,8 @@ struct RootView: View {
 // last ConnectView() reference) — HARD-DELETED (was #if false). See
 // reports/ninebee_b1_deadviews_build.md.
 
-// MARK: - Pair request (universal link)
-
-struct PairRequest: Identifiable {
-    let code: String
-    var id: String { code }
-}
+// [cleanup] PairRequest model struct removed — orphaned (its @State user + the
+// handleIncomingURL pair branch were commented; PairRequestView was deleted in 9b B1).
 
 /// A tapped /m/<id> link awaiting open (Phase 2 Build 4a). The deep-link sibling
 /// of PairRequest — set by handleIncomingURL, presented by RootView.
