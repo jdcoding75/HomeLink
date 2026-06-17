@@ -173,69 +173,10 @@ final class PeopleManager: ObservableObject {
         selectedPerson = person
     }
 
-    /// Resolve an incoming connection's friend id to the local person card it's
-    /// linked to — `nil` when no card is linked yet. That nil is the gate for
-    /// "a thought arrived but needs setup": a ping from an unlinked sender must
-    /// not pop catch mode until the user links them to a person.
-    func person(forPairedUserID friendID: UUID) -> Person? {
-        people.first { $0.pairedUserID == friendID.uuidString }
-    }
-
-    /// Make sure some local person carries the connected friend's Supabase id —
-    /// per-person status, pointing reports, and ping naming all key off it.
-    /// When the connection knows which card it belongs to (owner_person_id),
-    /// binds that exact person; otherwise falls back to selected/first.
-    func bindConnection(friendID: UUID, toPersonID personID: UUID? = nil) {
-        guard !people.contains(where: { $0.pairedUserID == friendID.uuidString }) else { return }
-        let target = personID.flatMap { id in people.first(where: { $0.id == id }) }
-                     ?? selectedPerson ?? people.first
-        guard let target else { return }
-        target.pairedUserID = friendID.uuidString
-        try? save()
-    }
-
-    /// Insert a fully-built person coming from an accepted invite —
-    /// connection-initiated, so it bypasses the free-tier person gate.
-    func insertFromInvite(_ person: Person) {
-        if person.tagline == nil { person.tagline = TaglineSystem.random }
-        modelContext?.insert(person)
-        try? modelContext?.save()
-        fetchAll()
-        if selectedPerson == nil || selectedPerson.map(DemoPerson.isDemo) == true {
-            selectedPerson = person
-        }
-        removeDemoPersonIfPresent()   // [5/6] real connection → Alex steps aside
-    }
-
-    /// Accepting an invite auto-adds the person it came labeled as.
-    /// Connection-initiated, so it bypasses the free-tier person gate.
-    /// Location starts at the recipient's own position (distance ~0) until
-    /// they edit the person and set a real address.
-    @discardableResult
-    func addFromInvite(name: String, emoji: String, friendID: UUID,
-                       near coordinate: CLLocationCoordinate2D?) -> Person? {
-        if let existing = people.first(where: { $0.pairedUserID == friendID.uuidString }) {
-            return existing
-        }
-        let person = Person(
-            name: name,
-            emoji: emoji,
-            latitude: coordinate?.latitude ?? 0,
-            longitude: coordinate?.longitude ?? 0,
-            displayAddress: "",
-            locationDisplayName: name
-        )
-        person.pairedUserID = friendID.uuidString
-        person.tagline = TaglineSystem.random
-        modelContext?.insert(person)
-        try? modelContext?.save()
-        fetchAll()
-        if selectedPerson == nil || selectedPerson.map(DemoPerson.isDemo) == true {
-            selectedPerson = person
-        }
-        removeDemoPersonIfPresent()   // [5/6] real connection → Alex steps aside
-        return person
-    }
+    // [9b · B3] pairing-era funcs DELETED — person(forPairedUserID:), bindConnection,
+    // insertFromInvite, addFromInvite (all app-callers were #if-false/B1-deleted; only
+    // PairingScenarioTests used them, retired this batch). The link-era replacement is
+    // person(forSenderID:) + upsertContact below.
 
     // ── [phase2 build5] Contact auto-create ON RECEIVE (pairing-FREE) ─────
 

@@ -48,7 +48,9 @@ final class SkipOnboardingTests: XCTestCase {
                       "skip-onboarding must mark onboarding complete")
 
         // 2 — Sarah exists in SwiftData.
-        let sarah = people.person(forPairedUserID: DevTools.mockFriendID)
+        // [9b · B3] migrated person(forPairedUserID:) → person(forSenderID:) — Sarah's
+        // mirror-write keeps pairedUserID == senderID, so this is behavior-identical.
+        let sarah = people.person(forSenderID: DevTools.mockFriendID.uuidString)
         XCTAssertNotNil(sarah, "Sarah must be injected into SwiftData")
         XCTAssertEqual(sarah?.name, DevTools.mockName)
         XCTAssertEqual(sarah?.latitude ?? 0, DevTools.mockCoord.latitude, accuracy: 0.0001,

@@ -6,7 +6,8 @@
 // history of thoughts between you.
 
 import SwiftUI
-import MessageUI
+// [9b · B5] import MessageUI removed — MFMessageCompose was only used by the
+// B1-deleted pairing connect CTA / MessageComposerView.
 
 struct PersonDetailView: View {
 
@@ -18,28 +19,17 @@ struct PersonDetailView: View {
     @Environment(\.dismiss) private var dismiss
 
     @State private var showEdit = false
-
-    @State private var codeInput = ""
-    @State private var isBusy = false
-    @State private var errorMessage: String?
     @State private var lastSeen: Date?
-    @State private var showConnectOptions = false
-    @State private var connectedNow = false   // refresh after in-sheet pairing
-    @State private var personInvite: String?  // full message tied to THIS person
-    @State private var personInviteLink: String?  // just the pair URL (copy)
-    @State private var showMessageComposer = false
-    @State private var linkCopied = false
+    // [9b · B5] removed now-unused pairing @State (codeInput / isBusy / errorMessage /
+    // showConnectOptions / connectedNow / personInvite / personInviteLink /
+    // showMessageComposer / linkCopied) — referenced only by the B1-deleted connect CTA.
 
     private var isConnected: Bool {
-        // [reconcile] LINK-ERA TRUTH first: a stamped senderID = connected — matches
-        // PeopleListView's "connected ✦" (was: pairing-only, which a senderID contact's
-        // pairedUserID rarely satisfied → wrongly "not yet linked").
-        if !(person.senderID ?? "").isEmpty { return true }
-        // [transitional — legacy pairing fallback; connectedNow is DEAD post-#5; remove
-        //  both, with connectedFriendID, at the 9b dead-pairing cleanup]
-        if connectedNow { return true }
-        guard let friend = SupabaseService.connectedFriendID else { return false }
-        return person.pairedUserID == friend.uuidString
+        // [9b · B5] senderID-ONLY — matches PeopleListView's "connected ✦". The
+        // transitional legacy clauses (connectedNow — dead; pairedUserID ==
+        // connectedFriendID — pairing-era) are removed. (connectedFriendID the GLOBAL
+        // stays — load-bearing in PingView — only this clause referencing it goes.)
+        !(person.senderID ?? "").isEmpty
     }
 
     private var partnerID: UUID? {
@@ -145,13 +135,8 @@ struct PersonDetailView: View {
             historyRecords = await SupabaseService.shared.fetchPings(with: partnerID)
             historyLoaded = true
         }
-        // [cleanup #5] iMessage composer for the pairing invite — DISABLED (its only
-        // trigger, the connect CTA, is gone). ⚠️ MessageComposerView (ConnectView.swift)
-        // was kept live ONLY for this flow → it is now ORPHANED (flag for the cleanup
-        // pass; not removed here). Reversible: uncomment with the connect block.
-        // .sheet(isPresented: $showMessageComposer) {
-        //     MessageComposerView(body: personInvite ?? "")
-        // }
+        // [9b · B5] the pairing iMessage-composer .sheet (MessageComposerView) removed —
+        // MessageComposerView was deleted with ConnectView.swift (B1).
         // A felt receipt just landed (realtime UPDATE on our sent ping) —
         // refresh so the grey dot turns into the lavender pair live.
         .onChange(of: pings.lastFeltAt) { _, _ in
@@ -236,12 +221,6 @@ struct PersonDetailView: View {
             )
         }
     }
-
-    // [9b · B1] prepareInvite() (createInvite pairing invite) + connect() (manual
-    // code redeem) HARD-DELETED (were #if false). Their targets — SupabaseService
-    // createInvite / redeem — retire in B2. The now-unused @State (showConnectOptions,
-    // personInvite/Link, showMessageComposer, codeInput, linkCopied, isBusy/errorMessage)
-    // are left for the B5/cleanup sweep (unused stored props don't error).
 
     // MARK: - Expandable memory trail
 

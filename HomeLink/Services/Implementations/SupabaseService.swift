@@ -26,10 +26,8 @@ extension PostgrestResponse: @retroactive @unchecked Sendable {}
 enum SupabaseServiceError: LocalizedError, Equatable {
     case notConfigured
     case notSignedIn
-    case invalidCodeFormat
-    case codeNotFound
-    case cannotPairWithSelf
-    case codeAlreadyClaimed
+    // [9b · B3] invalidCodeFormat / codeNotFound / cannotPairWithSelf / codeAlreadyClaimed
+    // removed — only the deleted redeem/lookupInvite threw them.
     case networkProblem
     case timedOut
 
@@ -37,10 +35,6 @@ enum SupabaseServiceError: LocalizedError, Equatable {
         switch self {
         case .notConfigured:      return "The backend isn't configured yet."
         case .notSignedIn:        return "Sign in to send pings."
-        case .invalidCodeFormat:  return "Codes look like POINT-XXXX — double-check and try again."
-        case .codeNotFound:       return "That code wasn't found — make sure it's typed exactly."
-        case .cannotPairWithSelf: return "That's your own code."
-        case .codeAlreadyClaimed: return "That code is already paired with someone else."
         case .networkProblem:     return "Network problem — check your connection and try again."
         case .timedOut:           return "That took too long — check your connection and try again."
         }
@@ -392,23 +386,8 @@ final class SupabaseService: ObservableObject {
         return "POINT-\(suffix)"
     }
 
-    // [9b · B2] `redeem` / `redeemCode` (the invite-claim funcs that consumed
-    // claimOutcome) were deleted; PairOutcome + claimOutcome are RETAINED because
-    // PairingScenarioTests (deferred to B3) still exercises the pure state machine.
-    // They retire WITH PairingScenarioTests in B3. (Pure, side-effect-free; no live
-    // app caller now.)
-    enum PairOutcome: Equatable {
-        case pairWithSelf     // the code is our own → refuse
-        case alreadyClaimed   // someone else holds it → refuse
-        case alreadyOurs      // we already claimed it → idempotent success
-        case proceed          // unclaimed → claim it; both sides link
-    }
-
-    static func claimOutcome(owner: UUID, friend: UUID?, me: UUID) -> PairOutcome {
-        if owner == me { return .pairWithSelf }
-        if let friend { return friend == me ? .alreadyOurs : .alreadyClaimed }
-        return .proceed
-    }
+    // [9b · B3] PairOutcome + claimOutcome (the pairing claim state machine) DELETED —
+    // their last caller, PairingScenarioTests, retired in this batch.
 
     /// Every established connection, both directions, with the owner-side
     /// person id so the right card gets bound.
