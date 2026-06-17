@@ -13,7 +13,8 @@ final class ServiceContainer: ObservableObject {
     let skinStore:           SkinStore
     let instrumentStore:     InstrumentStore
     let networkService:      NetworkServiceProtocol
-    let pairingService:      PairingServiceProtocol
+    // [9b · B2] pairingService (PairingServiceProtocol/MockPairingService) removed —
+    // never read; the pairing-invite DI plumbing is retired.
     let notificationService: NotificationServiceProtocol
     let geocodingService:    GeocodingServiceProtocol
     let compassManager:      CompassManager
@@ -30,7 +31,6 @@ final class ServiceContainer: ObservableObject {
         skinStore        = SkinStore()
         instrumentStore  = InstrumentStore()
         networkService   = MockNetworkService()
-        pairingService   = MockPairingService()
         notificationService = LocalNotificationService()
         geocodingService = CLGeocodingService()
         subscriptionManager = SubscriptionManager(skinStore: skinStore)

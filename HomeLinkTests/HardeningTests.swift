@@ -167,22 +167,9 @@ final class PairingHardeningTests: XCTestCase {
         XCTAssertEqual(code, "POINT-GP2S")
     }
 
-    func testBothSidesLinkAfterAccept() {
-        // An unclaimed code, redeemed by someone who isn't the owner → proceed:
-        // friend gets filled in and both sides reference each other. A re-run by
-        // the same friend is idempotent (still linked, no error).
-        let owner = UUID(), friend = UUID()
-        XCTAssertEqual(SupabaseService.claimOutcome(owner: owner, friend: nil, me: friend), .proceed)
-        XCTAssertEqual(SupabaseService.claimOutcome(owner: owner, friend: friend, me: friend), .alreadyOurs)
-    }
-
-    func testDuplicatePairingPrevented() {
-        // A code already claimed by someone else is refused; so is pairing with
-        // your own code. No double-claim, no self-pair.
-        let owner = UUID(), other = UUID(), me = UUID()
-        XCTAssertEqual(SupabaseService.claimOutcome(owner: owner, friend: other, me: me), .alreadyClaimed)
-        XCTAssertEqual(SupabaseService.claimOutcome(owner: me, friend: nil, me: me), .pairWithSelf)
-    }
+    // [9b · B2] testBothSidesLinkAfterAccept + testDuplicatePairingPrevented removed —
+    // they tested SupabaseService.claimOutcome, which is retired (the pairing
+    // invite-accept path). See reports/ninebee_b2_revised_build.md.
 
     func testPersonCardInviteTiesCorrectly() {
         // A person-card invite carries that person's name and their pairing code,

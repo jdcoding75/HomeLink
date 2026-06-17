@@ -328,188 +328,13 @@ final class SupabaseService: ObservableObject {
         }
     }
 
-    /// Read-only superset that ALSO carries the owner's location columns
-    /// (owner_latitude / owner_longitude). Decoded from SELECTs — the optional
-    /// owner-location fields are simply nil on pre-migration databases, so this
-    /// is always safe to decode. Never used for INSERT (which would send those
-    /// keys and fail where the columns don't exist).
-    private struct FullConnectionRow: Decodable {
-        let code: String
-        let owner: UUID
-        var friend: UUID?
-        var personName: String?
-        var personEmoji: String?
-        var ownerPersonID: UUID?
-        var friendPersonID: UUID?
-        var ownerLatitude: Double?
-        var ownerLongitude: Double?
-
-        enum CodingKeys: String, CodingKey {
-            case code, owner, friend
-            case personName     = "person_name"
-            case personEmoji    = "person_emoji"
-            case ownerPersonID  = "owner_person_id"
-            case friendPersonID = "friend_person_id"
-            case ownerLatitude  = "owner_latitude"
-            case ownerLongitude = "owner_longitude"
-        }
-    }
-
-    struct RedeemResult {
-        let ownerID: UUID
-        let personName: String?
-        let personEmoji: String?
-        /// The owner's location, when their invite carried a profile — lets the
-        /// recipient auto-build a pre-filled, correctly-placed person card.
-        var ownerLatitude: Double? = nil
-        var ownerLongitude: Double? = nil
-    }
 
     struct DiscoveredConnection {
         let partnerID: UUID
         let myPersonID: UUID?   // set when I'm the owner — which card to bind
     }
 
-    /// Create (or reuse) an invite tied to one of MY person cards. The invite
-    /// carries MY profile (name · emoji · location) so when the recipient
-    /// accepts, their app auto-builds a pre-filled card representing ME, while
-    /// owner_person_id re-links the right card on my side. [2/4]
-    func createInvite(ownerName: String, ownerEmoji: String,
-                      ownerLatitude: Double?, ownerLongitude: Double?,
-                      ownerPersonID: UUID) async throws -> String {
-        guard let client else { throw SupabaseServiceError.notConfigured }
-        guard let me = await currentUserID else { throw SupabaseServiceError.notSignedIn }
 
-        log.info("pairing: createInvite for person \(ownerPersonID.uuidString, privacy: .public)")
-        let mine: [ConnectionRow] = try await withRetry(label: "createInvite.lookup") {
-            try await client
-                .from("connections")
-                .select()
-                .eq("owner", value: me.uuidString)
-                .eq("owner_person_id", value: ownerPersonID.uuidString)
-                .execute().value
-        }
-        if let existing = mine.first {
-            log.info("pairing: reusing person invite \(existing.code, privacy: .public)")
-            return existing.code
-        }
-
-        let code = Self.generatePairingCode()
-        try await insertInvite(code: code, owner: me, ownerName: ownerName,
-                               ownerEmoji: ownerEmoji,
-                               ownerLatitude: ownerLatitude, ownerLongitude: ownerLongitude,
-                               ownerPersonID: ownerPersonID)
-        log.info("pairing: created person invite \(code, privacy: .public)")
-        return code
-    }
-
-    /// [2/4] The SELF-PROFILE invite — YOUR code, carrying YOUR profile and no
-    /// specific person card. Reuses your existing unclaimed generic code (the
-    /// one myPairingCode mints) and stamps your profile onto it, so the code
-    /// stays stable while sharing your latest identity. Returns POINT-XXXX.
-    func createProfileInvite(name: String, emoji: String,
-                             latitude: Double?, longitude: Double?) async throws -> String {
-        guard let client else { throw SupabaseServiceError.notConfigured }
-        guard let me = await currentUserID else { throw SupabaseServiceError.notSignedIn }
-
-        // Find an unclaimed, generic (no owner_person_id) row to reuse.
-        let mine: [ConnectionRow] = try await withRetry(label: "profileInvite.lookup") {
-            try await client
-                .from("connections")
-                .select()
-                .eq("owner", value: me.uuidString)
-                .execute().value
-        }
-        let reusable = mine.first { $0.friend == nil && $0.ownerPersonID == nil }
-        let code = reusable?.code ?? Self.generatePairingCode()
-
-        if reusable != nil {
-            try await updateInviteProfile(code: code, name: name, emoji: emoji,
-                                          latitude: latitude, longitude: longitude)
-            log.info("pairing: stamped profile onto existing code \(code, privacy: .public)")
-        } else {
-            try await insertInvite(code: code, owner: me, ownerName: name, ownerEmoji: emoji,
-                                   ownerLatitude: latitude, ownerLongitude: longitude,
-                                   ownerPersonID: nil)
-            log.info("pairing: created profile code \(code, privacy: .public)")
-        }
-        Self.localPairingCode = code
-        return code
-    }
-
-    /// Insert a connection row carrying the owner's profile. Two steps so it's
-    /// safe before the owner-location columns exist: the identity (name/emoji
-    /// in person_name/person_emoji, which always exist) lands via the Codable
-    /// row; the location is a best-effort follow-up that no-ops on pre-migration
-    /// databases.
-    private func insertInvite(code: String, owner: UUID,
-                              ownerName: String, ownerEmoji: String,
-                              ownerLatitude: Double?, ownerLongitude: Double?,
-                              ownerPersonID: UUID?) async throws {
-        guard let client else { throw SupabaseServiceError.notConfigured }
-        try await withRetry(label: "invite.insert") {
-            try await client
-                .from("connections")
-                .insert(ConnectionRow(code: code, owner: owner, friend: nil,
-                                      personName: ownerName, personEmoji: ownerEmoji,
-                                      ownerPersonID: ownerPersonID))
-                .execute()
-        }
-        await stampLocation(code: code, latitude: ownerLatitude, longitude: ownerLongitude)
-    }
-
-    /// Stamp the owner's latest profile onto an existing code. Identity columns
-    /// always exist; location is best-effort.
-    private func updateInviteProfile(code: String, name: String, emoji: String,
-                                     latitude: Double?, longitude: Double?) async throws {
-        guard let client else { throw SupabaseServiceError.notConfigured }
-        try await withRetry(label: "invite.update") {
-            try await client
-                .from("connections")
-                .update(["person_name": name, "person_emoji": emoji])
-                .eq("code", value: code)
-                .execute()
-        }
-        await stampLocation(code: code, latitude: latitude, longitude: longitude)
-    }
-
-    /// Best-effort write of the owner's lat/lng onto a connection row — silently
-    /// no-ops where the owner_latitude/owner_longitude columns don't exist yet.
-    private func stampLocation(code: String, latitude: Double?, longitude: Double?) async {
-        guard let client, let latitude, let longitude else { return }
-        do {
-            try await client
-                .from("connections")
-                .update(["owner_latitude": latitude, "owner_longitude": longitude])
-                .eq("code", value: code)
-                .execute()
-        } catch {
-            log.warning("pairing: owner location not stored (columns missing?) — \(error.localizedDescription, privacy: .public)")
-        }
-    }
-
-    /// Peek at an invite without claiming it — powers the accept sheet's
-    /// "[name] wants to connect with you".
-    func lookupInvite(_ rawCode: String) async throws
-        -> (name: String?, emoji: String?, latitude: Double?, longitude: Double?) {
-        guard let client else { throw SupabaseServiceError.notConfigured }
-        let code = Self.normalizePairingCode(rawCode)
-        log.info("pairing: lookupInvite \(code, privacy: .public)")
-        // FullConnectionRow also carries the owner's location (nil pre-migration),
-        // so the accept screen can show where the sender is before claiming.
-        let rows: [FullConnectionRow] = try await withRetry(label: "lookupInvite") {
-            try await client
-                .from("connections")
-                .select()
-                .eq("code", value: code)
-                .execute().value
-        }
-        guard let row = rows.first else {
-            log.warning("pairing: lookupInvite — code not found")
-            throw SupabaseServiceError.codeNotFound
-        }
-        return (row.personName, row.personEmoji, row.ownerLatitude, row.ownerLongitude)
-    }
 
     /// Fetch (or create on first call) this user's pairing code, e.g. "POINT-4729".
     /// Prefers a still-UNCLAIMED generic code: person invites belong to their
@@ -567,22 +392,11 @@ final class SupabaseService: ObservableObject {
         return "POINT-\(suffix)"
     }
 
-    /// Enter a friend's code: claims their connection row. Returns the owner's
-    /// id plus the person identity stored with the invite (for auto-adding).
-    ///
-    /// Failure-mode map (each one logged + thrown as a human message):
-    ///   bad format     → invalidCodeFormat, before any network call
-    ///   no such code   → codeNotFound
-    ///   own code       → cannotPairWithSelf
-    ///   already taken  → codeAlreadyClaimed (atomic: claim only lands on an
-    ///                    unclaimed row, then is verified with a read-back)
-    ///   network drop   → networkProblem/timedOut after a retry, at any step;
-    ///                    re-entering the same code later is idempotent —
-    ///                    a row already claimed by ME counts as success.
-    /// The pure decision at the heart of `redeem`: given a connection row's
-    /// owner and current friend, and who *we* are, what should claiming do?
-    /// Extracted so the self-pair / already-claimed / idempotent / both-sides
-    /// rules are testable without a live backend. [8/8]
+    // [9b · B2] `redeem` / `redeemCode` (the invite-claim funcs that consumed
+    // claimOutcome) were deleted; PairOutcome + claimOutcome are RETAINED because
+    // PairingScenarioTests (deferred to B3) still exercises the pure state machine.
+    // They retire WITH PairingScenarioTests in B3. (Pure, side-effect-free; no live
+    // app caller now.)
     enum PairOutcome: Equatable {
         case pairWithSelf     // the code is our own → refuse
         case alreadyClaimed   // someone else holds it → refuse
@@ -594,104 +408,6 @@ final class SupabaseService: ObservableObject {
         if owner == me { return .pairWithSelf }
         if let friend { return friend == me ? .alreadyOurs : .alreadyClaimed }
         return .proceed
-    }
-
-    func redeem(_ rawCode: String, friendPersonID: UUID? = nil) async throws -> RedeemResult {
-        guard let client else { throw SupabaseServiceError.notConfigured }
-        guard let me = await currentUserID else { throw SupabaseServiceError.notSignedIn }
-
-        let code = Self.normalizePairingCode(rawCode)
-        log.info("redeem: input '\(rawCode, privacy: .public)' → lookup '\(code, privacy: .public)'")
-
-        // Wrong shape entirely? Say so before hitting the network.
-        guard Self.isValidPairingCode(code) else { throw SupabaseServiceError.invalidCodeFormat }
-
-        let rows: [FullConnectionRow] = try await withRetry(label: "redeem.lookup") {
-            try await client
-                .from("connections")
-                .select()
-                .eq("code", value: code)
-                .execute().value
-        }
-        log.info("redeem: lookup matched \(rows.count) row(s)")
-        guard let row = rows.first else { throw SupabaseServiceError.codeNotFound }
-        switch Self.claimOutcome(owner: row.owner, friend: row.friend, me: me) {
-        case .pairWithSelf:
-            throw SupabaseServiceError.cannotPairWithSelf
-        case .alreadyClaimed:
-            log.warning("redeem: code already claimed by another user")
-            throw SupabaseServiceError.codeAlreadyClaimed
-        case .alreadyOurs:
-            // A retry after a network drop mid-pair → idempotent success.
-            log.info("redeem: already claimed by me — idempotent success")
-            Self.connectedFriendID = row.owner
-            return RedeemResult(ownerID: row.owner,
-                                personName: row.personName,
-                                personEmoji: row.personEmoji,
-                                ownerLatitude: row.ownerLatitude,
-                                ownerLongitude: row.ownerLongitude)
-        case .proceed:
-            break   // unclaimed — fall through to the atomic claim below
-        }
-
-        // Atomic claim: only an UNCLAIMED row matches — two phones racing on
-        // the same code can't both win. friend_person_id records WHICH of
-        // the recipient's cards is the sender, so both sides stay linked to
-        // the right person. (Falls back to friend-only if the column is
-        // missing — pre-migration databases.)
-        var claim = ["friend": me.uuidString]
-        if let friendPersonID { claim["friend_person_id"] = friendPersonID.uuidString }
-        do {
-            let payload = claim
-            try await withRetry(label: "redeem.claim") {
-                try await client
-                    .from("connections")
-                    .update(payload)
-                    .eq("code", value: code)
-                    .is("friend", value: nil)
-                    .execute()
-            }
-        } catch let error as SupabaseServiceError {
-            throw error
-        } catch {
-            log.warning("redeem: claim with friend_person_id failed (pre-migration schema?) — retrying friend-only")
-            try await withRetry(label: "redeem.claim.legacy") {
-                try await client
-                    .from("connections")
-                    .update(["friend": me.uuidString])
-                    .eq("code", value: code)
-                    .is("friend", value: nil)
-                    .execute()
-            }
-        }
-
-        // Verify the claim landed — RLS (or losing the race) can match zero
-        // rows and "succeed" silently.
-        let check: [ConnectionRow] = try await withRetry(label: "redeem.verify") {
-            try await client
-                .from("connections")
-                .select()
-                .eq("code", value: code)
-                .execute().value
-        }
-        guard check.first?.friend == me else {
-            log.error("redeem: claim did not persist (claimed by someone else in the race?)")
-            throw SupabaseServiceError.codeAlreadyClaimed
-        }
-
-        Self.connectedFriendID = row.owner
-        log.info("redeem: connected ✓ partner=\(row.owner.uuidString, privacy: .public)")
-        return RedeemResult(ownerID: row.owner,
-                            personName: row.personName,
-                            personEmoji: row.personEmoji,
-                            ownerLatitude: row.ownerLatitude,
-                            ownerLongitude: row.ownerLongitude)
-    }
-
-    /// Legacy shape — returns just the partner id.
-    @discardableResult
-    func redeemCode(_ rawCode: String) async throws -> UUID {
-        try await redeem(rawCode).ownerID
     }
 
     /// Every established connection, both directions, with the owner-side
