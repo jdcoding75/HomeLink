@@ -43,6 +43,10 @@ struct OnboardingView: View {
     @State private var geocodeTask:      Task<Void, Never>? = nil
 
     private let locationManager = CLLocationManager()
+    // [build10] "Use current location" — one-shot grab → reverse-geocode → the SAME
+    // geocoded path a typed address uses. @State holds one stable instance.
+    @State private var oneShotLocation = OneShotLocationProvider()
+    @State private var locating = false
     @State private var notificationsRequested = false
     @State private var showContactPicker = false
 
@@ -555,6 +559,21 @@ struct OnboardingView: View {
                     fieldLabel("Home Location (optional but recommended)")   // [build10 shot3a] relabel; [fixbatch] +optional hint
                     addressAutocompleteField
 
+                    // [build10] USE CURRENT LOCATION — the 3rd Home-Location option
+                    // (Skip / Type / Use current). One-time when-in-use grab → reverse-
+                    // geocode → writes into the SAME geocodedLocation/geocodeState path the
+                    // typed address uses, so commitProfile sends lat/lng identically.
+                    Button { useCurrentLocation() } label: {
+                        HStack(spacing: 6) {
+                            Image(systemName: "location.fill").font(.system(size: 11))
+                            Text(locating ? "finding your location…" : "Use current location")
+                        }
+                        .font(.system(size: 13))
+                        .foregroundColor(Self.lavender)
+                    }
+                    .disabled(locating)
+                    .padding(.top, 4)
+
                     Text("your location lets people you connect with point\ntoward you — share only what you're comfortable with")
                         .font(.system(size: 11, design: .serif).italic())
                         .foregroundColor(DesignTokens.Color.textDim)
@@ -831,6 +850,32 @@ struct OnboardingView: View {
             } catch {
                 guard !Task.isCancelled else { return }
                 geocodeState = .failure(error.localizedDescription)
+            }
+        }
+    }
+
+    /// [build10] "Use current location" — one-time when-in-use grab → reverse-geocode →
+    /// write into the SAME geocodedLocation/geocodeState path as a typed/picked address,
+    /// so commitProfile sends lat/lng identically. Deny/fail degrades to Skip (no
+    /// coordinate written → seeded bearing), with a gentle note in the existing UI.
+    private func useCurrentLocation() {
+        guard !locating else { return }
+        locating = true
+        autocomplete.clear()
+        geocodeState = .geocoding("your location")   // shows "finding you…"
+        Task {
+            defer { locating = false }
+            do {
+                let coordinate = try await oneShotLocation.requestOnce()
+                let result = try await geocodingService.reverseGeocode(coordinate: coordinate)
+                geocodedLocation    = result
+                geocodeState        = .success(result)          // commitProfile reads this
+                addressText         = result.fullAddress         // reflect it in the field
+                selectedAddressText = result.fullAddress         // don't re-trigger a search
+            } catch OneShotLocationProvider.LocationError.denied {
+                geocodeState = .failure("Location access is off — type your address or skip.")
+            } catch {
+                geocodeState = .failure("Couldn't get your location — type your address or skip.")
             }
         }
     }
