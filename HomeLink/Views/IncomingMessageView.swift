@@ -46,7 +46,7 @@ struct IncomingMessageView: View {
     // [phase2 build5] Auto-create the sender as a contact on a valid message.
     @EnvironmentObject var people:  PeopleManager
 
-    private enum Phase { case incoming, receipt, notFound }
+    private enum Phase { case incoming, receipt, landing, notFound }
     @State private var phase: Phase = .incoming
     @State private var message: Message? = nil
     @State private var flipGate = OpenedFlipGate()
@@ -78,11 +78,30 @@ struct IncomingMessageView: View {
                         ping:  receivedPing(from: message),
                         style: instrumentStyle(from: message),
                         onRevealed: { flipOpened() },          // ← completion signal
-                        onFinished: { onFinished() }           // ← dismiss (no flip)
+                        onFinished: { goToLanding() }          // ← [build10] → 3-doors landing (was: dismiss)
                     )
                     // [build5-done] Contact auto-create for this sender already
                     // fired at FETCH (see begin() → people.upsertContact). It is
                     // silent by design — no prompt hangs here (TRUTH principle #6).
+                    .transition(.opacity)
+                }
+            // [build10] LINK-ARRIVER LANDING — the "what next" moment. Previously the
+            // receipt's onFinished dismissed the cover straight into the app; now it
+            // lands here (3 doors). Placeholder UI; design locked in TRUTH. Additive —
+            // the receipt/arrival sequence above is untouched.
+            case .landing:
+                if let message {
+                    LinkArriverLandingView(
+                        senderName: resolvedSenderName(for: message),
+                        onSendBack: {
+                            // TODO (Shot 2): real compose-straight-back to the sender.
+                            // Placeholder: dismiss into the app + open the compass (the
+                            // existing send surface). markAllMyPingsOpened etc. unaffected.
+                            NotificationCenter.default.post(name: .pointwardOpenCompass, object: nil)
+                            onFinished()
+                        },
+                        onDismiss: { onFinished() }            // ← quiet exit (the old behavior)
+                    )
                     .transition(.opacity)
                 }
             }
@@ -227,6 +246,14 @@ struct IncomingMessageView: View {
         guard flipGate.completionReached() else { return }
         let id = messageID
         Task { await SupabaseService.shared.markMessageOpened(id: id) }
+    }
+
+    /// [build10] The receipt finished → present the link-arriver landing (the
+    /// "what next" 3-doors moment) instead of dismissing straight into the app.
+    /// The opened-flip already fired at onRevealed (the reveal); this is purely
+    /// the post-arrival hand-off.
+    private func goToLanding() {
+        withAnimation(.easeInOut(duration: 0.4)) { phase = .landing }
     }
 
     // MARK: - Message → receipt inputs
