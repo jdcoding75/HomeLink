@@ -47,7 +47,7 @@ final class SupabaseService: ObservableObject {
 
     /// Console logging for the pairing/ping flows — filter on
     /// subsystem com.jdcoding75.pointward in Console.app.
-    private let log = Logger(subsystem: "com.jdcoding75.pointward", category: "supabase")
+    let log = Logger(subsystem: "com.jdcoding75.pointward", category: "supabase")
 
     /// nil until SupabaseConfig is filled in — every API below guards on it.
     private(set) lazy var client: SupabaseClient? = {
@@ -89,7 +89,7 @@ final class SupabaseService: ObservableObject {
     // result; without this, each is a "result of call to withRetry is unused"
     // warning (a Swift 6 error). Callers that DO need the value still get it.
     @discardableResult
-    private func withRetry<T: Sendable>(
+    func withRetry<T: Sendable>(
         attempts: Int = 2,
         label: String,
         _ operation: @escaping @Sendable () async throws -> T
@@ -118,7 +118,7 @@ final class SupabaseService: ObservableObject {
     }
 
     /// Map low-level transport errors to a human message; pass ours through.
-    private static func friendly(_ error: Error) -> Error {
+    static func friendly(_ error: Error) -> Error {
         if let serviceError = error as? SupabaseServiceError { return serviceError }
         if isTransient(error) { return SupabaseServiceError.networkProblem }
         return error
@@ -126,30 +126,6 @@ final class SupabaseService: ObservableObject {
 
     // MARK: - Auth (Apple Sign In)
 
-    /// Exchange an ASAuthorizationAppleIDCredential's identity token for a
-    /// Supabase session. Call from the Sign in with Apple completion handler.
-    func signInWithApple(idToken: String, nonce: String) async throws {
-        guard let client else { throw SupabaseServiceError.notConfigured }
-        log.info("auth: signInWithApple starting")
-        do {
-            try await client.auth.signInWithIdToken(
-                credentials: OpenIDConnectCredentials(
-                    provider: .apple,
-                    idToken: idToken,
-                    nonce: nonce
-                )
-            )
-            log.info("auth: signInWithApple ✓")
-        } catch {
-            log.error("auth: signInWithApple FAILED: \(error.localizedDescription, privacy: .public)")
-            throw Self.friendly(error)
-        }
-    }
-
-    func signOut() async throws {
-        guard let client else { throw SupabaseServiceError.notConfigured }
-        try await client.auth.signOut()
-    }
 
     #if DEBUG
     // ── [5/5] Developer test-data tools — DEBUG ONLY, never ships ──────────
@@ -182,30 +158,6 @@ final class SupabaseService: ObservableObject {
     /// [1/4] Mirror YOUR profile into public.users — best-effort, so it no-ops
     /// silently on databases that haven't added the profile columns yet. Split
     /// into homogeneous updates to avoid a heterogeneous-JSON dependency.
-    /// [#6 fix C] lat/lng are now OPTIONAL — `display_name` + `emoji` are written
-    /// UNCONDITIONALLY (a name-only profile, no address, MUST still set display_name;
-    /// the geocode-gating was the root of the NULL-display_name / "Someone" bug). The
-    /// location update runs only when BOTH coordinates are present.
-    func updateUserProfile(name: String, emoji: String,
-                           latitude: Double? = nil, longitude: Double? = nil) async {
-        guard let client, let me = await currentUserID else { return }
-        do {
-            try await client
-                .from("users")
-                .update(["display_name": name, "emoji": emoji])
-                .eq("id", value: me.uuidString)
-                .execute()
-            if let latitude, let longitude {
-                try await client
-                    .from("users")
-                    .update(["latitude": latitude, "longitude": longitude])
-                    .eq("id", value: me.uuidString)
-                    .execute()
-            }
-        } catch {
-            log.warning("profile: users mirror skipped (columns missing?) — \(error.localizedDescription, privacy: .public)")
-        }
-    }
 
     // [phase2] Read-only decode of OUR own public.users row — just the
     // short_code for now. nonisolated Decodable (pure data) → no main-actor
@@ -237,19 +189,7 @@ final class SupabaseService: ObservableObject {
     }
 
     /// The signed-in user's id, or nil when signed out / unconfigured.
-    var currentUserID: UUID? {
-        get async {
-            guard let client else { return nil }
-            return try? await client.auth.session.user.id
-        }
-    }
 
-    // MARK: - Local identity cache (UserDefaults)
-
-    static var localUserID: UUID? {
-        get { UserDefaults.standard.string(forKey: "currentUserID").flatMap(UUID.init) }
-        set { UserDefaults.standard.set(newValue?.uuidString, forKey: "currentUserID") }
-    }
 
     // [pairing-retire step6] connectedFriendID static var HARD-DELETED — the pairing-era
     // "cached partner" was set only by the (deleted) refreshConnection readers and read
@@ -261,45 +201,6 @@ final class SupabaseService: ObservableObject {
     // UserDefaults key stays in DevTools.userDataDefaultsKeys so a legacy stored value is
     // still wiped on reset.
 
-    // MARK: - Users table
-
-    // [concurrency 2026-06-13] `nonisolated` so the synthesized Encodable
-    // conformance isn't main-actor-isolated (this type is nested in the
-    // @MainActor SupabaseService). Pure data struct → behavior-identical; clears
-    // the Swift-6 "main actor-isolated conformance to 'Encodable'" warning.
-    private nonisolated struct UserRow: Codable {
-        let id: UUID
-        let appleUserID: String?
-
-        enum CodingKeys: String, CodingKey {
-            case id
-            case appleUserID = "apple_user_id"
-        }
-    }
-
-    /// After Apple Sign In: upsert our row in public.users and cache the id.
-    /// Returns the Supabase user UUID.
-    @discardableResult
-    func ensureUser(appleUserID: String) async throws -> UUID {
-        guard let client else { throw SupabaseServiceError.notConfigured }
-        guard let me = await currentUserID else { throw SupabaseServiceError.notSignedIn }
-        try await withRetry(label: "ensureUser") {
-            try await client
-                .from("users")
-                .upsert(UserRow(id: me, appleUserID: appleUserID))
-                .execute()
-        }
-        Self.localUserID = me
-        log.info("auth: user ensured ✓ id=\(me.uuidString, privacy: .public)")
-        // [phase2 stage B] (S2) primary drain — now signed in, write any connections
-        // queued while signed OUT (the fresh-install /m/ open path). Covers both the
-        // onboarding + settings sign-in paths (both route through ensureUser).
-        await drainPendingConnections()
-        // APNs may have delivered the device token BEFORE sign-in completed —
-        // registration was skipped then; flush the cached token now.
-        await registerCachedDeviceTokenIfNeeded()
-        return me
-    }
 
     // MARK: - Pairing  [pairing-retire step7 — FULLY RETIRED, code-only; table = step 8]
     // The entire pairing-code subsystem is HARD-DELETED (all uncalled in app code since
@@ -311,61 +212,6 @@ final class SupabaseService: ObservableObject {
     // cleanly until the table is dropped. The LINK mechanism (link_connections / senderID /
     // short_code) is the connection model and is untouched.
 
-    // MARK: - Device tokens (for push via Edge Function)
-
-    // [concurrency 2026-06-13] `nonisolated` — see UserRow. Pure data struct for
-    // the device_tokens upsert; clears the Swift-6 Encodable-isolation warning.
-    private nonisolated struct DeviceTokenRow: Codable {
-        let token: String
-        let userID: UUID
-        let platform: String
-
-        enum CodingKeys: String, CodingKey {
-            case token
-            case userID = "user_id"
-            case platform
-        }
-    }
-
-    /// The latest APNs token, kept locally so registration can be replayed
-    /// after sign-in or on the next launch if the upload ever fails.
-    private static var cachedDeviceToken: String? {
-        get { UserDefaults.standard.string(forKey: "apnsDeviceToken") }
-        set { UserDefaults.standard.set(newValue, forKey: "apnsDeviceToken") }
-    }
-
-    func registerDeviceToken(_ token: String) async {
-        // Always remember the newest token first — whatever happens below,
-        // a later registerCachedDeviceTokenIfNeeded() can finish the job.
-        Self.cachedDeviceToken = token
-        log.info("push: APNs token received (\(token.prefix(8), privacy: .public)…)")
-        guard let client else {
-            log.error("push: token registration deferred — backend not configured")
-            return
-        }
-        guard let me = await currentUserID else {
-            log.warning("push: token registration deferred — not signed in yet (will retry after sign-in)")
-            return
-        }
-        do {
-            try await withRetry(label: "registerDeviceToken") {
-                try await client
-                    .from("device_tokens")
-                    .upsert(DeviceTokenRow(token: token, userID: me, platform: "ios"))
-                    .execute()
-            }
-            log.info("push: device token registered ✓ (\(token.prefix(8), privacy: .public)…)")
-        } catch {
-            log.error("push: token registration FAILED (cached for retry): \(error.localizedDescription, privacy: .public)")
-        }
-    }
-
-    /// Replay a token that arrived before sign-in (or whose upload failed).
-    /// Called after ensureUser and on every app foreground — idempotent.
-    func registerCachedDeviceTokenIfNeeded() async {
-        guard let token = Self.cachedDeviceToken else { return }
-        await registerDeviceToken(token)
-    }
 
     // MARK: - Pings
 
@@ -900,15 +746,6 @@ final class SupabaseService: ObservableObject {
 
     // MARK: - Presence (last seen)
 
-    /// Stamp our presence — called on every app open.
-    func touchLastSeen() async {
-        guard let client, let me = await currentUserID else { return }
-        _ = try? await client
-            .from("users")
-            .update(["last_seen": ISO8601DateFormatter().string(from: .now)])
-            .eq("id", value: me.uuidString)
-            .execute()
-    }
 
     // [build10 shot2] FILL-VIA-LINK — a connected user's PUBLIC profile, read by id.
     // Same wide-open `users` SELECT (RLS `using(true)`) the `fetchLastSeen(of:)` read
@@ -941,77 +778,6 @@ final class SupabaseService: ObservableObject {
     }
 
     /// A partner's last_seen, for "active recently / last seen 2 hours ago".
-    func fetchLastSeen(of user: UUID) async -> Date? {
-        struct Row: Codable {
-            let lastSeen: Date?
-            enum CodingKeys: String, CodingKey { case lastSeen = "last_seen" }
-        }
-        guard let client else { return nil }
-        let rows: [Row]? = try? await client
-            .from("users")
-            .select("last_seen")
-            .eq("id", value: user.uuidString)
-            .execute().value
-        return rows?.first?.lastSeen
-    }
 
-    // MARK: - Giving back
 
-    /// Total donated so far, in cents. Nil when offline/unconfigured —
-    /// callers fall back to $0 gracefully.
-    func fetchGivingTotalCents() async -> Int? {
-        struct Row: Codable {
-            let totalDonatedCents: Int
-            enum CodingKeys: String, CodingKey {
-                case totalDonatedCents = "total_donated_cents"
-            }
-        }
-        guard let client else { return nil }
-        let rows: [Row]? = try? await client
-            .from("giving")
-            .select("total_donated_cents")
-            .limit(1)
-            .execute().value
-        return rows?.first?.totalDonatedCents
-    }
-
-    // MARK: - Stale data cleanup
-
-    /// Launch-time housekeeping so the backend doesn't accumulate dead presence
-    /// and token rows. RLS scopes every delete to `auth.uid()`, so this only
-    /// ever prunes OUR OWN rows — global pruning of every user's stale data is a
-    /// server-side scheduled job (Postgres `cleanup_stale_data`), not something
-    /// a client can or should do. Best-effort and silent on failure: launch must
-    /// never be blocked by housekeeping. Call from a background task. [3/8]
-    ///
-    /// - compass_bearings: our presence bearing older than 1 hour (a stale
-    ///   "pointing at you" glow should not linger after we've moved on).
-    /// - device_tokens: tokens not refreshed in 60 days — the device re-registers
-    ///   a fresh token every launch, so anything this old is a dead device.
-    /// Connections are deliberately untouched: they are the social graph (never
-    /// auto-deleted), and there is no per-connection activity column to drive a
-    /// "30 days inactive" sweep — that would need a schema change + a server job.
-    func cleanupStaleData() async {
-        guard let client, let me = await currentUserID else { return }
-        let iso = ISO8601DateFormatter()
-        let oneHourAgo   = iso.string(from: Date().addingTimeInterval(-3_600))
-        let sixtyDaysAgo = iso.string(from: Date().addingTimeInterval(-60 * 24 * 3_600))
-        do {
-            try await client
-                .from("compass_bearings")
-                .delete()
-                .eq("user_id", value: me.uuidString)
-                .lt("updated_at", value: oneHourAgo)
-                .execute()
-            try await client
-                .from("device_tokens")
-                .delete()
-                .eq("user_id", value: me.uuidString)
-                .lt("updated_at", value: sixtyDaysAgo)
-                .execute()
-            log.info("cleanup: pruned our own stale bearings/tokens ✓")
-        } catch {
-            log.error("cleanup: stale-data prune failed (non-fatal): \(error.localizedDescription, privacy: .public)")
-        }
-    }
 }
