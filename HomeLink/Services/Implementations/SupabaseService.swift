@@ -168,7 +168,6 @@ final class SupabaseService: ObservableObject {
             .or("owner.eq.\(id),friend.eq.\(id)").execute()
         try await client.from("compass_bearings").delete().eq("user_id", value: id).execute()
         try await client.from("users").delete().eq("id", value: id).execute()
-        Self.connectedFriendID = nil
         Self.localUserID = nil
         try await client.auth.signOut()
         log.info("DEV: cleared all data and signed out ✓")
@@ -182,7 +181,6 @@ final class SupabaseService: ObservableObject {
         let id = me.uuidString
         try await client.from("connections").delete()
             .or("owner.eq.\(id),friend.eq.\(id)").execute()
-        Self.connectedFriendID = nil
         log.info("DEV: cleared partner connections for \(id.prefix(8), privacy: .public) ✓")
     }
     #endif
@@ -259,10 +257,10 @@ final class SupabaseService: ObservableObject {
         set { UserDefaults.standard.set(newValue?.uuidString, forKey: "currentUserID") }
     }
 
-    static var connectedFriendID: UUID? {
-        get { UserDefaults.standard.string(forKey: "connectedFriendID").flatMap(UUID.init) }
-        set { UserDefaults.standard.set(newValue?.uuidString, forKey: "connectedFriendID") }
-    }
+    // [pairing-retire step6] connectedFriendID static var HARD-DELETED — the pairing-era
+    // "cached partner" was set only by the (deleted) refreshConnection readers and read
+    // only by vestigial plumbing (RootView partner, the now-gone PeopleListView presence).
+    // The LINK connection state lives per-Person on senderID; there is no global partner.
 
     static var localPairingCode: String? {
         get { UserDefaults.standard.string(forKey: "pairingCode") }
@@ -330,10 +328,9 @@ final class SupabaseService: ObservableObject {
     }
 
 
-    struct DiscoveredConnection {
-        let partnerID: UUID
-        let myPersonID: UUID?   // set when I'm the owner — which card to bind
-    }
+    // [pairing-retire step6] DiscoveredConnection HARD-DELETED — the pairing-discovery
+    // result model; its only users (refreshConnections + the startRealtime onPaired param)
+    // are gone.
 
 
 
@@ -396,84 +393,11 @@ final class SupabaseService: ObservableObject {
     // [9b · B3] PairOutcome + claimOutcome (the pairing claim state machine) DELETED —
     // their last caller, PairingScenarioTests, retired in this batch.
 
-    /// Every established connection, both directions, with the owner-side
-    /// person id so the right card gets bound.
-    func refreshConnections() async throws -> [DiscoveredConnection] {
-        guard let client else { throw SupabaseServiceError.notConfigured }
-        guard let me = await currentUserID else { throw SupabaseServiceError.notSignedIn }
-
-        var found: [DiscoveredConnection] = []
-
-        let mine: [ConnectionRow] = try await withRetry(label: "refreshConnections.mine") {
-            try await client
-                .from("connections")
-                .select()
-                .eq("owner", value: me.uuidString)
-                .execute().value
-        }
-        for row in mine where row.friend != nil {
-            found.append(DiscoveredConnection(partnerID: row.friend!,
-                                              myPersonID: row.ownerPersonID))
-        }
-
-        let theirs: [ConnectionRow] = try await withRetry(label: "refreshConnections.theirs") {
-            try await client
-                .from("connections")
-                .select()
-                .eq("friend", value: me.uuidString)
-                .execute().value
-        }
-        for row in theirs {
-            found.append(DiscoveredConnection(partnerID: row.owner, myPersonID: nil))
-        }
-
-        log.info("pairing: refreshConnections → \(found.count) connection(s)")
-        // Keep the cached partner stable across refreshes — only replace it
-        // when it's gone (unpaired) or never set.
-        let cached = Self.connectedFriendID
-        if cached == nil || !found.contains(where: { $0.partnerID == cached }) {
-            Self.connectedFriendID = found.first?.partnerID
-        }
-        return found
-    }
-
-    /// Look both directions for an established connection and cache the partner.
-    @discardableResult
-    func refreshConnection() async throws -> UUID? {
-        guard let client else { throw SupabaseServiceError.notConfigured }
-        guard let me = await currentUserID else { throw SupabaseServiceError.notSignedIn }
-
-        // Someone redeemed one of my codes. NOTE: scan ALL rows — with person
-        // invites a user owns several, and the claimed one is rarely first.
-        let mine: [ConnectionRow] = try await withRetry(label: "refreshConnection.mine") {
-            try await client
-                .from("connections")
-                .select()
-                .eq("owner", value: me.uuidString)
-                .execute().value
-        }
-        if let friend = mine.compactMap(\.friend).first {
-            Self.connectedFriendID = friend
-            log.info("pairing: refreshConnection → partner \(friend.uuidString, privacy: .public) (they redeemed my code)")
-            return friend
-        }
-
-        // I redeemed someone else's code
-        let theirs: [ConnectionRow] = try await withRetry(label: "refreshConnection.theirs") {
-            try await client
-                .from("connections")
-                .select()
-                .eq("friend", value: me.uuidString)
-                .execute().value
-        }
-        if let owner = theirs.first?.owner {
-            Self.connectedFriendID = owner
-            log.info("pairing: refreshConnection → partner \(owner.uuidString, privacy: .public) (I redeemed theirs)")
-            return owner
-        }
-        log.info("pairing: refreshConnection → no connection yet")
-        return nil
-    }
+    // [pairing-retire step5] refreshConnections() + refreshConnection() HARD-DELETED —
+    // the pairing `connections`-table readers that set connectedFriendID. The LINK path
+    // (senderID / link_connections) is the connection mechanism; nothing reads these.
+    // (ConnectionRow is removed in step 7 with myPairingCode; DiscoveredConnection in
+    // step 6 with the vestigial startRealtime onPaired param.)
 
     /// "POINT-" + four unambiguous characters (no 0/O/1/I/L).
     static func generatePairingCode() -> String {
@@ -883,11 +807,12 @@ final class SupabaseService: ObservableObject {
     /// claims on our own invite codes (the inviter-side celebration).
     /// Safe to call repeatedly — tears down any existing channel first.
     func startRealtime(
-        partner: UUID?,
+        // [pairing-retire step6] `partner` + `onPaired` params REMOVED — both vestigial:
+        // the pings/felt streams below filter on to_user/from_user = me (no partner id
+        // needed), and the pairing-claim stream that once fired onPaired is retired.
         onPing: @escaping (PingEvent) -> Void,
         onFelt: @escaping (PingEvent) -> Void,
-        onPointed: @escaping (Double?) -> Void,
-        onPaired: @escaping (DiscoveredConnection) -> Void = { _ in }
+        onPointed: @escaping (Double?) -> Void
     ) async {
         guard let client, let me = await currentUserID else { return }
         await stopListening()
@@ -915,7 +840,7 @@ final class SupabaseService: ObservableObject {
         //     filter: "owner=eq.\(me.uuidString)")
 
         await channel.subscribe()
-        log.info("realtime: consolidated channel subscribed (partner: \(partner?.uuidString ?? "none", privacy: .public))")
+        log.info("realtime: consolidated channel subscribed")
 
         // The streams end when the channel unsubscribes — loops exit cleanly.
         Task { [log] in
@@ -977,7 +902,7 @@ final class SupabaseService: ObservableObject {
         //         }
         //     }
         // }
-        _ = onPointed; _ = onPaired   // [build9] retained in signature, no longer fired
+        _ = onPointed   // [build9] retained in signature, no longer fired (onPaired removed step6)
     }
 
     func stopListening() async {

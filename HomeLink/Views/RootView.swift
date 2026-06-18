@@ -299,22 +299,9 @@ struct RootView: View {
         }
         Task { await SupabaseService.shared.touchLastSeen() }   // "active recently"
         Task {
-            // [build9] pairing DISCOVER retired (refreshConnections + bindConnection).
-            // `partner` is now just the cached connectedFriendID (delivery fallback
-            // for the pings realtime — left intact).
-            let partner = SupabaseService.connectedFriendID
-            // do {
-            //     let connections = try await SupabaseService.shared.refreshConnections()
-            //     await MainActor.run {
-            //         for connection in connections {
-            //             people.bindConnection(friendID: connection.partnerID,
-            //                                   toPersonID: connection.myPersonID)
-            //         }
-            //     }
-            //     partner = connections.first?.partnerID ?? partner
-            // } catch {
-            //     rootLog.error("realtime: connection discovery failed: …")
-            // }
+            // [pairing-retire step6] pairing DISCOVER fully retired — the
+            // `partner = connectedFriendID` plumbing is GONE (it was vestigial: the
+            // realtime pings stream filters on to_user = me, so no partner id is needed).
 
             // OFFLINE CATCH-UP: sweep every paired person for thoughts that
             // arrived while we were away — newest becomes the catch, the
@@ -325,7 +312,6 @@ struct RootView: View {
             }
 
             await SupabaseService.shared.startRealtime(
-                partner: partner,
                 onPing: { event in
                     Task { @MainActor in
                         let fromName = people.people.first {
@@ -352,11 +338,10 @@ struct RootView: View {
                         pings.lastFeltAt = .now
                     }
                 },
-                // [build9] mutual-pointing + pairing-claim retired → no-op closures
-                // (kept in the signature; the realtime pairing streams that fired
-                // them are commented in SupabaseService.startRealtime).
-                onPointed: { _ in },
-                onPaired: { _ in }
+                // [build9] mutual-pointing retired → no-op closure (the compass_bearings
+                // stream that fired it is commented in SupabaseService.startRealtime).
+                // [pairing-retire step6] onPaired removed (param dropped from startRealtime).
+                onPointed: { _ in }
             )
         }
     }

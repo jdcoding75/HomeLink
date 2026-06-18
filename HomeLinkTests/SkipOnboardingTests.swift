@@ -28,7 +28,7 @@ final class SkipOnboardingTests: XCTestCase {
         let pings = PingManager(networkService: MockNetworkService())
 
         // Clean slate — these are UserDefaults-backed statics.
-        SupabaseService.connectedFriendID = nil
+        // [pairing-retire step6] connectedFriendID reset removed (var deleted).
         SupabaseService.localUserID = nil
         UserDefaults.standard.set(false, forKey: "hasCompletedOnboarding")
 
@@ -61,11 +61,13 @@ final class SkipOnboardingTests: XCTestCase {
         XCTAssertEqual(people.selectedPerson?.id, sarah?.id,
                        "Sarah must be the selected person")
 
-        // 4 — the mock connection is set.
-        XCTAssertEqual(SupabaseService.connectedFriendID, DevTools.mockFriendID,
-                       "mock connection must be set")
+        // 4 — the mock connection is set. [pairing-retire step6] the pairing-era
+        // connectedFriendID assertion removed (var deleted); the LINK-era key
+        // (senderID, mirrored to pairedUserID) is the connection of record.
         XCTAssertEqual(sarah?.pairedUserID, DevTools.mockFriendID.uuidString,
                        "Sarah's card must carry the mock connection")
+        XCTAssertEqual(sarah?.senderID, DevTools.mockFriendID.uuidString,
+                       "Sarah's card must carry the mock senderID (link-era connection)")
     }
 
     /// Re-running injection (every launch re-checks the arg) must not create a

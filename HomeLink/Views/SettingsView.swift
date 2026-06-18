@@ -406,10 +406,9 @@ struct SettingsView: View {
                     try await SupabaseService.shared.signInWithApple(idToken: idToken,
                                                                      nonce: currentNonce)
                     let me = try await SupabaseService.shared.ensureUser(appleUserID: credential.user)
-                    // [pairing-retire step2] pairing-code mint call REMOVED (discarded result;
-                    // stops writing `connections` rows). refreshConnection() is LEFT (step 4,
-                    // gated on the PeopleListView migration — it still sets connectedFriendID).
-                    _ = try await SupabaseService.shared.refreshConnection()
+                    // [pairing-retire step2+5] pairing-code mint + refreshConnection calls
+                    // REMOVED — pairing is retired (connections table read no longer drives
+                    // any connection state; the LINK path uses senderID/link_connections).
                     signedInUserID = me
                     Self.log.info("signin: complete ✓")
                 } catch {
@@ -425,7 +424,6 @@ struct SettingsView: View {
             await SupabaseService.shared.stopListening()   // realtime dies with the session
             try? await SupabaseService.shared.signOut()
             SupabaseService.localUserID       = nil
-            SupabaseService.connectedFriendID = nil
             SupabaseService.localPairingCode  = nil
             signedInUserID = nil
         }

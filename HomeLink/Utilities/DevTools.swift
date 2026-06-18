@@ -42,7 +42,8 @@ enum DevTools {
     @MainActor
     static func injectMockData(people: PeopleManager, pings: PingManager? = nil,
                                withHistory: Bool = false) {
-        SupabaseService.connectedFriendID = mockFriendID
+        // [pairing-retire step6] connectedFriendID mock-set removed (var deleted); the
+        // mock Sarah is a LINK contact keyed on mockFriendID as her senderID (below).
         if SupabaseService.localUserID == nil { SupabaseService.localUserID = mockMeID }
 
         // [build9] Sarah repointed off pairing: dedup + insert via the link-era
@@ -201,7 +202,6 @@ enum DevTools {
     @MainActor
     static func resetToOnboarding(people: PeopleManager) {
         for p in people.people { try? people.deletePerson(p) }
-        SupabaseService.connectedFriendID = nil
         UserDefaults.standard.removeObject(forKey: injectFlagKey)
         UserDefaults.standard.set(false, forKey: "hasCompletedOnboarding")
         UserDefaults.standard.set(false, forKey: "enteredViaLink")   // [build10 shot2]
@@ -221,8 +221,7 @@ enum DevTools {
     /// emoji-set choices, subscription, units, haptics) is deliberately kept.
     static let userDataDefaultsKeys: [String] = [
         "currentUserID",            // local identity cache
-        "connectedFriendID",        // the paired friend
-        "pairingCode",              // pairing data
+        "pairingCode",              // [pairing-retire] legacy localPairingCode key (cleared on reset)
         "hasCompletedOnboarding",   // onboarding flag
         "enteredViaLink",           // [build10 shot2] link-arriver guest entry flag
         "apnsDeviceToken",          // device push token

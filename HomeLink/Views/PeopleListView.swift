@@ -17,7 +17,10 @@ struct PeopleListView: View {
     @State private var detailPerson: Person? = nil
     @State private var showConnect = false
     @State private var showUnlock = false
-    @State private var friendLastSeen: Date? = nil   // presence of the connected friend
+    // [pairing-retire step4-presence] friendLastSeen + fetchFriendPresence + lastSeenText
+    // REMOVED — the cosmetic "· last seen X ago" badge suffix was gated on the pairing-era
+    // global connectedFriendID (already nil/dead for link contacts). The badge stays
+    // "connected ✓". This removes PeopleListView's last connectedFriendID read.
 
     var body: some View {
         ZStack {
@@ -48,7 +51,6 @@ struct PeopleListView: View {
                                 distanceText: distanceText(for: person),
                                 isConnected: isConnected(person),
                                 isPending: isPending(person),
-                                lastSeenText: lastSeenText(for: person),
                                 showLocationHint: needsLocation(person),
                                 disambiguator: disambiguator(for: person, dupes: dupes),
                                 hideConnectionStatus: isLinkContact(person),
@@ -122,7 +124,6 @@ struct PeopleListView: View {
         // .sheet(isPresented: $showConnect) {
         //     ConnectView()
         // }
-        .onAppear { fetchFriendPresence() }
         // A replay is about to present app-wide — get our sheets out of the way
         .onReceive(NotificationCenter.default.publisher(for: .pointwardCloseSheetsForReplay)) { _ in
             detailPerson = nil
@@ -157,17 +158,6 @@ struct PeopleListView: View {
         person.pairedUserID != nil && !isConnected(person)
     }
 
-    private func lastSeenText(for person: Person) -> String? {
-        guard isConnected(person), let date = friendLastSeen else { return nil }
-        return PersonDetailView.presenceText(for: date)
-    }
-
-    private func fetchFriendPresence() {
-        guard let friend = SupabaseService.connectedFriendID else { return }
-        Task {
-            friendLastSeen = await SupabaseService.shared.fetchLastSeen(of: friend)
-        }
-    }
 
     // MARK: - [phase2 build6] Display helpers
 
@@ -286,7 +276,6 @@ struct PersonCard: View {
     let distanceText: String?
     let isConnected: Bool
     var isPending: Bool = false   // [1/3] one-sided pairing — dim, "pending"
-    let lastSeenText: String?
     var showLocationHint: Bool = false      // [build6] zero-location → add-location hint
     var disambiguator: String? = nil        // [build6] same-name suffix line
     var hideConnectionStatus: Bool = false  // [build6] suppress pairing row for link contacts
@@ -389,7 +378,7 @@ struct PersonCard: View {
                                            : DesignTokens.Color.textDim.opacity(0.6)))
                         .frame(width: 6, height: 6)
                     Text(isConnected
-                         ? (lastSeenText.map { "connected ✓ · \($0)" } ?? "connected ✓")
+                         ? "connected ✓"
                          : (isPending ? "connection pending · waiting for \(person.name) to reconnect"
                                       : "not yet linked"))
                         .font(.system(size: 10))
