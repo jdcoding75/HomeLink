@@ -577,8 +577,11 @@ struct OnboardingView: View {
                     .padding(.top, 4)
 
                     Text("your location lets people you connect with point\ntoward you — share only what you're comfortable with")
-                        .font(.system(size: 11, design: .serif).italic())
-                        .foregroundColor(DesignTokens.Color.textDim)
+                        // [build10] legibility bump (device feedback: too small/faint) —
+                        // 11 → 13 (just below the screen's 14 body helper) + textDim → textMuted
+                        // (the screen's standard muted helper color). Still subordinate, now readable.
+                        .font(.system(size: 13, design: .serif).italic())
+                        .foregroundColor(DesignTokens.Color.textMuted)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 .padding(.horizontal, 30)
