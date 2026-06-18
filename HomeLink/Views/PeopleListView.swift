@@ -142,10 +142,12 @@ struct PeopleListView: View {
         return BearingCalculator.formattedDistance(km)
     }
 
-    /// Connected = this person carries the paired friend's Supabase id.
+    /// [pairing-retire step4] Connected = this LINK-era contact carries a senderID
+    /// (auto-created on receive). senderID-ONLY — mirrors PersonDetailView's reconciled
+    /// isConnected; no longer reads the pairing-era global connectedFriendID. isPending +
+    /// lastSeenText follow automatically (they call isConnected, not connectedFriendID).
     private func isConnected(_ person: Person) -> Bool {
-        guard let friend = SupabaseService.connectedFriendID else { return false }
-        return person.pairedUserID == friend.uuidString
+        !(person.senderID ?? "").isEmpty
     }
 
     /// [1/3] Scenario 4 — one-sided pairing: we recorded a partner id for this

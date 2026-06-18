@@ -171,13 +171,8 @@ final class PairingHardeningTests: XCTestCase {
     // they tested SupabaseService.claimOutcome, which is retired (the pairing
     // invite-accept path). See reports/ninebee_b2_revised_build.md.
 
-    func testPersonCardInviteTiesCorrectly() {
-        // A person-card invite carries that person's name and their pairing code,
-        // so accepting it links to the right card.
-        let msg = AppLinks.personInviteMessage(personName: "Grandma", code: "POINT-GP2S")
-        XCTAssertTrue(msg.contains("Grandma"))
-        XCTAssertTrue(msg.contains("/pair/POINT-GP2S"))
-    }
+    // [pairing-retire step3] testPersonCardInviteTiesCorrectly RETIRED
+    // (AppLinks.personInviteMessage deleted).
 }
 
 // MARK: - Notifications

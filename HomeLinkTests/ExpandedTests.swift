@@ -426,10 +426,8 @@ final class OrbGeometryTests: XCTestCase {
 
 final class PairingLinkTests: XCTestCase {
 
-    func testPairLinkBuildsUniversalLink() {
-        XCTAssertEqual(AppLinks.pairLink(code: "POINT-GP2S"),
-                       "https://pointward.app/pair/POINT-GP2S")
-    }
+    // [pairing-retire step3] testPairLinkBuildsUniversalLink RETIRED (AppLinks.pairLink deleted).
+    // The 3 code-format tests below (normalize/isValid/generate) retire in step 7 with the internals.
 
     func testDeepLinkPathExtractsCode() {
         // Mirrors RootView.handleIncomingURL parsing.
@@ -448,31 +446,8 @@ final class PairingLinkTests: XCTestCase {
         XCTAssertEqual(SupabaseService.normalizePairingCode(parts[1]), "POINT-GP2S")
     }
 
-    func testInviteMessageWithCodeContainsTappableLink() {
-        let msg = AppLinks.inviteMessage(pairingCode: "POINT-GP2S")
-        XCTAssertTrue(msg.contains("https://pointward.app/pair/POINT-GP2S"))
-    }
-
-    func testInviteMessageWithoutCodeFallsBackToDownload() {
-        let msg = AppLinks.inviteMessage(pairingCode: nil)
-        XCTAssertFalse(msg.contains("/pair/"))
-        XCTAssertTrue(msg.contains("https://pointward.app"))
-        XCTAssertEqual(AppLinks.inviteMessage(pairingCode: ""), msg,
-                       "empty code is treated like no code")
-    }
-
-    func testPersonInviteTiesToTheRightPerson() {
-        let msg = AppLinks.personInviteMessage(personName: "Grandma", code: "POINT-GP2S")
-        XCTAssertTrue(msg.contains("Grandma wants to connect"))
-        XCTAssertTrue(msg.contains("/pair/POINT-GP2S"))
-    }
-
-    func testThoughtInviteAppendsCode() {
-        let withCode = AppLinks.thoughtInvite(code: "POINT-GP2S")
-        XCTAssertTrue(withCode.contains("enter my code: POINT-GP2S"))
-        let without = AppLinks.thoughtInvite(code: nil)
-        XCTAssertFalse(without.contains("enter my code"))
-    }
+    // [pairing-retire step3] RETIRED (AppLinks builders deleted): testInviteMessageWithCodeContainsTappableLink,
+    // testInviteMessageWithoutCodeFallsBackToDownload, testPersonInviteTiesToTheRightPerson, testThoughtInviteAppendsCode.
 
     func testNormalizeRoundTripsValidGeneratedCodes() {
         for _ in 0..<25 {
