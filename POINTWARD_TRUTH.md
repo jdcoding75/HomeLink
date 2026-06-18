@@ -1889,12 +1889,14 @@ Full detail + line counts: **`reports/structural_map.md`**.
 
 **RECOMMENDED ORDER** (effort · risk · what it unlocks):
 
-1. **DEAD-CODE DELETE** — zero risk, do FIRST. 4 whole-file orphans (all `#if false`/zero-caller, HIGH
-   confidence — verify the RootView/CompassView refs are *comments* at delete time): **ArrivalPreviewView**
-   (79) · **MutualMomentView** (72) · **FireflyInstrumentView** (149) · **DirectionResolver** (93). PLUS 2
-   dead arrival structs **inside CompassView** — **RevealArrivalView** (~231) + **CoreArrivalView** (~187),
-   zero external callers, ⚠️ arrival/reveal-adjacent (animation-track care) — deleting shrinks CompassView
-   ~13%. **~810 dead lines total.** _Unlocks:_ "Claude sees only live code"; cleaner every search/review.
+1. **DEAD-CODE DELETE** — zero risk, do FIRST. **✅ DONE** (commits `2899565` + `5429413`). 4 whole-file
+   orphans deleted: **ArrivalPreviewView** (79) · **MutualMomentView** (72) · **FireflyInstrumentView** (149)
+   · **DirectionResolver** (93). PLUS — **CORRECTION to the original map:** there were **FOUR** dead arrival
+   structs inside CompassView, not 2 — `DirectionalArrivalView`, `RevealArrivalView`, `CoreArrivalView`,
+   `ThoughtArrivalView` (the map wrongly called `DirectionalArrivalView` "live"). **ALL FOUR were DEAD**
+   (zero callers — *"previous arrival flows retired"*); **the LIVE arrival is `ReceiptView`** (an excluded
+   animation file, untouched). All 4 were **deleted** (−483 lines, `5429413`); **no `CompassArrivalViews.swift`
+   was created** (there's no live arrival view to contain). _Unlocks:_ "Claude sees only live code".
 
 2. **SUPABASESERVICE EXTENSION-SPLIT** — the **#1 parallelism unlock**. 1017 lines, **touched by 25 files**
    = the worst chokepoint (every backend task edits it). Split into `extension SupabaseService` files
@@ -1909,11 +1911,12 @@ Full detail + line counts: **`reports/structural_map.md`**.
    OnboardingView** → a shared `AddressAutocompleteField` + helpers. _Unlocks:_ removes "synchronized
    multi-file edit" collisions + shrinks 5 views.
 
-4. **COMPASSVIEW SUBVIEW EXTRACTION** — UI parallelism. 3109 lines, touched by 18. Extract the independent
-   structs FIRST (**SkinQuickPicker / PersonSwitcherSheet / ShareCardView / thought-history**) — LOW risk.
-   **DEFER** the send-trigger (`CompassView+Send`, ⚠️ **PATH-1**) + the arrival views (⚠️ **animation**) to
-   separate careful **device-verified** passes. _Unlocks:_ compass / history / share / people-switch tasks
-   **in parallel**.
+4. **COMPASSVIEW SUBVIEW EXTRACTION** — UI parallelism. **✅ PARTLY DONE** (`5429413`): **SkinQuickPicker /
+   PersonSwitcherSheet / ShareCardView** extracted to their own files (LOW risk, zero caller change) +
+   the 4 dead arrival structs deleted → CompassView **3109 → 2382**. **DEFER** the send-trigger
+   (`CompassView+Send`, ⚠️ **PATH-1**) to a careful device-verified pass. _(No "arrival views" remain to
+   extract — they were all dead and deleted; the live arrival is `ReceiptView`.)_ _Unlocks:_ compass /
+   share / people-switch tasks **in parallel**.
 
 5. **`pairedUserID` → `senderID` MIGRATION** — LAST, careful. `pairedUserID` is a **pure mirror of
    senderID** (no extra info) but still read by ~4 live sites incl ⚠️ **PingManager:264 (PATH-1 delivery
