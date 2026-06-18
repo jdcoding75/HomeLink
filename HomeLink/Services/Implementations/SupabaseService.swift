@@ -164,8 +164,9 @@ final class SupabaseService: ObservableObject {
         try await client.from("device_tokens").delete().eq("user_id", value: id).execute()
         try await client.from("pings").delete()
             .or("from_user.eq.\(id),to_user.eq.\(id)").execute()
-        try await client.from("connections").delete()
-            .or("owner.eq.\(id),friend.eq.\(id)").execute()
+        // [pairing-retire step8] connections-table delete REMOVED — the pairing `connections`
+        // table was dropped server-side; this call would now error. (link_connections is a
+        // SEPARATE table, untouched.)
         try await client.from("compass_bearings").delete().eq("user_id", value: id).execute()
         try await client.from("users").delete().eq("id", value: id).execute()
         Self.localUserID = nil
@@ -173,16 +174,9 @@ final class SupabaseService: ObservableObject {
         log.info("DEV: cleared all data and signed out ✓")
     }
 
-    /// Remove only the pairing connections (keeps pings history) so pairing
-    /// can be re-tested without a fresh account.
-    func clearConnectionsOnly() async throws {
-        guard let client else { throw SupabaseServiceError.notConfigured }
-        guard let me = await currentUserID else { throw SupabaseServiceError.notConfigured }
-        let id = me.uuidString
-        try await client.from("connections").delete()
-            .or("owner.eq.\(id),friend.eq.\(id)").execute()
-        log.info("DEV: cleared partner connections for \(id.prefix(8), privacy: .public) ✓")
-    }
+    // [pairing-retire step8] clearConnectionsOnly() HARD-DELETED — a DEV-only pairing-test
+    // helper (zero callers) that deleted from the now-dropped `connections` table. Pairing
+    // is fully retired; nothing re-tests it.
     #endif
 
     /// [1/4] Mirror YOUR profile into public.users — best-effort, so it no-ops
