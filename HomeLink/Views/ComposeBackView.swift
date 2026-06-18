@@ -169,7 +169,10 @@ struct ComposeBackView: View {
                     try await SupabaseService.shared.signInWithApple(idToken: idToken,
                                                                      nonce: currentNonce)
                     try await SupabaseService.shared.ensureUser(appleUserID: credential.user)
-                    _ = try? await SupabaseService.shared.myPairingCode()   // background mint (same as onboarding)
+                    // [pairing-retire step2] pairing-code mint call REMOVED (discarded result).
+                    // ⚠️ THIRD call site — the audit listed only OnboardingView + SettingsView;
+                    // this one (added in Shot 2, "same as onboarding") was also stopping the
+                    // mint open for link-arriver sign-ins. Removed to fully stop the mint.
                     HapticEngine.connectionFelt()
                     withAnimation(.easeOut(duration: 0.35)) { signedIn = true }   // → name step
                 } catch {

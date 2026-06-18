@@ -406,7 +406,9 @@ struct SettingsView: View {
                     try await SupabaseService.shared.signInWithApple(idToken: idToken,
                                                                      nonce: currentNonce)
                     let me = try await SupabaseService.shared.ensureUser(appleUserID: credential.user)
-                    _ = try await SupabaseService.shared.myPairingCode()
+                    // [pairing-retire step2] pairing-code mint call REMOVED (discarded result;
+                    // stops writing `connections` rows). refreshConnection() is LEFT (step 4,
+                    // gated on the PeopleListView migration — it still sets connectedFriendID).
                     _ = try await SupabaseService.shared.refreshConnection()
                     signedInUserID = me
                     Self.log.info("signin: complete ✓")

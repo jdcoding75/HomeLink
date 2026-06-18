@@ -298,8 +298,10 @@ struct OnboardingView: View {
                     try await SupabaseService.shared.signInWithApple(idToken: idToken,
                                                                      nonce: currentNonce)
                     try await SupabaseService.shared.ensureUser(appleUserID: credential.user)
-                    // Mint the pairing code in the background so Connect is instant
-                    Task { _ = try? await SupabaseService.shared.myPairingCode() }
+                    // [pairing-retire step2] pairing-code mint call REMOVED (return value
+                    // was discarded; the code is unredeemable + never surfaced). Stops
+                    // writing new `connections` rows. The func def stays (removed later, in
+                    // order). The LINK path (senderID/link_connections) is unaffected.
                     withAnimation(.easeOut(duration: 0.4)) { signedIn = true }
                     HapticEngine.connectionFelt()
                     // Brief success moment, then onward
