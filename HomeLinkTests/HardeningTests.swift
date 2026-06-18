@@ -153,27 +153,10 @@ final class CatchModeHardeningTests: XCTestCase {
     }
 }
 
-// MARK: - Pairing
-
-final class PairingHardeningTests: XCTestCase {
-
-    func testDeepLinkParsesCode() {
-        // pointward.app/pair/POINT-GP2S → the filled-in pairing code.
-        let url = URL(string: "https://pointward.app/pair/POINT-GP2S")!
-        let parts = url.pathComponents.filter { $0 != "/" }
-        XCTAssertTrue(["pair", "join"].contains(parts[0].lowercased()))
-        let code = SupabaseService.normalizePairingCode(parts[1])
-        XCTAssertTrue(SupabaseService.isValidPairingCode(code))
-        XCTAssertEqual(code, "POINT-GP2S")
-    }
-
-    // [9b · B2] testBothSidesLinkAfterAccept + testDuplicatePairingPrevented removed —
-    // they tested SupabaseService.claimOutcome, which is retired (the pairing
-    // invite-accept path). See reports/ninebee_b2_revised_build.md.
-
-    // [pairing-retire step3] testPersonCardInviteTiesCorrectly RETIRED
-    // (AppLinks.personInviteMessage deleted).
-}
+// [pairing-retire step7] The entire PairingHardeningTests class RETIRED — its last active
+// case (testDeepLinkParsesCode) exercised the deleted normalize/isValid POINT-XXXX helpers;
+// the rest were already retired (9b B2 claimOutcome + step 3 personInviteMessage). No LINK
+// coverage here (the /m/ link path is tested in MessageLinkTests/ShortCodeTests).
 
 // MARK: - Notifications
 

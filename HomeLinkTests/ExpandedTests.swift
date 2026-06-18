@@ -422,41 +422,9 @@ final class OrbGeometryTests: XCTestCase {
     }
 }
 
-// MARK: - Pairing links & person invites
-
-final class PairingLinkTests: XCTestCase {
-
-    // [pairing-retire step3] testPairLinkBuildsUniversalLink RETIRED (AppLinks.pairLink deleted).
-    // The 3 code-format tests below (normalize/isValid/generate) retire in step 7 with the internals.
-
-    func testDeepLinkPathExtractsCode() {
-        // Mirrors RootView.handleIncomingURL parsing.
-        let url = URL(string: "https://pointward.app/pair/POINT-GP2S")!
-        let parts = url.pathComponents.filter { $0 != "/" }
-        XCTAssertEqual(parts.first?.lowercased(), "pair")
-        let code = SupabaseService.normalizePairingCode(parts[1])
-        XCTAssertTrue(SupabaseService.isValidPairingCode(code))
-        XCTAssertEqual(code, "POINT-GP2S")
-    }
-
-    func testJoinPathAlsoAccepted() {
-        let url = URL(string: "https://pointward.app/join/gp2s")!
-        let parts = url.pathComponents.filter { $0 != "/" }
-        XCTAssertTrue(["pair", "join"].contains(parts[0].lowercased()))
-        XCTAssertEqual(SupabaseService.normalizePairingCode(parts[1]), "POINT-GP2S")
-    }
-
-    // [pairing-retire step3] RETIRED (AppLinks builders deleted): testInviteMessageWithCodeContainsTappableLink,
-    // testInviteMessageWithoutCodeFallsBackToDownload, testPersonInviteTiesToTheRightPerson, testThoughtInviteAppendsCode.
-
-    func testNormalizeRoundTripsValidGeneratedCodes() {
-        for _ in 0..<25 {
-            let code = SupabaseService.generatePairingCode()
-            // A generated code, when re-normalized, returns itself.
-            XCTAssertEqual(SupabaseService.normalizePairingCode(code), code)
-        }
-    }
-}
+// [pairing-retire step7] The entire PairingLinkTests class RETIRED — every case exercised
+// the deleted pairing-code subsystem (pairLink/invite builders [step 3] + normalize/isValid/
+// generate on the POINT-XXXX code [step 7]). None tested LINK (/m/) behavior.
 
 // MARK: - Subscription tier gates
 

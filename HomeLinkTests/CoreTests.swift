@@ -131,51 +131,10 @@ final class AlignmentTests: XCTestCase {
     }
 }
 
-// MARK: - Pairing codes
-
-final class PairingCodeTests: XCTestCase {
-
-    func testGeneratedFormatIsAlwaysPointDashFour() {
-        for _ in 0..<100 {
-            let code = SupabaseService.generatePairingCode()
-            XCTAssertTrue(SupabaseService.isValidPairingCode(code),
-                          "generated code \(code) failed its own validation")
-            XCTAssertEqual(code.count, 10)
-            XCTAssertTrue(code.hasPrefix("POINT-"))
-            // No ambiguous characters, ever
-            for forbidden in ["0", "O", "1", "I", "L"] {
-                XCTAssertFalse(code.dropFirst(6).contains(forbidden),
-                               "code \(code) contains ambiguous char \(forbidden)")
-            }
-        }
-    }
-
-    func testValidationRejectsWrongShapes() {
-        XCTAssertFalse(SupabaseService.isValidPairingCode(""))
-        XCTAssertFalse(SupabaseService.isValidPairingCode("POINT-"))
-        XCTAssertFalse(SupabaseService.isValidPairingCode("POINT-AB"))       // too short
-        XCTAssertFalse(SupabaseService.isValidPairingCode("POINT-ABCDE"))    // too long
-        XCTAssertFalse(SupabaseService.isValidPairingCode("PONT-ABCD"))      // wrong prefix
-        XCTAssertFalse(SupabaseService.isValidPairingCode("point-abcd"))     // lowercase
-        XCTAssertFalse(SupabaseService.isValidPairingCode("POINT-AB!?"))     // symbols
-        XCTAssertTrue(SupabaseService.isValidPairingCode("POINT-GP2S"))
-    }
-
-    func testNormalizationAcceptsHumanInput() {
-        // The UI displays "POINT · GP2S" — people type all of these:
-        XCTAssertEqual(SupabaseService.normalizePairingCode("POINT-GP2S"), "POINT-GP2S")
-        XCTAssertEqual(SupabaseService.normalizePairingCode("point gp2s"), "POINT-GP2S")
-        XCTAssertEqual(SupabaseService.normalizePairingCode("POINT · GP2S"), "POINT-GP2S")
-        XCTAssertEqual(SupabaseService.normalizePairingCode("gp2s"), "POINT-GP2S")
-        XCTAssertEqual(SupabaseService.normalizePairingCode("  GP2S  "), "POINT-GP2S")
-    }
-
-    func testCodesAreUniqueAcrossGenerations() {
-        // 10 draws from a 923k space — a collision here means the RNG broke
-        let codes = (0..<10).map { _ in SupabaseService.generatePairingCode() }
-        XCTAssertEqual(Set(codes).count, codes.count, "duplicate codes generated: \(codes)")
-    }
-}
+// [pairing-retire step7] The entire PairingCodeTests class RETIRED — all 4 cases
+// (testGeneratedFormatIsAlwaysPointDashFour, testValidationRejectsWrongShapes,
+// testNormalizationAcceptsHumanInput, testCodesAreUniqueAcrossGenerations) exercised the
+// deleted POINT-XXXX code helpers (generate/validate/normalize). No LINK coverage here.
 
 // MARK: - Instrument selection (tier gate)
 

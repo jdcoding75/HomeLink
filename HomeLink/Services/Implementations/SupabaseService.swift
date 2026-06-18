@@ -262,10 +262,10 @@ final class SupabaseService: ObservableObject {
     // only by vestigial plumbing (RootView partner, the now-gone PeopleListView presence).
     // The LINK connection state lives per-Person on senderID; there is no global partner.
 
-    static var localPairingCode: String? {
-        get { UserDefaults.standard.string(forKey: "pairingCode") }
-        set { UserDefaults.standard.set(newValue, forKey: "pairingCode") }
-    }
+    // [pairing-retire step7] localPairingCode cache HARD-DELETED — it was written only by
+    // myPairingCode (deleted) and cleared on signout (also removed). The "pairingCode"
+    // UserDefaults key stays in DevTools.userDataDefaultsKeys so a legacy stored value is
+    // still wiped on reset.
 
     // MARK: - Users table
 
@@ -307,110 +307,15 @@ final class SupabaseService: ObservableObject {
         return me
     }
 
-    // MARK: - Pairing (connections: code · owner · friend · person identity)
-
-    private struct ConnectionRow: Codable {
-        let code: String
-        let owner: UUID
-        var friend: UUID?
-        var personName: String?      // who the owner says this connection is
-        var personEmoji: String?
-        var ownerPersonID: UUID?     // the owner's local Person.id, to re-link
-        var friendPersonID: UUID?    // the FRIEND's local Person.id (set on claim)
-
-        enum CodingKeys: String, CodingKey {
-            case code, owner, friend
-            case personName     = "person_name"
-            case personEmoji    = "person_emoji"
-            case ownerPersonID  = "owner_person_id"
-            case friendPersonID = "friend_person_id"
-        }
-    }
-
-
-    // [pairing-retire step6] DiscoveredConnection HARD-DELETED — the pairing-discovery
-    // result model; its only users (refreshConnections + the startRealtime onPaired param)
-    // are gone.
-
-
-
-    /// Fetch (or create on first call) this user's pairing code, e.g. "POINT-4729".
-    /// Prefers a still-UNCLAIMED generic code: person invites belong to their
-    /// cards, and a claimed code can never pair anyone again — handing either
-    /// out as "your code" used to silently break the next pairing.
-    func myPairingCode() async throws -> String {
-        guard let client else { throw SupabaseServiceError.notConfigured }
-        guard let me = await currentUserID else { throw SupabaseServiceError.notSignedIn }
-
-        let mine: [ConnectionRow] = try await withRetry(label: "myPairingCode.lookup") {
-            try await client
-                .from("connections")
-                .select()
-                .eq("owner", value: me.uuidString)
-                .execute().value
-        }
-        if let open = mine.first(where: { $0.friend == nil && $0.ownerPersonID == nil })
-                   ?? mine.first(where: { $0.friend == nil }) {
-            Self.localPairingCode = open.code
-            log.info("pairing: my code \(open.code, privacy: .public) (existing, unclaimed)")
-            return open.code
-        }
-
-        // All codes claimed (or none yet) — mint a fresh one. Retry with a
-        // different code on the (rare) primary-key collision.
-        var lastError: Error = SupabaseServiceError.networkProblem
-        for _ in 0..<3 {
-            let code = Self.generatePairingCode()
-            do {
-                try await withRetry(label: "myPairingCode.insert") {
-                    try await client
-                        .from("connections")
-                        .insert(ConnectionRow(code: code, owner: me, friend: nil))
-                        .execute()
-                }
-                log.info("pairing: created code \(code, privacy: .public)")
-                Self.localPairingCode = code
-                return code
-            } catch {
-                lastError = error
-                log.warning("pairing: code insert failed (collision/network) — \(error.localizedDescription, privacy: .public)")
-            }
-        }
-        throw lastError
-    }
-
-    /// Normalize whatever the user typed into the stored form "POINT-XXXX".
-    /// The UI displays codes as "POINT · GP2S", so people enter dots, spaces,
-    /// lowercase, or just the suffix — all of these must resolve.
-    static func normalizePairingCode(_ raw: String) -> String {
-        let alphanumerics = raw.uppercased().filter { $0.isLetter || $0.isNumber }
-        let suffix = alphanumerics.hasPrefix("POINT")
-            ? String(alphanumerics.dropFirst(5))
-            : alphanumerics
-        return "POINT-\(suffix)"
-    }
-
-    // [9b · B3] PairOutcome + claimOutcome (the pairing claim state machine) DELETED —
-    // their last caller, PairingScenarioTests, retired in this batch.
-
-    // [pairing-retire step5] refreshConnections() + refreshConnection() HARD-DELETED —
-    // the pairing `connections`-table readers that set connectedFriendID. The LINK path
-    // (senderID / link_connections) is the connection mechanism; nothing reads these.
-    // (ConnectionRow is removed in step 7 with myPairingCode; DiscoveredConnection in
-    // step 6 with the vestigial startRealtime onPaired param.)
-
-    /// "POINT-" + four unambiguous characters (no 0/O/1/I/L).
-    static func generatePairingCode() -> String {
-        let alphabet = Array("23456789ABCDEFGHJKMNPQRSTUVWXYZ")
-        let suffix = String((0..<4).map { _ in alphabet.randomElement()! })
-        return "POINT-\(suffix)"
-    }
-
-    /// True only for the canonical stored form: "POINT-" + 4 alphanumerics.
-    static func isValidPairingCode(_ code: String) -> Bool {
-        guard code.count == 10, code.hasPrefix("POINT-") else { return false }
-        return code.dropFirst(6).allSatisfy { $0.isLetter || $0.isNumber }
-    }
+    // MARK: - Pairing  [pairing-retire step7 — FULLY RETIRED, code-only; table = step 8]
+    // The entire pairing-code subsystem is HARD-DELETED (all uncalled in app code since
+    // step 2): ConnectionRow (the `connections`-row model), myPairingCode() (mint),
+    // generatePairingCode() / normalizePairingCode() / isValidPairingCode() (the POINT-XXXX
+    // code helpers), and DiscoveredConnection/refreshConnection(s) (removed in steps 5-6).
+    // The `connections` TABLE itself is left for step 8 (server SQL) — it is referenced
+    // ONLY by the DEV clear utilities (clearAllMyData / clearConnectionsOnly), which no-op
+    // cleanly until the table is dropped. The LINK mechanism (link_connections / senderID /
+    // short_code) is the connection model and is untouched.
 
     // MARK: - Device tokens (for push via Edge Function)
 

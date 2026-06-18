@@ -424,7 +424,6 @@ struct SettingsView: View {
             await SupabaseService.shared.stopListening()   // realtime dies with the session
             try? await SupabaseService.shared.signOut()
             SupabaseService.localUserID       = nil
-            SupabaseService.localPairingCode  = nil
             signedInUserID = nil
         }
     }
