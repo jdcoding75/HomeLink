@@ -719,6 +719,27 @@ struct CompassView: View {
                                 flightFly   = false
                                 finishSend(emoji: previewEmoji, style: previewStyle)
                             })
+                    } else if previewStyle == .fingerFlick {
+                        // [flick] [ROOT-2 promote] The locked V2 (DESK) send — the
+                        // paper ball spins across a twilight sky, then hands back to
+                        // the finishSend pipeline (NO embedded reveal — verified).
+                        // PRIOR: flick fell to the inline V1 `SenderAnimationView`
+                        // (the else branch below); that path is unchanged for the
+                        // remaining styles (glow · star · wind · rocket).
+                        FlickSendAnimationV2(
+                            transition: InstrumentTransition(
+                                exitBearing: compass.state.bearingDegrees,
+                                exitPoint: .zero,
+                                instrument: .flick,
+                                emoji: previewEmoji,
+                                message: sentMessage,
+                                tagline: sentTagline),
+                            personName: compass.state.personName,
+                            onComplete: {
+                                flightToken = nil
+                                flightFly   = false
+                                finishSend(emoji: previewEmoji, style: previewStyle)
+                            })
                     } else {
                         SenderAnimationView(
                             style: previewStyle,

@@ -115,11 +115,17 @@ struct ReceiptView: View {
             bowReceipt
         } else if style == .plane {
             planeReceipt
+        } else if style == .fingerFlick {
+            // [ROOT-2 promote] FLICK now has its own locked V2 receipt (was the
+            // shared standardReceipt bucket via the else below).
+            flickReceipt
         } else if style == .glow {
             // [compass] COMPASS — its own SIMPLE-REVEAL receipt: the orb drifts
             // in at an angle and settles into the receiver's own compass face,
-            // then the reveal. No bucket, no spin-to-catch. (Flick/wand still use
-            // the shared standardReceipt below — only compass is intercepted.)
+            // then the reveal. No bucket, no spin-to-catch. (WAND still uses the
+            // shared standardReceipt below — its dedicated receipt is not built yet
+            // [WandReceiptAnimation is a stub enum]; only compass + flick are
+            // intercepted here.)
             compassReceipt
         } else {
             standardReceipt
@@ -140,10 +146,31 @@ struct ReceiptView: View {
         )
     }
 
-    // ── PLANE — the V1 visual-bible receipt (plane flies toward you → bucket) ─
-
+    // ── PLANE — [ROOT-2 promote] the locked V2 receipt (parachute descent) ──
+    // V2 init matches V1 exactly (senderBearing·emoji·message·tagline·fromName·
+    // onRevealed·onFinished) and hands off to EmojiRevealView(.received, .plane).
+    // PRIOR (V1 visual-bible, plane flies toward you → bucket):
+    //   PlaneReceiptAnimation(
+    //       senderBearing: compass.rawBearingToTarget ?? 120,
+    //       emoji: ping.emoji, message: ping.message, tagline: ping.tagline,
+    //       fromName: ping.fromName,
+    //       onRevealed: { revealHandoff() }, onFinished: onFinished)
     private var planeReceipt: some View {
-        PlaneReceiptAnimation(
+        PlaneReceiptAnimationV2(
+            senderBearing: compass.rawBearingToTarget ?? 120,
+            emoji: ping.emoji,
+            message: ping.message,
+            tagline: ping.tagline,
+            fromName: ping.fromName,
+            onRevealed: { revealHandoff() },
+            onFinished: onFinished
+        )
+    }
+
+    // ── FLICK — [ROOT-2 promote] the locked V2 receipt (paper ball → bucket) ──
+    // Hands off to EmojiRevealView(.received). Was the shared standardReceipt.
+    private var flickReceipt: some View {
+        FlickReceiptAnimationV2(
             senderBearing: compass.rawBearingToTarget ?? 120,
             emoji: ping.emoji,
             message: ping.message,
