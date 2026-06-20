@@ -1855,6 +1855,7 @@ struct CompassView: View {
         HapticEngine.caughtConfirmation()        // soft confirmation tap
         // Cut any in-flight hold/load progress so nothing fires after a cancel.
         holdProgress = 0
+        compassAwaitingTap = false               // [latch fix] clear the compass awaiting-tap latch on cancel
         loadFlightToken = nil
         loadFlightProgress = 0
         messageFocused = false                   // [5/7] close the message editor
