@@ -1976,31 +1976,39 @@ struct CompassView: View {
             arrivalPreviewLayer
             sentNoticeToast
         }
-        .confirmationDialog("Keep showing arrival previews?",
-                            isPresented: $showKeepPreviewPrompt, titleVisibility: .visible) {
-            Button("Keep showing them") { arrivalPreviewEnabled = true }
-            Button("Turn off", role: .destructive) { arrivalPreviewEnabled = false }
-        } message: {
-            Text("You've seen 10 — a quick glimpse of what your person catches. You can change this anytime in Settings.")
-        }
+        // [suppress reveal #1] RETIRED — the "Keep showing arrival previews?"
+        // prompt is dead once the preview is gone (it was only triggered from
+        // arrivalPreviewFinished after the 10th preview, now uncalled). Preserved:
+        // .confirmationDialog("Keep showing arrival previews?",
+        //                     isPresented: $showKeepPreviewPrompt, titleVisibility: .visible) {
+        //     Button("Keep showing them") { arrivalPreviewEnabled = true }
+        //     Button("Turn off", role: .destructive) { arrivalPreviewEnabled = false }
+        // } message: {
+        //     Text("You've seen 10 — a quick glimpse of what your person catches. You can change this anytime in Settings.")
+        // }
     }
 
     @ViewBuilder
     private var arrivalPreviewLayer: some View {
-        if let preview = arrivalPreview {
-            // [2/3] SENT CONFIRMATION — every instrument's send ends with the
-            // ONE shared EmojiRevealView: context = .sent ("sent to [Name] ✦"),
-            // ambient = the instrument's world. Same component as the receipt.
-            EmojiRevealView(
-                emoji: preview.emoji,
-                message: sentMessage,
-                tagline: sentTagline,
-                context: .sent(recipientName: preview.name),
-                ambient: RevealAmbient.forStyle(preview.style),
-                onDismiss: { arrivalPreviewFinished() }
-            )
-            .transition(.opacity)
-        }
+        // [suppress reveal #1] RETIRED — the sender-side arrival-preview
+        // presentation (the duplicate EmojiRevealView .sent) is removed. With
+        // `finishSend` no longer setting `arrivalPreview`, this never presented;
+        // it is now explicitly emptied. Preserved verbatim for restore:
+        // if let preview = arrivalPreview {
+        //     // [2/3] SENT CONFIRMATION — every instrument's send ends with the
+        //     // ONE shared EmojiRevealView: context = .sent ("sent to [Name] ✦"),
+        //     // ambient = the instrument's world. Same component as the receipt.
+        //     EmojiRevealView(
+        //         emoji: preview.emoji,
+        //         message: sentMessage,
+        //         tagline: sentTagline,
+        //         context: .sent(recipientName: preview.name),
+        //         ambient: RevealAmbient.forStyle(preview.style),
+        //         onDismiss: { arrivalPreviewFinished() }
+        //     )
+        //     .transition(.opacity)
+        // }
+        EmptyView()
     }
 
     @ViewBuilder
@@ -2023,29 +2031,42 @@ struct CompassView: View {
     /// The flight finished. Either show a brief glimpse of the recipient's
     /// catch (the arrival preview), or just confirm "sent ✦".
     private func finishSend(emoji: String, style: SenderStyle) {
-        if arrivalPreviewEnabled {
-            arrivalPreviewCount += 1
-            let recipient = people.selectedPerson?.name ?? "them"
-            arrivalPreview = ArrivalPreviewData(emoji: emoji, style: style, name: recipient)
-            // The preview view calls back when its glimpse ends.
-        } else {
-            showSentNotice()
-            appState.transition(to: .idle)
-        }
-    }
-
-    /// Called when the arrival preview finishes its ~2.5 s glimpse.
-    private func arrivalPreviewFinished() {
-        arrivalPreview = nil
+        // [suppress reveal #1] The sender-side arrival preview — the duplicate
+        // EmojiRevealView(.sent) — is removed for ALL instruments. Every send now
+        // ends with the "sent ✦" toast only; the emoji/message reveal happens once,
+        // on the RECEIVER side (ReceiptView .received, untouched). This is the
+        // single funnel — all 6 send-out onComplete closures call finishSend — so
+        // gating here suppresses #1 everywhere. Original preserved below.
         showSentNotice()
         appState.transition(to: .idle)
-        // After the 10th preview, ask whether to keep showing them.
-        if arrivalPreviewCount == 10 {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
-                showKeepPreviewPrompt = true
-            }
-        }
+        // PRIOR — sender-side arrival preview (reveal #1), now suppressed:
+        // if arrivalPreviewEnabled {
+        //     arrivalPreviewCount += 1
+        //     let recipient = people.selectedPerson?.name ?? "them"
+        //     arrivalPreview = ArrivalPreviewData(emoji: emoji, style: style, name: recipient)
+        //     // The preview view calls back when its glimpse ends.
+        // } else {
+        //     showSentNotice()
+        //     appState.transition(to: .idle)
+        // }
     }
+
+    // [suppress reveal #1] RETIRED — the arrival-preview completion handler is
+    // now uncalled (its only caller was arrivalPreviewLayer's onDismiss, removed).
+    // It also drove the "Keep showing arrival previews?" prompt (now dead too).
+    // Preserved verbatim for restore:
+    // /// Called when the arrival preview finishes its ~2.5 s glimpse.
+    // private func arrivalPreviewFinished() {
+    //     arrivalPreview = nil
+    //     showSentNotice()
+    //     appState.transition(to: .idle)
+    //     // After the 10th preview, ask whether to keep showing them.
+    //     if arrivalPreviewCount == 10 {
+    //         DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+    //             showKeepPreviewPrompt = true
+    //         }
+    //     }
+    // }
 
     private func showSentNotice() {
         withAnimation(.easeOut(duration: 0.3)) { sentNotice = true }
