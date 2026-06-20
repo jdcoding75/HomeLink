@@ -189,14 +189,19 @@ enum AnimationManifest {
             instrument: .firework, kind: .instrument,
             stages: [.compass, .send, .receipt], fixedEmoji: "🎆", defaultEmoji: "🎆"),
 
+        // INTERIM (Stage-2): birthday default is 🎂 (not the intended 🎁) so the
+        // emoji-keyed recipient (ReceiptView, `ping.emoji == "🎂"`) routes it to
+        // birthdayReceipt correctly. FLIP BACK TO 🎁 once Stage 3 re-keys ReceiptView
+        // to dispatch on `style == .birthday`. Tracked: special_moments peer-
+        // architecture Stage 3. (Firework's default 🎆 already matches its key.)
         AnimationDefinition(
             icon: "🎂", name: "Birthday Cake", version: "V1", style: .birthday,
             instrument: .birthday, kind: .instrument,
-            stages: [.compass, .receipt], fixedEmoji: "🎂", defaultEmoji: "🎁"),
+            stages: [.compass, .receipt], fixedEmoji: "🎂", defaultEmoji: "🎂"),  // INTERIM: was "🎁" → restore at Stage 3
         AnimationDefinition(
             icon: "🎂", name: "Birthday Cake", version: "V2", style: .birthday,
             instrument: .birthday, kind: .instrument,
-            stages: [.compass, .send, .receipt], fixedEmoji: "🎂", defaultEmoji: "🎁"),
+            stages: [.compass, .send, .receipt], fixedEmoji: "🎂", defaultEmoji: "🎂"),  // INTERIM: was "🎁" → restore at Stage 3
     ]
 
     // ── Derived views of the catalog ─────────────────────────────────────
