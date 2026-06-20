@@ -124,6 +124,18 @@ struct WandInstrumentView: View {
                             .repeatForever(autoreverses: true)) {
                 crystalPulse = true
             }
+            // [default-payload] loadedToken now arrives NON-nil (the default emoji),
+            // so the nil→value onChange below won't fire on appear — start shake
+            // here too. LIFECYCLE ONLY: mirrors the onChange branch; no shake
+            // sensitivity / gate change.
+            if loadedToken != nil {
+                released = false
+                imploding = false
+                fullChargeSeconds = 0
+                shake.onShake = { onShakeCounted($0) }
+                shake.onFull  = { HapticEngine.wandFull() }
+                shake.start()
+            }
         }
         .onChange(of: loadedToken) { _, token in
             if token != nil {

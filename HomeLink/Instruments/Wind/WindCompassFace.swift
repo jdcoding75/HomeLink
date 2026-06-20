@@ -101,6 +101,14 @@ struct WindInstrumentView: View {
         .frame(width: 370, height: 370)
         .onAppear {
             seedSeeds()
+            // [default-payload] loadedToken now arrives NON-nil (the default emoji),
+            // so the nil→value onChange below won't fire on appear — start breath
+            // here too. LIFECYCLE ONLY: mirrors the onChange branch; no breath
+            // threshold / sensitivity / gate change.
+            if loadedToken != nil {
+                breath.onExhale = { exhaleDetected() }
+                breath.start()
+            }
         }
         // The mic listens only while a thought is loaded
         .onChange(of: loadedToken) { _, token in

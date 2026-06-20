@@ -374,11 +374,17 @@ struct RocketInstrumentView: View {
     }
 
     private var rocketStep: String {
+        // [copy] Reworded to "aim, tap rocket to fuel" (keeps the x/5 count once
+        // locked). PRIOR:
+        //   if !lockedAim {
+        //       return aligned ? "almost — keep spinning to lock"
+        //                      : "spin to aim at \(personName)"
+        //   }
+        //   return "locked ✦ tap to fuel · \(fuelSegments)/5"
         if !lockedAim {
-            return aligned ? "almost — keep spinning to lock"
-                           : "spin to aim at \(personName)"
+            return "aim, tap rocket to fuel"
         }
-        return "locked ✦ tap to fuel · \(fuelSegments)/5"
+        return "aim, tap rocket to fuel · \(fuelSegments)/5"
     }
 
     // ── Mechanic ────────────────────────────────────────────────────────────

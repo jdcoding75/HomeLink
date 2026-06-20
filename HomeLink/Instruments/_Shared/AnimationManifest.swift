@@ -177,16 +177,16 @@ enum AnimationManifest {
         AnimationDefinition(
             icon: "🎆", name: "Firework", version: nil, style: .glow,
             instrument: nil, kind: .emoji,
-            stages: [.compass, .send, .receipt], fixedEmoji: "🎆"),
+            stages: [.compass, .send, .receipt], fixedEmoji: "🎆", defaultEmoji: "🎆"),
 
         AnimationDefinition(
             icon: "🎂", name: "Birthday Cake", version: "V1", style: .glow,
             instrument: nil, kind: .emoji,
-            stages: [.compass, .receipt], fixedEmoji: "🎂"),
+            stages: [.compass, .receipt], fixedEmoji: "🎂", defaultEmoji: "🎁"),
         AnimationDefinition(
             icon: "🎂", name: "Birthday Cake", version: "V2", style: .glow,
             instrument: nil, kind: .emoji,
-            stages: [.compass, .send, .receipt], fixedEmoji: "🎂"),
+            stages: [.compass, .send, .receipt], fixedEmoji: "🎂", defaultEmoji: "🎁"),
     ]
 
     // ── Derived views of the catalog ─────────────────────────────────────

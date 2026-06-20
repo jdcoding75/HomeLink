@@ -39,6 +39,10 @@ struct CompassView: View {
     @State private var lockGlowActive = false
     @State private var emojiScaled    = false
     @State private var lockBadgeShown = false
+    // [explicit send] Compass: once the hold completes the compass LOCKS and waits
+    // for an explicit tap to send (point → hold → lock → tap). No auto-send on
+    // alignment anymore. Set in holdTick at holdProgress>=1.0; consumed by tapFace().
+    @State private var compassAwaitingTap = false
 
     // Ping animation
     @State private var pingRingActive  = false
@@ -344,8 +348,12 @@ struct CompassView: View {
                             }
                         case .bow:
                             BowInstrumentView(
-                                loadedToken: selectedToken,
-                                loadedSymbol: selectedToken.map { AnyView(sendSymbol($0, size: 26)) },
+                                // [default-payload] was `selectedToken` / `selectedToken.map{…}`
+                                // — now the defaulted `effectiveToken`, so the face GATE engages
+                                // and the DISPLAYED glyph is the default with no manual emoji
+                                // (display + payload agree; send already uses effectiveToken).
+                                loadedToken: effectiveToken,
+                                loadedSymbol: AnyView(sendSymbol(effectiveToken, size: 26)),
                                 bearingDegrees: compass.state.bearingDegrees,
                                 personName: compass.state.personName,
                                 personEmoji: compass.state.personEmoji,
@@ -355,8 +363,10 @@ struct CompassView: View {
                             // 🌬️ WIND — replaced the firefly (same mechanic as
                             // compass made it redundant; view kept in the repo)
                             WindInstrumentView(
-                                loadedToken: selectedToken,
-                                loadedSymbol: selectedToken.map { AnyView(sendSymbol($0, size: 26)) },
+                                // [default-payload] was `selectedToken` — now defaulted effectiveToken
+                                // (the wind face starts breath on appear for this non-nil value).
+                                loadedToken: effectiveToken,
+                                loadedSymbol: AnyView(sendSymbol(effectiveToken, size: 26)),
                                 bearingDegrees: compass.state.bearingDegrees,
                                 personName: compass.state.personName,
                                 personEmoji: compass.state.personEmoji,
@@ -377,7 +387,10 @@ struct CompassView: View {
                             // then it re-arms). Old face commented out (never delete).
                             FlickDeskCompassFace(
                                 personName: compass.state.personName,
-                                emoji: selectedToken.map { sendRemoteEmoji(for: $0) } ?? "💜",
+                                // [default-payload] was `selectedToken.map{…} ?? "💜"` — the audit's
+                                // display/payload MISMATCH (showed 💜, sent 🤗). Now the face shows
+                                // exactly what sends: the defaulted effectiveToken glyph.
+                                emoji: sendRemoteEmoji(for: effectiveToken),
                                 bearingDegrees: compass.state.bearingDegrees,
                                 onSend: { sendThought(effectiveToken) },   // [redesign] default supplies a payload
                                 autoPlay: false
@@ -396,9 +409,11 @@ struct CompassView: View {
                             // mechanic owns emoji loading + alignment, then
                             // calls back to fire the shared send pipeline.
                             RocketInstrumentView(
-                                loadedToken: selectedToken,
-                                loadedSymbol: selectedToken.map { AnyView(sendSymbol($0, size: 24)) },
-                                loadedEmoji: selectedToken.map { sendRemoteEmoji(for: $0) },
+                                // [default-payload] was `selectedToken` / `selectedToken.map{…}` —
+                                // now defaulted effectiveToken (gate engages, glyph = payload).
+                                loadedToken: effectiveToken,
+                                loadedSymbol: AnyView(sendSymbol(effectiveToken, size: 24)),
+                                loadedEmoji: sendRemoteEmoji(for: effectiveToken),
                                 bearingDegrees: compass.state.bearingDegrees,
                                 personName: compass.state.personName,
                                 personEmoji: compass.state.personEmoji,
@@ -409,9 +424,11 @@ struct CompassView: View {
                             // release at full charge within 15°. Owns its own
                             // mechanic, then fires the shared send pipeline.
                             WandInstrumentView(
-                                loadedToken: selectedToken,
-                                loadedSymbol: selectedToken.map { AnyView(sendSymbol($0, size: 22)) },
-                                loadedEmoji: selectedToken.map { sendRemoteEmoji(for: $0) },
+                                // [default-payload] was `selectedToken` — now defaulted effectiveToken
+                                // (the wand face starts shake on appear for this non-nil value).
+                                loadedToken: effectiveToken,
+                                loadedSymbol: AnyView(sendSymbol(effectiveToken, size: 22)),
+                                loadedEmoji: sendRemoteEmoji(for: effectiveToken),
                                 bearingDegrees: compass.state.bearingDegrees,
                                 personName: compass.state.personName,
                                 personEmoji: compass.state.personEmoji,
@@ -421,9 +438,11 @@ struct CompassView: View {
                             // ✈️ PLANE — wind the propeller (8 winds), let fly.
                             // Owns its winding mechanic, then fires the send pipeline. [3/5]
                             PlaneInstrumentView(
-                                loadedToken: selectedToken,
-                                loadedSymbol: selectedToken.map { AnyView(sendSymbol($0, size: 22)) },
-                                loadedEmoji: selectedToken.map { sendRemoteEmoji(for: $0) },
+                                // [default-payload] was `selectedToken` / `selectedToken.map{…}` —
+                                // now defaulted effectiveToken (gate engages, glyph = payload).
+                                loadedToken: effectiveToken,
+                                loadedSymbol: AnyView(sendSymbol(effectiveToken, size: 22)),
+                                loadedEmoji: sendRemoteEmoji(for: effectiveToken),
                                 bearingDegrees: compass.state.bearingDegrees,
                                 personName: compass.state.personName,
                                 personEmoji: compass.state.personEmoji,
@@ -1005,9 +1024,12 @@ struct CompassView: View {
             // user explicitly picks an emoji.
             guard instrumentStore.selected == .compass, flightToken == nil else {
                 if holdProgress > 0 { holdProgress = 0 }
+                compassAwaitingTap = false       // [explicit send] reset off-compass / while sending
                 return
             }
-            let token = effectiveToken
+            // [explicit send] Once locked and awaiting the tap, FREEZE the hold —
+            // don't re-accumulate or re-fire the lock cue; tapFace() does the send.
+            if compassAwaitingTap { return }
             // [3/5] SOFT LOCK — the hold STARTS within 15°, but once it has
             // begun it tolerates drift up to 30° (hysteresis), so a small
             // wobble of the phone never breaks the lock or freezes the hold.
@@ -1016,8 +1038,10 @@ struct CompassView: View {
                 holdProgress += 0.05 / holdDuration
                 if holdProgress >= 1.0 {
                     holdProgress = 0
-                    HapticEngine.compassSend()      // [5/5] gentle double tap
-                    sendThought(token)
+                    HapticEngine.compassSend()      // [5/5] now the LOCK confirmation
+                    // [explicit send] LOCK, don't auto-send — wait for the tap.
+                    compassAwaitingTap = true
+                    // PRIOR (auto-send on hold complete): sendThought(effectiveToken)
                 }
             } else if holdProgress > 0 {
                 withAnimation(.easeOut(duration: 0.3)) { holdProgress = 0 }
@@ -1220,11 +1244,16 @@ struct CompassView: View {
     /// retired stage-completion dots used to occupy).
     private var instrumentHelperLines: some View {
         VStack(spacing: 6) {
-            // Mechanism recipe — the gesture tail (always shown).
-            Text(mechanismRecipe)
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundColor(DesignTokens.Color.accentSoft)
-                .multilineTextAlignment(.center)
+            // Mechanism recipe — the gesture tail. [copy] SUPPRESSED for flick:
+            // the flick face already carries its own edge text ("pointing toward
+            // [name]" / "flick toward the point ✦"), so the bare "flick" recipe
+            // line was redundant. Shown for every other instrument.
+            if instrumentStore.selected != .flick {
+                Text(mechanismRecipe)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(DesignTokens.Color.accentSoft)
+                    .multilineTextAlignment(.center)
+            }
 
             // Aim hint — compass ONLY (the one instrument that aims by turning
             // the phone). Live alignment guidance via `alignmentInstruction`.
@@ -1514,6 +1543,15 @@ struct CompassView: View {
 
     /// Tap the face: it answers — pulse, brief bearing readout, soft haptic.
     private func tapFace() {
+        // [explicit send] When the compass has locked and is awaiting the tap, a
+        // single tap SENDS (point → hold → lock → tap). Otherwise keep the
+        // existing bearing-flash behavior below.
+        if compassAwaitingTap {
+            compassAwaitingTap = false
+            HapticEngine.compassSend()
+            sendThought(effectiveToken)
+            return
+        }
         HapticEngine.personSelected()
         withAnimation(.spring(response: 0.35, dampingFraction: 0.55)) { faceTapPulse = true }
         withAnimation(.easeIn(duration: 0.3)) { bearingFlash = true }
