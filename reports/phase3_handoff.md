@@ -13,10 +13,10 @@ was audited or decided during the animation-track session; this doc is the durab
 record so Phase 3 can resume without re-investigating. Ground any build on
 POINTWARD_TRUTH.md + a fresh git status + the named report files in `reports/`._
 
-_Last shipped commit at hand-off: Special Moments Stages 1+2 (`c38ca9d`) + interim
-birthday default (`9ab3f6e`). Restore ladder: `09ba2f5` → `b9e2a30` → `be59c38` →
-`d403584` → `8fbd7d8` → `e0d7576` → `7128da7` → `c38ca9d` (+ birthday-interim `9ab3f6e`).
-All hashes verified against `git log`._
+_Last shipped commit: Special Moments Stage 3 (`624b044`, HEAD) — peer architecture
+complete end-to-end. Restore ladder: `09ba2f5` → `b9e2a30` → `be59c38` → `d403584` →
+`8fbd7d8` → `e0d7576` → `7128da7` → `c38ca9d` → (birthday-interim `9ab3f6e`) → `624b044`
+(HEAD). All hashes verified against `git log`._
 
 ---
 
@@ -66,15 +66,18 @@ above is the authoritative source either way.
 
 ---
 
-## 2. SPECIAL MOMENTS — STAGE 3 (recipient re-key) — likely PRE-LAUNCH, gated
-**Status:** Stages 1+2 shipped (`c38ca9d`) — Birthday/Firework are first-class peer
-Instrument+SenderStyle cases, selectable cards, sender-side dispatch keys on
-style/selection. **Stage 3 finishes it.**
+## 2. SPECIAL MOMENTS — STAGES 1+2+3 ✅ COMPLETE (only Stage 4 remains)
+**Status (UPDATED):** Stage 3 SHIPPED (`624b044`) — the Birthday/Firework peer
+architecture is now COMPLETE **end-to-end**. Both the sender-side AND the recipient
+(`ReceiptView`) dispatch key on style/selection, not the emoji. Birthday's default is
+back to the intended **🎁**. **Only Stage 4 remains** (retire the emoji fallback,
+post fleet-adoption — see below). The original Stage-3 plan + gate notes are kept below
+as the record of what shipped.
 
-**What Stage 3 does:** re-key `ReceiptView` dispatch (~:101/106) from `emoji == 🎂/🎆`
-to `style == .birthday/.firework` (KEEP emoji fallback during transition). This closes
-the birthday-arrives-as-bucket gap AND lets the Birthday default flip back from interim
-🎂 to the intended 🎁.
+**What Stage 3 did (DONE):** re-keyed `ReceiptView` dispatch (~:101/106) from `emoji ==
+🎂/🎆` to `style == .birthday/.firework` (emoji fallback KEPT, commented for Stage 4).
+Closed the birthday-arrives-as-bucket gap AND flipped the Birthday default back from
+interim 🎂 to the intended 🎁. _(reports/special_moments_stage3_build.md)_
 
 **SQL GATE: CLEARED.** Verified `pings.sender_style` is free text, no constraint, already
 holds arbitrary style strings (firefly/glow/rocket/etc.) — **no migration needed.**
@@ -86,16 +89,18 @@ travel fine on both paths.
 certainly fine (it's a push-sender, doesn't render the animation). If it validates,
 small function edit + a Supabase deploy (Joshua).
 
-**Interim state to undo at Stage 3:** Birthday's `defaultEmoji` was set to 🎂 (from the
-intended 🎁) so the unchanged emoji-keyed recipient routes it correctly (`9ab3f6e`).
-Comment in AnimationManifest marks the flip-back. **Flip to 🎁 when Stage 3 lands.**
+**Interim state — RESOLVED at Stage 3:** Birthday's `defaultEmoji` was set to 🎂 as a
+Stage-2 stopgap (`9ab3f6e`) and has been **flipped back to 🎁** at Stage 3 (`624b044`),
+now safe because the recipient routes by style. The AnimationManifest comment is updated
+to "[STAGE 3 DONE]".
 
 **Stage 4 (later):** retire the emoji-keyed fallback branches (face/send/receipt) once
 the fleet has updated. Pure cleanup.
 
 **Reports:** `special_moments_peer_architecture_plan.md` (the full staged plan),
-`special_moments_stage12_build.md` (what shipped), `special_moments_selector_build.md`
-(the earlier Stage-stop that scoped it), `birthday_default_interim.md` (the interim flip).
+`special_moments_stage12_build.md` (Stages 1+2), `special_moments_stage3_build.md`
+(Stage 3 — the recipient re-key + 🎁 flip), `special_moments_selector_build.md` (the
+earlier Stage-stop that scoped it), `birthday_default_interim.md` (the interim flip).
 
 ---
 
