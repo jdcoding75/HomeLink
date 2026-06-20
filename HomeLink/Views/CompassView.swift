@@ -126,6 +126,11 @@ struct CompassView: View {
     @FocusState private var messageFocused: Bool
     @State private var composing = false                    // [5/7] message editor open
     @State private var showEmojiPicker = false              // [redesign] [Emoji] box toggles the strip
+    // [custom-text lock] True once the user HAND-EDITS the message — while true,
+    // the default message no longer follows the emoji/animation (their custom
+    // text is preserved across emoji changes). Session/per-send only: @State, so
+    // it resets on a fresh launch; an empty field clears it (default may refill).
+    @State private var messageEdited = false
     @State private var longPressLabel: String? = nil        // [1/3] curated-emoji label on long-press
     @State private var loadFlightToken: String? = nil       // [1/5] load flight
     @State private var loadFlightProgress: CGFloat = 0
@@ -178,10 +183,19 @@ struct CompassView: View {
     /// charge inside the instrument, so they show no aim hint. Mirrors the
     /// non-aim split used by `instrumentStep`.
     private var isAimInstrument: Bool {
-        switch instrumentStore.selected {
-        case .firefly, .wand: return false   // wind · wand — charge inside
-        default:              return true
-        }
+        // [plane aim fix] ONLY the compass aims by PHYSICALLY TURNING THE PHONE,
+        // so it is the only instrument that shows the live directional aim hint.
+        // Canonical source: Instrument.alignsByPhoneRotation (true only for
+        // compass). On-screen aimers (bow · rocket · flick) and the no-aim
+        // instruments (wind · wand · plane) get the mechanism hint only — no
+        // directional/aim hint. This fixes the regression where plane showed an
+        // aim hint, contradicting the locked "Plane: no aiming" spec.
+        instrumentStore.selected.alignsByPhoneRotation
+        // PRIOR (bottom-band build) — true for all except wind/wand:
+        //   switch instrumentStore.selected {
+        //   case .firefly, .wand: return false   // wind · wand — charge inside
+        //   default:              return true
+        //   }
     }
 
     /// The gesture TAIL only (no "choose emoji · message ·" prefix) — the
@@ -448,14 +462,19 @@ struct CompassView: View {
                                 .allowsHitTesting(false)
                         }
                     }
-                    // [2/5] STEP PROGRESS — dots beneath the instrument tracking
-                    // where you are in the send.
-                    .overlay(alignment: .bottom) {
-                        StepProgressView(instrument: instrumentStore.selected,
-                                         currentStep: instrumentStep)
-                            .offset(y: 22)
-                            .opacity(pings.nowPlaying == nil ? 1 : 0)
-                    }
+                    // [dots removed] RETIRED — the obsolete per-step completion
+                    // dot row (emoji ✓ · message ✓ · aim ✓ …). The 4 picker boxes
+                    // now show state directly and the default emoji removes the
+                    // "must add emoji" step, so the dots are redundant. Its slot
+                    // (just under the instrument) is now the mechanism-recipe line.
+                    // Preserved (commented, never deleted); StepProgressView.swift
+                    // and `instrumentStep` are left intact for a clean restore.
+                    // .overlay(alignment: .bottom) {
+                    //     StepProgressView(instrument: instrumentStore.selected,
+                    //                      currentStep: instrumentStep)
+                    //         .offset(y: 22)
+                    //         .opacity(pings.nowPlaying == nil ? 1 : 0)
+                    // }
                     // [3/6] The compass hold-to-send progress rings the face
                     .overlay {
                         if instrumentStore.selected == .compass && holdProgress > 0 {
@@ -533,6 +552,12 @@ struct CompassView: View {
                                     withAnimation(.easeOut(duration: 0.3)) { showSkinOverlay = true }
                                 }
                         )
+
+                    // [recipe moved up] Mechanism recipe (+ compass-only aim hint),
+                    // sitting JUST UNDER the instrument it describes — it took the
+                    // retired dots' slot. (Previously lived in bottomBandRedesign.)
+                    instrumentHelperLines
+                        .padding(.top, 26)
 
                     Spacer(minLength: 12)
 
@@ -1188,29 +1213,42 @@ struct CompassView: View {
     // MARK: - [bottom-band redesign] Helper lines · preview · picker row
     // ════════════════════════════════════════════════════════════════════
 
-    /// The redesigned bottom band, beneath the (unchanged) compass face:
-    /// helper lines (aim hint + mechanism recipe) → preview line (feeling +
-    /// full message) → picker row [Animation] [Emoji] [Message] [To]. No send
-    /// button — the instrument gesture sends, always with a payload.
-    private var bottomBandRedesign: some View {
-        VStack(spacing: 12) {
+    /// [recipe moved up] The two helper lines that sit JUST UNDER the instrument:
+    /// the mechanism recipe (always) and — for the compass ONLY — the live
+    /// directional aim hint. Relocated here out of `bottomBandRedesign` so the
+    /// recipe sits with the instrument it describes (it also fills the slot the
+    /// retired stage-completion dots used to occupy).
+    private var instrumentHelperLines: some View {
+        VStack(spacing: 6) {
+            // Mechanism recipe — the gesture tail (always shown).
+            Text(mechanismRecipe)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundColor(DesignTokens.Color.accentSoft)
+                .multilineTextAlignment(.center)
 
-            // ── Helper line 1 — aim hint (aim instruments only) ──────────
-            // The live alignment guidance (existing `alignmentInstruction`,
-            // wrapping AlignmentText.guidance). Wind · wand charge inside the
-            // instrument, so they show no aim hint.
+            // Aim hint — compass ONLY (the one instrument that aims by turning
+            // the phone). Live alignment guidance via `alignmentInstruction`.
             if isAimInstrument {
                 Text(alignmentInstruction)
                     .font(.system(size: 13, weight: .medium))
                     .foregroundColor(DesignTokens.Color.textMuted)
                     .multilineTextAlignment(.center)
             }
+        }
+        // Recede during a receipt, exactly as the dots did.
+        .opacity(pings.nowPlaying == nil ? 1 : 0)
+    }
 
-            // ── Helper line 2 — mechanism recipe (gesture tail) ──────────
-            Text(mechanismRecipe)
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundColor(DesignTokens.Color.accentSoft)
-                .multilineTextAlignment(.center)
+    /// The redesigned bottom band, beneath the (unchanged) compass face:
+    /// preview line (feeling + full message) → picker row [Animation] [Emoji]
+    /// [Message] [To]. No send button — the instrument gesture sends, always
+    /// with a payload. (The helper lines moved up to `instrumentHelperLines`.)
+    private var bottomBandRedesign: some View {
+        VStack(spacing: 12) {
+
+            // [recipe moved up] The aim hint + mechanism-recipe helper lines used
+            // to render here; they now live in `instrumentHelperLines`, just under
+            // the instrument. The band now begins at the preview line.
 
             // ── Preview line — the feeling + the FULL typed message ───────
             previewLine
@@ -1536,6 +1574,15 @@ struct CompassView: View {
                             .onChange(of: messageText) { _, newValue in
                                 let clamped = MessageRules.clamped(newValue)
                                 if clamped != newValue { messageText = clamped }
+                                // [custom-text lock] While the compose field is
+                                // focused, any change is a hand-edit → lock it so a
+                                // later emoji change won't overwrite it. Clearing
+                                // the field releases the lock (default may refill).
+                                if newValue.isEmpty {
+                                    messageEdited = false
+                                } else if messageFocused {
+                                    messageEdited = true
+                                }
                             }
                         Text("\(messageText.count)/30")
                             .font(.system(size: 10))
@@ -1560,6 +1607,7 @@ struct CompassView: View {
                         ForEach(options, id: \.self) { option in
                             Button {
                                 messageText = MessageRules.clamped(option)
+                                messageEdited = true   // [custom-text lock] a chosen suggestion is a deliberate edit
                                 HapticEngine.personSelected()
                             } label: {
                                 HStack {
@@ -1676,6 +1724,7 @@ struct CompassView: View {
             } else if isSelected {
                 withAnimation(.spring(response: 0.32, dampingFraction: 0.6)) { selectedToken = nil }
                 messageText = ""
+                messageEdited = false           // [custom-text lock] clear the lock on deselect
                 composing = false               // [5/7] close the message editor
                 messageFocused = false
                 HapticEngine.personSelected()
@@ -1684,7 +1733,13 @@ struct CompassView: View {
                 // [3/3] Auto-fill the warm default message (user can edit/clear).
                 // [hints 2026-06-13] seedMessage falls back to the instrument's
                 // TaglineSystem hint when the emoji has no curated default.
-                messageText = MessageRules.clamped(seedMessage(for: item))
+                // [custom-text lock] Only re-seed the default when the user has
+                // NOT hand-edited the message — custom text survives an emoji
+                // change; the animation default keeps following the emoji while
+                // the field is still the default (or empty).
+                if !messageEdited {
+                    messageText = MessageRules.clamped(seedMessage(for: item))
+                }
                 triggerLoadFlight(item.emoji)
             }
         } label: {
@@ -1744,6 +1799,7 @@ struct CompassView: View {
         loadFlightToken = nil
         loadFlightProgress = 0
         messageFocused = false                   // [5/7] close the message editor
+        messageEdited = false                    // [custom-text lock] reset on cancel
         withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
             selectedToken = nil                  // deselect the feeling
             messageText = ""                     // clear the optional note
@@ -2025,6 +2081,7 @@ struct CompassView: View {
         withAnimation(.easeOut(duration: 0.25)) { selectedToken = nil }
         messageFocused = false
         messageText = ""
+        messageEdited = false                    // [custom-text lock] per-send reset
         flightToken = token
         flightFly = true   // legacy flag (the style view drives its own motion)
 
