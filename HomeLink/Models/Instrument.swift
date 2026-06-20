@@ -15,6 +15,10 @@ enum Instrument: String, CaseIterable, Codable, Identifiable {
     case rocket   = "rocket"    // pro — fuel · aim · blast off
     case wand     = "wand"      // pro — load · shake · release
     case plane    = "plane"     // pro — wind · let fly · glide
+    // [special moments — peer animations] First-class peers of the 7 instruments:
+    // their own face + send + (Stage-3) receipt; selected like any instrument.
+    case birthday = "birthday"  // pro — special moment: light the candles
+    case firework = "firework"  // pro — special moment: light the fuse
 
     var id: String { rawValue }
 
@@ -29,6 +33,8 @@ enum Instrument: String, CaseIterable, Codable, Identifiable {
         case .rocket:  return "rocket"
         case .wand:    return "wand"
         case .plane:   return "plane"
+        case .birthday: return "birthday"
+        case .firework: return "firework"
         }
     }
 
@@ -41,6 +47,8 @@ enum Instrument: String, CaseIterable, Codable, Identifiable {
         case .rocket:  return "fuel · aim · blast off"
         case .wand:    return "load · shake · release"
         case .plane:   return "wind · let fly"
+        case .birthday: return "light the candles"
+        case .firework: return "light the fuse"
         }
     }
 
@@ -53,6 +61,8 @@ enum Instrument: String, CaseIterable, Codable, Identifiable {
         case .rocket:  return "🚀"
         case .wand:    return "🪄"
         case .plane:   return "✈️"
+        case .birthday: return "🎂"
+        case .firework: return "🎆"
         }
     }
 
@@ -67,6 +77,8 @@ enum Instrument: String, CaseIterable, Codable, Identifiable {
         case .rocket:  return .rocket
         case .wand:    return .wand
         case .plane:   return .plane
+        case .birthday: return .birthday
+        case .firework: return .firework
         }
     }
 
@@ -79,6 +91,7 @@ enum Instrument: String, CaseIterable, Codable, Identifiable {
         switch self {
         case .compass, .bow, .flick, .rocket: return true
         case .firefly, .wand, .plane:         return false   // breath · shake · auto-aim
+        case .birthday, .firework:            return false   // special moments — tap/drag on the face, no aim
         }
     }
 

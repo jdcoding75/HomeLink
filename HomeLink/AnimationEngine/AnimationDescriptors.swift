@@ -680,6 +680,9 @@ extension AnimationDescriptor {
         case .rocket:  return .rocket
         case .wand:    return .wand
         case .plane:   return .plane
+        // [special moments] no dedicated descriptor — fall back to the compass
+        // (glow) descriptor they originally shared. Legacy/test path only.
+        case .birthday, .firework: return .compass
         }
     }
 }

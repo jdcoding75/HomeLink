@@ -173,19 +173,29 @@ enum AnimationManifest {
             instrument: .plane, kind: .instrument,
             stages: [.compass, .send, .receipt], fixedEmoji: nil),
 
-        // ── Emoji mechanisms (ship their own full mechanic) ───────────────
+        // ── Special moments — now FIRST-CLASS PEER INSTRUMENTS ─────────────
+        // [special moments — peer animations] Reclassified from kind:.emoji /
+        // instrument:nil / style:.glow → instruments with their OWN instrument +
+        // style, so `liveInstruments` surfaces them as selectable picker cards and
+        // the sender dispatch keys on selection/style (not the emoji). The default
+        // PAYLOAD stays 🎁/🎆 (changeable); the fixedEmoji 🎂/🎆 remains the
+        // canonical glyph used by the (Stage-3-pending) emoji-keyed receipt.
+        // PRIOR (emoji-mechanism rows):
+        //   icon "🎆" Firework      version nil  style .glow  instrument nil  kind .emoji
+        //   icon "🎂" Birthday Cake version V1   style .glow  instrument nil  kind .emoji
+        //   icon "🎂" Birthday Cake version V2   style .glow  instrument nil  kind .emoji
         AnimationDefinition(
-            icon: "🎆", name: "Firework", version: nil, style: .glow,
-            instrument: nil, kind: .emoji,
+            icon: "🎆", name: "Firework", version: nil, style: .firework,
+            instrument: .firework, kind: .instrument,
             stages: [.compass, .send, .receipt], fixedEmoji: "🎆", defaultEmoji: "🎆"),
 
         AnimationDefinition(
-            icon: "🎂", name: "Birthday Cake", version: "V1", style: .glow,
-            instrument: nil, kind: .emoji,
+            icon: "🎂", name: "Birthday Cake", version: "V1", style: .birthday,
+            instrument: .birthday, kind: .instrument,
             stages: [.compass, .receipt], fixedEmoji: "🎂", defaultEmoji: "🎁"),
         AnimationDefinition(
-            icon: "🎂", name: "Birthday Cake", version: "V2", style: .glow,
-            instrument: nil, kind: .emoji,
+            icon: "🎂", name: "Birthday Cake", version: "V2", style: .birthday,
+            instrument: .birthday, kind: .instrument,
             stages: [.compass, .send, .receipt], fixedEmoji: "🎂", defaultEmoji: "🎁"),
     ]
 

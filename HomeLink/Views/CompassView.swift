@@ -296,9 +296,12 @@ struct CompassView: View {
                     Group {
                         switch instrumentStore.selected {
                         case .compass:
-                            // [birthday] When 🎂 is the selected emoji, the
-                            // compass face becomes the special tap-the-candles
-                            // birthday send mechanic; otherwise the normal face.
+                            // [special moments — TRANSITION FALLBACK, retire in Stage 4]
+                            // Legacy path: picking 🎂/🎆 from the emoji strip while on
+                            // the compass still swaps to the birthday/firework face.
+                            // The first-class entry is now `case .birthday/.firework`
+                            // below (selection-keyed). Kept so a legacy emoji pick keeps
+                            // working during the transition.
                             if (selectedToken.map { sendRemoteEmoji(for: $0) }) == "🎂" {
                                 // [birthday V2] HERO — tap each candle to LIGHT it.
                                 // (V1 BirthdayCakeCompassFace kept as fallback.)
@@ -346,6 +349,29 @@ struct CompassView: View {
                                                : .easeIn(duration: 0.4),
                                                value: faceDimmedForInstrument)
                             }
+                        // [special moments — peer animations] SELECTION-keyed faces:
+                        // selecting Birthday/Firework brings its face directly (the
+                        // animation is the entry point, not the emoji). The 🎂/🎆
+                        // emoji-check inside `case .compass` above is KEPT as a
+                        // transition fallback (legacy emoji pick) — retire in Stage 4.
+                        case .birthday:
+                            BirthdayCakeCompassFaceV2(
+                                bearingDegrees: compass.state.bearingDegrees,
+                                personName: compass.state.personName,
+                                onSend: { sendThought(effectiveToken) }
+                            )
+                            .frame(width: 240, height: 240)
+                            .scaleEffect(370.0 / 240.0)
+                            .frame(width: 370, height: 370)
+                        case .firework:
+                            FireworkCompassFace(
+                                bearingDegrees: compass.state.bearingDegrees,
+                                personName: compass.state.personName,
+                                onSend: { sendThought(effectiveToken) }
+                            )
+                            .frame(width: 240, height: 240)
+                            .scaleEffect(370.0 / 240.0)
+                            .frame(width: 370, height: 370)
                         case .bow:
                             BowInstrumentView(
                                 // [default-payload] was `selectedToken` / `selectedToken.map{…}`
@@ -648,10 +674,15 @@ struct CompassView: View {
                 // approved and wired live here, the same way the rocket v2 parachute
                 // receipt is. All paths call the SAME completion → pipeline unchanged.
                 Group {
-                    if previewEmoji == "🎆" {
-                        // [firework] 🎆 is a SPECIAL emoji send — the spectacular
-                        // deep-space launch → small pops → massive burst → embers,
-                        // shown for ANY instrument, then back to the pipeline.
+                    // [special moments — peer animations] STYLE-keyed first (the
+                    // animation is the entry point, any emoji); the emoji check is
+                    // KEPT as a transition fallback (legacy 🎂/🎆 pick) — retire in
+                    // Stage 4. PRIOR conditions were emoji-only:
+                    //   if previewEmoji == "🎆" { … }
+                    //   else if previewEmoji == "🎂" { … }
+                    if previewStyle == .firework || previewEmoji == "🎆" {
+                        // [firework] the spectacular deep-space launch → small pops →
+                        // massive burst → embers, then back to the pipeline.
                         FireworkSendAnimation(
                             emoji: previewEmoji,
                             onComplete: {
@@ -659,10 +690,9 @@ struct CompassView: View {
                                 flightFly   = false
                                 finishSend(emoji: previewEmoji, style: previewStyle)
                             })
-                    } else if previewEmoji == "🎂" {
-                        // [birthday V2] 🎂 is a SPECIAL emoji send — the cake +
-                        // confetti burst, shown for ANY instrument, then back to
-                        // the pipeline (no EmojiRevealView here).
+                    } else if previewStyle == .birthday || previewEmoji == "🎂" {
+                        // [birthday V2] the cake + confetti burst, then back to the
+                        // pipeline (no EmojiRevealView here).
                         BirthdayCakeSendAnimationV2(
                             emoji: previewEmoji,
                             onComplete: {
@@ -1951,6 +1981,8 @@ struct CompassView: View {
         case .rocket:  return "aim · fuel · blast"
         case .wand:    return "shake · release"
         case .plane:   return "wind · fly"
+        case .birthday: return "light the candles"
+        case .firework: return "light the fuse"
         }
     }
 
@@ -1966,6 +1998,8 @@ struct CompassView: View {
         case .rocket:  return "fuel the rocket toward \(name)"
         case .wand:    return "shake · release toward \(name)"
         case .plane:   return "wind it up, then let fly toward \(name)"
+        case .birthday: return "light the candles for \(name)"
+        case .firework: return "light the fuse for \(name)"
         }
     }
 

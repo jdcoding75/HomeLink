@@ -884,6 +884,7 @@ struct SenderStylePreview: View {
         case .rocket:       return 1.1
         case .wand:         return 1.0
         case .plane:        return 1.4
+        case .birthday, .firework: return 0.9   // [special moments] glow-default preview timing
         }
     }
 
@@ -897,6 +898,7 @@ struct SenderStylePreview: View {
         case .rocket:       return .easeIn(duration: duration)
         case .wand:         return AnimationSystem.easeOutCubic(duration)
         case .plane:        return AnimationSystem.easeInOutSine(duration)
+        case .birthday, .firework: return AnimationSystem.easeOutCubic(duration)   // [special moments]
         }
     }
 
@@ -992,6 +994,11 @@ struct SenderStylePreview: View {
             Text("✈️")
                 .font(.system(size: 16))
                 .rotationEffect(.degrees(-18))
+                .shadow(color: Color(hex: "#c4a8d4").opacity(0.6), radius: 4)
+        case .birthday, .firework:
+            // [special moments] simple glyph dot for the Pro-setup preview.
+            Text(style.emoji)
+                .font(.system(size: 16))
                 .shadow(color: Color(hex: "#c4a8d4").opacity(0.6), radius: 4)
         }
     }

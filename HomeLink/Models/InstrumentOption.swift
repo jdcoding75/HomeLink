@@ -27,13 +27,17 @@ enum InstrumentOption: String, CaseIterable, Identifiable {
     case wind   = "wind"     // replaced the firefly
     case wand   = "wand"     // load · shake · release
     case plane  = "plane"    // ✈️ wind · let fly · glide
+    // [special moments — peer animations] Selectable cards alongside the instruments.
+    case birthday = "birthday" // 🎂 special moment
+    case firework = "firework" // 🎆 special moment
 
     var id: String { rawValue }
 
     var requiresPro: Bool {
         switch self {
         case .compassVintage:                            return false
-        case .bow, .flick, .rocket, .wind, .wand, .plane: return true
+        case .bow, .flick, .rocket, .wind, .wand, .plane,
+             .birthday, .firework:                       return true
         }
     }
 
@@ -50,6 +54,8 @@ enum InstrumentOption: String, CaseIterable, Identifiable {
         case .wind:           return "wind"
         case .wand:           return "wand"
         case .plane:          return "plane"
+        case .birthday:       return "birthday"
+        case .firework:       return "firework"
         }
     }
 
@@ -62,6 +68,8 @@ enum InstrumentOption: String, CaseIterable, Identifiable {
         case .wind:   return "🌬️"
         case .wand:   return "🪄"
         case .plane:  return "✈️"
+        case .birthday: return "🎂"
+        case .firework: return "🎆"
         }
     }
 
@@ -75,6 +83,8 @@ enum InstrumentOption: String, CaseIterable, Identifiable {
         case .wind:           return "breathe · release"
         case .wand:           return "load · shake · release"
         case .plane:          return "wind · let fly"
+        case .birthday:       return "light the candles"
+        case .firework:       return "light the fuse"
         }
     }
 
@@ -88,6 +98,8 @@ enum InstrumentOption: String, CaseIterable, Identifiable {
         case .rocket: return .rocket
         case .wand:   return .wand
         case .plane:  return .plane
+        case .birthday: return .birthday
+        case .firework: return .firework
         }
     }
 
@@ -125,6 +137,8 @@ enum InstrumentOption: String, CaseIterable, Identifiable {
         case .firefly: self = .wind
         case .wand:    self = .wand
         case .plane:   self = .plane
+        case .birthday: self = .birthday
+        case .firework: self = .firework
         }
     }
 
@@ -172,6 +186,8 @@ enum InstrumentOption: String, CaseIterable, Identifiable {
         case .wand:    derived = .wand
         case .plane:   derived = .plane
         case .firefly: derived = .wind
+        case .birthday: derived = .birthday
+        case .firework: derived = .firework
         case .compass:
             // [2/5] minimal retired — minimal AND heart users land on vintage.
             switch CompassSkin(rawValue: skinRaw) ?? .vintage {

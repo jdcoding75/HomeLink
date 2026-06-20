@@ -164,6 +164,9 @@ extension RevealAmbient {
     case .flick:   return .flick
     case .bow:     return .bow
     case .plane:   return .plane
+    // [special moments] shared-reveal ambient falls back to compass; their own
+    // dedicated receipts (cake/firework) carry their real worlds.
+    case .birthday, .firework: return .compass
     }
   }
 
@@ -176,6 +179,7 @@ extension RevealAmbient {
     case .fingerFlick:         return .flick
     case .plane:               return .plane
     case .glow, .shootingStar: return .compass
+    case .birthday, .firework: return .compass   // [special moments] shared-reveal fallback
     }
   }
 }

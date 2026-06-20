@@ -200,6 +200,9 @@ struct SenderAnimationView<Symbol: View>: View {
         case .rocket:       return Self.rocketOrange
         case .wand:         return Self.wandGold
         case .plane:        return Self.gold   // ✈️ placeholder flight tint [3/5]
+        // [special moments] never reached — birthday/firework are special-cased to
+        // their own send animations in CompassView; compile-only fallback.
+        case .birthday, .firework: return Self.gold
         }
     }
 
@@ -244,6 +247,9 @@ struct SenderAnimationView<Symbol: View>: View {
                     case .rocket:       rocketSend(end: end)
                     case .wand:         wandSend(end: end)
                     case .plane:        planeSend(end: end)  // [1/8] real plane flight
+                    // [special moments] never reached — birthday/firework dispatch to
+                    // their own send animations in CompassView; compile-only fallback.
+                    case .birthday, .firework: glowSend(end: end)
                     }
 
                     // IMPACT — brief flash where the thought leaves the screen
@@ -1287,6 +1293,10 @@ struct SenderAnimationView<Symbol: View>: View {
                 baEdgeFlash = true                      // bloom fades at the edge
             }
             finish(after: 1.9 + 1.2 + 0.3)
+        // [special moments] never reached — birthday/firework dispatch to their own
+        // send animations in CompassView; compile-only no-op fallback.
+        case .birthday, .firework:
+            break
         }
     }
 

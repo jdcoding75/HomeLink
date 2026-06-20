@@ -16,6 +16,11 @@ enum SenderStyle: String, CaseIterable, Identifiable {
     case rocket        = "rocket"          // pro — fuel · aim · blast off
     case wand          = "wand"            // pro — load · shake · release
     case plane         = "plane"           // pro — wind · let fly · glide
+    // [special moments — peer animations] Their own wire style, so the recipient
+    // (Stage 3) can route the arrival by STYLE regardless of which emoji was sent.
+    // New wire VALUES; SenderStyle.from() degrades unknowns to .glow on old clients.
+    case birthday      = "birthday"        // pro — special moment
+    case firework      = "firework"        // pro — special moment
 
     var id: String { rawValue }
 
@@ -33,6 +38,8 @@ enum SenderStyle: String, CaseIterable, Identifiable {
         case .rocket:       return "rocket"
         case .wand:         return "wand"
         case .plane:        return "paper plane"
+        case .birthday:     return "birthday"
+        case .firework:     return "firework"
         }
     }
 
@@ -46,6 +53,8 @@ enum SenderStyle: String, CaseIterable, Identifiable {
         case .rocket:       return "🚀"
         case .wand:         return "🪄"
         case .plane:        return "✈️"
+        case .birthday:     return "🎂"
+        case .firework:     return "🎆"
         }
     }
 
@@ -60,6 +69,8 @@ enum SenderStyle: String, CaseIterable, Identifiable {
         case .rocket:       return "fueled and launched"
         case .wand:         return "charged and cast"
         case .plane:        return "wound and let fly"
+        case .birthday:     return "a wish, delivered"
+        case .firework:     return "a burst of joy"
         }
     }
 
@@ -75,6 +86,10 @@ enum SenderStyle: String, CaseIterable, Identifiable {
         case .rocket:       return 4.00   // countdown 1500 · ignition 200 · flight 1500 · exit 800
         case .wand:         return 2.00   // charge held · burst 200 · flight 1000 · trail 800
         case .plane:        return 3.50   // wind · banking flight 2500 · glide out 1000
+        // Special moments use their OWN dedicated send animations (these are
+        // fallback timings only — the cake/firework views own their real durations).
+        case .birthday:     return 3.00
+        case .firework:     return 4.00
         }
     }
 
@@ -89,6 +104,8 @@ enum SenderStyle: String, CaseIterable, Identifiable {
         case .rocket:       return 0.80   // descends to landing pad with beeps
         case .wand:         return 0.45   // sparkle trail rushes to center
         case .plane:        return 0.70   // glides in, banks, drops into the bucket
+        case .birthday:     return 0.50   // dedicated receipt owns the real timing
+        case .firework:     return 0.50
         }
     }
 

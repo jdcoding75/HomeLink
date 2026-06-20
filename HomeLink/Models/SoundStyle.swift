@@ -94,6 +94,9 @@ enum SoundStyle: String, CaseIterable, Identifiable {
         case .rocket:  return "rocket.blast"
         case .wand:    return "style.bell"
         case .plane:   return "plane.wind"
+        // [special moments] no dedicated sound-style preview — use the warm
+        // compass default (their own send/receipt sounds live in their animations).
+        case .birthday, .firework: return "catch.arrival"
         }
     }
 }

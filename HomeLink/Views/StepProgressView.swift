@@ -30,6 +30,8 @@ struct StepProgressView: View {
         case .firefly: return ["emoji", "message", "breathe"]        // wind
         case .rocket:  return ["emoji", "message", "aim", "fuel", "blast"]
         case .plane:   return ["emoji", "message", "wind", "fly"]
+        case .birthday: return ["emoji", "message", "candles"]
+        case .firework: return ["emoji", "message", "fuse"]
         }
     }
 

@@ -32,6 +32,9 @@ struct InstrumentPreview: View {
         case .rocket:  RocketLaunchPreview()
         case .wand:    WandChargePreview()
         case .plane:   PlaneLaunchPreview()
+        // [special moments] no dedicated mini-preview — show the glyph as a
+        // placeholder (the real face is the cake/firework on selection).
+        case .birthday, .firework: Text(instrument.icon).font(.system(size: 40))
         }
     }
 
@@ -421,6 +424,8 @@ extension Instrument {
         case .rocket:              instrument = .rocket
         case .wand:                instrument = .wand
         case .plane:               instrument = .plane
+        case .birthday:            instrument = .birthday
+        case .firework:            instrument = .firework
         }
         defaults.set(instrument.rawValue, forKey: InstrumentStore.storageKey)
     }
