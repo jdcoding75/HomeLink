@@ -125,6 +125,7 @@ struct CompassView: View {
     @State private var messageText: String = ""             // [5/5] optional note (≤30)
     @FocusState private var messageFocused: Bool
     @State private var composing = false                    // [5/7] message editor open
+    @State private var showEmojiPicker = false              // [redesign] [Emoji] box toggles the strip
     @State private var longPressLabel: String? = nil        // [1/3] curated-emoji label on long-press
     @State private var loadFlightToken: String? = nil       // [1/5] load flight
     @State private var loadFlightProgress: CGFloat = 0
@@ -155,6 +156,48 @@ struct CompassView: View {
     }
     private var sendAlignDiff: Double {
         BearingCalculator.alignmentError(relativeBearing: compass.state.bearingDegrees)
+    }
+
+    // ── [bottom-band redesign] Default-emoji payload + helper-line copy ──────
+
+    /// The current animation's default feeling (from AnimationManifest, never
+    /// hardcoded here). All animations default to 🤗 for now; the `?? "🤗"` is a
+    /// pure safety net should the lookup ever miss.
+    private var defaultEmojiForCurrentAnimation: String {
+        AnimationManifest.instruments
+            .first { $0.instrument == instrumentStore.selected }?
+            .defaultEmoji ?? "🤗"
+    }
+
+    /// The feeling that will actually send. A default ALWAYS supplies a payload,
+    /// so the send is never gated on an explicit emoji choice. Used at every
+    /// send site and in the preview line.
+    private var effectiveToken: String { selectedToken ?? defaultEmojiForCurrentAnimation }
+
+    /// Aim instruments need the phone pointed; the magic ones (wind · wand)
+    /// charge inside the instrument, so they show no aim hint. Mirrors the
+    /// non-aim split used by `instrumentStep`.
+    private var isAimInstrument: Bool {
+        switch instrumentStore.selected {
+        case .firefly, .wand: return false   // wind · wand — charge inside
+        default:              return true
+        }
+    }
+
+    /// The gesture TAIL only (no "choose emoji · message ·" prefix) — the
+    /// mechanism recipe helper line. Birthday/Firework are emoji sub-modes of
+    /// the compass instrument; their mechanic lives on the face, so their
+    /// recipe is the face's own instruction (BirthdayCakeCompassFaceV2 /
+    /// FireworkCompassFace), not a compass "point · hold".
+    private var mechanismRecipe: String {
+        if instrumentStore.selected == .compass {
+            switch sendRemoteEmoji(for: effectiveToken) {
+            case "🎂": return "tap each candle to light it"
+            case "🎆": return "drag the match up to the fuse"
+            default:  break
+            }
+        }
+        return universalInstruction   // now the stripped gesture tail
     }
 
     /// [2/5] Best-effort current step for the progress dots. Load is done once
@@ -244,7 +287,7 @@ struct CompassView: View {
                                 BirthdayCakeCompassFaceV2(
                                     bearingDegrees: compass.state.bearingDegrees,
                                     personName: compass.state.personName,
-                                    onSend: { if let token = selectedToken { sendThought(token) } }
+                                    onSend: { sendThought(effectiveToken) }   // [redesign] default supplies a payload
                                 )
                                 .frame(width: 240, height: 240)
                                 .scaleEffect(370.0 / 240.0)
@@ -255,7 +298,7 @@ struct CompassView: View {
                                 FireworkCompassFace(
                                     bearingDegrees: compass.state.bearingDegrees,
                                     personName: compass.state.personName,
-                                    onSend: { if let token = selectedToken { sendThought(token) } }
+                                    onSend: { sendThought(effectiveToken) }   // [redesign] default supplies a payload
                                 )
                                 .frame(width: 240, height: 240)
                                 .scaleEffect(370.0 / 240.0)
@@ -292,7 +335,7 @@ struct CompassView: View {
                                 bearingDegrees: compass.state.bearingDegrees,
                                 personName: compass.state.personName,
                                 personEmoji: compass.state.personEmoji,
-                                onSend: { if let token = selectedToken { sendThought(token) } }
+                                onSend: { sendThought(effectiveToken) }   // [redesign] default supplies a payload
                             )
                         case .firefly:
                             // 🌬️ WIND — replaced the firefly (same mechanic as
@@ -303,7 +346,7 @@ struct CompassView: View {
                                 bearingDegrees: compass.state.bearingDegrees,
                                 personName: compass.state.personName,
                                 personEmoji: compass.state.personEmoji,
-                                onSend: { if let token = selectedToken { sendThought(token) } }
+                                onSend: { sendThought(effectiveToken) }   // [redesign] default supplies a payload
                             )
                             // FireflyInstrumentView(
                             //     loadedToken: selectedToken,
@@ -322,7 +365,7 @@ struct CompassView: View {
                                 personName: compass.state.personName,
                                 emoji: selectedToken.map { sendRemoteEmoji(for: $0) } ?? "💜",
                                 bearingDegrees: compass.state.bearingDegrees,
-                                onSend: { if let token = selectedToken { sendThought(token) } },
+                                onSend: { sendThought(effectiveToken) },   // [redesign] default supplies a payload
                                 autoPlay: false
                             )
                             // FlickInstrumentView(
@@ -345,7 +388,7 @@ struct CompassView: View {
                                 bearingDegrees: compass.state.bearingDegrees,
                                 personName: compass.state.personName,
                                 personEmoji: compass.state.personEmoji,
-                                onLaunch: { if let token = selectedToken { sendThought(token) } }
+                                onLaunch: { sendThought(effectiveToken) }   // [redesign] default supplies a payload
                             )
                         case .wand:
                             // 🪄 WAND — load into the crystal, shake to charge,
@@ -358,7 +401,7 @@ struct CompassView: View {
                                 bearingDegrees: compass.state.bearingDegrees,
                                 personName: compass.state.personName,
                                 personEmoji: compass.state.personEmoji,
-                                onSend: { if let token = selectedToken { sendThought(token) } }
+                                onSend: { sendThought(effectiveToken) }   // [redesign] default supplies a payload
                             )
                         case .plane:
                             // ✈️ PLANE — wind the propeller (8 winds), let fly.
@@ -370,7 +413,7 @@ struct CompassView: View {
                                 bearingDegrees: compass.state.bearingDegrees,
                                 personName: compass.state.personName,
                                 personEmoji: compass.state.personEmoji,
-                                onLaunch: { if let token = selectedToken { sendThought(token) } }
+                                onLaunch: { sendThought(effectiveToken) }   // [redesign] default supplies a payload
                             )
                         }
                     }
@@ -493,11 +536,19 @@ struct CompassView: View {
 
                     Spacer(minLength: 12)
 
-                    // ── BOTTOM ZONE: distance · funny · tagline · emojis ──────
-                    bottomZone
-                        .padding(.top, 24)
+                    // ── [bottom-band redesign] NEW STACK ──────────────────────
+                    // compass face (above, UNCHANGED) → helper lines (aim hint +
+                    // mechanism recipe) → preview line (emoji + full message) →
+                    // picker row [Animation] [Emoji] [Message] [To]. No send
+                    // button — the instrument gesture sends, always with a payload.
+                    bottomBandRedesign
+                        .padding(.top, 20)
+                        // The catch owns the screen — the band recedes to 30 %.
+                        .opacity(appState.currentState == .catchMode ? 0.3 : 1.0)
+                        .animation(.easeInOut(duration: 0.3),
+                                   value: appState.currentState == .catchMode)
 
-                    // ── Catch badge — "X thoughts waiting ✦", every tier ──
+                    // ── Catch badge — KEPT (per scope) until the History tab is built ──
                     if pings.queueCount > 0 && pings.nowPlaying == nil {
                         CatchBadgeView(count: pings.queueCount) {
                             pings.playNext()
@@ -506,23 +557,22 @@ struct CompassView: View {
                         .transition(.opacity.combined(with: .move(edge: .bottom)))
                     }
 
-                    // The six, always visible — sending lives right here.
-                    // The gap above equals one tagline line height (26pt):
-                    // the tagline breathes clearly, not crowded, not far.
-                    emojiRow
-                        .padding(.top, pings.queueCount > 0 && pings.nowPlaying == nil ? 8 : 26)
-                        // The catch owns the screen — the row recedes to 30 %
-                        .opacity(appState.currentState == .catchMode ? 0.3 : 1.0)
-                        .animation(.easeInOut(duration: 0.3),
-                                   value: appState.currentState == .catchMode)
-
-                    // [1/6] The separate message box below the emojis is GONE —
-                    // the message now lives in the ONE zone above the emoji row
-                    // (bottomZone), replacing the tagline when a feeling is loaded.
-
-                    sendControl
-                        .padding(.top, 10)
-                        .padding(.bottom, 12)
+                    // ── RETIRED (preserved — commented, never deleted) ──────────
+                    // Replaced by `bottomBandRedesign` above. The emoji STRIP
+                    // (`emojiRow`) is NOT retired — it is reused inside the [Emoji]
+                    // picker box; only its in-band placement here is removed. The
+                    // word block (`bottomZone`) and the instruction line
+                    // (`sendControl`) are fully retired. Restore by uncommenting:
+                    //   bottomZone
+                    //       .padding(.top, 24)
+                    //   emojiRow
+                    //       .padding(.top, pings.queueCount > 0 && pings.nowPlaying == nil ? 8 : 26)
+                    //       .opacity(appState.currentState == .catchMode ? 0.3 : 1.0)
+                    //       .animation(.easeInOut(duration: 0.3),
+                    //                  value: appState.currentState == .catchMode)
+                    //   sendControl
+                    //       .padding(.top, 10)
+                    //       .padding(.bottom, 12)
 
                     // (connect link removed — connection UI lives in the
                     //  People tab only; the compass stays clean)
@@ -925,11 +975,14 @@ struct CompassView: View {
         // [3/6] Compass send mechanic: hold within 15° for 2 s → auto-send.
         // Built-in, every tier — the tap button is gone.
         .onReceive(holdTick) { _ in
-            guard instrumentStore.selected == .compass,
-                  let token = selectedToken, flightToken == nil else {
+            // [redesign] No longer gated on `selectedToken` — a default always
+            // supplies a payload, so a hold within 15° sends even before the
+            // user explicitly picks an emoji.
+            guard instrumentStore.selected == .compass, flightToken == nil else {
                 if holdProgress > 0 { holdProgress = 0 }
                 return
             }
+            let token = effectiveToken
             // [3/5] SOFT LOCK — the hold STARTS within 15°, but once it has
             // begun it tolerates drift up to 30° (hysteresis), so a small
             // wobble of the phone never breaks the lock or freezes the hold.
@@ -1131,6 +1184,142 @@ struct CompassView: View {
         return DemoPerson.isDemo(person)
     }
 
+    // ════════════════════════════════════════════════════════════════════
+    // MARK: - [bottom-band redesign] Helper lines · preview · picker row
+    // ════════════════════════════════════════════════════════════════════
+
+    /// The redesigned bottom band, beneath the (unchanged) compass face:
+    /// helper lines (aim hint + mechanism recipe) → preview line (feeling +
+    /// full message) → picker row [Animation] [Emoji] [Message] [To]. No send
+    /// button — the instrument gesture sends, always with a payload.
+    private var bottomBandRedesign: some View {
+        VStack(spacing: 12) {
+
+            // ── Helper line 1 — aim hint (aim instruments only) ──────────
+            // The live alignment guidance (existing `alignmentInstruction`,
+            // wrapping AlignmentText.guidance). Wind · wand charge inside the
+            // instrument, so they show no aim hint.
+            if isAimInstrument {
+                Text(alignmentInstruction)
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundColor(DesignTokens.Color.textMuted)
+                    .multilineTextAlignment(.center)
+            }
+
+            // ── Helper line 2 — mechanism recipe (gesture tail) ──────────
+            Text(mechanismRecipe)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundColor(DesignTokens.Color.accentSoft)
+                .multilineTextAlignment(.center)
+
+            // ── Preview line — the feeling + the FULL typed message ───────
+            previewLine
+                .padding(.top, 2)
+
+            // ── Picker row — [Animation] [Emoji] [Message] [To] ──────────
+            pickerRow
+                .padding(.horizontal, 16)
+                .padding(.top, 4)
+
+            // ── Emoji strip — REUSED verbatim, toggled by the [Emoji] box ─
+            if showEmojiPicker {
+                emojiRow
+                    .padding(.top, 2)
+                    .transition(.opacity.combined(with: .move(edge: .bottom)))
+            }
+        }
+    }
+
+    /// The chosen (or default) feeling next to the full message text. The
+    /// message is emotional → serif, per the design system.
+    private var previewLine: some View {
+        HStack(spacing: 8) {
+            sendSymbol(effectiveToken, size: 24)
+            if !messageText.isEmpty {
+                Text(messageText)
+                    .font(.system(size: 15, design: .serif))
+                    .foregroundColor(DesignTokens.Color.textPrimary)
+                    .lineLimit(2)
+                    .multilineTextAlignment(.leading)
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.horizontal, 24)
+    }
+
+    /// Four labeled boxes, each showing its current value and opening its
+    /// EXISTING selector. No new data sources — every box reads/writes the
+    /// same state the old surfaces did.
+    private var pickerRow: some View {
+        HStack(spacing: 8) {
+            pickerBox(label: "animation") {
+                pickerValue(instrumentStore.selected.displayName)
+            } action: {
+                HapticEngine.personSelected()
+                withAnimation(.easeOut(duration: 0.3)) { showSkinOverlay = true }
+            }
+            pickerBox(label: "emoji") {
+                sendSymbol(effectiveToken, size: 22)
+            } action: {
+                HapticEngine.personSelected()
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                    showEmojiPicker.toggle()
+                }
+            }
+            pickerBox(label: "message") {
+                pickerValue(messageText.isEmpty ? "add" : messageText)
+            } action: {
+                // The compose overlay needs a non-nil token — commit the
+                // default feeling first so a message can be written even before
+                // an explicit emoji choice (messageComposeOverlay stays unchanged).
+                if selectedToken == nil { selectedToken = defaultEmojiForCurrentAnimation }
+                composing = true
+                messageFocused = true
+            }
+            pickerBox(label: "to") {
+                pickerValue(compass.state.personName)
+            } action: {
+                HapticEngine.personSelected()
+                showPersonSwitcher = true
+            }
+        }
+    }
+
+    /// One labeled picker box: the current value on top, the label beneath.
+    private func pickerBox<C: View>(label: String,
+                                    @ViewBuilder content: () -> C,
+                                    action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            VStack(spacing: 4) {
+                content()
+                    .frame(height: 26)
+                Text(label)
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundColor(DesignTokens.Color.textMuted)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 10)
+            .background(DesignTokens.Color.backgroundCard.opacity(0.7))
+            .cornerRadius(14)
+            .overlay(
+                RoundedRectangle(cornerRadius: 14)
+                    .stroke(DesignTokens.Color.border.opacity(0.6), lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
+    }
+
+    /// The value text inside a picker box — single line, truncated.
+    private func pickerValue(_ text: String) -> some View {
+        Text(text)
+            .font(.system(size: 13, weight: .semibold))
+            .foregroundColor(DesignTokens.Color.textPrimary)
+            .lineLimit(1)
+            .truncationMode(.tail)
+            .frame(maxWidth: .infinity)
+            .padding(.horizontal, 4)
+    }
+
     // ── BOTTOM ZONE ───────────────────────────────────────────────────────
 
     /// The mode line 1 cycles through: standard → funny (Pro) → light speed.
@@ -1167,6 +1356,10 @@ struct CompassView: View {
         .animation(.easeInOut(duration: 0.3), value: distanceMode)
     }
 
+    /* [bottom-band redesign] RETIRED — the WORD BLOCK is replaced by the preview
+       line + the [Message] picker box. Preserved verbatim (commented, never
+       deleted); retires A2 "tap to add a tagline" and A5 "add a message".
+       Restore by un-wrapping this block comment.
     private var bottomZone: some View {
         VStack(spacing: 12) {
             // [1/6] ONE text zone above the emoji row — never a second box below.
@@ -1226,6 +1419,7 @@ struct CompassView: View {
         .animation(.easeInOut(duration: 0.3), value: distanceMode)
         .animation(.easeInOut(duration: 0.3), value: selectedToken)
     }
+    */
 
     // [4/4] Per-person tagline management.
 
@@ -1587,6 +1781,11 @@ struct CompassView: View {
         }
     }
 
+    /* [bottom-band redesign] RETIRED — the instruction line is replaced by the
+       two helper lines (aim hint + mechanism recipe) in `bottomBandRedesign`.
+       Preserved verbatim (commented, never deleted); retires C1 "tap above to
+       add a feeling ✦". `universalInstruction` stays live — it now feeds
+       `mechanismRecipe`. Restore by un-wrapping this block comment.
     @ViewBuilder
     private var sendControl: some View {
         if pings.nowPlaying != nil {
@@ -1613,19 +1812,29 @@ struct CompassView: View {
                 .animation(.easeInOut(duration: 0.25), value: universalInstruction)
         }
     }
+    */
 
     /// Per-instrument step guide, shown once a feeling is loaded. The "loaded"
     /// step is checked; the rest are the steps to send.
     private var universalInstruction: String {
-        // [4/6] The full step flow per instrument: emoji · message · …action.
+        // [bottom-band redesign] The "choose emoji · message · " PREFIX is retired
+        // (the picker row now owns emoji + message); this returns the gesture TAIL
+        // only — the mechanism recipe. Originals preserved below for restore:
+        //   .compass: "choose emoji · message · point · hold"
+        //   .bow:     "choose emoji · message · aim · draw · release"
+        //   .firefly: "choose emoji · message · breathe"   // wind
+        //   .flick:   "choose emoji · message · flick"
+        //   .rocket:  "choose emoji · message · aim · fuel · blast"
+        //   .wand:    "choose emoji · message · shake · release"
+        //   .plane:   "choose emoji · message · wind · fly"
         switch instrumentStore.selected {
-        case .compass: return "choose emoji · message · point · hold"
-        case .bow:     return "choose emoji · message · aim · draw · release"
-        case .firefly: return "choose emoji · message · breathe"          // wind
-        case .flick:   return "choose emoji · message · flick"
-        case .rocket:  return "choose emoji · message · aim · fuel · blast"
-        case .wand:    return "choose emoji · message · shake · release"
-        case .plane:   return "choose emoji · message · wind · fly"
+        case .compass: return "point · hold"
+        case .bow:     return "aim · draw · release"
+        case .firefly: return "breathe"          // wind
+        case .flick:   return "flick"
+        case .rocket:  return "aim · fuel · blast"
+        case .wand:    return "shake · release"
+        case .plane:   return "wind · fly"
         }
     }
 

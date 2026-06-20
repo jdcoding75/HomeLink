@@ -69,6 +69,15 @@ struct AnimationDefinition: Identifiable, Hashable {
     /// instruments (which carry whatever feeling the user chose).
     let fixedEmoji: String?
 
+    /// [bottom-band redesign] The feeling sent when the user performs the
+    /// instrument gesture WITHOUT explicitly choosing an emoji — a default
+    /// always supplies a payload, so the send is never gated on a selection.
+    /// Set to 🤗 (hug) for ALL animations for now; `var` + default keeps every
+    /// existing initializer in `all` unchanged while allowing a future
+    /// per-animation override. Read via `effectiveToken`, never hardcoded at
+    /// the send site.
+    var defaultEmoji: String = "🤗"
+
     /// Stable id, e.g. "bow.v2" / "firework" / "compass".
     var id: String {
         let base = name.lowercased().replacingOccurrences(of: " ", with: "-")
