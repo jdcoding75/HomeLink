@@ -41,6 +41,11 @@ struct WindInstrumentView: View {
     @State private var holdProgress: Double = 0      // fallback hold-to-send
     @State private var lastPulseHaptic = Date.distantPast
     @State private var lifting = false               // [4/7] leaf lifts on send
+    // [single-shot 2026-06-20] Per-send cooldown for the breath path — after one
+    // breath-send, ignore further exhales for a beat so a re-armed detector can't
+    // chain sends. Time-based (the detector keeps running), so it never gets stuck.
+    @State private var lastBreathSend = Date.distantPast
+    private let breathSendCooldown: TimeInterval = 2.0   // device-tunable
 
     private let driftTick = Timer.publish(every: 0.7, on: .main, in: .common).autoconnect()
     private let holdTick  = Timer.publish(every: 0.05, on: .main, in: .common).autoconnect()
@@ -376,7 +381,12 @@ struct WindInstrumentView: View {
     /// [3/7] Breath path: ANY detected exhale releases — no aim needed.
     /// The leaf lifts off and the magic carries the thought to the person.
     private func exhaleDetected() {
-        guard loadedToken != nil, !lifting else { return }
+        // [single-shot 2026-06-20] One send per breath: added `!lifting`'s sibling
+        // cooldown so a re-armed detector (or any residual exhale) can't chain
+        // sends. PRIOR guard: `guard loadedToken != nil, !lifting else { return }`.
+        guard loadedToken != nil, !lifting,
+              Date.now.timeIntervalSince(lastBreathSend) > breathSendCooldown else { return }
+        lastBreathSend = .now
         HapticEngine.windSend()             // very soft double tap
         withAnimation(.easeIn(duration: 0.5)) { lifting = true }
         onSend()

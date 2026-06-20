@@ -35,6 +35,13 @@ final class BreathDetector: ObservableObject {
     private let engine = AVAudioEngine()
     private var sustainedSeconds: Double = 0
     private var previousDb: Float = -120
+    // [anti-ambient 2026-06-20] Exhale-SHAPE gate. A real breath RISES from quiet;
+    // a constant in-band room tone does not. `armed` is set only when the level
+    // dips below the band (genuine quiet), and a sustained breath only counts while
+    // armed. Firing DISARMS it, so the detector won't re-fire until a NEW quiet→
+    // rise onset — this both rejects steady ambient AND single-shots the detector
+    // (no immediate re-fire after a send). Starts false: a quiet moment arms it.
+    private var armed = false
     /// Rolling window of the last RMS readings → a steady level (spec: 10).
     private var levelWindow: [Float] = []
     private let windowSize = 10
@@ -43,11 +50,16 @@ final class BreathDetector: ObservableObject {
     // ambient silence; the old thresholds were so strict real breathing barely
     // registered. Lowered the whole band and the required hold.
     private let silenceDb: Float  = -40   // below this → silence (was -50)
-    private let breathLowDb: Float = -38  // breath detected from here (was -45)
+    // [anti-ambient 2026-06-20] Floor LIFTED above typical room ambient so a steady
+    // room tone can no longer sit inside the breath band. Device-tunable — start
+    // conservative; Joshua to dial in. (regression-fix for Item C / 393b31c.)
+    private let breathLowDb: Float = -30  // breath detected from here (was -38 → self-fired on ambient; orig -45)
     private let breathHighDb: Float = -12 // breath band ceiling (was -25)
     private let speechDb: Float   = -6    // above this → shouting/noise, ignore
     private let spikeJumpDb: Float = 16    // a sharp jump = tap onset (was 12)
-    private let requiredSeconds   = 0.8    // sustain only 0.8 s now (was 1.6)
+    // [anti-ambient 2026-06-20] Sustain RAISED back up (toward the original 1.6 s)
+    // so a momentary in-band blip doesn't count — a real exhale is a long hill.
+    private let requiredSeconds   = 1.3    // (was 0.8 → too twitchy; orig 1.6)
     // Live-arc normalization: map silence → full breath onto 0…1.
     private let arcFloorDb: Float   = -42  // very dim lavender
     private let arcCeilingDb: Float = -16  // full glow
@@ -74,6 +86,7 @@ final class BreathDetector: ObservableObject {
         exhaleProgress = 0
         level = 0
         levelWindow.removeAll()
+        armed = false            // [anti-ambient] restart disarmed — a quiet moment re-arms
         // Hand the session back to ambient playback (SoundEngine's world)
         try? AVAudioSession.sharedInstance().setCategory(.ambient, options: [.mixWithOthers])
     }
@@ -145,19 +158,41 @@ final class BreathDetector: ObservableObject {
         let inBreathBand = db >= breathLowDb && db <= breathHighDb
         let isSpeech     = db > speechDb
 
-        if inBreathBand && !isSpeech && !jumped {
+        // [anti-ambient 2026-06-20] SHAPE GATE + single-shot. PRIOR (looped on
+        // ambient — any sustained in-band level fired, then re-armed instantly):
+        //   if inBreathBand && !isSpeech && !jumped {
+        //       sustainedSeconds += dt
+        //       exhaleProgress = min(1, sustainedSeconds / requiredSeconds)
+        //       if sustainedSeconds >= requiredSeconds {
+        //           sustainedSeconds = 0
+        //           exhaleProgress = 0
+        //           onExhale?()
+        //       }
+        //   } else {
+        //       sustainedSeconds = max(0, sustainedSeconds - dt * 2)
+        //       exhaleProgress = min(1, sustainedSeconds / requiredSeconds)
+        //   }
+        if db < breathLowDb {
+            // Below the band = genuine quiet → ARM: the next rise into the band is
+            // a real exhale onset. A steady in-band ambient level never reaches
+            // here, so it can never arm (and never fires).
+            armed = true
+            sustainedSeconds = max(0, sustainedSeconds - dt * 2)
+        } else if inBreathBand && !isSpeech && !jumped && armed {
+            // A real exhale that rose from quiet — count the sustained hill.
             sustainedSeconds += dt
-            exhaleProgress = min(1, sustainedSeconds / requiredSeconds)
             if sustainedSeconds >= requiredSeconds {
                 sustainedSeconds = 0
+                armed = false            // single-shot: a NEW quiet→rise onset is required
                 exhaleProgress = 0
                 onExhale?()
+                return                   // (defer updates previousDb)
             }
         } else {
-            // Silence, speech, or a spike — the breath broke. Ease back
-            // rather than hard reset so a brief wobble doesn't punish.
+            // Speech, a spike, above-band, or in-band WITHOUT a fresh onset
+            // (constant ambient) — decay rather than hard-reset.
             sustainedSeconds = max(0, sustainedSeconds - dt * 2)
-            exhaleProgress = min(1, sustainedSeconds / requiredSeconds)
         }
+        exhaleProgress = min(1, sustainedSeconds / requiredSeconds)
     }
 }
