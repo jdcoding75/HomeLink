@@ -98,14 +98,18 @@ struct ReceiptView: View {
         // Wind + Rocket keep their dedicated, approved full receipts. The today's
         // V2 receipts (BowReceiptAnimationV2 / FlickReceiptAnimationV2 /
         // PlaneReceiptAnimationV2) are parked for the Animation Test Lab only.
-        if ping.emoji == "🎂" {
-            // [birthday] 🎂 is a SPECIAL emoji receipt — the cake is the vessel,
-            // there is NO bucket. Intercepted by emoji (not style) above every
-            // instrument so a birthday always arrives as a cake.
+        if style == .birthday || ping.emoji == "🎂" {
+            // [special moments — STAGE 3] BIRTHDAY now routes by the wire STYLE
+            // (`sender_style == "birthday"`), so the recipient plays the cake
+            // regardless of which emoji was sent (e.g. the 🎁 default). The
+            // `ping.emoji == "🎂"` half is a TRANSITION FALLBACK — retire in Stage 4 —
+            // so legacy sends (un-updated sender: glow + 🎂) still arrive as a cake.
+            // The cake is the vessel; there is NO bucket. Sits BEFORE the else.
             birthdayReceipt
-        } else if ping.emoji == "🎆" {
-            // [firework] 🎆 is a SPECIAL emoji receipt — afterglow → bloom →
-            // drift into the bucket. Intercepted by emoji above every instrument.
+        } else if style == .firework || ping.emoji == "🎆" {
+            // [special moments — STAGE 3] FIREWORK routes by STYLE; the
+            // `ping.emoji == "🎆"` half is the TRANSITION FALLBACK (retire Stage 4).
+            // afterglow → bloom → drift into the bucket. Sits BEFORE the else.
             fireworkReceipt
         } else if style == .firefly {
             windReceipt

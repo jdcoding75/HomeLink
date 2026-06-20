@@ -189,19 +189,20 @@ enum AnimationManifest {
             instrument: .firework, kind: .instrument,
             stages: [.compass, .send, .receipt], fixedEmoji: "🎆", defaultEmoji: "🎆"),
 
-        // INTERIM (Stage-2): birthday default is 🎂 (not the intended 🎁) so the
-        // emoji-keyed recipient (ReceiptView, `ping.emoji == "🎂"`) routes it to
-        // birthdayReceipt correctly. FLIP BACK TO 🎁 once Stage 3 re-keys ReceiptView
-        // to dispatch on `style == .birthday`. Tracked: special_moments peer-
-        // architecture Stage 3. (Firework's default 🎆 already matches its key.)
+        // [STAGE 3 DONE] Birthday default restored to the intended 🎁 (gift). Safe
+        // now: ReceiptView routes the arrival by `style == .birthday` (the wire
+        // sender_style), not the emoji — so a 🎁 default birthday plays the cake on
+        // the recipient. (Interim 🎂 was the Stage-2 stopgap for the emoji-keyed
+        // recipient; flipped here with the Stage-3 re-key. Firework default 🎆
+        // already matched its key.)
         AnimationDefinition(
             icon: "🎂", name: "Birthday Cake", version: "V1", style: .birthday,
             instrument: .birthday, kind: .instrument,
-            stages: [.compass, .receipt], fixedEmoji: "🎂", defaultEmoji: "🎂"),  // INTERIM: was "🎁" → restore at Stage 3
+            stages: [.compass, .receipt], fixedEmoji: "🎂", defaultEmoji: "🎁"),  // [Stage 3] restored from interim 🎂
         AnimationDefinition(
             icon: "🎂", name: "Birthday Cake", version: "V2", style: .birthday,
             instrument: .birthday, kind: .instrument,
-            stages: [.compass, .send, .receipt], fixedEmoji: "🎂", defaultEmoji: "🎂"),  // INTERIM: was "🎁" → restore at Stage 3
+            stages: [.compass, .send, .receipt], fixedEmoji: "🎂", defaultEmoji: "🎁"),  // [Stage 3] restored from interim 🎂
     ]
 
     // ── Derived views of the catalog ─────────────────────────────────────
