@@ -1521,6 +1521,9 @@ struct SenderAnimationView<Symbol: View>: View {
 /// [swipe] Wraps ReplayOverlayView with horizontal-swipe navigation between a
 /// list of thoughts, subtle nav hints, and an auto-advance toggle. A request
 /// with no siblings is just a single replay (no nav chrome shown).
+/* [replay buttons — superseded HEAD 5cf1d47] OLD auto-advance + swipe + tap-to-dismiss
+   container, preserved (comment-don't-delete). Replaced by the explicit
+   PREV · NEXT · CLOSE · DELETE struct below (no auto, no swipe, button-driven).
 struct ReplaySwipeContainer: View {
     let request: PingManager.ReplayRequest
     let onDismiss: () -> Void
@@ -1637,6 +1640,109 @@ struct ReplaySwipeContainer: View {
                     else if v.translation.width > 40, hasPrev { withAnimation { idx -= 1 } }
                 }
         )
+    }
+}
+*/
+
+// [replay buttons] Explicit, button-driven replay overlay: PREV · NEXT · CLOSE · DELETE.
+// No auto-advance, no auto-exit, no swipe — every move is a deliberate tap. DELETE removes
+// the shown thought from caughtHistory (via onDelete) then advances to the next remaining
+// item in place; deleting the last one dismisses. DELETE is hidden for replays with no
+// bucket historyID (non-bucket callers — today only RootView/bucket presents this container).
+struct ReplaySwipeContainer: View {
+    let request: PingManager.ReplayRequest
+    let onDismiss: () -> Void
+    // Per-item delete — called with the CURRENT item's bucket historyID. nil → no Delete affordance.
+    let onDelete: ((UUID) -> Void)?
+
+    // Local, mutable copy so DELETE can drop an item in place and recompute Prev/Next.
+    @State private var liveItems: [PingManager.ReplayItem]
+    @State private var idx: Int
+    private static let lav = Color(hex: "#c4a8d4")
+
+    init(request: PingManager.ReplayRequest, onDismiss: @escaping () -> Void,
+         onDelete: ((UUID) -> Void)? = nil) {
+        self.request = request
+        self.onDismiss = onDismiss
+        self.onDelete = onDelete
+        // Same source as the OLD computed `items`: siblings, or a single-item fallback.
+        let initial: [PingManager.ReplayItem] = request.siblings.isEmpty
+            ? [PingManager.ReplayItem(emoji: request.emoji, bearingDegrees: request.bearingDegrees,
+                                      styleRaw: request.styleRaw, fromName: request.fromName,
+                                      message: request.message, tagline: request.tagline,
+                                      historyID: request.historyID)]
+            : request.siblings
+        _liveItems = State(initialValue: initial)
+        _idx = State(initialValue: min(max(0, request.index), max(0, initial.count - 1)))
+    }
+
+    private var cur: PingManager.ReplayItem { liveItems[min(max(0, idx), liveItems.count - 1)] }
+    private var hasPrev: Bool { idx > 0 }
+    private var hasNext: Bool { idx < liveItems.count - 1 }
+
+    var body: some View {
+        ZStack {
+            DesignTokens.Color.background.ignoresSafeArea()
+            // Same EmojiRevealView as the live receipt — bloom/breathe is repeatForever, so
+            // the thought rests on screen. onDismiss is a no-op here: the reveal no longer
+            // self-exits at 6s and its tap-to-dismiss is inert — the buttons are the only nav.
+            EmojiRevealView(
+                emoji: cur.emoji,
+                message: cur.message,
+                tagline: cur.tagline,
+                context: .received(fromName: cur.fromName),
+                ambient: RevealAmbient.forStyle(SenderStyle.from(cur.styleRaw)),
+                onDismiss: { }
+            )
+            .id(cur.id)   // keyed on item identity → Prev/Next AND delete-advance both re-trigger the replay
+
+            // PREV · NEXT · CLOSE · DELETE — large, legible; replaces auto + swipe + tiny text.
+            VStack {
+                Spacer()
+                HStack(spacing: 12) {
+                    controlButton("chevron.left",  "Prev",  enabled: hasPrev) { withAnimation { idx -= 1 } }
+                    controlButton("chevron.right", "Next",  enabled: hasNext) { withAnimation { idx += 1 } }
+                    controlButton("xmark",         "Close", enabled: true)    { onDismiss() }
+                    // Bucket-only: hidden when the shown item carries no historyID (non-bucket replays).
+                    if cur.historyID != nil, onDelete != nil {
+                        controlButton("trash", "Delete", enabled: true) { deleteCurrent() }
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.bottom, 60)
+            }
+            .allowsHitTesting(true)
+        }
+    }
+
+    // DELETE: remove the shown thought locally + from caughtHistory (via onDelete), then
+    // advance — the next item shifts into the same idx; if none remain, dismiss.
+    private func deleteCurrent() {
+        let removeIdx = min(max(0, idx), liveItems.count - 1)
+        if let hid = liveItems[removeIdx].historyID { onDelete?(hid) }
+        liveItems.remove(at: removeIdx)
+        if liveItems.isEmpty { onDismiss(); return }
+        idx = min(removeIdx, liveItems.count - 1)   // next item now occupies removeIdx; clamp to new last
+    }
+
+    @ViewBuilder
+    private func controlButton(_ icon: String, _ label: String, enabled: Bool,
+                               _ action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            VStack(spacing: 5) {
+                Image(systemName: icon).font(.system(size: 21, weight: .semibold))
+                Text(label).font(.system(size: 14, weight: .semibold))
+            }
+            .foregroundColor(enabled ? Self.lav : Self.lav.opacity(0.3))
+            .frame(maxWidth: .infinity)
+            .frame(height: 62)
+            .background(RoundedRectangle(cornerRadius: 16)
+                .fill(DesignTokens.Color.background.opacity(enabled ? 0.7 : 0.45)))
+            .overlay(RoundedRectangle(cornerRadius: 16)
+                .stroke(Self.lav.opacity(enabled ? 0.45 : 0.18), lineWidth: 1))
+        }
+        .buttonStyle(.plain)
+        .disabled(!enabled)
     }
 }
 

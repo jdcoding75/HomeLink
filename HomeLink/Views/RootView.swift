@@ -555,14 +555,16 @@ struct MainTabView: View {
                         pings.removeFromHistory(id: id)
                     }
                 )
-                VStack {
-                    Spacer()
-                    Text(request.siblings.count > 1 ? "swipe ‹ › · tap to dismiss" : "tap to dismiss")
-                        .font(.system(size: 11, design: .serif).italic())
-                        .foregroundColor(DesignTokens.Color.textDim)
-                        .padding(.bottom, 28)
-                }
-                .allowsHitTesting(false)
+                // [replay buttons] Obsolete external hint — the container now renders
+                // explicit PREV·NEXT·CLOSE·DELETE buttons; swipe + tap-to-dismiss removed.
+                // VStack {
+                //     Spacer()
+                //     Text(request.siblings.count > 1 ? "swipe ‹ › · tap to dismiss" : "tap to dismiss")
+                //         .font(.system(size: 11, design: .serif).italic())
+                //         .foregroundColor(DesignTokens.Color.textDim)
+                //         .padding(.bottom, 28)
+                // }
+                // .allowsHitTesting(false)
             }
         }
         // ── THE RECEIPT — a dedicated full-screen receive experience over the
