@@ -78,6 +78,21 @@ struct AnimationDefinition: Identifiable, Hashable {
     /// the send site.
     var defaultEmoji: String = "🤗"
 
+    /// [per-instrument default message] The starting compose text when THIS instrument is
+    /// selected — PREFERRED over the per-emoji `CuratedEmoji.defaultMessage` (which stays the
+    /// fallback). Optional + default nil: an unset instrument keeps EXACTLY today's per-emoji
+    /// behavior (no regression). Deliberate intermediate state (per-instrument preferred,
+    /// per-emoji fallback) — NOT a full migration. Read via `CompassView.seedMessage`, never
+    /// hardcoded at the seed site. Only Birthday sets a value today.
+    var defaultMessage: String? = nil
+
+    /// [per-instrument default tagline] FIELD ONLY — not yet wired (no values set). The
+    /// traveling tagline currently rides from the selected PERSON
+    /// (`people.selectedPerson?.tagline`), a different/entangled path than the message seed,
+    /// so wiring is deliberately deferred. Added now so the manifest is the future home for a
+    /// per-instrument tagline default. Default nil → zero effect today.
+    var defaultTagline: String? = nil
+
     /// Stable id, e.g. "bow.v2" / "firework" / "compass".
     var id: String {
         let base = name.lowercased().replacingOccurrences(of: " ", with: "-")
@@ -198,11 +213,11 @@ enum AnimationManifest {
         AnimationDefinition(
             icon: "🎂", name: "Birthday Cake", version: "V1", style: .birthday,
             instrument: .birthday, kind: .instrument,
-            stages: [.compass, .receipt], fixedEmoji: "🎂", defaultEmoji: "🎁"),  // [Stage 3] restored from interim 🎂
+            stages: [.compass, .receipt], fixedEmoji: "🎂", defaultEmoji: "🎁", defaultMessage: "Happy Birthday"),  // [Stage 3] restored from interim 🎂; [per-instrument default] Birthday seeds "Happy Birthday" (others stay nil)
         AnimationDefinition(
             icon: "🎂", name: "Birthday Cake", version: "V2", style: .birthday,
             instrument: .birthday, kind: .instrument,
-            stages: [.compass, .send, .receipt], fixedEmoji: "🎂", defaultEmoji: "🎁"),  // [Stage 3] restored from interim 🎂
+            stages: [.compass, .send, .receipt], fixedEmoji: "🎂", defaultEmoji: "🎁", defaultMessage: "Happy Birthday"),  // [Stage 3] restored from interim 🎂; [per-instrument default] Birthday seeds "Happy Birthday" (others stay nil)
     ]
 
     // ── Derived views of the catalog ─────────────────────────────────────

@@ -1770,7 +1770,26 @@ struct CompassView: View {
     /// The starting message for a freshly-picked emoji: its curated default if it
     /// has one, otherwise the current instrument's hint (TaglineSystem). This is
     /// the single point where the message field is seeded on selection.
+    /// The selected instrument's per-instrument default message (manifest), or nil when the
+    /// instrument doesn't set one → falls back to the per-emoji default. Mirrors
+    /// `defaultEmojiForCurrentAnimation`. Only Birthday sets a value today.
+    private func instrumentDefaultMessage() -> String? {
+        AnimationManifest.instruments
+            .first { $0.instrument == instrumentStore.selected }?
+            .defaultMessage
+    }
+
     private func seedMessage(for item: CuratedEmoji.Item) -> String {
+        // [per-instrument default message] PREFER the selected instrument's manifest
+        // defaultMessage (e.g. Birthday → "Happy Birthday"). Deliberate intermediate state:
+        // per-instrument preferred, per-emoji fallback — NOT a full migration. Every other
+        // instrument leaves defaultMessage nil → falls through to EXACTLY today's chain
+        // below (no regression). The seed stays USER-EDITABLE (the !messageEdited lock at
+        // the call site still lets the user override).
+        if let instrumentMessage = instrumentDefaultMessage(), !instrumentMessage.isEmpty {
+            return instrumentMessage
+        }
+        // PRIOR (preserved) — per-emoji curated default, then the instrument's TaglineSystem hint:
         if !item.defaultMessage.isEmpty { return item.defaultMessage }
         return instrumentHint() ?? ""
     }
