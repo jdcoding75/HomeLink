@@ -1,58 +1,69 @@
 # TRUTH Pre-Release Update — Doc Reconcile Report
 
 _Documentation ONLY. No code / schema / settings touched. ONE commit._
-_Records the pre-release animation-fixes batch (`380d374` → `5cf1d47`, HEAD) into the
-canonical reference + Phase-3 handoff. Originals preserved — additive/amend only._
+_Records the pre-release animation batch (`380d374` → `e3438a5`, HEAD) into the canonical
+reference + the Phase-3 handoff. Originals preserved — additive/amend only._
 
 ## Commits recorded (verified against `git log`)
 - **`380d374`** — pre-release 3-in-1: (1) firework + birthday FREEZE fix (approach B —
-  `finishSend` bumps `instrumentResetID` for `.firework`/`.birthday` after the flight; no
-  animation-face edit); (2) rocket receipt descent smoothing (first pass); (3) removed the
-  dead "show arrival preview" setting.
+  `finishSend` bumps `instrumentResetID` for `.firework`/`.birthday` after the flight,
+  recreating the face fresh; no animation-face edit); (2) rocket receipt descent smoothing
+  (first pass); (3) removed the dead "show arrival preview" setting.
 - **`68de96d`** — rocket receipt FIRST-DROP fix: split the single `easeInOut(4.0)` into a
   slow `easeIn` ENTRY (`entryDropDuration` default 5.0s, tunable) + kept `easeOut` SETTLE;
   post-descent beats re-anchored off `land`. Accepted "good enough."
 - **`e6e0608`** — removed the dead/mislabeled "thoughts" notification toggle (gated the
   retired `notify_pointing`); `setNotifyPointing` + `users.notify_pointing` now unreferenced
   client-side; app has ZERO user-facing notification controls.
-- **`5cf1d47`** (HEAD) — bucket per-item DELETE: `PingManager.removeFromHistory(id:)`
-  (keyed `remoteID ?? id`; reusable Phase-3 backbone) + a "🗑 delete" button on the replay
-  overlay (`ReplaySwipeContainer`). Delete-only; NO save/preserve.
+- **`5cf1d47`** — bucket per-item DELETE: `PingManager.removeFromHistory(id:)` (keyed
+  `remoteID ?? id`; reusable Phase-3 backbone) + a "🗑 delete" button on the replay overlay.
+  Delete-only; NO save/preserve. [UX superseded by `e3438a5`.]
+- **`e3438a5`** (HEAD) — replay overlay UX rework: auto-advance + swipe → explicit
+  **PREV · NEXT · CLOSE · DELETE** button row. Prev disabled on first, Next on last (both on
+  a single item); DELETE removes current + advances to next (closes if last); no auto-exit;
+  reveal keyed on `cur.id` (not `idx`) so delete-advance re-fires the animation. PersonDetail
+  replays (separate inline cover) unaffected; DELETE hidden when no `historyID`. KNOWN
+  COSMETIC: EmojiRevealView's internal "tap anywhere to keep ✦" hint still renders but is now
+  INERT (no-op dismiss) — left untouched (fenced shared reveal).
 
 ## Device-test status recorded
 - firework / birthday re-arm — **CONFIRMED on device**.
 - arrival-preview removal — **CONFIRMED**.
 - rocket receipt descent — **accepted "good enough."**
-- thoughts-toggle removal + bucket-delete — **shipped, device-test PENDING.**
+- thoughts-toggle removal + bucket-delete + replay button rework (`e3438a5`) — **shipped,
+  device-test PENDING.**
 
-## POINTWARD_TRUTH.md — what changed (all additive/amend)
-1. **"Last updated:" log (line 10)** — appended a "⭐ PRE-RELEASE FIXES BATCH
-   (`380d374` → `5cf1d47`, HEAD)" entry.
-2. **Phase 2 — Animation Track (canonical commit ledger)** — appended the 4 commit
-   bullets after `624b044` under a "_Pre-release fixes batch (this session)_" sub-header,
-   plus a device-test status blockquote.
-3. **Restore-ladder tail (corrected)** — now reads:
-   `… c38ca9d → (birthday-interim 9ab3f6e) → 624b044 → bd285d8 → 380d374 → 68de96d →
-   e6e0608 → 5cf1d47 (HEAD)`.
-4. **Lock Ledger** — added 5 bullets: firework/birthday FREEZE fixed (`380d374`); rocket
-   receipt descent SMOOTHED (`380d374` + `68de96d`); Settings notifications REMOVED
-   (`e6e0608` → zero user-facing notification controls); bucket per-item DELETE SHIPPED
-   (`5cf1d47`).
-5. **PHASE 3 — History-tab bullet** — noted the per-item delete backbone
-   (`removeFromHistory(id:)`) now EXISTS; save/preserve still deferred.
+## POINTWARD_TRUTH.md — what changed this pass (all additive/amend)
+1. **"Last updated:" log (line 10)** — extended the existing "PRE-RELEASE FIXES BATCH" entry
+   range `380d374 → 5cf1d47` → **`380d374 → e3438a5`**, and appended the replay-UX-rework
+   clause + the "device-test PENDING" list.
+2. **Phase 2 — Animation Track (canonical commit ledger)** — added the **`e3438a5`** entry
+   after `5cf1d47`; tagged the `5cf1d47` entry "[UX superseded by `e3438a5`]"; updated the
+   device-test blockquote to include the replay rework.
+3. **Restore-ladder tail (corrected)** — now ends:
+   `… 624b044 → bd285d8 → 380d374 → 68de96d → e6e0608 → 5cf1d47 → e3438a5 (HEAD)`.
+4. **Lock Ledger** — added a "Replay overlay UX — REWORKED (`e3438a5`)" bullet (button row,
+   no auto-exit, cur.id keying, PersonDetail unaffected, inert-hint cosmetic).
+   _(The `380d374`/`68de96d`/`e6e0608`/`5cf1d47` ledger + lock bullets were already present
+   from the prior reconcile `0b0ba16`; left intact.)_
 
-## reports/phase3_handoff.md — what changed
-- **§1 HISTORY TAB** — added the "Per-item DELETE backbone already EXISTS" note
-  (`removeFromHistory(id:)`, swipe-delete reuses it); reaffirmed Save/preserve deferred to
-  Phase-3 retention; amended the swipe-to-delete line to reference the backbone.
-- **§6 CROSS-TRACK** — recorded the notifications toggle REMOVAL (`e6e0608`), the now-unused
-  `setNotifyPointing`/`users.notify_pointing`, and the post-launch relabel/repoint option
-  (replacing the prior "leave as-is" stance).
+## reports/phase3_handoff.md — what changed this pass
+- **§5 KNOWN GAPS** — added (1) the replay-overlay UX-rework device-test item (`e3438a5`) and
+  (2) the ⭐ KNOWN COSMETIC note: the inert "tap to keep ✦" hint in `EmojiRevealView` to gate
+  in a future in-reveal pass.
+- _Already present from `0b0ba16` (left intact): §1 per-item delete backbone + save/preserve
+  deferred; §6 notifications toggle REMOVED + relabel/repoint option + unused
+  `setNotifyPointing`/column._
 
 ## Hash / ladder corrections
-- Restore-ladder tail extended + corrected to include `bd285d8` (docs) and the 4 new
-  commits ending at HEAD `5cf1d47` (see above).
-- All 4 hashes + HEAD verified against `git log`. No prior hashes altered.
+- Restore-ladder tail extended to HEAD **`e3438a5`** (was `5cf1d47`).
+- All 5 hashes + HEAD verified against `git log` (`e3438a5` = HEAD). No prior hashes altered.
+
+## Reconciliation flags
+- **No conflicts** between git log / existing reports and this prompt's decisions/reasoning.
+  The prompt's one-liners match the commit subjects + the per-commit build reports
+  (`rocket_firstdrop_fix.md`, `remove_thoughts_toggle_build.md`, `bucket_delete_build.md`,
+  `replay_buttons_build.md`).
 
 ## Files touched (this commit)
 - `POINTWARD_TRUTH.md` (doc)

@@ -142,6 +142,18 @@ during the ROOT-2 promotion, which deferred wand for exactly this reason.)
   RELEASE/TestFlight build on device (no code fix expected). See `wrapup_audit.md` Item 4.
 - **Large device-test debt** — much shipped untested: plane/flick V2, Batch 1, wind fix,
   Special Moments Stages 1+2. Needs a full device pass.
+- ⭐ **Replay overlay UX reworked** (`e3438a5`) — the bucket replay now uses an explicit
+  **PREV · NEXT · CLOSE · DELETE** button row (auto-advance + swipe removed). Device-test
+  PENDING: Prev disabled on first / Next on last / both on a single item; DELETE removes the
+  current thought then advances (closes if last); the reveal is keyed on `cur.id` so a
+  delete-advance re-fires the animation; PersonDetail replays (separate inline cover) must be
+  unaffected. _(reports/replay_buttons_build.md)_
+- ⭐ **KNOWN COSMETIC — inert "tap to keep ✦" hint** — `EmojiRevealView`'s internal faint
+  "tap anywhere to keep ✦" hint still renders during the bucket replay but is now **INERT**
+  (the overlay passes a no-op `onDismiss`, so tapping does nothing — CLOSE is the button).
+  Left untouched on purpose (it lives in the FENCED shared reveal component). **Clean up in a
+  future in-reveal pass** — gate/hide the hint when the reveal is presented in the
+  button-driven replay context. Cosmetic only; no functional impact.
 
 ---
 
