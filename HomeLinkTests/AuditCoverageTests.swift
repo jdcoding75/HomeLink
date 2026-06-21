@@ -143,7 +143,10 @@ final class EmojiRevealContextTests: XCTestCase {
         for inst in Instrument.allCases {
             _ = RevealAmbient.forInstrument(inst)   // would not compile if non-exhaustive
         }
-        XCTAssertEqual(Instrument.allCases.count, 7)
+        // 7 core instruments + Birthday + Firework (Special Moments peer instruments,
+        // added in c38ca9d). The exhaustive loop above is the real guard; this count
+        // just flags an unexpected add/remove. (Was 7 pre-Special-Moments.)
+        XCTAssertEqual(Instrument.allCases.count, 9)
     }
 }
 

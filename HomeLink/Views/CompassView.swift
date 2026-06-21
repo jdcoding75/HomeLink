@@ -2147,6 +2147,10 @@ struct CompassView: View {
         if instrumentStore.selected == .firework || instrumentStore.selected == .birthday {
             instrumentResetID += 1
         }
+        // [#1 share-on-animation-complete] The send flight has finished — signal PingManager
+        // so a PATH-2 link send presents its share sheet NOW (or the instant the insert
+        // returns, if still in flight). No-op for PATH-1 / demo sends (no pending link).
+        pings.markSendAnimationComplete()
         // PRIOR — sender-side arrival preview (reveal #1), now suppressed:
         // if arrivalPreviewEnabled {
         //     arrivalPreviewCount += 1
@@ -2257,6 +2261,27 @@ struct CompassView: View {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) {
             playSendSound(token)
             // HapticEngine.thoughtLaunched()   // retired — single .light at launch
+        }
+
+        // [#2 demo local-only] Demo Dan NEVER sends for real. The send animation above
+        // plays as usual; instead of inserting a message + building a link, inject the
+        // receipt LOCALLY via the existing test-playback path (isTest → never deduped/
+        // persisted server-side; remoteID nil → markOpened makes NO Supabase call). While
+        // appState == .sending the catch is QUEUED and plays the instant the send animation
+        // completes (PingManager's simultaneous-send/receive ordering). NO insert, NO link,
+        // NO share sheet, NO SentLink — zero DB writes. Returns before the two-path send.
+        if let demo = people.selectedPerson, DemoPerson.isDemo(demo) {
+            CompassView.log.info("send: DEMO local-only preview — no insert, no link, no share")
+            pings.receivePing(
+                fromName:    demo.name,
+                emoji:       sendRemoteEmoji(for: token),
+                remoteID:    nil,
+                senderStyle: style.rawValue,
+                message:     outgoingMessage.isEmpty ? nil : outgoingMessage,
+                tagline:     demo.tagline,
+                isTest:      true,
+                autoPlay:    true)
+            return
         }
 
         // [phase2 stage C] TWO-PATH SEND — mutually exclusive (NO double-send). The

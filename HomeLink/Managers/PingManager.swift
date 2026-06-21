@@ -317,6 +317,14 @@ final class PingManager: ObservableObject {
     @Published var linkFailedNotice: String?
     private var lastLinkSend: (() -> Void)?
 
+    // [#1 share-on-animation-complete] The share sheet must appear only AFTER the send
+    // animation finishes — not the instant the insert returns (which lands mid-flight,
+    // cutting the animation off). createAndShareLink stashes the built share text here
+    // instead of presenting; the View calls markSendAnimationComplete() from finishSend
+    // (every send-out animation's terminal funnel). Whichever lands second presents.
+    private var pendingShareText: String?
+    private var sendAnimationComplete = false
+
     /// Store the just-sent thought as a `messages` row, then present the share
     /// sheet with the /m/[id] link + the short-code fallback. Background work —
     /// the caller has already kicked off the (uninterrupted) send animation.
@@ -331,6 +339,11 @@ final class PingManager: ObservableObject {
         let run: () -> Void = { [weak self] in
             guard let self else { return }
             self.linkFailedNotice = nil
+            // [#1] New send → clear any prior link-ready / animation-done coordination so
+            // THIS send's sheet waits for THIS send's animation to finish (runs
+            // synchronously, before the animation can complete).
+            self.pendingShareText = nil
+            self.sendAnimationComplete = false
             Task { @MainActor in
                 do {
                     let id = try await SupabaseService.shared.insertMessage(
@@ -341,8 +354,11 @@ final class PingManager: ObservableObject {
                     let link = MessageLink.url(for: id)
                     let text = MessageLink.shareText(senderName: senderName,
                                                      link: link, shortCode: shortCode)
-                    self.log.info("link: message stored, presenting share sheet (id=\(id.uuidString, privacy: .public))")
-                    ShareSheet.present(text)
+                    self.log.info("link: message stored (id=\(id.uuidString, privacy: .public)) — sharing once the send animation completes")
+                    // [#1] Stash the built link; present only once the send animation has
+                    // finished (markSendAnimationComplete). Whichever lands second wins.
+                    self.pendingShareText = text
+                    self.presentShareIfReady()
                 } catch {
                     self.log.error("link: insert FAILED — \(error.localizedDescription, privacy: .public)")
                     self.linkFailedNotice = "couldn't create your link — retry"
@@ -355,6 +371,23 @@ final class PingManager: ObservableObject {
 
     /// Re-run the last link send (the retry affordance on linkFailedNotice).
     func retryLinkSend() { lastLinkSend?() }
+
+    /// [#1] Called by the View when the send animation completes (CompassView.finishSend —
+    /// the single terminal funnel for all send-out onComplete closures). If the link is
+    /// already built, present now; otherwise the insert-completion will present it.
+    func markSendAnimationComplete() {
+        sendAnimationComplete = true
+        presentShareIfReady()
+    }
+
+    /// [#1] Present the share sheet only when BOTH the link is built AND the send animation
+    /// has finished. Idempotent — clears the state after presenting so it fires exactly once.
+    private func presentShareIfReady() {
+        guard sendAnimationComplete, let text = pendingShareText else { return }
+        pendingShareText = nil
+        sendAnimationComplete = false
+        ShareSheet.present(text)
+    }
 
     func showFelt(name: String) {
         feltNotice = "\(name) felt your thought ✓"
