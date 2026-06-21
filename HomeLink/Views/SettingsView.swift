@@ -30,7 +30,8 @@ struct SettingsView: View {
     // Display preference — surprise unit each launch (-1) or a locked favourite.
     @AppStorage("funnyUnitLocked")       private var funnyUnitLocked      = -1
     @AppStorage("notifyPointing")        private var notifyPointing       = true
-    @AppStorage("arrivalPreviewEnabled") private var arrivalPreviewEnabled = true   // [5/6]
+    // [arrival-preview removed] `@AppStorage("arrivalPreviewEnabled")` deleted — the
+    // setting it backed is gone (fully dead; see notificationsSection).
 
     @State private var showGivingBack = false
     @State private var showAbout      = false
@@ -165,26 +166,12 @@ struct SettingsView: View {
                         Task { await SupabaseService.shared.setNotifyPointing(enabled) }
                     }
             }
-
-            Divider().background(DesignTokens.Color.border).padding(.leading, 44)
-
-            // [5/6] A brief glimpse of what your person catches, right after you
-            // send — on by default for your first sends, then your choice.
-            settingsRow {
-                Image(systemName: "eye")
-                    .settingsIcon()
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("show arrival preview")
-                        .settingsLabel()
-                    Text("a 2-second glimpse of their catch after you send")
-                        .font(.system(size: 11))
-                        .foregroundColor(DesignTokens.Color.textDim)
-                }
-                Spacer()
-                Toggle("", isOn: $arrivalPreviewEnabled)
-                    .tint(Self.toggleOn)
-                    .labelsHidden()
-            }
+            // [arrival-preview removed] The "show arrival preview" row + its toggle were
+            // DELETED here — fully dead: R2 (be59c38) globally suppressed the sender-side
+            // arrival preview, so `arrivalPreviewEnabled` gated nothing (all readers
+            // commented). Was: a `Divider()` + a `settingsRow` ("show arrival preview" /
+            // "a 2-second glimpse of their catch after you send") bound to
+            // `$arrivalPreviewEnabled`.
         }
     }
 

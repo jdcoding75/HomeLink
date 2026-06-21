@@ -370,24 +370,29 @@ struct RocketLandingReceiptAnimation: View {
         InstrumentSoundPlayer.shared.playReceipt(.rocket)
         HapticPattern.singleSoft.fire()
 
-        // FALL — descends upright and grows, gently.
-        withAnimation(.easeIn(duration: 2.6)) { descend = 0.82; grow = 1.0 }
+        // DESCENT — [smooth-descent fix] ONE continuous fall, all the way to the
+        // surface, with a single easeInOut curve so there is NO velocity discontinuity.
+        // Replaces the old two-phase FALL(easeIn 2.6→0.82) + SETTLE(easeOut 2.0→1.0 @ +2.8)
+        // which (a) whipped down on the accelerating easeIn and (b) STOPPED for ~0.2s
+        // at 0.82 (FALL ended 2.6, SETTLE didn't start until 2.8) — the jerk. easeInOut
+        // eases out of the top AND decelerates onto the pad; 4.0s lands just before the
+        // +4.4 touchdown beat. PRIOR (two-phase):
+        //   withAnimation(.easeIn(duration: 2.6)) { descend = 0.82; grow = 1.0 }   // FALL
+        //   …
+        //   DispatchQueue.main.asyncAfter(deadline: .now() + 2.8) {                  // SETTLE
+        //       withAnimation(.easeOut(duration: 2.0)) { descend = 1 }
+        //   }
+        withAnimation(.easeInOut(duration: 4.0)) { descend = 1; grow = 1.0 }
         for k in 0..<3 {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.7 + Double(k) * 0.45) {
                 HapticEngine.rocketCountdown(); jitter()
             }
         }
 
-        // LEGS — deploy + switch to a hover flame, just before the settle.
+        // LEGS — deploy + switch to a hover flame, on the approach.
         DispatchQueue.main.asyncAfter(deadline: .now() + 2.4) {
             withAnimation(AnimationSystem.easeOutBack(0.4)) { legs = 1 }
             hover = true
-        }
-
-        // SETTLE — a SLOW, graceful final descent that DECELERATES onto the
-        // surface (0.82 → 1.0 over 2.0s, easeOut) — no fast drop.
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2.8) {
-            withAnimation(.easeOut(duration: 2.0)) { descend = 1 }
         }
 
         // TOUCHDOWN — fires as the legs seat (tail of the slow settle):
@@ -431,9 +436,14 @@ struct RocketLandingReceiptAnimation: View {
     }
 
     private func jitter() {
-        withAnimation(.spring(response: 0.1, dampingFraction: 0.3)) { shake = 3 }
+        // [smooth-descent fix] Softened to a gentle engine wobble (was a sharp ±3px
+        // jerk that read as jerky during the fall): smaller amplitude + softer, more
+        // damped springs. PRIOR:
+        //   withAnimation(.spring(response: 0.1, dampingFraction: 0.3)) { shake = 3 }
+        //   … withAnimation(.spring(response: 0.2, dampingFraction: 0.5)) { shake = 0 }
+        withAnimation(.spring(response: 0.18, dampingFraction: 0.6)) { shake = 1.2 }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
-            withAnimation(.spring(response: 0.2, dampingFraction: 0.5)) { shake = 0 }
+            withAnimation(.spring(response: 0.28, dampingFraction: 0.7)) { shake = 0 }
         }
     }
 }

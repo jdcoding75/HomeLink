@@ -140,7 +140,10 @@ struct CompassView: View {
     @State private var loadFlightProgress: CGFloat = 0
     @State private var flightToken: String? = nil
     // [5/6] Arrival preview — a brief glimpse of the recipient's catch.
-    @AppStorage("arrivalPreviewEnabled") private var arrivalPreviewEnabled = true
+    // [arrival-preview removed] `@AppStorage("arrivalPreviewEnabled")` DELETED — its
+    // setting is gone and all readers here were already commented out (R2 / be59c38
+    // suppressed the sender-side preview). The remaining arrivalPreview* machinery below
+    // is inert (commented) and left for a future cleanup pass — not deleted here.
     @AppStorage("arrivalPreviewCount")   private var arrivalPreviewCount   = 0
     @State private var arrivalPreview: ArrivalPreviewData? = nil
     @State private var sentMessage: String? = nil   // [2/3] for the sent confirmation
@@ -2133,6 +2136,17 @@ struct CompassView: View {
         // gating here suppresses #1 everywhere. Original preserved below.
         showSentNotice()
         appState.transition(to: .idle)
+        // [firework/birthday freeze fix] FireworkCompassFace + BirthdayCakeCompassFaceV2
+        // hold one-way @State (`sent = true` after firing) and never self-reset. As
+        // SELECTED instruments their face instance PERSISTS across sends → frozen after
+        // one use. (The old emoji path cleared `selectedToken`, which destroyed+recreated
+        // the face — the implicit reset that's now gone.) Bump `instrumentResetID` here —
+        // `finishSend` is every send-out onComplete's terminal call, i.e. AFTER the send
+        // flight has finished — so the face rebuilds fresh (lit/sent reset), restoring
+        // exactly that reset. Gated to firework/birthday so no other instrument is touched.
+        if instrumentStore.selected == .firework || instrumentStore.selected == .birthday {
+            instrumentResetID += 1
+        }
         // PRIOR — sender-side arrival preview (reveal #1), now suppressed:
         // if arrivalPreviewEnabled {
         //     arrivalPreviewCount += 1
