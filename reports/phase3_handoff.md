@@ -45,6 +45,11 @@ data layer, not just a view. **Full scope already mapped in
 - **Retention engine** — replace the blind `removeFirst` with: 50 TOTAL (sent+received),
   evict oldest UNPRESERVED first, then oldest PRESERVED, **gentle warning before
   evicting a preserved item**. Unpreserved drop silently.
+- ⭐ **Per-item DELETE backbone already EXISTS** (`5cf1d47`): `PingManager.removeFromHistory(id:)`
+  (keyed on `remoteID ?? id`; idempotent; current UserDefaults shape) — the in-compass
+  bucket's "🗑 delete" button already uses it, and the **History-tab swipe-delete reuses
+  it as-is**. **Save/preserve is STILL deferred** to Phase-3 retention (the shipped delete
+  is delete-only — no `preserved` flag yet).
 
 **The view (all decided, ready to spec):**
 - Own tab in the bottom bar — **additive `.tag(3)`** in `MainTabView` (`RootView.swift`
@@ -54,7 +59,7 @@ data layer, not just a view. **Full scope already mapped in
 - Person label FLIPS: "From" on Received, "To" on Sent.
 - Read/unread cue = ALL-OF-THE-ABOVE (unmissable): distinct unread row style + "New" tag
   + unread count on the toggle + a "New" section pinning unread to top.
-- Swipe-to-delete = LOCAL only (sender keeps theirs).
+- Swipe-to-delete = LOCAL only (sender keeps theirs) — reuse `removeFromHistory(id:)` (above).
 - Supersedes the compass "your bucket ✦" section (`CompassView.swift` ~:2555) — relocate
   it out of compass when History ships.
 
@@ -143,6 +148,13 @@ during the ROOT-2 promotion, which deferred wand for exactly this reason.)
 ## 6. CROSS-TRACK (Phase-2 / backbone — not animation-track to build alone)
 - **History data layer** — touches send-recording near PATH-1; coordinate.
 - **Stage 3 Edge Function** — `send-ping-notification` read + possible deploy (Joshua).
+- ⭐ **Notifications toggle REMOVED** (`e6e0608`) — the dead/mislabeled "thoughts" toggle
+  (it gated the retired `notify_pointing`, NOT thought-arrival) is gone; the app now has
+  **zero user-facing notification controls**. `PingManager.setNotifyPointing(_:)` +
+  `users.notify_pointing` (column) are now **unreferenced client-side** (left in place —
+  not dropped). **Post-launch option (NOT pre-launch):** relabel/repoint a fresh toggle to
+  gate the LIVE thought-arrival push — a cross-track item (PATH-1 client + Edge Function +
+  deploy), not a standalone animation-track build. (Was previously slated "leave as-is.")
 - **Pre-launch (from `wrapup_audit.md`, NOT animation work):** deployment target is
   `IPHONEOS_DEPLOYMENT_TARGET = 26.5` (locks out almost all devices) — needs a
   `CLGeocodingService` @available guard + CLGeocoder fallback, then lower to iOS 16/17.
