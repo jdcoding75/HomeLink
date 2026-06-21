@@ -109,6 +109,24 @@ earlier Stage-stop that scoped it), `birthday_default_interim.md` (the interim f
 
 ---
 
+## 2b. COMPOSE UNIFORMITY — per-instrument defaults (DE-RISKED, `277b457`)
+**Direction:** move the compose-field defaults from per-EMOJI (`CuratedEmoji.defaultMessage`)
+to per-INSTRUMENT (manifest), so each instrument carries its own default message + tagline.
+**Step 1 SHIPPED (`277b457`):** `AnimationDefinition` now has `defaultMessage: String?` +
+`defaultTagline: String?` alongside `defaultEmoji`; `CompassView.seedMessage` PREFERS the
+selected instrument's `defaultMessage` and FALLS BACK to the per-emoji default (then the
+TaglineSystem instrument hint). Only **Birthday → "Happy Birthday"** is populated today; every
+other instrument is nil → identical to today's behavior (no regression). `defaultTagline` is a
+field only — **UNWIRED** (the traveling tagline currently rides from `people.selectedPerson?.tagline`,
+an entangled path; wiring deferred). The receipt is unaffected (style-keyed).
+- ⭐ **What's left is now pure DATA-ENTRY, no new plumbing:** populate the other instruments'
+  `defaultMessage` (and decide `defaultTagline` wiring), then retire the per-emoji
+  `CuratedEmoji.defaultMessage` fallback once every instrument sets its own. The mechanism +
+  fallback chain are already in place — this is the deliberate intermediate state
+  (per-instrument preferred, per-emoji fallback). _(reports/birthday_default_message_build.md)_
+
+---
+
 ## 3. FUTURE SPECIAL MOMENTS ROSTER
 Valentine's 💌, For Mum 💐, July 4th 🎇, Graduation 🎓 (Birthday + Firework already built).
 - Each needs: an `Instrument` + `SenderStyle` case + a manifest row + `InstrumentOption`
@@ -141,7 +159,10 @@ during the ROOT-2 promotion, which deferred wand for exactly this reason.)
 - **Send-sound distortion** — DEBUG-only artifact per audit; confirm clean in a
   RELEASE/TestFlight build on device (no code fix expected). See `wrapup_audit.md` Item 4.
 - **Large device-test debt** — much shipped untested: plane/flick V2, Batch 1, wind fix,
-  Special Moments Stages 1+2. Needs a full device pass.
+  Special Moments Stages 1+2, thoughts-toggle removal, bucket delete, the replay button rework
+  (`e3438a5`), and the Birthday default message (`277b457`). Needs a full device pass.
+  (CONFIRMED on device so far: firework/birthday re-arm, arrival-preview removal; ACCEPTED
+  as-is: rocket descent "good enough".)
 - ⭐ **Replay overlay UX reworked** (`e3438a5`) — the bucket replay now uses an explicit
   **PREV · NEXT · CLOSE · DELETE** button row (auto-advance + swipe removed). Device-test
   PENDING: Prev disabled on first / Next on last / both on a single item; DELETE removes the
@@ -160,6 +181,15 @@ during the ROOT-2 promotion, which deferred wand for exactly this reason.)
 ## 6. CROSS-TRACK (Phase-2 / backbone — not animation-track to build alone)
 - **History data layer** — touches send-recording near PATH-1; coordinate.
 - **Stage 3 Edge Function** — `send-ping-notification` read + possible deploy (Joshua).
+- ⭐ **Interleaved Phase-2/pairing commits (FYI, ladder-acknowledged):** `684eabc` ("prelaunch
+  fix batch" — demo local-only preview + Demo Dan rename + share-sheet-on-animation-complete +
+  inline add-person) and `7ac50bc` (keep Demo Dan permanently + sole-contact switcher-tap fix)
+  landed from the Phase-2/pairing track interleaved with this animation work. **`7ac50bc` is
+  current HEAD.** Detailed in that track; noted here only so the ladder is accurate.
+- **iOS deployment-target ship-blocker (HANDED TO PHASE-2):** the highest-impact pre-launch
+  item — `CLGeocodingService` @available guard + CLGeocoder fallback, lower the target from 26.5
+  → 17.0. Per `4093623` this was already done (verify current `IPHONEOS_DEPLOYMENT_TARGET`
+  before acting — see the repo note below). Owned by Phase-2/backbone, not animation-track.
 - ⭐ **Notifications toggle REMOVED** (`e6e0608`) — the dead/mislabeled "thoughts" toggle
   (it gated the retired `notify_pointing`, NOT thought-arrival) is gone; the app now has
   **zero user-facing notification controls**. `PingManager.setNotifyPointing(_:)` +
@@ -187,6 +217,8 @@ during the ROOT-2 promotion, which deferred wand for exactly this reason.)
 
 ---
 
-_Source: animation-track session hand-off, reconciled against the repo on the
-documentation pass committed as "docs(truth): reconcile phase2 animation work + Phase 3
-handoff." Companion: `reports/truth_phase3_reconcile.md`._
+_Source: animation-track session hand-off, reconciled against the repo across the
+documentation passes — most recently "docs(truth): reconcile full pre-release animation
+batch + handoff" (adds the per-instrument default-message direction §2b, the interleaved
+Phase-2 commits `684eabc`/`7ac50bc`, and refreshed device-test debt). Companions:
+`reports/truth_full_reconcile.md`, `reports/truth_phase3_reconcile.md`._
