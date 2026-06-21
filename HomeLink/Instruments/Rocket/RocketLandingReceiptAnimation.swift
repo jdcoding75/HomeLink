@@ -112,6 +112,18 @@ struct RocketLandingReceiptAnimation: View {
     /// Legs-bottom offset from the rocket's centre (frame 110×200, scale 1).
     private static let rocketFootOffset: CGFloat = 86
 
+    // [first-drop fix] The descent is SPLIT so the rocket's entry (its drop in from
+    // the TOP of the screen) is slow + watchable, while the later settle keeps its feel.
+    // ⭐ `entryDropDuration` is the ONE knob to tune the first-drop speed on device.
+    // The old single `easeInOut(4.0)` covered descend 0→0.5 in ~2.0 s (its fast middle =
+    // "too fast to see"); this stretches that first half. 5.0 s ≈ 2.5× slower; raise
+    // toward ~10.0 for a full ~5×. The SETTLE half (descend 0.5→1.0) keeps the original
+    // ~2.0 s easeOut feel, and every post-descent beat (legs/touchdown/eject/reveal) is
+    // anchored off landing so their durations/feel are UNCHANGED — only pushed out.
+    private static let entryDropDuration: Double  = 5.0   // ⭐ TUNABLE — slow first drop
+    private static let entrySplit:        CGFloat = 0.5   // descend 0 → here = the "drop from top"
+    private static let settleDuration:    Double  = 2.0   // descend split → 1.0 (kept feel)
+
     /// The bucket sits SEATED on the earth, lightly planted (base ~34pt below the
     /// surface) at its x — so the rocket and bucket share one grounded horizon.
     private func bucketPoint(_ size: CGSize) -> CGPoint {
@@ -382,22 +394,35 @@ struct RocketLandingReceiptAnimation: View {
         //   DispatchQueue.main.asyncAfter(deadline: .now() + 2.8) {                  // SETTLE
         //       withAnimation(.easeOut(duration: 2.0)) { descend = 1 }
         //   }
-        withAnimation(.easeInOut(duration: 4.0)) { descend = 1; grow = 1.0 }
+        // [first-drop fix] SPLIT descent — the single curve above had a FAST MIDDLE
+        // (the rocket whipped through the upper screen "too fast to see"). Now: a slow,
+        // watchable ENTRY (descend 0 → entrySplit over entryDropDuration, easeIn so the
+        // very top is slowest) then the KEPT SETTLE (descend entrySplit → 1.0 over
+        // settleDuration, easeOut — the part that already felt fine). easeIn-end meets
+        // easeOut-start (both fast at the split) → velocity-continuous, no hitch.
+        // PRIOR (Build 380d374, single curve):
+        //   withAnimation(.easeInOut(duration: 4.0)) { descend = 1; grow = 1.0 }
+        let land = Self.entryDropDuration + Self.settleDuration   // when it seats; beats anchor off this
+        withAnimation(.easeIn(duration: Self.entryDropDuration)) { descend = Self.entrySplit; grow = 0.65 }
+        DispatchQueue.main.asyncAfter(deadline: .now() + Self.entryDropDuration) {
+            withAnimation(.easeOut(duration: Self.settleDuration)) { descend = 1; grow = 1.0 }
+        }
         for k in 0..<3 {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.7 + Double(k) * 0.45) {
                 HapticEngine.rocketCountdown(); jitter()
             }
         }
 
-        // LEGS — deploy + switch to a hover flame, on the approach.
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2.4) {
+        // LEGS — deploy + switch to a hover flame, on the approach. [first-drop fix]
+        // Anchored 1.6s before landing (was the absolute +2.4 vs the old 4.0s land).
+        DispatchQueue.main.asyncAfter(deadline: .now() + (land - 1.6)) {
             withAnimation(AnimationSystem.easeOutBack(0.4)) { legs = 1 }
             hover = true
         }
 
         // TOUCHDOWN — fires as the legs seat (tail of the slow settle):
-        // soft dust · flash · gentle bounce.
-        DispatchQueue.main.asyncAfter(deadline: .now() + 4.4) {
+        // soft dust · flash · gentle bounce. [first-drop fix] anchored land + 0.4 (was +4.4).
+        DispatchQueue.main.asyncAfter(deadline: .now() + (land + 0.4)) {
             HapticPattern.doubleSoft.fire()
             dust = true
             withAnimation(.easeOut(duration: 0.08)) { flash = true }
@@ -410,26 +435,26 @@ struct RocketLandingReceiptAnimation: View {
             }
         }
 
-        // EJECT — nose cone splits, emoji pops out of the cone.
-        DispatchQueue.main.asyncAfter(deadline: .now() + 4.9) {
+        // EJECT — nose cone splits, emoji pops out of the cone. [first-drop fix] land + 0.9 (was +4.9).
+        DispatchQueue.main.asyncAfter(deadline: .now() + (land + 0.9)) {
             withAnimation(AnimationSystem.easeOutBack(0.5)) { noseOpen = 1 }
         }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 5.3) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + (land + 1.3)) {   // [first-drop fix] was +5.3
             HapticEngine.catchReveal()
             withAnimation(AnimationSystem.easeOutBack(0.5)) { emojiScale = 1 }
             // Arc across and drop into the bucket.
             withAnimation(.easeInOut(duration: 1.1)) { emojiEject = 1 }
         }
 
-        // SETTLE — the emoji drops in; catch glow + soft thud.
-        DispatchQueue.main.asyncAfter(deadline: .now() + 6.2) {
+        // SETTLE — the emoji drops in; catch glow + soft thud. [first-drop fix] land + 2.2 (was +6.2).
+        DispatchQueue.main.asyncAfter(deadline: .now() + (land + 2.2)) {
             withAnimation(.easeOut(duration: 0.4)) { emojiScale = 0.55; bucketGlow = true }
             InstrumentSoundPlayer.shared.playCue(file: PlaneSounds.catchFile, duration: 0.45)
             HapticPattern.singleSoft.fire()
         }
 
-        // → the shared reveal.
-        DispatchQueue.main.asyncAfter(deadline: .now() + 6.8) {
+        // → the shared reveal. [first-drop fix] land + 2.8 (was +6.8).
+        DispatchQueue.main.asyncAfter(deadline: .now() + (land + 2.8)) {
             onRevealed()
             withAnimation(.easeInOut(duration: 0.3)) { revealing = true }
         }
