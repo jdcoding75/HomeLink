@@ -1524,14 +1524,19 @@ struct SenderAnimationView<Symbol: View>: View {
 struct ReplaySwipeContainer: View {
     let request: PingManager.ReplayRequest
     let onDismiss: () -> Void
+    // [bucket delete] Optional per-item delete — called with the CURRENT item's bucket
+    // historyID, then the overlay dismisses. nil for replays without a delete affordance.
+    let onDelete: ((UUID) -> Void)?
 
     @State private var idx: Int
     @AppStorage("replayAutoAdvance") private var autoAdvance = false
     private static let lav = Color(hex: "#c4a8d4")
 
-    init(request: PingManager.ReplayRequest, onDismiss: @escaping () -> Void) {
+    init(request: PingManager.ReplayRequest, onDismiss: @escaping () -> Void,
+         onDelete: ((UUID) -> Void)? = nil) {
         self.request = request
         self.onDismiss = onDismiss
+        self.onDelete = onDelete
         _idx = State(initialValue: request.index)
     }
 
@@ -1539,7 +1544,8 @@ struct ReplaySwipeContainer: View {
         request.siblings.isEmpty
             ? [PingManager.ReplayItem(emoji: request.emoji, bearingDegrees: request.bearingDegrees,
                                       styleRaw: request.styleRaw, fromName: request.fromName,
-                                      message: request.message, tagline: request.tagline)]
+                                      message: request.message, tagline: request.tagline,
+                                      historyID: request.historyID)]   // [bucket delete]
             : request.siblings
     }
     private var cur: PingManager.ReplayItem { items[min(max(0, idx), items.count - 1)] }
@@ -1591,6 +1597,34 @@ struct ReplaySwipeContainer: View {
                     .padding(10).contentShape(Rectangle())
                     .onTapGesture { autoAdvance.toggle() }
                     .padding(.bottom, 54)
+                }
+                .allowsHitTesting(true)
+            }
+
+            // [bucket delete] DELETE — remove THE CURRENTLY-SHOWN thought from the
+            // bucket (caughtHistory) by its historyID, then dismiss. Additive: a Button
+            // intercepts its own tap, so the swipe (40pt) + tap-to-dismiss + replay are
+            // untouched. Shown only when this item carries a bucket historyID (so it
+            // never appears on non-bucket replays, e.g. PersonDetail).
+            if let hid = cur.historyID, onDelete != nil {
+                VStack {
+                    Spacer()
+                    Button {
+                        onDelete?(hid)
+                        onDismiss()
+                    } label: {
+                        HStack(spacing: 5) {
+                            Image(systemName: "trash")
+                            Text("delete")
+                        }
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundColor(Self.lav.opacity(0.92))
+                        .padding(.horizontal, 16).padding(.vertical, 9)
+                        .background(Capsule().fill(DesignTokens.Color.background.opacity(0.65)))
+                        .overlay(Capsule().stroke(Self.lav.opacity(0.4), lineWidth: 1))
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.bottom, 98)   // clear of the "auto" toggle + dismiss text
                 }
                 .allowsHitTesting(true)
             }

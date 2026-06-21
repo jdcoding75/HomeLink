@@ -116,6 +116,20 @@ final class PingManager: ObservableObject {
         log.info("history: recorded caught thought from \(ping.fromName, privacy: .public) (\(self.caughtHistory.count) kept)")
     }
 
+    /// [bucket delete · ⭐ Phase-3 backbone] Remove ONE thought from local history by its
+    /// BUCKET id — the value the bucket/replay carries, which is `remoteID ?? id` (matches
+    /// how `loadCompassThoughts` keys each PingRecord). Idempotent: a no-op if absent.
+    /// `caughtHistory`'s didSet re-persists automatically (current UserDefaults shape;
+    /// NO schema/preserved-flag change). This is the SINGLE per-item remove for
+    /// caughtHistory — the future History-tab swipe-delete reuses it.
+    func removeFromHistory(id: UUID) {
+        let before = caughtHistory.count
+        caughtHistory.removeAll { ($0.remoteID ?? $0.id) == id }
+        if caughtHistory.count != before {
+            log.info("history: removed 1 thought (\(self.caughtHistory.count) kept)")
+        }
+    }
+
     private func persistCaughtHistory() {
         let stored = caughtHistory.map {
             PersistedPing(fromName: $0.fromName, emoji: $0.emoji,
@@ -505,6 +519,10 @@ final class PingManager: ObservableObject {
         // into replay so a replayed thought shows everything the live catch did.
         var message: String? = nil
         var tagline: String? = nil
+        // [bucket delete] The caughtHistory BUCKET id (`remoteID ?? id`) this replay
+        // item came from, so the overlay's Delete can remove THE RIGHT history item.
+        // nil for replays that don't originate from the bucket (no Delete shown).
+        var historyID: UUID? = nil
     }
     struct ReplayRequest: Identifiable, Equatable {
         let id = UUID()
@@ -518,6 +536,9 @@ final class PingManager: ObservableObject {
         // can SWIPE to the next/previous thought without re-presenting.
         var siblings: [ReplayItem] = []
         var index: Int = 0
+        // [bucket delete] Bucket id for the SINGLE-item fallback (siblings empty);
+        // multi-item replays carry it per-sibling on each ReplayItem instead.
+        var historyID: UUID? = nil
     }
     @Published var replayRequest: ReplayRequest?
 
@@ -538,7 +559,8 @@ final class PingManager: ObservableObject {
         replayRequest = ReplayRequest(emoji: it.emoji, bearingDegrees: it.bearingDegrees,
                                       styleRaw: it.styleRaw, fromName: it.fromName,
                                       message: it.message, tagline: it.tagline,
-                                      siblings: items, index: i)
+                                      siblings: items, index: i,
+                                      historyID: it.historyID)   // [bucket delete] start item's id (single-fallback)
     }
 
     // ── Felt receipts, live ──────────────────────────────────────────────

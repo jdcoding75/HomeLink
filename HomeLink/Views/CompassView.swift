@@ -2669,7 +2669,8 @@ struct CompassView: View {
                                    styleRaw: $0.senderStyle,
                                    fromName: $0.fromName ?? compass.state.personName,
                                    message: $0.message,        // AUDIT [5/6]
-                                   tagline: $0.tagline)
+                                   tagline: $0.tagline,
+                                   historyID: $0.id)           // [bucket delete] PingRecord.id == caughtHistory's (remoteID ?? id)
         }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
             pings.requestReplaySequence(items, startIndex: start)

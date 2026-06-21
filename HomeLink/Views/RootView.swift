@@ -543,10 +543,18 @@ struct MainTabView: View {
         .fullScreenCover(item: $pings.replayRequest) { request in
             ZStack {
                 // [swipe] The container handles single OR a swipeable list.
-                ReplaySwipeContainer(request: request) {
-                    pings.replayRequest = nil
-                    appState.transition(to: .idle)   // never strand .replay
-                }
+                ReplaySwipeContainer(
+                    request: request,
+                    onDismiss: {
+                        pings.replayRequest = nil
+                        appState.transition(to: .idle)   // never strand .replay
+                    },
+                    // [bucket delete] per-item delete from the replay overlay → the
+                    // reusable per-item remove; the bubble's tap-to-replay is unchanged.
+                    onDelete: { id in
+                        pings.removeFromHistory(id: id)
+                    }
+                )
                 VStack {
                     Spacer()
                     Text(request.siblings.count > 1 ? "swipe ‹ › · tap to dismiss" : "tap to dismiss")
