@@ -1248,7 +1248,11 @@ struct CompassView: View {
                 }
             }
             .onTapGesture {
-                guard people.people.count > 1 else { return }
+                // [sole-contact switcher] Always open the switcher when there's at least one
+                // person (incl. the sole-Demo-Dan case). PRIOR `count > 1` suppressed it for a
+                // single contact — outdated now that the switcher carries an inline
+                // "+ add new person" row, so tapping with one contact is useful (add another).
+                guard !people.people.isEmpty else { return }
                 HapticEngine.personSelected()
                 showPersonSwitcher = true
             }

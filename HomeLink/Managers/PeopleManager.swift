@@ -123,8 +123,11 @@ final class PeopleManager: ObservableObject {
         modelContext?.insert(person)
         try modelContext?.save()
         fetchAll()
-        // [5/6] A real person has arrived — Alex steps aside.
-        removeDemoPersonIfPresent()
+        // [keep-demo] Demo Dan is now a PERMANENT try-out sandbox — he is NOT auto-removed
+        // when a real person is added. The user deletes him manually from the People tab,
+        // like any contact. PRIOR auto-removal (retired, preserved):
+        // // [5/6] A real person has arrived — Alex steps aside.
+        // removeDemoPersonIfPresent()
     }
 
     // ── [5/6] Demo person (Alex) lifecycle ───────────────────────────────
@@ -150,8 +153,10 @@ final class PeopleManager: ObservableObject {
         selectedPerson = alex
     }
 
-    /// Remove the demo person (Alex) once a real card exists — Alex is a
-    /// placeholder, never real data. Safe to call anytime. [5/6]
+    /// Remove the demo person once a real card exists. [keep-demo] RETIRED as an
+    /// AUTOMATIC step — Demo Dan now persists as a permanent try-out sandbox, so both
+    /// callers (addPerson / upsertContact) were commented out. Kept (uncalled) for
+    /// restore + possible manual use; deleting Demo Dan is done from the People tab.
     func removeDemoPersonIfPresent() {
         guard let alex = demoPerson, people.count > 1 else { return }
         try? deletePerson(alex)
@@ -244,7 +249,9 @@ final class PeopleManager: ObservableObject {
         if selectedPerson == nil || selectedPerson.map(DemoPerson.isDemo) == true {
             selectedPerson = person
         }
-        removeDemoPersonIfPresent()
+        // [keep-demo] Demo Dan stays as a permanent sandbox — auto-removal retired (the
+        // arriving real contact still becomes active above). PRIOR (preserved):
+        // removeDemoPersonIfPresent()
         return person
     }
 
