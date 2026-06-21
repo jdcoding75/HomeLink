@@ -29,7 +29,13 @@ struct SettingsView: View {
 
     // Display preference — surprise unit each launch (-1) or a locked favourite.
     @AppStorage("funnyUnitLocked")       private var funnyUnitLocked      = -1
-    @AppStorage("notifyPointing")        private var notifyPointing       = true
+    // [thoughts-toggle removed] `@AppStorage("notifyPointing")` REMOVED — the toggle it
+    // backed was dead + mislabeled: it wrote the RETIRED pointing-push pref
+    // (SupabaseService.setNotifyPointing → users.notify_pointing), but no pointing pushes
+    // exist (NotificationHandler ignores type=="pointing"; CompassManager.reportPointing
+    // is a no-op), the client never READ it, and it did NOT gate the live thought-arrival
+    // push. Preserved for restore:
+    //   @AppStorage("notifyPointing")        private var notifyPointing       = true
     // [arrival-preview removed] `@AppStorage("arrivalPreviewEnabled")` deleted — the
     // setting it backed is gone (fully dead; see notificationsSection).
 
@@ -57,8 +63,13 @@ struct SettingsView: View {
                     sectionHeader("send preferences")
                     sendPreferencesSection
 
-                    sectionHeader("notifications")
-                    notificationsSection
+                    // [thoughts-toggle removed] The whole "notifications" section is
+                    // removed — its only control was the dead/mislabeled "thoughts"
+                    // toggle, so the header + section go together (no empty header left).
+                    // The live thought-arrival push has no user toggle and is unaffected.
+                    // Preserved for restore:
+                    //   sectionHeader("notifications")
+                    //   notificationsSection
 
                     sectionHeader("about Pointward")
                     aboutSection
@@ -143,8 +154,15 @@ struct SettingsView: View {
         }
     }
 
-    // MARK: - Notifications  (will evolve with Phase 2)
-
+    // MARK: - Notifications — REMOVED [thoughts-toggle removed]
+    // The entire `notificationsSection` is removed: its only control was the dead +
+    // mislabeled "thoughts" toggle (wrote the RETIRED pointing-push pref via
+    // SupabaseService.setNotifyPointing → users.notify_pointing — no pointing pushes exist,
+    // client never read it, did NOT gate the live thought-arrival push). Its render site +
+    // header were removed in `body`. `SupabaseService.setNotifyPointing` +
+    // `users.notify_pointing` are now UNREFERENCED — harmless, left in place (no server
+    // cleanup this commit). Preserved verbatim for restore:
+    /*
     private var notificationsSection: some View {
         settingsGroup {
             settingsRow {
@@ -166,14 +184,10 @@ struct SettingsView: View {
                         Task { await SupabaseService.shared.setNotifyPointing(enabled) }
                     }
             }
-            // [arrival-preview removed] The "show arrival preview" row + its toggle were
-            // DELETED here — fully dead: R2 (be59c38) globally suppressed the sender-side
-            // arrival preview, so `arrivalPreviewEnabled` gated nothing (all readers
-            // commented). Was: a `Divider()` + a `settingsRow` ("show arrival preview" /
-            // "a 2-second glimpse of their catch after you send") bound to
-            // `$arrivalPreviewEnabled`.
+            // [arrival-preview removed] earlier dead row (see git history)
         }
     }
+    */
 
     // MARK: - About Pointward
 
