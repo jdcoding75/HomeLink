@@ -20,11 +20,17 @@ extension SupabaseService {
         let token: String
         let userID: UUID
         let platform: String
+        // [token-prune] Bump updated_at on EVERY upsert so re-registering a stable token
+        // refreshes its timestamp — otherwise the 60-day cleanup sweeps (which filter on
+        // updated_at) could age out a live token or never clear a dead one. Encoded with the
+        // codebase's proven timestamptz format (matches last_seen / opened_at writes).
+        let updatedAt: String
 
         enum CodingKeys: String, CodingKey {
             case token
             case userID = "user_id"
             case platform
+            case updatedAt = "updated_at"
         }
     }
 
@@ -52,7 +58,8 @@ extension SupabaseService {
             try await withRetry(label: "registerDeviceToken") {
                 try await client
                     .from("device_tokens")
-                    .upsert(DeviceTokenRow(token: token, userID: me, platform: "ios"))
+                    .upsert(DeviceTokenRow(token: token, userID: me, platform: "ios",
+                                           updatedAt: ISO8601DateFormatter().string(from: .now)))
                     .execute()
             }
             log.info("push: device token registered ✓ (\(token.prefix(8), privacy: .public)…)")
