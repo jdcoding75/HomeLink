@@ -117,19 +117,49 @@ async function sendPush(toUser: string, aps: Record<string, unknown>): Promise<R
       const first = await pushToDevice(order[0], t.token, jwt, topic, aps);
       if (first === 400 || first === 410) {
         const second = await pushToDevice(order[1], t.token, jwt, topic, aps);
-        return { token: t.token.slice(0, 8), first, second };
+        return { token: t.token.slice(0, 8), full: t.token, first, second };
       }
-      return { token: t.token.slice(0, 8), first };
+      return { token: t.token.slice(0, 8), full: t.token, first };
     }),
   );
-  console.log("push chain ⑤ APNs:", JSON.stringify(results));
+  // Logging UNCHANGED — strip the full token so it never lands in logs (sliced only).
+  const logShape = (r: { full: string; [k: string]: unknown }) => {
+    const { full: _full, ...rest } = r;
+    return rest;
+  };
+  console.log("push chain ⑤ APNs:", JSON.stringify(results.map(logShape)));
   // Surface any non-200 APNs status (400/410 BadDeviceToken, 403 bad cert…).
   const failures = results.filter((r) =>
     (r.second ?? r.first) !== 200);
   if (failures.length > 0) {
-    console.error(`push chain ⑤ APNs: ${failures.length} device(s) FAILED — ${JSON.stringify(failures)}`);
+    console.error(`push chain ⑤ APNs: ${failures.length} device(s) FAILED — ${JSON.stringify(failures.map(logShape))}`);
   }
-  return new Response(JSON.stringify({ sent: results }), { status: 200 });
+
+  // [self-prune] A token whose FINAL APNs status (AFTER the prod↔sandbox fallback) is
+  // 410 Unregistered or 400 BadDeviceToken is dead — the app was uninstalled or the
+  // token rotated. DELETE its row so device_tokens stops accumulating dead tokens (one
+  // user had 56 rows, 53 dead). ONLY the final status counts: a SANDBOX token 410s on
+  // prod but 200s on sandbox → final 200 → live → kept. Best-effort; never blocks the
+  // push. (This client uses the SERVICE_ROLE key, so the delete bypasses RLS.)
+  const deadTokens = results
+    .filter((r) => {
+      const finalStatus = r.second ?? r.first;
+      return finalStatus === 410 || finalStatus === 400;
+    })
+    .map((r) => r.full);
+  if (deadTokens.length > 0) {
+    const { error: pruneErr } = await supabase
+      .from("device_tokens")
+      .delete()
+      .in("token", deadTokens);
+    if (pruneErr) {
+      console.error(`push chain ⑥ prune: FAILED to delete ${deadTokens.length} dead token(s) — ${pruneErr.message}`);
+    } else {
+      console.log(`push chain ⑥ prune: deleted ${deadTokens.length} dead token(s) (410/400) — device_tokens self-pruned`);
+    }
+  }
+
+  return new Response(JSON.stringify({ sent: results.map(logShape) }), { status: 200 });
 }
 
 // [link-era] Resolve the SENDER's display name from public.users — pairing-
