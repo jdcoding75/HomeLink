@@ -88,11 +88,12 @@ auto-prune.
 
 ## PASS 3 — INTERNAL FEATURE PASS (all animations) · 2 phones
 
-> ✅ **UPDATE (2026-06-22) — v1 ships FULLY OPEN, so PASS 3 no longer needs the tester-unlock.** Once
-> the small **"unlock everything for v1"** change ships (all instruments free in Release), **every
-> animation is testable directly** on an internal TestFlight build — no tester-unlock, no Debug build
-> required. (Tester-unlock is superseded for v1; see `reports/tester_unlock_spec.md`.) The prerequisite
-> note below applies only in the (deferred) world where a paywall is live.
+> ✅ **UPDATE (2026-06-22) — v1 ships 100% FREE (no paywall, no payment), so PASS 3 no longer needs the
+> tester-unlock.** Once the small **"unlock everything / disable the live paywall"** change ships (all
+> instruments free in Release), **every animation is testable directly** on an internal TestFlight
+> build — no tester-unlock, no Debug build required. (Tester-unlock is superseded for v1; see
+> `reports/tester_unlock_spec.md`.) The prerequisite note below applies only in the (deferred,
+> traction-gated) world where a paywall is ever live.
 
 **Prerequisite (only if a paywall is live):** premium animations would be paywalled even for internal
 testers, so you'd need either the **"unlock everything for v1"** build (the v1 path) or a Debug
