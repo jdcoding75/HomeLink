@@ -1,7 +1,14 @@
 # Tester Unlock — Design Spec (NOT an implementation)
 
-_Design only. DOC ONLY — no code. Grounded in the live gating code (file:line). Prerequisite for
-`reports/test_plan.md` PASS 3._
+> ⚠️ **SUPERSEDED FOR V1 (2026-06-22).** The v1 monetization decision is to **ship FULLY OPEN — no
+> paywall, all animations/instruments free** (a small "unlock everything for v1" app change replaces
+> the live paywall gating). With everything open, **internal testers can exercise all animations with
+> NO special unlock**, so this tester-unlock is **NOT the near-term path.** This spec is **retained**
+> (unchanged below) **in case a paywall is later reintroduced** (only if the app gains traction). See
+> POINTWARD_TRUTH → **LAUNCH / MONETIZATION STRATEGY — v1 = FULLY OPEN**.
+
+_Design only. DOC ONLY — no code. Grounded in the live gating code (file:line). (Was: prerequisite for
+`reports/test_plan.md` PASS 3 — no longer needed for v1; see the banner above.)_
 
 ---
 

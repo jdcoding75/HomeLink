@@ -86,13 +86,20 @@ auto-prune.
 
 ---
 
-## PASS 3 — INTERNAL FEATURE PASS (premium content) · 2 phones
+## PASS 3 — INTERNAL FEATURE PASS (all animations) · 2 phones
 
-**Prerequisite:** the **tester-unlock build** exists (see `reports/tester_unlock_spec.md`). Without it,
-premium animations are paywalled even for internal testers, so do this on a Debug (Xcode) build or
-wait for the unlock build. **No external submission / no review needed** — internal TestFlight.
+> ✅ **UPDATE (2026-06-22) — v1 ships FULLY OPEN, so PASS 3 no longer needs the tester-unlock.** Once
+> the small **"unlock everything for v1"** change ships (all instruments free in Release), **every
+> animation is testable directly** on an internal TestFlight build — no tester-unlock, no Debug build
+> required. (Tester-unlock is superseded for v1; see `reports/tester_unlock_spec.md`.) The prerequisite
+> note below applies only in the (deferred) world where a paywall is live.
 
-**Setup:** both phones on the **unlocked internal build** (tester-unlock applied), both signed in.
+**Prerequisite (only if a paywall is live):** premium animations would be paywalled even for internal
+testers, so you'd need either the **"unlock everything for v1"** build (the v1 path) or a Debug
+(Xcode) build, or — if a paywall ever returns — the tester-unlock (`reports/tester_unlock_spec.md`).
+**No external submission / no review needed** — internal TestFlight.
+
+**Setup:** both phones on the **fully-open internal build** (all instruments free), both signed in.
 
 **Exercise:**
 - **Premium animations** — every instrument beyond the free compass (bow, flick, rocket, wind, wand,
