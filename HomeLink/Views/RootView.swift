@@ -135,6 +135,12 @@ struct RootView: View {
             people.configure(with: modelContext)
             if done { ensureDemoPersonIfAppropriate() }   // [5/6] no one added → Alex
             startCompassIfNeeded()
+            // [cold-receive fix] A /m/ link captured during onboarding (held in PendingLink)
+            // was stranded — onboarding completion never drained it, so the thought only
+            // played on a manual re-tap. Drain now so it presents right after onboarding
+            // finishes. presentPendingMessageIfReady is idempotent (guards the splash + an
+            // already-open cover, and take() is atomic), so this can't double-present.
+            if done { presentPendingMessageIfReady() }
             // [build8] post-onboarding "want to connect?" nudge stripped (pairing-era).
             // // One-time gentle nudge after first setup
             // if done && !connectPromptShown {

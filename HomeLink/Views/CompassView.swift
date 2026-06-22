@@ -149,6 +149,9 @@ struct CompassView: View {
     @State private var sentMessage: String? = nil   // [2/3] for the sent confirmation
     @State private var sentTagline: String? = nil
     @State private var sentNotice = false
+    // [sent-confirmation] The recipient's name captured at send time, so the post-send
+    // toast can read "sent to [Name] ✦" (falls back to "sent ✦" when there's no name).
+    @State private var sentToName = ""
     @State private var showKeepPreviewPrompt = false
     // Full-compass sender styles dim the skin to 20 % while they play
     @State private var faceDimmedForInstrument = false
@@ -2134,17 +2137,26 @@ struct CompassView: View {
     @ViewBuilder
     private var sentNoticeToast: some View {
         if sentNotice {
-            Text("sent ✦")
-                .font(.system(size: 14, design: .serif).italic())
-                .foregroundColor(Color(hex: "#c4a8d4"))
-                .padding(.horizontal, 18)
-                .padding(.vertical, 9)
-                .background(
-                    Capsule().fill(DesignTokens.Color.background.opacity(0.9))
-                        .overlay(Capsule().stroke(Color(hex: "#c4a8d4").opacity(0.35), lineWidth: 1))
-                )
-                .padding(.top, 60)
-                .transition(.opacity.combined(with: .move(edge: .top)))
+            // [sent-confirmation] Clearer post-send feedback: a soft check + "sent to
+            // [Name] ✦" (falls back to "sent ✦" when there's no name). Larger + a touch
+            // longer than the old faint toast, so the sender plainly sees it landed.
+            // Reads for BOTH PATH-1 (direct) and PATH-2 (link) sends.
+            HStack(spacing: 7) {
+                Image(systemName: "checkmark.circle.fill")
+                    .font(.system(size: 16))
+                    .foregroundColor(Color(hex: "#5dcaa5"))
+                Text(sentToName.isEmpty ? "sent ✦" : "sent to \(sentToName) ✦")
+                    .font(.system(size: 16, weight: .medium, design: .serif).italic())
+                    .foregroundColor(Color(hex: "#c4a8d4"))
+            }
+            .padding(.horizontal, 20)
+            .padding(.vertical, 11)
+            .background(
+                Capsule().fill(DesignTokens.Color.background.opacity(0.92))
+                    .overlay(Capsule().stroke(Color(hex: "#c4a8d4").opacity(0.4), lineWidth: 1))
+            )
+            .padding(.top, 60)
+            .transition(.opacity.combined(with: .move(edge: .top)))
         }
     }
 
@@ -2157,6 +2169,9 @@ struct CompassView: View {
         // on the RECEIVER side (ReceiptView .received, untouched). This is the
         // single funnel — all 6 send-out onComplete closures call finishSend — so
         // gating here suppresses #1 everywhere. Original preserved below.
+        // [sent-confirmation] Capture the recipient name before the toast so it can read
+        // "sent to [Name] ✦" (the recipient is the selected person at send time).
+        sentToName = people.selectedPerson?.name ?? ""
         showSentNotice()
         appState.transition(to: .idle)
         // [firework/birthday freeze fix] FireworkCompassFace + BirthdayCakeCompassFaceV2
@@ -2205,7 +2220,9 @@ struct CompassView: View {
 
     private func showSentNotice() {
         withAnimation(.easeOut(duration: 0.3)) { sentNotice = true }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.6) {
+        // [sent-confirmation] a touch longer (1.6 → 2.2s) so the clearer "sent to [Name]"
+        // reads comfortably before it fades.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.2) {
             withAnimation(.easeIn(duration: 0.4)) { sentNotice = false }
         }
     }
