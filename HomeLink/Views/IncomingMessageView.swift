@@ -46,7 +46,9 @@ struct IncomingMessageView: View {
     // [phase2 build5] Auto-create the sender as a contact on a valid message.
     @EnvironmentObject var people:  PeopleManager
 
-    private enum Phase { case incoming, receipt, landing, composeBack, notFound }
+    // [a2-send-on-receive] `.sending` plays the SEND (transit) stage BEFORE the
+    // receipt, so the receiver sees the thought launch + fly in, then land/reveal.
+    private enum Phase { case incoming, sending, receipt, landing, composeBack, notFound }
     @State private var phase: Phase = .incoming
     // [build10 shot2] Guest entry: a link-arriver who taps a landing door enters the
     // app WITHOUT the fresh-installer onboarding. RootView routes on this flag
@@ -76,6 +78,13 @@ struct IncomingMessageView: View {
             switch phase {
             case .incoming:  incomingBeat
             case .notFound:  notFoundState
+            // [a2-send-on-receive] The SEND stage, played AS-IS (no reversal/mirror),
+            // exactly as the sender sees it — then it advances to the receipt.
+            case .sending:
+                if let message {
+                    sendStage(for: message)
+                        .transition(.opacity)
+                }
             case .receipt:
                 if let message {
                     ReceiptView(
@@ -272,7 +281,10 @@ struct IncomingMessageView: View {
                 withAnimation(.easeInOut(duration: 0.4)) {
                     if let result {
                         message = result
-                        phase = .receipt
+                        // [a2-send-on-receive] Go to the SEND stage FIRST; its
+                        // onComplete advances to .receipt (unchanged). The fetch-time
+                        // side effects below are UNCHANGED — they still fire here.
+                        phase = .sending
                         // [phase2 build5] A VALID message means a real sender —
                         // silently create-or-update them as a contact, keyed on
                         // the immutable senderID. Fires at FETCH (not at the
@@ -388,6 +400,55 @@ struct IncomingMessageView: View {
         // Registry-driven fallback: the manifest's first (default) live instrument
         // — .compass, whose style is .glow. Never a hardcoded style.
         return (AnimationManifest.liveInstruments.first?.instrument ?? .compass).senderStyle
+    }
+
+    // MARK: - [a2-send-on-receive] The SEND (transit) stage on receive
+    //
+    // REPLICATED (not extracted) from CompassView's live send dispatch
+    // (CompassView.swift:668-792): that dispatch is entangled with send-time state
+    // (flightToken / sentMessage / finishSend), so extraction is out of scope for
+    // this first pass. Keyed on SenderStyle (+ the same 🎆/🎂 fallbacks the sender
+    // uses) so each instrument plays its REAL send — never a generic fallback. The
+    // send is played AS-IS: same direction, no reversal/mirror. On completion it
+    // advances to the existing .receipt flow. DUPLICATION flagged for a later
+    // shared-SendStageView cleanup.
+    @ViewBuilder
+    private func sendStage(for m: Message) -> some View {
+        let style   = instrumentStyle(from: m)
+        let emoji   = (m.emoji?.isEmpty == false ? m.emoji! : CuratedEmoji.defaultEmoji)
+        let bearing = compass.rawBearingToTarget ?? 120
+        let name    = resolvedSenderName(for: m)
+        let advance = { withAnimation(.easeInOut(duration: 0.4)) { phase = .receipt } }
+
+        if style == .firework || emoji == "🎆" {
+            FireworkSendAnimation(emoji: emoji, onComplete: advance)
+        } else if style == .birthday || emoji == "🎂" {
+            BirthdayCakeSendAnimationV2(emoji: emoji, onComplete: advance)
+        } else if style == .wand {
+            WandSendAnimation(transition: sendTransition(.wand, emoji, bearing, m),
+                              personName: name, onComplete: advance)
+        } else if style == .bowArrow {
+            BowSendAnimationV2(transition: sendTransition(.bow, emoji, bearing, m),
+                               personName: name, onComplete: advance)
+        } else if style == .plane {
+            PlaneSendAnimation(transition: sendTransition(.plane, emoji, bearing, m),
+                               personName: name, onComplete: advance)
+        } else if style == .fingerFlick {
+            FlickSendAnimationV2(transition: sendTransition(.flick, emoji, bearing, m),
+                                 personName: name, onComplete: advance)
+        } else {
+            // glow / shootingStar / firefly(wind) / rocket — the shared dispatcher.
+            SenderAnimationView(style: style, emoji: emoji, bearingDegrees: bearing,
+                                symbol: Text(emoji).font(.system(size: 45))) { advance() }
+        }
+    }
+
+    /// Builds the InstrumentTransition the dedicated sends need (exitPoint .zero,
+    /// exitBearing = the sender's bearing; tagline nil on receive).
+    private func sendTransition(_ instrument: Instrument, _ emoji: String,
+                                _ bearing: Double, _ m: Message) -> InstrumentTransition {
+        InstrumentTransition(exitBearing: bearing, exitPoint: .zero, instrument: instrument,
+                             emoji: emoji, message: m.content, tagline: nil)
     }
 }
 
