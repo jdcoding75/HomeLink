@@ -35,9 +35,12 @@ final class CompassManager: NSObject, ObservableObject {
         super.init()
         locationManager.delegate        = self
         locationManager.desiredAccuracy = kCLLocationAccuracyHundredMeters
-        // Ask immediately — before any startUpdatingLocation() call — so the
-        // system popup appears as soon as the app needs location.
-        locationManager.requestWhenInUseAuthorization()
+        // [perm-defer] Launch-time location request REMOVED so it never fires over the
+        // received-thought animation. Location is still requested — just later: in
+        // `start(tracking:)` (:48, when the compass actually tracks a person, post-onboarding)
+        // and in onboarding `saveAboutYou` (OnboardingView.swift:734, the final tap). Original
+        // preserved:
+        // locationManager.requestWhenInUseAuthorization()
     }
 
     func start(tracking person: Person) {

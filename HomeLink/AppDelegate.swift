@@ -50,21 +50,24 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
             switch settings.authorizationStatus {
             case .authorized:    auth = "authorized"
             case .denied:        auth = "DENIED — banners will NOT show (Settings → Pointward → Notifications)"
-            case .notDetermined: auth = "notDetermined — requesting now"
+            case .notDetermined: auth = "notDetermined — onboarding will request (NOT at launch)"
             case .provisional:   auth = "provisional"
             case .ephemeral:     auth = "ephemeral"
             @unknown default:    auth = "unknown"
             }
             let registered = UIApplication.shared.isRegisteredForRemoteNotifications
             self.log.info("push chain ① device: authorization=\(auth, privacy: .public) registeredForRemote=\(registered, privacy: .public) alertsEnabled=\(settings.alertSetting == .enabled, privacy: .public)")
-            if settings.authorizationStatus == .notDetermined {
-                center.requestAuthorization(options: [.alert, .sound, .badge]) { granted, _ in
-                    self.log.info("push chain ① device: permission request → granted=\(granted, privacy: .public)")
-                    DispatchQueue.main.async {
-                        UIApplication.shared.registerForRemoteNotifications()
-                    }
-                }
-            }
+            // [perm-defer] Launch-time notification request REMOVED so it never fires over the
+            // received-thought animation. The ask now lives ONLY in onboarding `saveAboutYou`
+            // (the final "continue →" tap, after the animation). Logging above is unchanged;
+            // `registerForRemoteNotifications()` in didFinishLaunching (:19) still registers the
+            // APNs token route (no prompt). Original preserved:
+            // if settings.authorizationStatus == .notDetermined {
+            //     center.requestAuthorization(options: [.alert, .sound, .badge]) { granted, _ in
+            //         self.log.info("push chain ① device: permission request → granted=\(granted, privacy: .public)")
+            //         DispatchQueue.main.async { UIApplication.shared.registerForRemoteNotifications() }
+            //     }
+            // }
         }
     }
 
