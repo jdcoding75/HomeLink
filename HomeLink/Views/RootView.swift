@@ -294,7 +294,7 @@ struct RootView: View {
         Task { @MainActor in
             await SupabaseService.shared.drainPendingConnections()
             let rows = await SupabaseService.shared.fetchMyConnections()
-            people.stampConnections(rows)
+            await people.stampConnections(rows)
             // [phase2 stage C] read-receipt poll (messages isn't realtime) — which of
             // my sent thoughts the recipient has opened in full → "opened ✦" indicator.
             let opened = await SupabaseService.shared.fetchOpenedSentMessageIDs()

@@ -202,7 +202,7 @@ final class PeopleManager: ObservableObject {
     /// Silent (no prompt) and gate-free (a received message is connection-initiated,
     /// like the invite paths) — TRUTH product principles #1/#6.
     @discardableResult
-    func upsertContact(senderID: String, displayName: String?) -> Person? {
+    func upsertContact(senderID: String, displayName: String?, makeActive: Bool = true) -> Person? {
         guard modelContext != nil, !senderID.isEmpty else { return nil }
         let incoming = (displayName ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
 
@@ -246,7 +246,10 @@ final class PeopleManager: ObservableObject {
         fetchAll()
         // First real contact for a fresh user → make them active (and Alex steps
         // aside), mirroring the invite paths so the history bucket has a subject.
-        if selectedPerson == nil || selectedPerson.map(DemoPerson.isDemo) == true {
+        // [conn-display-fix] makeActive defaults true (existing callers unchanged);
+        // the connection-sync fallback passes false so surfacing a synced connection
+        // never changes the currently selected/active person.
+        if makeActive, (selectedPerson == nil || selectedPerson.map(DemoPerson.isDemo) == true) {
             selectedPerson = person
         }
         // [keep-demo] Demo Dan stays as a permanent sandbox — auto-removal retired (the
@@ -290,24 +293,41 @@ final class PeopleManager: ObservableObject {
     /// `pairedUserID = Y` mirror, so PATH-1's direct channel works). Idempotent (skips
     /// already-stamped); skips a row whose `via` is nil or whose `SentLink` is missing
     /// (e.g. sent from another device). Enables Stage-C PATH 1 (not built here).
-    func stampConnections(_ rows: [SupabaseService.LinkConnection]) {
+    func stampConnections(_ rows: [SupabaseService.LinkConnection]) async {
         guard let context = modelContext else { return }
         var didChange = false
         for row in rows {
             guard let via = row.viaMessageID else {
                 continue   // no join key (deleted message → via set null) — skip
             }
-            guard let link = try? context.fetch(
-                FetchDescriptor<SentLink>(predicate: #Predicate { $0.messageID == via })).first
-            else {
-                continue   // no SentLink (sent from another device / pruned) — skip
+            // EXISTING (warm) PATH — UNCHANGED: a local SentLink maps the row to the
+            // contact I sent to, and we stamp its senderID/pairedUserID.
+            if let link = try? context.fetch(
+                FetchDescriptor<SentLink>(predicate: #Predicate { $0.messageID == via })).first {
+                guard let person = people.first(where: { $0.id == link.personID }) else { continue }
+                guard (person.senderID ?? "").isEmpty else { continue }   // already stamped
+                let y = row.connectedUserID.uuidString
+                person.senderID    = y
+                person.pairedUserID = y                                    // mirror → PATH-1 channel
+                didChange = true
+            } else {
+                // [conn-display-fix] NO local SentLink (reinstall wiped SwiftData, or
+                // sent from another device). The connection is REAL + persisted server-
+                // side — surface it from server data so it DISPLAYS instead of silently
+                // dropping. Resolve the OTHER user (connectedUserID) → public profile →
+                // find-or-create a contact keyed on the SAME senderID (upsertContact
+                // dedups via person(forSenderID:), so no duplicate). makeActive:false →
+                // a synced connection never changes the active person. upsertContact /
+                // applySenderLocation save + fetchAll themselves.
+                let y = row.connectedUserID
+                let profile = await SupabaseService.shared.fetchPublicProfile(of: y)
+                upsertContact(senderID: y.uuidString,
+                              displayName: profile?.displayName,
+                              makeActive: false)
+                applySenderLocation(senderID: y.uuidString,
+                                    latitude: profile?.latitude,
+                                    longitude: profile?.longitude)
             }
-            guard let person = people.first(where: { $0.id == link.personID }) else { continue }
-            guard (person.senderID ?? "").isEmpty else { continue }   // already stamped
-            let y = row.connectedUserID.uuidString
-            person.senderID    = y
-            person.pairedUserID = y                                    // mirror → PATH-1 channel
-            didChange = true
         }
         if didChange { try? context.save(); fetchAll() }
     }
