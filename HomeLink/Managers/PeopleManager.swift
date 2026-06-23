@@ -159,7 +159,9 @@ final class PeopleManager: ObservableObject {
     /// restore + possible manual use; deleting Demo Dan is done from the People tab.
     func removeDemoPersonIfPresent() {
         guard let alex = demoPerson, people.count > 1 else { return }
-        try? deletePerson(alex)
+        // [p2-delete-disconnect] deletePerson is now async; demo has no real server row
+        // (mock id → 0-row delete), so fire-and-forget the local delete.
+        Task { try? await deletePerson(alex) }
     }
 
     func save() throws {
@@ -167,7 +169,17 @@ final class PeopleManager: ObservableObject {
         fetchAll()
     }
 
-    func deletePerson(_ person: Person) throws {
+    // [p2-delete-disconnect] A CONNECTED contact (senderID set) → clear MY server
+    // link_connections row FIRST, so the 256e854 sync fallback can't re-surface the
+    // deleted contact. If the server disconnect FAILS (offline / RLS), do NOT
+    // local-delete (the row would survive and re-create the contact next sync) — throw
+    // instead. A manual contact (no senderID) has no server row → local-delete as before.
+    func deletePerson(_ person: Person) async throws {
+        if let sid = person.senderID, !sid.isEmpty, let other = UUID(uuidString: sid) {
+            guard await SupabaseService.shared.deleteConnection(other: other) else {
+                throw PeopleError.disconnectFailed
+            }
+        }
         modelContext?.delete(person)
         try modelContext?.save()
         fetchAll()
@@ -349,6 +361,16 @@ final class PeopleManager: ObservableObject {
 
     enum PeopleError: Error, LocalizedError {
         case upgradeRequired
-        var errorDescription: String? { "Unlock Pointward to add more people — one-time purchase, no subscription." }
+        // [p2-delete-disconnect] server disconnect failed → contact NOT deleted (so it
+        // can't silently re-surface); user can retry when back online.
+        case disconnectFailed
+        var errorDescription: String? {
+            switch self {
+            case .upgradeRequired:
+                return "Unlock Pointward to add more people — one-time purchase, no subscription."
+            case .disconnectFailed:
+                return "Couldn't disconnect on the server — check your connection and try again."
+            }
+        }
     }
 }

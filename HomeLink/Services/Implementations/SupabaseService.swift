@@ -488,6 +488,30 @@ final class SupabaseService: ObservableObject {
         }
     }
 
+    /// [p2-delete-disconnect] One-directional disconnect (Option A): remove MY
+    /// `link_connections` row for this other user (`sender_id = me AND
+    /// connected_user_id = other`). RLS policy "link_conn delete own" permits deleting
+    /// own rows. The reciprocal row (`sender_id = other`) is NOT touched (bilateral
+    /// parked). Returns true on a clean execute so the caller only local-deletes when
+    /// the server row is actually gone (prevents the 256e854 fallback re-surfacing it).
+    @discardableResult
+    func deleteConnection(other: UUID) async -> Bool {
+        guard let client, let me = await currentUserID else { return false }
+        do {
+            try await client
+                .from("link_connections")
+                .delete()
+                .eq("sender_id", value: me.uuidString)
+                .eq("connected_user_id", value: other.uuidString)
+                .execute()
+            log.info("connection: deleteConnection ✓ other=\(other.uuidString, privacy: .public)")
+            return true
+        } catch {
+            log.error("connection: deleteConnection failed: \(error.localizedDescription, privacy: .public)")
+            return false
+        }
+    }
+
     /// The SENDER reads who has connected to them (RLS scopes to own rows). Empty on
     /// failure / signed-out — never throws to the caller.
     func fetchMyConnections() async -> [LinkConnection] {

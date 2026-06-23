@@ -526,11 +526,16 @@ struct EditPersonView: View {
     }
 
     private func deletePerson() {
-        do {
-            try people.deletePerson(person)
-            dismiss()
-        } catch {
-            saveError = error.localizedDescription
+        // [p2-delete-disconnect] deletePerson is async (clears the server connection for
+        // a connected contact BEFORE the local delete). Dismiss only on success; on
+        // failure (e.g. offline → disconnectFailed) show the error and DON'T delete.
+        Task { @MainActor in
+            do {
+                try await people.deletePerson(person)
+                dismiss()
+            } catch {
+                saveError = error.localizedDescription
+            }
         }
     }
 

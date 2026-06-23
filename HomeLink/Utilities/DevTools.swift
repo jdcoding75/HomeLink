@@ -201,7 +201,7 @@ enum DevTools {
     /// Wipe local people + connection + onboarding flag → back to onboarding.
     @MainActor
     static func resetToOnboarding(people: PeopleManager) {
-        for p in people.people { try? people.deletePerson(p) }
+        for p in people.people { Task { try? await people.deletePerson(p) } }
         UserDefaults.standard.removeObject(forKey: injectFlagKey)
         UserDefaults.standard.set(false, forKey: "hasCompletedOnboarding")
         UserDefaults.standard.set(false, forKey: "enteredViaLink")   // [build10 shot2]
@@ -240,7 +240,7 @@ enum DevTools {
     @MainActor
     static func clearLocalUserData(people: PeopleManager, pings: PingManager) {
         // Local SwiftData — every person card (carries the connection binding).
-        for p in people.people { try? people.deletePerson(p) }
+        for p in people.people { Task { try? await people.deletePerson(p) } }
         // Every local thought (bucket queue + caught + widget mirror + ledger).
         pings.clearAllThoughts()
         // The targeted UserDefaults keys — explicit, never a blanket wipe.
