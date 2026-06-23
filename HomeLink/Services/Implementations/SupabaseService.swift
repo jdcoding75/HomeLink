@@ -557,7 +557,12 @@ final class SupabaseService: ObservableObject {
         // needed), and the pairing-claim stream that once fired onPaired is retired.
         onPing: @escaping (PingEvent) -> Void,
         onFelt: @escaping (PingEvent) -> Void,
-        onPointed: @escaping (Double?) -> Void
+        onPointed: @escaping (Double?) -> Void,
+        // [p3-conn-realtime] Fired on a link_connections INSERT for me (sender_id=me)
+        // → the caller re-runs the SAME connection sync the foreground path uses, so a
+        // new connection appears without a manual relaunch. Default no-op keeps this
+        // additive (any other caller is unaffected).
+        onConnection: @escaping () -> Void = {}
     ) async {
         guard let client, let me = await currentUserID else { return }
         await stopListening()
@@ -571,6 +576,12 @@ final class SupabaseService: ObservableObject {
         let feltUpdates = channel.postgresChange(
             UpdateAction.self, schema: "public", table: "pings",
             filter: "from_user=eq.\(me.uuidString)")
+        // [p3-conn-realtime] Connections written to me now arrive LIVE (was: seen only
+        // on RootView onAppear + foreground). RLS (select using auth.uid()=sender_id)
+        // governs realtime reads, so this delivers only my own rows — NO SQL change.
+        let connInserts = channel.postgresChange(
+            InsertAction.self, schema: "public", table: "link_connections",
+            filter: "sender_id=eq.\(me.uuidString)")
         // [build9] PAIRING streams retired — compass_bearings (mutual-pointing) +
         // connections (claim celebrate). The pings/felt DELIVERY streams above stay.
         // (Clears the compass_bearings + connections postgresChange deprecations.)
@@ -612,6 +623,16 @@ final class SupabaseService: ObservableObject {
                 } catch {
                     log.error("realtime: felt update DECODE FAILED: \(error.localizedDescription, privacy: .public)")
                 }
+            }
+        }
+        // [p3-conn-realtime] On each connection insert, trigger the caller's sync
+        // (fetchMyConnections + stampConnections) — the SAME single display funnel the
+        // foreground path uses, so the 256e854 fallback + future P1 annotation apply
+        // identically. We do NOT decode the row — the sync re-fetches authoritatively.
+        Task { [log] in
+            for await _ in connInserts {
+                log.info("realtime: link_connections insert — re-syncing connections")
+                onConnection()
             }
         }
         // [build9] PAIRING stream loops retired (compass_bearings + connections).

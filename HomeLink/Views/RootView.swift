@@ -353,7 +353,11 @@ struct RootView: View {
                 // [build9] mutual-pointing retired → no-op closure (the compass_bearings
                 // stream that fired it is commented in SupabaseService.startRealtime).
                 // [pairing-retire step6] onPaired removed (param dropped from startRealtime).
-                onPointed: { _ in }
+                onPointed: { _ in },
+                // [p3-conn-realtime] A new connection (someone connected to me) arrives
+                // live → re-run syncConnections (the SAME foreground path), so it appears
+                // without a relaunch. Idempotent: stampConnections dedups on senderID.
+                onConnection: { Task { @MainActor in syncConnections() } }
             )
         }
     }
