@@ -228,6 +228,7 @@ enum DevTools {
         "seenPingIDs",              // received-thought ledger
         "pendingThoughtQueue",      // unread bucket queue
         "postOnboardConnectPromptShown",
+        "didCheckClipboardForPendingLink",   // [clipboard-bridge · READ] reset → re-test the cold first-launch read
         injectFlagKey,              // dev mock-inject flag
     ]
 

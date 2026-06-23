@@ -10,6 +10,7 @@ import SwiftData          // [fix] explicit — \.modelContext (line below) is a
                           // SwiftData environment key; was resolving transitively
 import CoreLocation
 import UserNotifications
+import UIKit              // [clipboard-bridge · READ] UIPasteboard.detectPatterns / .string
 import os
 
 private let rootLog = Logger(subsystem: "com.jdcoding75.pointward", category: "root")
@@ -120,6 +121,11 @@ struct RootView: View {
             syncConnections()   // [phase2 stage B] drain (S2) + stamp connected contacts
             skinStore.enforceTier(subscription.tier)   // free = Minimal, always
             instrumentStore.enforceTier(subscription.tier)   // free = compass, always
+            // [clipboard-bridge · READ] FIRST-LAUNCH ONLY: recover a cold /m/<id> link the
+            // website wrote to the clipboard on the "Get Pointward" tap. Sets PendingLink →
+            // the EXISTING drain (pendingLink onChange / splash-fade) presents it. Async +
+            // best-effort; one-time (UserDefaults flag). See recoverPendingLinkFromClipboardOnce().
+            recoverPendingLinkFromClipboardOnce()
             // [double-tap fix · Layer 2] (a) data layer is configured — try now
             // (presents immediately for a WARM launch; no-ops while the splash is up).
             presentPendingMessageIfReady()
@@ -437,6 +443,40 @@ struct RootView: View {
         guard let id = PendingLink.shared.take() else { return }
         rootLog.info("deeplink: presenting pending message \(id.uuidString, privacy: .public)")
         messageOpenRequest = MessageOpenRequest(id: id)
+    }
+
+    /// [clipboard-bridge · READ] Cold-receive PRIMARY path. The website writes
+    /// "https://pointward.app/m/<id>" to the clipboard on the "Get Pointward" tap; on the
+    /// FIRST launch only we recover that id → `PendingLink` → the existing
+    /// `presentPendingMessageIfReady` flow plays the thought (no downstream change).
+    /// ONE-TIME: a UserDefaults flag, set BEFORE the read, guarantees the clipboard is
+    /// never read again on any later launch (privacy + no re-read). `detectPatterns` gates
+    /// FIRST (silent — no prompt, no read) so a normal installer with unrelated clipboard
+    /// content is never prompted; the string is read only when a web URL is actually present.
+    /// Best-effort: any failure (no pasteboard / parse fail / API miss) is a silent no-op —
+    /// the re-tap fallback covers a miss.
+    private func recoverPendingLinkFromClipboardOnce() {
+        let flagKey = "didCheckClipboardForPendingLink"
+        guard !UserDefaults.standard.bool(forKey: flagKey) else { return }   // already checked once
+        UserDefaults.standard.set(true, forKey: flagKey)   // set NOW → clipboard never read again
+        Task { @MainActor in
+            // Silent presence check (iOS 14+): does NOT prompt and does NOT read contents.
+            // Bridge the completion-handler API (no async refinement is exposed for it) via a
+            // continuation; a nil/error result → empty set → silent no-op (best-effort).
+            let patterns: Set<UIPasteboard.DetectionPattern> = await withCheckedContinuation { cont in
+                UIPasteboard.general.detectPatterns(for: [.probableWebURL]) { result in
+                    cont.resume(returning: (try? result.get()) ?? [])
+                }
+            }
+            guard patterns.contains(.probableWebURL) else { return }   // nothing relevant → no read, no prompt
+            // A URL is present → read the string (the single framed "paste" moment) + parse with
+            // the EXISTING parser. Accept ONLY a pointward.app /m/<uuid> link; ignore anything else.
+            guard let raw = UIPasteboard.general.string,
+                  let url = URL(string: raw.trimmingCharacters(in: .whitespacesAndNewlines)),
+                  let id = MessageLink.messageID(from: url) else { return }
+            rootLog.info("clipboard-bridge: recovered pending /m/\(id.uuidString, privacy: .public)")
+            PendingLink.shared.set(id)   // existing presentPendingMessageIfReady flow presents it
+        }
     }
 }
 
