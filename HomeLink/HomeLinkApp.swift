@@ -12,18 +12,29 @@ struct PointwardApp: App {
     @StateObject private var container = ServiceContainer()
 
     init() {
-        #if DEBUG
         // ═══════════════════════════════════════════════════════════════════
-        // ⚠️ DEBUG-ONLY TESTING DEFAULTS — REMOVE BEFORE APP STORE SUBMISSION ⚠️
-        // Forces tier .pro + Pro features on so DEBUG builds skip the paywall.
-        // This is wrapped in #if DEBUG, so RELEASE builds start at .free and the
-        // real StoreKit entitlement (SubscriptionManager) decides Pro access.
+        // [unlock-all v1] Pointward v1 ships 100% FREE — no paywall, no payment.
+        // Force the unlocked tier + Pro playground ON for EVERY user (ALL builds)
+        // by registering these as the default values. This runs before the lazy
+        // ServiceContainer builds the stores, so SkinStore / InstrumentStore /
+        // SubscriptionManager all read "unlocked" → every tier gate passes and no
+        // paywall trigger fires. The tier system, StoreKit plumbing, and PaywallView
+        // are LEFT INTACT — only the default is flipped, so monetization can return
+        // later simply by reverting this block.
+        // REVERSAL: re-wrap in `#if DEBUG … #endif` (its original form, preserved
+        // below) to restore RELEASE-starts-at-.free + real StoreKit gating.
         // ═══════════════════════════════════════════════════════════════════
         UserDefaults.standard.register(defaults: [
             "subscriptionTier": "unlocked",      // SubscriptionTier.pro
             ProFeatures.storageKey: true,        // proFeaturesEnabled
         ])
-        #endif
+        // Original DEBUG-only form (preserved for easy revert):
+        // #if DEBUG
+        //   UserDefaults.standard.register(defaults: [
+        //       "subscriptionTier": "unlocked",
+        //       ProFeatures.storageKey: true,
+        //   ])
+        // #endif
 
         // Carry "Expressive Mode" users into the renamed Pro key
         ProFeatures.migrateLegacyKey()
