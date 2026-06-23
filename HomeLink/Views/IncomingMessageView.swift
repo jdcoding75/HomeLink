@@ -54,6 +54,9 @@ struct IncomingMessageView: View {
     // app WITHOUT the fresh-installer onboarding. RootView routes on this flag
     // (alongside hasCompletedOnboarding). Never set on the fresh-installer path.
     @AppStorage("enteredViaLink") private var enteredViaLink = false
+    // [landing-onboarded-bypass] Existing/onboarded users (already have the app)
+    // skip the cold-recipient 3-door landing — see goToLanding().
+    @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
     @State private var message: Message? = nil
     @State private var flipGate = OpenedFlipGate()
     @State private var started = false
@@ -331,6 +334,12 @@ struct IncomingMessageView: View {
     /// The opened-flip already fired at onRevealed (the reveal); this is purely
     /// the post-arrival hand-off.
     private func goToLanding() {
+        // [landing-onboarded-bypass] Onboarded/existing users go STRAIGHT into the
+        // app after viewing the thought (restores the pre-build10 behavior) — RootView
+        // already routes the dismissed cover to MainTabView via hasCompletedOnboarding,
+        // so onFinished() lands them in-app (not a blank/guest state). Only NEW/cold
+        // arrivers (never onboarded) get the 3-door install funnel below.
+        guard !hasCompletedOnboarding else { onFinished(); return }
         withAnimation(.easeInOut(duration: 0.4)) { phase = .landing }
     }
 
