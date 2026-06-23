@@ -1862,7 +1862,17 @@ sender for an easy reply).
   after a countdown).
 - Maps to the **1×-pay future model** (non-consumable, NOT subscription).
 
-**DEFERRED:** custom **VOICE messages** (was built, removed; keep for the future, likely buried).
+**ATTACHMENTS (future — later):**
+- **VOICE attachment / custom voice on a thought** — was **BUILT then REMOVED**; keep as a future option
+  (attach a voice note to a send). _(Consolidates the earlier "custom VOICE messages — keep for future"
+  note — one entry now, not two.)_
+- **PHOTO / other media attachments (LATER-LATER)** — consider allowing a photo (or other media) attached
+  to a thought. Further out, exploratory.
+- **Shared note (both):** these are **BIGGER than the current data model** — Pointward today sends
+  text + emoji + instrument (small, fit in the `messages`/`pings` rows). Voice + photos are **BINARY MEDIA**
+  → need **file storage** (Supabase Storage or similar), upload/download, size limits, and rethinking how the
+  `/m/` link **carries** them + how they ride the receive animation. **NOT quick toggles — a
+  media-attachment subsystem.** Scope realistically when picked up.
 
 **FEASIBILITY ANCHOR:** the **visual works on WEB** (no app — viral on-ramp); **interactive receipts**
 (mic / camera-PPG / haptics / motion) need the **APP** (iOS web mic flaky; camera-PPG / haptics / motion
