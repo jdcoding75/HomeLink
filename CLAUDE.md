@@ -104,8 +104,9 @@ These apply to EVERY task without re-specification. A prompt need only name the 
    Then `git status` + `git pull --ff-only`. NEVER commit the standing dirty excludes
    (`.claude/settings.json`, the `.xcscheme`, the untracked `pointward-ship-report-*.md`).
 2. **Propose-first for substantive changes.** For any code / SQL / migration / canon-doc
-   (POINTWARD_TRUTH.md) change: SHOW the proposed diff (and SQL) FIRST and WAIT for approval before
-   writing. Read-only audits/investigations: just run them + write the report (no approval needed).
+   (POINTWARD_TRUTH.md) change: SHOW the proposed diff (and SQL) FIRST — **written to `reports/<name>.md`
+   (see #6), not terminal-only** — and WAIT for approval before writing the change. Read-only
+   audits/investigations: just run them + write the report (no approval needed).
    After approval, the mechanical steps (apply → build → commit → push) need no further confirmation.
 3. **Apply discipline.** COMMENT-OUT, never hard-delete — preserve the original inline. Tag every change
    with a short bracket marker (e.g. `[feature-tag]`) so it's greppable + reversible. Touch as FEW files
@@ -114,6 +115,9 @@ These apply to EVERY task without re-specification. A prompt need only name the 
    `xcodebuild -scheme HomeLink -destination 'platform=iOS Simulator,name=iPhone 17 Pro' build` (Swift 5).
    Success = **BUILD SUCCEEDED**. In-editor / SourceKit "cannot find type / No such module" diagnostics
    are KNOWN cross-file indexer noise — **xcodebuild is authoritative**; never treat them as failures.
+   **BATCH verification when safe:** when several changes are INDEPENDENT/safe, apply them together and run
+   ONE build/test cycle rather than a cycle per change (the "5-fix batch → one clean test" pattern). Isolate
+   risky/interacting changes so a failure isn't ambiguous. Goal: fewest build/test cycles.
 5. **Commit + push (after approval + green build).** Selective `git add <paths>` — NEVER `-A` (protect the
    excludes; the working tree is shared across tabs → each commit must stand alone / build on its own).
    End every commit message with:
@@ -123,6 +127,12 @@ These apply to EVERY task without re-specification. A prompt need only name the 
    build result, explicit confirmations of what was preserved/untouched (esp. load-bearing / DELIVERY
    BACKBONE, with grep-style verification), a manual/two-phone test note, and `file:line` sources. A
    read-only AUDIT report: findings + `file:line` + conclusion, and states "READ-ONLY — no edits, no commits."
+   **WRITE TO A FILE AT BOTH STEPS — never leave content terminal-only:** (1) **PROPOSE step** — write the
+   full proposed diff/plan to `reports/<name>.md`, THEN pause for approval (the approval question is
+   expected — but the content to review must be in the file, `copyreport`-able). (2) **APPLY step** — after
+   approval, write the applied result to `reports/<name>.md`. So John runs `copyreport <name>` on a clean
+   file at BOTH propose and apply — never pasting garbled terminal output. (Keeps propose-first +
+   wait-for-approval intact — just makes the proposal a readable file.)
 7. **Single-writer.** One writer, ONE repo per run. A task spanning the app AND `pointward-website` = two
    separate runs.
 8. **Supabase migrations.** WRITE the migration as `supabase/migrations/<YYYYMMDD…>_<name>.sql` but do NOT
