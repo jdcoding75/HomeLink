@@ -49,24 +49,39 @@
 - **BATCH verification when safe.** Prefer ONE test run / ONE device pass across several INDEPENDENT changes
   over a cycle per change (the "5-fix batch → one clean test" pattern). Only batch independent/safe changes
   — isolate risky/interacting ones so a failure isn't ambiguous. **Goal: fewest test cycles.**
+- **TESTING PHILOSOPHY (standing).** PREFER automated, step-checked tests over manual conversational testing
+  (manual two-phone is slow + churn-prone + loses fidelity). **SIMULATE-AT-BOUNDARY, AUTOMATE-DOWNSTREAM:**
+  for any flow with one irreducible OS/real-world step (clipboard handoff, APNs, true cold install), verify
+  that step manually ONCE, then INJECT the payload it produces and auto-test all consuming logic
+  (parse / state-transition / replay / reconciliation) — permanent coverage. **Layers:** unit (logic; has a
+  ceiling — passed while tonight's bug existed) → **DB-scenario** (per-side connection states via SQL /
+  Supabase MCP — the big unlock) → selective **XCUITest** (single-device, step-checked) → irreducible-manual
+  (real APNs to a closed phone, true cold install, visual render). Goal: shrink manual to the 2–3 OS-level
+  things; automate all logic.
 
 ### CURRENT STATE (what's done / what's next — update each session)
-- **RELEASE GATE = PAIRING CLUSTER → BUILT + VERIFIED (logic + server).** P3 realtime (`366fe79`), P2
-  delete-disconnect (`bcee4fe`, migration **APPLIED + verified**), P1 same-id guard + visibility
-  annotations (`2c2f535`), test harness **9/9** (`9cf858f`). Server confirmed via Supabase MCP:
-  `link_conn delete own` + `read own` policies LIVE, `record_connection` SECURITY DEFINER, no bilateral
-  RPC. **REMAINING:** one irreducibly-manual **two-phone pass** (real APNs to closed app, true cold
-  install, actual UI render incl. "(2)" / "same id as" rows, P3 live socket) — see
-  `reports/connection_test_harness.md` manual checklist.
+- **RELEASE GATE = PAIRING CLUSTER → HAPPY-PATH BUILT + VERIFIED; ⚠️ REAL GAP FOUND (2026-06-23 two-phone).**
+  P1/P2/P3 + harness 9/9 are the HAPPY path (P3 `366fe79`, P2 `bcee4fe`, P1 `2c2f535`, harness `9cf858f`;
+  server policies MCP-verified). **Tonight's device test surfaced the model's real gap → MISSING PER-SIDE
+  CONNECTION STATE** (delete→reconnect: a sender deletes + re-sends, but the receiver's phone still thinks
+  they're connected → her open reports nothing new → the sender never re-greens). The connection is modeled
+  as ONE shared fact, signalled ONE-SHOT + ONE-DIRECTIONAL — not per-side state. **So the gate is NOT
+  closed.** Also fixed tonight: the **P3 realtime publication bug** (`link_connections` wasn't in
+  `supabase_realtime` → no live broadcast → `alter publication supabase_realtime add table
+  public.link_connections` — live; ⚠️ **migration file OWED**). See WORK CLUSTERS P1 +
+  `reports/device_test_2026-06-23.md`.
 - **PAIRING DESIGN (decided).** ONE CONTACT PER USER ID (senderID sticks; incoming ID auto-attaches, never
   double-creates; server name never overwrites user name; "let it live, user cleans up" — NO
   auto-merge/merge-tool/name-matching). P1 = visibility only. P2 = one-directional disconnect = the
   linchpin that makes cleanup stick. Contacts-pick PREFERRED (firm name/address/channel; auto-addressed
   first send; stores send-channel = wrong-person PREVENTION; P2+P1 = safety net).
-- **NEXT PRIORITIES.** (1) **Two-phone verify** the pairing cluster (the manual checklist). (2) **canon reduction — pass 1 DONE
-  (`5088027`); pass-2/3 consistency + reduction polish applied**. (3)
-  Then the **iterative/non-blocking clusters** (animation-correctness, screens-reduction, compass
-  HOLD·LOCK·TAP, contact model, pre-launch polish) per WORK CLUSTERS — cut a line for v1 whenever satisfied.
+- **NEXT PRIORITIES.** (1) **AUDIT + DESIGN the per-side connection state** — the model's real gap + the
+  actual release gate now (delete→reconnect; re-fire/refresh on receiver-open; `record_connection`
+  upsert-on-conflict and/or `stampConnections` match on `connected_user_id`) — then BUILD + **DB-scenario
+  tests** (per-side state makes connection combos SQL-testable → shrinks the two-phone pass to the
+  irreducible). (2) the **owed realtime migration file** + re-confirm P3 realtime-LIVE (couldn't isolate
+  while the sender-green bug was active). (3) the **iterative/non-blocking clusters** per WORK CLUSTERS
+  (incl. the 3 new contact-UX bugs). _(Canon reduction passes 1–3 DONE.)_
 - **EFFICIENCY STACK (this session).** Supabase MCP both sides (planning chat verified working; Claude
   Code add pending auth); CLAUDE.md consolidated standing workflow (`1f89605`); write-to-file→`copyreport`
   is the clean handoff; GitHub URL-fetch works (partial on big files). **GitHub MCP = SKIP** for Claude Code (local git + `gh` cover it); **Supabase MCP = the add.** **Testing aids:** `HomeLinkTests` harness (logic) · **P2 delete doubles as a test-RESET tool** (clear connections on demand) · a **DevTools dev-send**.
@@ -508,15 +523,61 @@ on top is now **DESIGNED + DECIDED**. The three pieces **INTERLOCK** (one displa
 **INTERLOCKS:** `stampConnections` is the **single display funnel** — P3 adds a trigger, P1 hooks
 annotation/dedupe, P2 prevents re-surface via ordering. **Don't regress the `256e854` fallback.**
 
-**✅ STATUS (2026-06-23): the cluster is BUILT + VERIFIED (logic + server).** P3 realtime (`366fe79`), P2
+**✅ STATUS (2026-06-23): the cluster's HAPPY PATH is BUILT + VERIFIED (logic + server) — but see the KNOWN GAP below.** P3 realtime (`366fe79`), P2
 delete-disconnect (`bcee4fe`, migration APPLIED + verified live), P1 same-id guard + visibility (`2c2f535`),
 9/9 test harness + `[conn-di-seam]` (`9cf858f`). Supabase MCP confirms `link_conn delete own`/`read own`
 policies live, `record_connection` SECURITY DEFINER, no bilateral RPC. REMAINING = ONE manual two-phone
 pass (real APNs-to-closed-app, true cold install, UI render incl. "(2)"/"same id as" rows, P3 live socket;
 `reports/connection_test_harness.md`).
 
-**➡ This cluster, built (P3→P2→P1) + two-phone-tested, = the RELEASE GATE. When solid, v1 is shippable on
-connection grounds.**
+**🔴 KNOWN GAP (2026-06-23 two-phone test) — MISSING PER-SIDE CONNECTION STATE (the model's real gap = the
+missing P4).** The connection is modeled as ONE shared fact, signalled ONE-SHOT + ONE-DIRECTIONAL:
+`record_connection` fires only on the receiver's FIRST open; PK `(sender_id, connected_user_id)` +
+`on conflict do nothing` → never re-fires/refreshes (keeps the OLD `via_message_id` across reconnects —
+the stale-via symptom). **No per-side state** (each side's independent view of the other).
+- **Symptom:** John sends Jess a link → she opens → SHE greens John; FIRST-CLEAN connection → John ALSO
+  greens (both sides aligned). Then **John deletes Jess (P2 clears only HIS row) + re-sends; Jess's phone
+  still thinks they're connected → her open reports nothing new → John never re-greens.** Diverged sides
+  never reconcile (Jess: "already connected, nothing to report"; John: "waiting for a signal that never comes").
+- **What's missing:** each side tracks its OWN connection state to the other; a re-send to someone who
+  already has you must STILL re-confirm back to the (now-disconnected) sender.
+- **⭐ STRATEGIC FOLLOW-ON — per-side state enables DB-LEVEL TESTING:** per-side state in the DB makes
+  connection scenarios SQL-testable (set "John-deleted/Jess-didn't", "both connected", "one-sided" → assert
+  the app reconciles) WITHOUT two phones — the planning chat drives them via Supabase MCP. Shrinks the
+  two-phone pass to the truly-irreducible (real APNs, real cold install).
+- **🧭 GENERAL PATTERN — HANDOFF BOUNDARIES NEED EXPLICIT STATE (audit each when touched):** every
+  cross-system handoff — connection signal (sender↔receiver), clipboard/pending-link (web→app), push/APNs
+  (server→closed app) — should track explicit per-side status (pending/recorded/consumed/expired/failed),
+  NOT fire-and-forget one-shot. Tonight's sender-not-green = a missing-per-side-status case; the **clipboard
+  pending-link LIKELY has the same latent gap (predicted — will surface).** Explicit boundary status is BOTH
+  the robustness fix AND the automation enabler (set status → assert transition).
+- **NEXT SESSION (AUDIT + DESIGN, not a one-liner):** (1) AUDIT the model (single `link_connections` row vs
+  per-side; where `fetchMyConnections`→`stampConnections` / `SentLink` / `via_message_id` breaks on
+  reconnect). (2) DESIGN per-side status (reconcile on divergence; re-send re-confirms back) — consider
+  `record_connection` UPDATE-on-conflict + `stampConnections` match on `connected_user_id` (robust to
+  reconnect / old-link / re-add). (3) BUILD the fix. (4) **DB-SCENARIO TEST SUITE = AN EXPLICIT
+  DELIVERABLE** — the fix ships WITH its automated connection-scenario tests (clean-connect · delete→reconnect
+  · one-sided · both-sided · churn) so the manual phone-dance is never needed for connection logic again.
+
+**P3 REALTIME — publication bug FIXED (live-confirm owed).** `link_connections` was NOT in the
+`supabase_realtime` publication → INSERTs didn't broadcast → the sender got no live event. **FIX (live, via
+SQL):** `alter publication supabase_realtime add table public.link_connections;` (publication now:
+`compass_bearings`, `link_connections`, `pings`). ⚠️ **MIGRATION FILE OWED** →
+`supabase/migrations/<ts>_link_conn_realtime.sql` (live, not yet in repo). **Realtime-LIVE** (green pops
+without relaunch) **still UNCONFIRMED** — re-test after the per-side-state fix.
+
+**✅ VERIFIED WORKING (2026-06-23 two-phone test):** item-3 same-name **"(2)" suffix** in People + compose
+shows the **RAW name** (P1 d) · **P2 delete-disconnect** — deleting a *properly-stamped* connected contact
+cleared the server row (MCP-verified empty) + did NOT re-surface on relaunch (the earlier "didn't clear"
+was the churn / broken-stamp case → local-only delete, **consistent with the per-side gap, NOT a P2 bug**) ·
+**one-directional disconnect confirmed by design** (after John deletes, Jess still shows John connected —
+sender-only RLS delete; bilateral PARKED Option B — v1-acceptable) · **connection row forms reliably on
+receiver open** (server-verified, multiple fresh rows) · **first-clean sender-green worked once**
+post-publication-fix.
+
+**➡ This cluster's HAPPY path is built (P3→P2→P1) + harness 9/9 — but the per-side-state KNOWN GAP above is
+the REMAINING release gate: v1 is NOT shippable on connection grounds until it's designed + fixed (+ its
+DB-scenario tests).**
 
 ### PRIORITY 2+ — ITERATIVE / NON-BLOCKING (batch-test after several changes; cut a line for v1 whenever satisfied)
 
@@ -543,6 +604,12 @@ parked Compass v2** (red marker + haptic + lock-on-target) — same work, do tog
 
 **CONTACT MODEL / UX** — per-person emoji maybe unnecessary (review); **PHOTO on the contact list** (may
 SUPERSEDE the emoji — pair these decisions).
+
+**PEOPLE / CONTACT UX BUGS (2026-06-23 device test):** (a) **TAP-NAME-OPENS-EDIT** — tapping a person's name
+in People opens EDIT; should SELECT / switch the send-target (edit only via the edit affordance) — real
+change. (b) **ADD-PERSON FORCES ADDRESS** — can't skip address on add (ties to the parked "don't force
+address"). (c) **CONTACTS-PICK OVERWRITES TYPED NAME** — picking from Contacts clobbers a typed name;
+decide precedence. _(NOT a bug: post-receipt "type a message" was user error — compose hit at receipt end.)_
 
 **ADD-PERSON — CONTACTS-PICK PREFERRED** (design — **verify build-state; may need building**) — **bump
 toward the TOP of this cluster** given the connection-correctness benefit (PREVENTION for the pairing
