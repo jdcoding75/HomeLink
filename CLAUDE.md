@@ -77,7 +77,8 @@ into the live send flow (open item).
 - ALWAYS build after changes
 - ALWAYS commit after successful build
 - ALWAYS fix errors automatically without stopping
-- NEVER ask for confirmation — just do it
+- PROPOSE-FIRST for substantive changes (code/SQL/migration/canon-docs): show the diff,
+  wait for approval; then apply without further confirmation (see Standing Task Workflow #2)
 - Only stop for credentials or physical device actions
 
 ## Standing build patterns (self-enforce)
@@ -93,9 +94,43 @@ Apply these on every build without re-specification:
 - FLAG-DON'T-FORCE: if an audit/build surfaces something unexpected, broader, or
   more entangled than scoped, STOP and flag for a decision rather than pressing on.
 - Confirm explicitly in each report that load-bearing / shared code — especially the
-  **DELIVERY BACKBONE** (see POINTWARD_TRUTH.md: link send still `#if DEBUG`, so the
-  legacy pings path is the only release delivery) — was left untouched, with a
-  grep-style verification.
+  **DELIVERY BACKBONE** (link send is LIVE / un-gated = PATH 2; pings = PATH 1, connected
+  only — see POINTWARD_TRUTH.md) — was left untouched, with a grep-style verification.
+
+## Standing Task Workflow (every task — so prompts carry ONLY the task)
+These apply to EVERY task without re-specification. A prompt need only name the task + scope.
+
+1. **Orient (top of every task).** Confirm repo: `git remote -v` = `github.com/jdcoding75/HomeLink`.
+   Then `git status` + `git pull --ff-only`. NEVER commit the standing dirty excludes
+   (`.claude/settings.json`, the `.xcscheme`, the untracked `pointward-ship-report-*.md`).
+2. **Propose-first for substantive changes.** For any code / SQL / migration / canon-doc
+   (POINTWARD_TRUTH.md) change: SHOW the proposed diff (and SQL) FIRST and WAIT for approval before
+   writing. Read-only audits/investigations: just run them + write the report (no approval needed).
+   After approval, the mechanical steps (apply → build → commit → push) need no further confirmation.
+3. **Apply discipline.** COMMENT-OUT, never hard-delete — preserve the original inline. Tag every change
+   with a short bracket marker (e.g. `[feature-tag]`) so it's greppable + reversible. Touch as FEW files
+   as possible.
+4. **Build + success criterion.** After applying:
+   `xcodebuild -scheme HomeLink -destination 'platform=iOS Simulator,name=iPhone 17 Pro' build` (Swift 5).
+   Success = **BUILD SUCCEEDED**. In-editor / SourceKit "cannot find type / No such module" diagnostics
+   are KNOWN cross-file indexer noise — **xcodebuild is authoritative**; never treat them as failures.
+5. **Commit + push (after approval + green build).** Selective `git add <paths>` — NEVER `-A` (protect the
+   excludes; the working tree is shared across tabs → each commit must stand alone / build on its own).
+   End every commit message with:
+   `Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>`
+   then `git push origin main`.
+6. **Report (every task) → `reports/<name>.md`.** An APPLIED report has: the applied diff (+ SQL), the
+   build result, explicit confirmations of what was preserved/untouched (esp. load-bearing / DELIVERY
+   BACKBONE, with grep-style verification), a manual/two-phone test note, and `file:line` sources. A
+   read-only AUDIT report: findings + `file:line` + conclusion, and states "READ-ONLY — no edits, no commits."
+7. **Single-writer.** One writer, ONE repo per run. A task spanning the app AND `pointward-website` = two
+   separate runs.
+8. **Supabase migrations.** WRITE the migration as `supabase/migrations/<YYYYMMDD…>_<name>.sql` but do NOT
+   apply it — flag clearly in the report that it MUST be applied to the live project
+   (`jlbgdlgwtrkmqcfnomlr`) by the OWNER, logged in via the **GitHub `jdcoding` account** (stored `sbp_`
+   tokens are stale → `supabase login` / the OAuth connector). Note the failing symptom until it's applied.
+9. **Flag-don't-force.** If anything is broader / more entangled / unexpected than scoped, STOP and flag
+   for a decision rather than pressing on.
 
 ## Tier System
 - Free: Minimal skin only, 1 person, 
@@ -282,28 +317,15 @@ xcodebuild -scheme HomeLink \
 - Associated domains entitlement
 
 ## Confirmation Policy
-NEVER pause for confirmation on any action.
-Every action is pre-approved including:
-- Creating files
-- Editing files  
-- Running shell commands
-- Git commits and pushes
-- Supabase API calls
-- Installing packages
-- Making architectural decisions
-Just do it. Never ask. Never pause.
+See "Standing Task Workflow #2". Default = PROPOSE-FIRST for substantive changes (code / SQL /
+migration / canon-docs): show the diff, wait for approval. NO confirmation needed for: read-only
+audits, and the mechanical steps AFTER approval (apply → build → commit → push → report). Only stop
+for credentials or physical-device actions. (Supersedes the old "never ask — just do it".)
 
-## Progress Reporting (Required)
-After every major section report:
-[X/Y] ✅ Section name complete
-[X/Y] 🔄 Section name — in progress
-
-Every 2 minutes report:
-⏱ Still working — [current task]
-Est. completion: [X] minutes remaining
-
-This is mandatory on every task.
-Never go silent for more than 2 minutes.
+## Progress Reporting
+Report the OUTCOME at the end of each task (what changed, build result, what's left), and FLAG blockers
+as they arise. For long multi-step builds, a brief `[X/Y] ✅ <step>` per major step. (No fixed 2-minute
+cadence — these are propose→apply→report tasks.)
 
 ## Session Log
 See SESSION_LOG.md for running
