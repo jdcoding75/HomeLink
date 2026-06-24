@@ -613,19 +613,38 @@ not gating.)**
 
 ### PRIORITY 2+ — ITERATIVE / NON-BLOCKING (batch-test after several changes; cut a line for v1 whenever satisfied)
 
-**⭐ ARRIVAL PARITY — EVERY arrival deserves the FULL experience (EXPERIENCE-QUALITY priority; own build
-thread).** Principle (John): an arrival should feel like an EVENT — **envelope → transit ("watch it fly
-in") → receipt → reveal** — regardless of how it arrived. **CURRENTLY FRAGMENTED (path audit `f6ad2b4`):**
-- **PATH-2 (link / short-code) = FULL** — envelope beat + the A2 transit send-stage (`IncomingMessageView:192`,
-  `:424-453`) → `ReceiptView` → reveal.
-- **PATH-1 (connected / direct ping) = BARE** — `PingManager.receivePing` → `nowPlaying` → `ReceiptView`
-  **directly** (`RootView:622`); **no envelope, no transit build-up.** This is the MOST-USED, most-intimate
-  path — and it skips the build-up that makes an arrival land.
-- **HISTORY REPLAY = BARE** — also drops straight into the receipt/reveal, no build-up.
-**This is WHY some arrivals feel weak.** FIX DIRECTION: ONE shared full-arrival sequence that PATH-1,
-PATH-2, AND replay all feed into (generalizes the parked "extract shared `SendStageView`" idea to the WHOLE
-arrival — envelope+transit+receipt+reveal as a reusable pipeline). Refs: `IncomingMessageView:192,:424-453`
-(PATH-2 full), `ReceiptView:732` (internal arriving phase), `RootView:622` (PATH-1 bare), the replay cover.
+**✅⭐ ARRIVAL PARITY — CODE-COMPLETE (every arrival path → one shared `ArrivalSequenceView`); ⚠️ Stage-3
+two-phone verify OWED.** Principle (John): an arrival should feel like an EVENT — **envelope → transit
+("watch it fly in") → receipt → reveal** — regardless of how it arrived. **R1 fragmentation gap CLOSED.**
+ALL four arrival paths now route through the shared **`ArrivalSequenceView`** (`HomeLink/Views/`):
+- **PATH-1 (connected / direct ping)** — `RootView:622` `nowPlaying` cover → `ArrivalSequenceView` (`b7fdd24`).
+  POLICY stays at the call site: `onOpened: markOpened` (**PATH-1 CONSUMES** — read-receipt/`recordCaught`),
+  `onFinished: finishedPlaying + appState.idle`, `.onAppear: catchMode + select-sender + compass.start`.
+- **PATH-2 (link / short-code)** — `IncomingMessageView` builds an `Arrival`, presents `ArrivalSequenceView`,
+  then does its own landing/compose-back/opened-flip (`ea4f4b0`). Byte-identical (strict same-instant).
+- **HISTORY REPLAY (bucket)** — `ReplaySwipeContainer` → full sequence on ENTRY, instant reveal on
+  PREV/NEXT/DELETE-nav (`15c60f5`); **opened-flip SUPPRESSED** (`onOpened: {}`, `remoteID nil` = re-feel,
+  locked bucket decision #1).
+- **HISTORY REPLAY (PersonDetail)** — single-item cover → full sequence, dismiss on tap/6s; opened-flip
+  suppressed (`884d785`).
+**Architecture:** `AnimationDispatch` (pure send/receipt dispatch, `00e97b6`) → `ArrivalSequenceView`
+(envelope→transit→receipt→reveal from a neutral `Arrival { ping, senderBearing }`; transit via
+`AnimationDispatch`). The POLICY (fetch/side-effects, opened-flip/consume, landing, catch-mode, dismiss,
+badge/queue) stays with each caller; the shared view emits only `onOpened`/`onFinished`. Stages: **0** pure
+dispatch (`00e97b6`) · **1** `ArrivalSequenceView`/PATH-2 (`ea4f4b0`) · **2** bucket replay (`15c60f5`) ·
+**2b** PersonDetail (`884d785`) · **3** PATH-1 backbone (`b7fdd24`). Tests: dispatch + `Arrival` builder
+locked (`AnimationDispatchTests` + `ArrivalSequenceTests`); full `HomeLinkTests` 238/238.
+- **⚠️ OPEN — Stage 3 (PATH-1) NEEDS TWO-PHONE VERIFY (backbone; real devices):** (1) warm-foreground
+  realtime → full sequence plays; (2) closed-app **push** (real APNs) → tap → full sequence; (3)
+  `markOpened`/read-receipt fires ("opened ✦" + history); (4) dismiss + **queue advance** +
+  `appState→.idle` (no stranded catch-mode); (5) cold-launch restore still **badge-only** (user taps → full
+  sequence); (6) **F2** receipt sound/haptic now lands WITH the receipt (after the 1.6s envelope+transit,
+  like PATH-2) — confirm not "late"; (7) **F1** transit flies from the current compass bearing (like PATH-2;
+  the receipt still aims at the sender) — confirm acceptable. _(reports/arrival_stage3_applied.md.)_
+- **Optional cleanup (future pass):** hard-delete the `#if false [arrival-parity]` originals (the relocated/
+  replaced bare-arrival blocks in `IncomingMessageView`, `CompassView`/`ReceiptView` dispatch ladders,
+  `SenderAnimationView` ReplaySwipeContainer, `PersonDetailView`, `RootView:622`).
+_(Refs: reports/arrival_stage{0,1,2,2b,3}_applied.md.)_
 
 **ANIMATION CORRECTNESS & VERIFICATION** — verify the full sequence plays correctly at ALL stages, across
 ALL send+receive paths + ALL instruments. **✅ PATH AUDIT DONE (2026-06-24, `f6ad2b4`, reports/path_audit.md)
