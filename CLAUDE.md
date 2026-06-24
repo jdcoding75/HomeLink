@@ -133,6 +133,12 @@ These apply to EVERY task without re-specification. A prompt need only name the 
    approval, write the applied result to `reports/<name>.md`. So John runs `copyreport <name>` on a clean
    file at BOTH propose and apply — never pasting garbled terminal output. (Keeps propose-first +
    wait-for-approval intact — just makes the proposal a readable file.)
+   **EVERY task type writes to a file — no exceptions:** audits, builds, fixes, CI runs, reorient/snapshots,
+   AND **any task that PAUSES mid-way for a decision or hits a blocker.** The file captures the result/status
+   before stopping — run conclusions (status + per-test/build totals + any red tail), errors, the diff
+   applied-or-proposed, what's blocked, and the EXACT question being asked. **Never leave results in
+   terminal-only output**; the user reads/pastes them via `copyreport <name>`. A mid-stop with a clean
+   `reports/<name>.md` beats a long terminal dump every time.
 7. **Single-writer.** One writer, ONE repo per run. A task spanning the app AND `pointward-website` = two
    separate runs.
 8. **Supabase migrations.** WRITE the migration as `supabase/migrations/<YYYYMMDD…>_<name>.sql` but do NOT

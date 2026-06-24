@@ -60,28 +60,37 @@
   things; automate all logic.
 
 ### CURRENT STATE (what's done / what's next — update each session)
-- **RELEASE GATE = PAIRING CLUSTER → HAPPY-PATH BUILT + VERIFIED; ⚠️ REAL GAP FOUND (2026-06-23 two-phone).**
+- **RELEASE GATE = PAIRING CLUSTER → SERVER SIDE DONE; CLIENT reconcile + DB-scenario tests REMAINING.**
   P1/P2/P3 + harness 9/9 are the HAPPY path (P3 `366fe79`, P2 `bcee4fe`, P1 `2c2f535`, harness `9cf858f`;
-  server policies MCP-verified). **Tonight's device test surfaced the model's real gap → MISSING PER-SIDE
-  CONNECTION STATE** (delete→reconnect: a sender deletes + re-sends, but the receiver's phone still thinks
-  they're connected → her open reports nothing new → the sender never re-greens). The connection is modeled
-  as ONE shared fact, signalled ONE-SHOT + ONE-DIRECTIONAL — not per-side state. **So the gate is NOT
-  closed.** Also fixed tonight: the **P3 realtime publication bug** (`link_connections` wasn't in
-  `supabase_realtime` → no live broadcast → `alter publication supabase_realtime add table
-  public.link_connections` — live; ⚠️ **migration file OWED**). See WORK CLUSTERS P1 +
-  `reports/device_test_2026-06-23.md`.
+  server policies MCP-verified). The 2026-06-23 delete→reconnect gap (sender never re-greens) had its
+  **SERVER side FIXED** (`07c770c` `[conn-reconnect-fix]`): `record_connection` now does `on conflict
+  (sender_id, connected_user_id) do update set via_message_id = excluded.via_message_id, connected_at =
+  now()` (was `do nothing`) → a reconnect re-fires + refreshes the via, so the stale-via symptom is gone
+  server-side; the LIVE RPC is verified upsert. **REMAINING / unverified:** the CLIENT reconcile (does
+  `stampConnections` match on `connected_user_id`, and the receiver re-fire on re-open so the sender
+  re-greens) + the **DB-scenario test suite** (clean-connect · delete→reconnect · one-sided · both · churn,
+  via Supabase MCP). P3 realtime publication is LIVE (`link_connections` in `supabase_realtime`, DB-verified).
+  See WORK CLUSTERS P1 + `reports/device_test_2026-06-23.md`.
 - **PAIRING DESIGN (decided).** ONE CONTACT PER USER ID (senderID sticks; incoming ID auto-attaches, never
   double-creates; server name never overwrites user name; "let it live, user cleans up" — NO
   auto-merge/merge-tool/name-matching). P1 = visibility only. P2 = one-directional disconnect = the
   linchpin that makes cleanup stick. Contacts-pick PREFERRED (firm name/address/channel; auto-addressed
   first send; stores send-channel = wrong-person PREVENTION; P2+P1 = safety net).
-- **NEXT PRIORITIES.** (1) **AUDIT + DESIGN the per-side connection state** — the model's real gap + the
-  actual release gate now (delete→reconnect; re-fire/refresh on receiver-open; `record_connection`
-  upsert-on-conflict and/or `stampConnections` match on `connected_user_id`) — then BUILD + **DB-scenario
-  tests** (per-side state makes connection combos SQL-testable → shrinks the two-phone pass to the
-  irreducible). (2) the **owed realtime migration file** + re-confirm P3 realtime-LIVE (couldn't isolate
-  while the sender-green bug was active). (3) the **iterative/non-blocking clusters** per WORK CLUSTERS
-  (incl. the 3 new contact-UX bugs). _(Canon reduction passes 1–3 DONE.)_
+- **NEXT PRIORITIES.** (1) **VERIFY the CLIENT reconcile** for delete→reconnect — the server upsert is in
+  (`07c770c`); confirm `stampConnections` matches on `connected_user_id` + the receiver re-fires on re-open
+  so the sender re-greens — then ship the **DB-scenario test suite** (clean-connect · delete→reconnect ·
+  one-sided · both · churn, via Supabase MCP). (2) **repo-hygiene:** write the already-live realtime +
+  `record_connection`-upsert SQL into `supabase/migrations/` for the record (the DB already has both — NOT a
+  DB-state gap; see WORK CLUSTERS P1). (3) the **iterative/non-blocking clusters** per WORK CLUSTERS (incl.
+  the contact-UX bugs). _(Canon reduction passes 1–3 DONE.)_
+- **CI (GitHub Actions auto-run on push) — SHELVED pre-launch.** Reason: the headless runner launches the
+  full app as the test host → unbounded per-subsystem launch crashes (APNs / SwiftData / StoreKit / Supabase
+  SDK). Durable fix = host-less tests, which need `ENABLE_DEBUG_DYLIB = NO` on the app target (the Xcode-16
+  debug-dylib stub blocks host-less `@testable` linking). Full recipe: `reports/ci_hostless_audit.md` +
+  `reports/ci_hostless_result.md`. The 16/16 `ConnectionClusterTests` run **LOCALLY** and are the
+  regression-floor safety net; DB-scenario verification via Supabase MCP is unaffected. Workflow is renamed
+  `ci.yml.disabled` (not deleted). Revisit CI post-launch. Keeping `be0edee` (in-memory store + StoreKit gate
+  + main-thread push-state read) — it fixed real latent launch bugs.
 - **EFFICIENCY STACK (this session).** Supabase MCP both sides (planning chat verified working; Claude
   Code add pending auth); CLAUDE.md consolidated standing workflow (`1f89605`); write-to-file→`copyreport`
   is the clean handoff; GitHub URL-fetch works (partial on big files). **GitHub MCP = SKIP** for Claude Code (local git + `gh` cover it); **Supabase MCP = the add.** **Testing aids:** `HomeLinkTests` harness (logic) · **P2 delete doubles as a test-RESET tool** (clear connections on demand) · a **DevTools dev-send**.
@@ -537,11 +546,15 @@ policies live, `record_connection` SECURITY DEFINER, no bilateral RPC. REMAINING
 pass (real APNs-to-closed-app, true cold install, UI render incl. "(2)"/"same id as" rows, P3 live socket;
 `reports/connection_test_harness.md`).
 
-**🔴 KNOWN GAP (2026-06-23 two-phone test) — MISSING PER-SIDE CONNECTION STATE (the model's real gap = the
-missing P4).** The connection is modeled as ONE shared fact, signalled ONE-SHOT + ONE-DIRECTIONAL:
-`record_connection` fires only on the receiver's FIRST open; PK `(sender_id, connected_user_id)` +
-`on conflict do nothing` → never re-fires/refreshes (keeps the OLD `via_message_id` across reconnects —
-the stale-via symptom). **No per-side state** (each side's independent view of the other).
+**🟡 PARTIALLY CLOSED — SERVER FIXED (`07c770c`); CLIENT reconcile + DB-scenario tests REMAIN (was: MISSING
+PER-SIDE CONNECTION STATE).** The connection is modeled as ONE shared fact, signalled ONE-SHOT +
+ONE-DIRECTIONAL: `record_connection` fires on the receiver's open; PK `(sender_id, connected_user_id)`.
+**SERVER FIX IS IN** (`[conn-reconnect-fix]`, `07c770c`): the RPC now does `on conflict do update set
+via_message_id = excluded.via_message_id, connected_at = now()` (was `do nothing`) → a reconnect re-fires +
+refreshes the via, so the stale-via symptom is gone server-side (LIVE RPC verified upsert). **REMAINING:**
+verify the CLIENT reconcile (`stampConnections` match on `connected_user_id`; receiver re-fire on re-open →
+sender re-greens) + the DB-scenario test suite. **No per-side state MACHINE yet** (each side's independent
+view) — the deeper model is still future work, but the shipping delete→reconnect bug is server-closed.
 - **Symptom:** John sends Jess a link → she opens → SHE greens John; FIRST-CLEAN connection → John ALSO
   greens (both sides aligned). Then **John deletes Jess (P2 clears only HIS row) + re-sends; Jess's phone
   still thinks they're connected → her open reports nothing new → John never re-greens.** Diverged sides
@@ -566,12 +579,13 @@ the stale-via symptom). **No per-side state** (each side's independent view of t
   DELIVERABLE** — the fix ships WITH its automated connection-scenario tests (clean-connect · delete→reconnect
   · one-sided · both-sided · churn) so the manual phone-dance is never needed for connection logic again.
 
-**P3 REALTIME — publication bug FIXED (live-confirm owed).** `link_connections` was NOT in the
-`supabase_realtime` publication → INSERTs didn't broadcast → the sender got no live event. **FIX (live, via
-SQL):** `alter publication supabase_realtime add table public.link_connections;` (publication now:
-`compass_bearings`, `link_connections`, `pings`). ⚠️ **MIGRATION FILE OWED** →
-`supabase/migrations/<ts>_link_conn_realtime.sql` (live, not yet in repo). **Realtime-LIVE** (green pops
-without relaunch) **still UNCONFIRMED** — re-test after the per-side-state fix.
+**P3 REALTIME — publication FIX LIVE (DB-verified).** `link_connections` IS in the `supabase_realtime`
+publication (verified live; publication: `compass_bearings`, `link_connections`, `pings`) → INSERTs
+broadcast. **NOTE — REPO HYGIENE ONLY, not a DB-state gap:** Supabase's migration tracker is empty (this +
+the `record_connection` upsert were applied via the dashboard SQL editor, not the migration system), so
+writing `supabase/migrations/<ts>_link_conn_realtime.sql` + the upsert `.sql` is REPO-RECORD hygiene — **the
+live DB already has both.** **Realtime-LIVE** (green pops without relaunch) still owes one clean two-phone
+re-confirm.
 
 **✅ VERIFIED WORKING (2026-06-23 two-phone test):** item-3 same-name **"(2)" suffix** in People + compose
 shows the **RAW name** (P1 d) · **P2 delete-disconnect** — deleting a *properly-stamped* connected contact
