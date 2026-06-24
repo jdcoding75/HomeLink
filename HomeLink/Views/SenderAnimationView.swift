@@ -1658,6 +1658,10 @@ struct ReplaySwipeContainer: View {
     // Local, mutable copy so DELETE can drop an item in place and recompute Prev/Next.
     @State private var liveItems: [PingManager.ReplayItem]
     @State private var idx: Int
+    // [arrival-parity stage2] false on cover ENTRY → the first item plays the FULL
+    // sequence (envelope→transit→receipt→reveal); set true on any PREV/NEXT/DELETE-advance
+    // → navigation shows the INSTANT reveal (snappy browse, not the full build-up each swipe).
+    @State private var hasNavigated = false
     private static let lav = Color(hex: "#c4a8d4")
 
     init(request: PingManager.ReplayRequest, onDismiss: @escaping () -> Void,
@@ -1683,9 +1687,38 @@ struct ReplaySwipeContainer: View {
     var body: some View {
         ZStack {
             DesignTokens.Color.background.ignoresSafeArea()
-            // Same EmojiRevealView as the live receipt — bloom/breathe is repeatForever, so
-            // the thought rests on screen. onDismiss is a no-op here: the reveal no longer
-            // self-exits at 6s and its tap-to-dismiss is inert — the buttons are the only nav.
+            // [arrival-parity stage2] ENTRY plays the FULL sequence (envelope→transit→
+            // receipt→reveal) — the parity win — with the opened-flip SUPPRESSED:
+            // onOpened {} = re-feel, NOT consume (locked bucket decision #1); remoteID nil.
+            // onFinished {} so the reveal RESTS (ReceiptView→EmojiRevealView(onDismiss:{onFinished()})
+            // → no-op → breathe repeatForever, 6s-exit + tap inert) → the buttons stay the only nav.
+            // NAVIGATION (Prev/Next/Delete-advance, hasNavigated) shows the INSTANT reveal (snappy
+            // browse). `.id(cur.id)` on BOTH → item change re-mounts. ORIGINAL entry path (always
+            // the bare reveal) preserved in #if false below.
+            if !hasNavigated {
+                ArrivalSequenceView(
+                    arrival:    arrival(for: cur),
+                    beatFloor:  1.6,
+                    earlyName:  cur.fromName,
+                    onOpened:   { },          // ← SUPPRESS opened-flip (re-feel only)
+                    onFinished: { }           // ← rests; buttons are the nav
+                )
+                .id(cur.id)
+            } else {
+                // Same EmojiRevealView as the live receipt — bloom/breathe is repeatForever, so
+                // the thought rests on screen. onDismiss is a no-op here: the reveal no longer
+                // self-exits at 6s and its tap-to-dismiss is inert — the buttons are the only nav.
+                EmojiRevealView(
+                    emoji: cur.emoji,
+                    message: cur.message,
+                    tagline: cur.tagline,
+                    context: .received(fromName: cur.fromName),
+                    ambient: RevealAmbient.forStyle(SenderStyle.from(cur.styleRaw)),
+                    onDismiss: { }
+                )
+                .id(cur.id)   // keyed on item identity → Prev/Next AND delete-advance both re-trigger the replay
+            }
+            #if false  // [arrival-parity stage2] ORIGINAL entry path (always bare reveal) — preserved:
             EmojiRevealView(
                 emoji: cur.emoji,
                 message: cur.message,
@@ -1694,14 +1727,15 @@ struct ReplaySwipeContainer: View {
                 ambient: RevealAmbient.forStyle(SenderStyle.from(cur.styleRaw)),
                 onDismiss: { }
             )
-            .id(cur.id)   // keyed on item identity → Prev/Next AND delete-advance both re-trigger the replay
+            .id(cur.id)
+            #endif
 
             // PREV · NEXT · CLOSE · DELETE — large, legible; replaces auto + swipe + tiny text.
             VStack {
                 Spacer()
                 HStack(spacing: 12) {
-                    controlButton("chevron.left",  "Prev",  enabled: hasPrev) { withAnimation { idx -= 1 } }
-                    controlButton("chevron.right", "Next",  enabled: hasNext) { withAnimation { idx += 1 } }
+                    controlButton("chevron.left",  "Prev",  enabled: hasPrev) { hasNavigated = true; withAnimation { idx -= 1 } }
+                    controlButton("chevron.right", "Next",  enabled: hasNext) { hasNavigated = true; withAnimation { idx += 1 } }
                     controlButton("xmark",         "Close", enabled: true)    { onDismiss() }
                     // Bucket-only: hidden when the shown item carries no historyID (non-bucket replays).
                     if cur.historyID != nil, onDelete != nil {
@@ -1718,11 +1752,26 @@ struct ReplaySwipeContainer: View {
     // DELETE: remove the shown thought locally + from caughtHistory (via onDelete), then
     // advance — the next item shifts into the same idx; if none remain, dismiss.
     private func deleteCurrent() {
+        // [arrival-parity stage2] delete-advance = navigation → the next item shows the
+        // INSTANT reveal (not a full re-play).
+        hasNavigated = true
         let removeIdx = min(max(0, idx), liveItems.count - 1)
         if let hid = liveItems[removeIdx].historyID { onDelete?(hid) }
         liveItems.remove(at: removeIdx)
         if liveItems.isEmpty { onDismiss(); return }
         idx = min(removeIdx, liveItems.count - 1)   // next item now occupies removeIdx; clamp to new last
+    }
+
+    /// [arrival-parity stage2] Build the neutral Arrival from a history item for the
+    /// ENTRY full sequence. remoteID nil ("a memory, not a new message") → nothing is
+    /// consumable; style/emoji/message/fromName/bearing carried from the item.
+    private func arrival(for item: PingManager.ReplayItem) -> Arrival {
+        Arrival(
+            ping: PingManager.ReceivedPing(
+                fromName: item.fromName, emoji: item.emoji, timestamp: .now, remoteID: nil,
+                senderStyle: item.styleRaw ?? "", message: item.message,
+                tagline: item.tagline, isTest: false),
+            senderBearing: item.bearingDegrees)
     }
 
     @ViewBuilder
