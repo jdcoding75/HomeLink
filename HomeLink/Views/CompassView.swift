@@ -686,6 +686,101 @@ struct CompassView: View {
                     // Stage 4. PRIOR conditions were emoji-only:
                     //   if previewEmoji == "🎆" { … }
                     //   else if previewEmoji == "🎂" { … }
+                    // [arrival-parity stage0] Selector now comes from the PURE
+                    // AnimationDispatch.sendAnimationKind — IDENTICAL conditions/order to the
+                    // original if/else chain; each case renders the SAME view + onComplete (moved
+                    // verbatim). ZERO behavior change. The ORIGINAL chain is preserved verbatim in
+                    // the `#if false` block just below (comment-don't-delete).
+                    switch AnimationDispatch.sendAnimationKind(for: previewStyle, emoji: previewEmoji) {
+                    case .firework:
+                        FireworkSendAnimation(
+                            emoji: previewEmoji,
+                            onComplete: {
+                                flightToken = nil
+                                flightFly   = false
+                                finishSend(emoji: previewEmoji, style: previewStyle)
+                            })
+                    case .birthday:
+                        BirthdayCakeSendAnimationV2(
+                            emoji: previewEmoji,
+                            onComplete: {
+                                flightToken = nil
+                                flightFly   = false
+                                finishSend(emoji: previewEmoji, style: previewStyle)
+                            })
+                    case .wand:
+                        WandSendAnimation(
+                            transition: InstrumentTransition(
+                                exitBearing: compass.state.bearingDegrees,
+                                exitPoint: .zero,
+                                instrument: .wand,
+                                emoji: previewEmoji,
+                                message: sentMessage,
+                                tagline: sentTagline),
+                            personName: compass.state.personName,
+                            onComplete: {
+                                flightToken = nil
+                                flightFly   = false
+                                finishSend(emoji: previewEmoji, style: previewStyle)
+                            })
+                    case .bowArrow:
+                        BowSendAnimationV2(
+                            transition: InstrumentTransition(
+                                exitBearing: compass.state.bearingDegrees,
+                                exitPoint: .zero,
+                                instrument: .bow,
+                                emoji: previewEmoji,
+                                message: sentMessage,
+                                tagline: sentTagline),
+                            personName: compass.state.personName,
+                            onComplete: {
+                                flightToken = nil
+                                flightFly   = false
+                                finishSend(emoji: previewEmoji, style: previewStyle)
+                            })
+                    case .plane:
+                        PlaneSendAnimation(
+                            transition: InstrumentTransition(
+                                exitBearing: compass.state.bearingDegrees,
+                                exitPoint: .zero,
+                                instrument: .plane,
+                                emoji: previewEmoji,
+                                message: sentMessage,
+                                tagline: sentTagline),
+                            personName: compass.state.personName,
+                            onComplete: {
+                                flightToken = nil
+                                flightFly   = false
+                                finishSend(emoji: previewEmoji, style: previewStyle)
+                            })
+                    case .fingerFlick:
+                        FlickSendAnimationV2(
+                            transition: InstrumentTransition(
+                                exitBearing: compass.state.bearingDegrees,
+                                exitPoint: .zero,
+                                instrument: .flick,
+                                emoji: previewEmoji,
+                                message: sentMessage,
+                                tagline: sentTagline),
+                            personName: compass.state.personName,
+                            onComplete: {
+                                flightToken = nil
+                                flightFly   = false
+                                finishSend(emoji: previewEmoji, style: previewStyle)
+                            })
+                    case .shared:
+                        SenderAnimationView(
+                            style: previewStyle,
+                            emoji: previewEmoji,
+                            bearingDegrees: compass.state.bearingDegrees,
+                            symbol: sendSymbol(token, size: 45)   // [5/5] 50% bigger base
+                        ) {
+                            flightToken = nil
+                            flightFly   = false
+                            finishSend(emoji: previewEmoji, style: previewStyle)
+                        }
+                    }
+                    #if false  // [arrival-parity stage0] ORIGINAL if/else chain — preserved verbatim:
                     if previewStyle == .firework || previewEmoji == "🎆" {
                         // [firework] the spectacular deep-space launch → small pops →
                         // massive burst → embers, then back to the pipeline.
@@ -788,6 +883,7 @@ struct CompassView: View {
                             finishSend(emoji: previewEmoji, style: previewStyle)
                         }
                     }
+                    #endif
                 }
                 .zIndex(6)
             }

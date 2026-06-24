@@ -98,6 +98,22 @@ struct ReceiptView: View {
         // Wind + Rocket keep their dedicated, approved full receipts. The today's
         // V2 receipts (BowReceiptAnimationV2 / FlickReceiptAnimationV2 /
         // PlaneReceiptAnimationV2) are parked for the Animation Test Lab only.
+        // [arrival-parity stage0] Selector now comes from the PURE
+        // AnimationDispatch.receiptKind — IDENTICAL conditions/order to the original
+        // if/else chain; the 9 receipt computed-vars are untouched. ZERO behavior change.
+        // ORIGINAL chain preserved verbatim in the `#if false` block below.
+        switch AnimationDispatch.receiptKind(for: style, emoji: ping.emoji) {
+        case .birthday: birthdayReceipt
+        case .firework: fireworkReceipt
+        case .wind:     windReceipt
+        case .rocket:   rocketReceipt
+        case .bow:      bowReceipt
+        case .plane:    planeReceipt
+        case .flick:    flickReceipt
+        case .compass:  compassReceipt
+        case .standard: standardReceipt
+        }
+        #if false  // [arrival-parity stage0] ORIGINAL if/else chain — preserved verbatim:
         if style == .birthday || ping.emoji == "🎂" {
             // [special moments — STAGE 3] BIRTHDAY now routes by the wire STYLE
             // (`sender_style == "birthday"`), so the recipient plays the cake
@@ -134,6 +150,7 @@ struct ReceiptView: View {
         } else {
             standardReceipt
         }
+        #endif
     }
 
     // ── COMPASS — the dedicated simple-reveal receipt (orb → compass face) ──
