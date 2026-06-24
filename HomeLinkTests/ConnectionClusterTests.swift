@@ -238,4 +238,32 @@ final class ConnectionClusterTests: XCTestCase {
         XCTAssertEqual(people.people.filter { $0.senderID == y.uuidString }.count, 1, "no duplicate under churn")
         XCTAssertNotNil(people.person(forSenderID: y.uuidString), "stays green")
     }
+
+    // ── [contacts-pick] cluster ──────────────────────────────────────────────
+
+    // 2b — CONFIRMING TEST (locks the decided "no change"): the same-id annotation is
+    // NAME-AGNOSTIC — two contacts that share a senderID under CLEARLY different names
+    // still annotate each other (so the dup-on-rename "JD/Momma" case WOULD surface IF
+    // both carried the id; it doesn't only because the typed one has no senderID).
+    func testSameIDAnnotationFiresAcrossDifferentNames() throws {
+        let (people, ctx) = try makeWorld()
+        let y = UUID().uuidString
+        let momma = try XCTUnwrap(people.upsertContact(senderID: y, displayName: "Momma"))
+        let jd = Person(name: "JD", latitude: 0, longitude: 0, senderID: y)   // direct insert; upsert would dedup
+        ctx.insert(jd); try ctx.save(); people.fetchAll()
+        XCTAssertEqual(people.sameIDOtherName(for: momma), "JD", "fires across different names")
+        XCTAssertEqual(people.sameIDOtherName(for: jd), "Momma")
+    }
+
+    // [contacts-pick] 1c — defaultSendChannel: phone (SMS) first, email fallback, nil when neither.
+    func testDefaultSendChannel() {
+        XCTAssertEqual(PeopleManager.defaultSendChannel(phone: "+1 555 0100", email: "a@b.com"), "sms",
+                       "phone present → SMS first")
+        XCTAssertEqual(PeopleManager.defaultSendChannel(phone: nil, email: "a@b.com"), "email",
+                       "no phone → email fallback")
+        XCTAssertEqual(PeopleManager.defaultSendChannel(phone: "   ", email: "a@b.com"), "email",
+                       "blank phone is ignored → email")
+        XCTAssertNil(PeopleManager.defaultSendChannel(phone: nil, email: nil), "neither → nil")
+        XCTAssertNil(PeopleManager.defaultSendChannel(phone: "", email: "  "), "both blank → nil")
+    }
 }

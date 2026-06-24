@@ -42,6 +42,12 @@ struct AddPersonView: View {
 
     // Contacts / invite
     @State private var showContactPicker = false
+    // [contacts-pick] 1c/2c-ii — captured from the picked iOS contact, carried onto
+    // the Person at save. Channel defaults phone(SMS)→email (PeopleManager.defaultSendChannel).
+    @State private var contactPhone: String? = nil
+    @State private var contactEmail: String? = nil
+    @State private var sendChannel:  String? = nil
+    @State private var photoData:    Data?   = nil
     // [cleanup #4a/#4b] forced invite-share on add — REMOVED (add = create + dismiss).
     // @State private var showInviteShare = false
 
@@ -152,32 +158,36 @@ struct AddPersonView: View {
             .frame(maxWidth: .infinity)
             .padding(.vertical, DesignTokens.Spacing.lg)
 
-            formLabel("their name")
-            TextField("Mum, Dad, Home, Nan…", text: $name)
-                .formInput()
-                .padding(.bottom, DesignTokens.Spacing.sm)
-
-            // Or pick straight from the address book
+            // [contacts-pick] 1a — LEAD with the iOS Contacts pick (the HERO/primary
+            // action): picking gives a stable identity anchor (name/phone/email/address)
+            // → fewer dup/wrong-person contacts + no naming drift, and captures the
+            // delivery channel. Manual entry is the secondary affordance below.
             Button {
                 showContactPicker = true
             } label: {
                 HStack(spacing: 8) {
                     Image(systemName: "person.crop.circle.badge.plus")
-                        .font(.system(size: 14))
+                        .font(.system(size: 16, weight: .medium))
                     Text("choose from contacts")
                         .font(DesignTokens.Font.label)
                 }
-                .foregroundColor(DesignTokens.Color.accentSoft)
+                .foregroundColor(DesignTokens.Color.textPrimary)
                 .frame(maxWidth: .infinity)
                 .padding(DesignTokens.Spacing.md)
-                .background(DesignTokens.Color.backgroundCard)
+                .background(DesignTokens.Color.accentStrong)
                 .cornerRadius(DesignTokens.Radius.button)
                 .overlay(
                     RoundedRectangle(cornerRadius: DesignTokens.Radius.button)
-                        .stroke(DesignTokens.Color.borderMid, lineWidth: 1)
+                        .stroke(DesignTokens.Color.accentMid.opacity(0.5), lineWidth: 1)
                 )
             }
             .padding(.bottom, DesignTokens.Spacing.md)
+
+            // Secondary: enter manually. (Picking fills the name; you can still edit it.)
+            formLabel("or enter their name")
+            TextField("Mum, Dad, Home, Nan…", text: $name)
+                .formInput()
+                .padding(.bottom, DesignTokens.Spacing.sm)
 
             formLabel("their emoji")
             EmojiPickerRow(selected: $emoji)
@@ -252,7 +262,30 @@ struct AddPersonView: View {
                     .foregroundColor(.red)
                     .padding(.top, 8)
             }
+
+            // [contacts-pick] 1e — don't force an address. Save now and add it later
+            // (the compass shows the add-location hint until then). Hidden once an
+            // address has resolved (the primary "save" CTA covers that case).
+            if !isGeocodeSuccess {
+                Button {
+                    saveError = nil
+                    savePerson()
+                } label: {
+                    Text("skip — add address later")
+                        .font(.system(size: 13, design: .serif).italic())
+                        .foregroundColor(DesignTokens.Color.accentSoft)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, DesignTokens.Spacing.md)
+                }
+                .padding(.top, 8)
+            }
         }
+    }
+
+    /// True once Step-2 geocoding has resolved a location (drives the CTA + hides skip).
+    private var isGeocodeSuccess: Bool {
+        if case .success = geocodeState { return true }
+        return false
     }
 
     @ViewBuilder
@@ -453,19 +486,30 @@ struct AddPersonView: View {
     }
 
     private func savePerson() {
-        guard let location = geocodedLocation else { return }
-
         guard people.canAddPerson() else {
             // Free tier holds one person — the unlock opens the rest
             showUnlock = true
             return
         }
 
-        let person = Person(
-            name:    name.trimmingCharacters(in: .whitespaces),
-            emoji:   emoji,
-            geocoded: location
-        )
+        let trimmedName = name.trimmingCharacters(in: .whitespaces)
+        // [contacts-pick] 1e — address is now SKIPPABLE. With a geocoded location we
+        // build the located contact as before; without one we create a zero-location
+        // contact (the People list shows the gentle "add location" hint until an
+        // address is set later in EditPersonView). Save is no longer gated on geocode.
+        let person: Person
+        if let location = geocodedLocation {
+            person = Person(name: trimmedName, emoji: emoji, geocoded: location)
+        } else {
+            person = Person(name: trimmedName, emoji: emoji, latitude: 0, longitude: 0)
+        }
+
+        // [contacts-pick] 1c/2c-ii — carry the captured delivery channel + photo onto
+        // the contact (nil for a manual add with no picked contact).
+        person.contactPhone = contactPhone
+        person.contactEmail = contactEmail
+        person.sendChannel  = sendChannel
+        person.photoData    = photoData
 
         do {
             try people.addPerson(person)
@@ -489,9 +533,34 @@ struct AddPersonView: View {
         let given    = contact.givenName.trimmingCharacters(in: .whitespaces)
         let family   = contact.familyName.trimmingCharacters(in: .whitespaces)
         let resolved = !nickname.isEmpty ? nickname : (!given.isEmpty ? given : family)
-        if !resolved.isEmpty {
+        // [contacts-pick] 1b — pick → FILL → edit (never type → pick → OVERWRITE):
+        // fill the name from the contact only when the user hasn't already typed one;
+        // they edit it on top afterwards (e.g. "Jessica Smith" → "Momma").
+        if !resolved.isEmpty, name.trimmingCharacters(in: .whitespaces).isEmpty {
             name  = resolved
             emoji = Self.suggestedEmoji(for: resolved, fallback: emoji)
+        }
+
+        // [contacts-pick] 1c — capture the DELIVERY CHANNEL (phone/SMS first, email
+        // fallback). Guard each key with isKeyAvailable — the picker hands back a
+        // contact fetched with a limited key set; reading an unfetched key throws.
+        if contact.isKeyAvailable(CNContactPhoneNumbersKey),
+           let phone = contact.phoneNumbers.first?.value.stringValue
+               .trimmingCharacters(in: .whitespaces), !phone.isEmpty {
+            contactPhone = phone
+        }
+        if contact.isKeyAvailable(CNContactEmailAddressesKey),
+           let email = (contact.emailAddresses.first?.value as String?)?
+               .trimmingCharacters(in: .whitespaces), !email.isEmpty {
+            contactEmail = email
+        }
+        sendChannel = PeopleManager.defaultSendChannel(phone: contactPhone, email: contactEmail)
+
+        // [contacts-pick] 2c-ii — minimal photo: the contact's thumbnail, rendered in
+        // the People-list avatar (else monogram). Guard the key (image data is often
+        // NOT fetched by the picker → reading it unguarded would throw).
+        if contact.isKeyAvailable(CNContactThumbnailImageDataKey) {
+            photoData = contact.thumbnailImageData
         }
 
         // Pre-fill the address step if the contact has a postal address —

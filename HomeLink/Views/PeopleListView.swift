@@ -3,6 +3,7 @@
 
 import SwiftUI
 import CoreLocation
+import UIKit   // [contacts-pick] UIImage for the contact-photo avatar
 
 struct PeopleListView: View {
 
@@ -59,13 +60,18 @@ struct PeopleListView: View {
                                 hasOpenedReceipt: people.contactsWithOpenedReceipt.contains(person.id),
                                 isLinkConnected: isLinkConnected(person)
                             ) {
-                                // Tap card → select + open the detail view
+                                // [contacts-pick] 2a — Tap card → SELECT/switch the
+                                // send-target ONLY, then drop back to the compass now
+                                // pointing at them (no auto-open of detail). Detail is
+                                // the explicit trailing chevron; edit is the pencil.
                                 people.select(person)
                                 compass.start(tracking: person)
                                 HapticEngine.personSelected()
-                                detailPerson = person
+                                NotificationCenter.default.post(name: .pointwardOpenCompass, object: nil)
                             } onEdit: {
                                 editPerson = person
+                            } onDetail: {
+                                detailPerson = person
                             } onAddLocation: {
                                 // The location hint taps straight into the edit path.
                                 editPerson = person
@@ -287,6 +293,7 @@ struct PersonCard: View {
     var isLinkConnected: Bool = false        // [display-polish] senderID set → show "connected ✦"
     let onTap: () -> Void
     let onEdit: () -> Void
+    var onDetail: () -> Void = {}            // [contacts-pick] 2a — trailing chevron → PersonDetailView
     var onAddLocation: () -> Void = {}       // [build6] hint tap → edit path
 
     /// [build6] Avatar fallback for emoji-less contacts (Build 5 leaves emoji "").
@@ -305,21 +312,28 @@ struct PersonCard: View {
                     .frame(width: 60, height: 60)
                     .blur(radius: 12)
                 Group {
-                    // [display-polish] Standardize the contact icon on the INITIAL —
-                    // stop displaying the per-person emoji (vestigial since the
-                    // onboarding emoji-picker cut; inconsistent across contacts). The
-                    // monogram was already the fallback for emoji-less link contacts;
-                    // it is now the ONE icon for all. person.emoji FIELD kept.
-                    // if person.emoji.isEmpty {
-                    Text(monogram)
-                        .font(.system(size: 26, weight: .semibold, design: .serif))
-                        .foregroundColor(DesignTokens.Color.accentSoft)
-                    // } else {
-                    //     Text(person.emoji)
-                    //         .font(.system(size: 30))
-                    // }
+                    // [contacts-pick] 2c-ii — PHOTO from the picked iOS contact, when
+                    // present; otherwise the INITIAL/monogram. (The per-person emoji is
+                    // vestigial since the onboarding emoji-picker cut; person.emoji FIELD
+                    // kept. Full photo subsystem — detail/widget — deferred.)
+                    if let data = person.photoData, let ui = UIImage(data: data) {
+                        Image(uiImage: ui)
+                            .resizable()
+                            .scaledToFill()
+                    } else {
+                        // [display-polish] Standardize the contact icon on the INITIAL.
+                        // if person.emoji.isEmpty {
+                        Text(monogram)
+                            .font(.system(size: 26, weight: .semibold, design: .serif))
+                            .foregroundColor(DesignTokens.Color.accentSoft)
+                        // } else {
+                        //     Text(person.emoji)
+                        //         .font(.system(size: 30))
+                        // }
+                    }
                 }
                     .frame(width: 60, height: 60)
+                    .clipped()
                     .background(DesignTokens.Color.backgroundLift)
                     .cornerRadius(18)
                     .overlay(
@@ -439,6 +453,20 @@ struct PersonCard: View {
                             .stroke(DesignTokens.Color.accentMid.opacity(0.5), lineWidth: 1)
                     )
             }
+
+            // [contacts-pick] 2a — explicit detail affordance. Tapping the card now
+            // just SELECTS (+ returns to the compass); this chevron opens the detail
+            // view (invites, connection status, etc.).
+            Button {
+                onDetail()
+            } label: {
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(DesignTokens.Color.textMuted)
+                    .frame(width: 28, height: 28)
+                    .contentShape(Rectangle())
+            }
+            .accessibilityLabel("\(person.name) details")
         }
         .padding(18)
         .background(

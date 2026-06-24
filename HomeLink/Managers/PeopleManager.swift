@@ -240,6 +240,16 @@ final class PeopleManager: ObservableObject {
         return idx == 0 ? person.name : "\(person.name) (\(idx + 1))"
     }
 
+    /// [contacts-pick] DEFAULT DELIVERY CHANNEL for a newly-picked contact: phone
+    /// (SMS) first, email as the fallback, nil when neither exists. Pure + unit-tested
+    /// (testDefaultSendChannel*). Stored on `Person.sendChannel`; the pre-addressed
+    /// first send (sms:/mailto:) that consumes it is a FOLLOW-UP.
+    static func defaultSendChannel(phone: String?, email: String?) -> String? {
+        if let p = phone, !p.trimmingCharacters(in: .whitespaces).isEmpty { return "sms" }
+        if let e = email, !e.trimmingCharacters(in: .whitespaces).isEmpty { return "email" }
+        return nil
+    }
+
     /// (c) Same-ID annotation (visibility only): if a DIFFERENT contact carries the
     /// SAME `senderID` (rare with the (b) guard, but surfaced if present), the other
     /// holder's name — so the list can show "same id as [Jess]". nil when the id is

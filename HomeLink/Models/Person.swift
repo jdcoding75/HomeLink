@@ -32,6 +32,21 @@ final class Person {
     /// [phase2 build5] When this contact last SENT us a message — populated now so
     /// Build 6's most-recent People-tab sort has data. Not consumed for display here.
     var lastReceivedAt:      Date?
+    /// [contacts-pick] DELIVERY CHANNEL for the (future) pre-addressed first send —
+    /// "sms" / "email" (PeopleManager.defaultSendChannel: phone first, email fallback).
+    /// Captured when the contact is picked from the iOS address book; nil for manual
+    /// adds with no phone/email. Additive optional (inline `= nil` default) → SwiftData
+    /// lightweight-migrates (no .sql). NOTE: the pre-addressed compose (sms:/mailto:)
+    /// is a FOLLOW-UP — this only STORES the channel for now.
+    var sendChannel:         String? = nil
+    /// [contacts-pick] The picked contact's phone / email (the address behind
+    /// `sendChannel`). Additive optional, lightweight-migrates.
+    var contactPhone:        String? = nil
+    var contactEmail:        String? = nil
+    /// [contacts-pick] Minimal photo — the iOS contact's thumbnail
+    /// (CNContact.thumbnailImageData), rendered in the People-list avatar when present
+    /// (else the monogram). Full photo subsystem (detail/widget) deferred.
+    var photoData:           Data? = nil
 
     init(
         id:                  UUID    = UUID(),
