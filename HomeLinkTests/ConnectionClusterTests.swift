@@ -172,4 +172,70 @@ final class ConnectionClusterTests: XCTestCase {
         XCTAssertTrue(people.people.isEmpty, "server disconnect ✓ → local delete proceeds")
         XCTAssertEqual(mock.deletedOthers, [other], "disconnected the right user, server-first")
     }
+
+    // ── S1–S5: reconnect / churn class (reports/connection_state_audit.md §4) ──
+
+    // S1 — clean connect → green (warm SentLink resolves a live contact)
+    func testS1_cleanConnectGreens() async throws {
+        let (people, ctx) = try makeWorld()
+        let target = Person(name: "Wife", latitude: 0, longitude: 0); ctx.insert(target)
+        let m = UUID(); ctx.insert(SentLink(messageID: m, personID: target.id))
+        try ctx.save(); people.fetchAll()
+        let y = UUID()
+        await people.stampConnections([row(connected: y, via: m)])
+        XCTAssertEqual(people.person(forSenderID: y.uuidString)?.id, target.id, "clean connect → contact greens")
+    }
+
+    // S2 — delete→reconnect (THE BUG): dangling SentLink (OLD→missing person) + stale row(via=OLD)
+    //      → POST-FIX falls through to connected_user_id → the sender re-greens.
+    func testS2_deleteReconnectGreensViaFallback() async throws {
+        let mock = MockConnectionService(
+            profile: SupabaseService.PublicProfile(displayName: "Jess", emoji: nil, latitude: nil, longitude: nil))
+        let (people, ctx) = try makeWorld(connection: mock)
+        let oldMsg = UUID()
+        ctx.insert(SentLink(messageID: oldMsg, personID: UUID()))   // DANGLING: no Person for this personID
+        try ctx.save(); people.fetchAll()
+        let y = UUID()
+        await people.stampConnections([row(connected: y, via: oldMsg)])
+        let greened = try XCTUnwrap(people.person(forSenderID: y.uuidString),
+                                    "sender re-greens despite dangling SentLink + stale via")
+        XCTAssertEqual(greened.name, "Jess", "stamped from the server profile (connected_user_id fallback)")
+    }
+
+    // S3 — one-sided-deleted: my (me,Y) row is gone → no row for Y in my fetch → Y not greened
+    func testS3_oneSidedDeletedNotGreen() async throws {
+        let (people, _) = try makeWorld()
+        let y = UUID()
+        await people.stampConnections([])   // fetchMyConnections (sender_id=me) returns nothing for Y
+        XCTAssertNil(people.person(forSenderID: y.uuidString), "no row for Y → not greened")
+    }
+
+    // S4 — both-connected: each side greens the other (two independent in-memory worlds)
+    func testS4_bothConnected() async throws {
+        let mockJohn = MockConnectionService(
+            profile: SupabaseService.PublicProfile(displayName: "Jess", emoji: nil, latitude: nil, longitude: nil))
+        let mockJess = MockConnectionService(
+            profile: SupabaseService.PublicProfile(displayName: "John", emoji: nil, latitude: nil, longitude: nil))
+        let (john, _) = try makeWorld(connection: mockJohn)
+        let (jess, _) = try makeWorld(connection: mockJess)
+        let jessID = UUID(); let johnID = UUID()
+        await john.stampConnections([row(connected: jessID, via: UUID())])   // no SentLink → fallback
+        await jess.stampConnections([row(connected: johnID, via: UUID())])
+        XCTAssertNotNil(john.person(forSenderID: jessID.uuidString), "John greens Jess")
+        XCTAssertNotNil(jess.person(forSenderID: johnID.uuidString), "Jess greens John")
+    }
+
+    // S5 — churn / stale-SentLink with an already-connected contact → idempotent, no dup, stays green
+    func testS5_churnStaleSentLinkNoDup() async throws {
+        let mock = MockConnectionService(
+            profile: SupabaseService.PublicProfile(displayName: "Y", emoji: nil, latitude: nil, longitude: nil))
+        let (people, ctx) = try makeWorld(connection: mock)
+        let y = UUID()
+        _ = try XCTUnwrap(people.upsertContact(senderID: y.uuidString, displayName: "Mom"))   // already connected
+        let staleMsg = UUID(); ctx.insert(SentLink(messageID: staleMsg, personID: UUID()))   // dangling
+        try ctx.save(); people.fetchAll()
+        await people.stampConnections([row(connected: y, via: staleMsg)])
+        XCTAssertEqual(people.people.filter { $0.senderID == y.uuidString }.count, 1, "no duplicate under churn")
+        XCTAssertNotNil(people.person(forSenderID: y.uuidString), "stays green")
+    }
 }

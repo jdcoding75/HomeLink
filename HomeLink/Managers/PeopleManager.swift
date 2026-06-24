@@ -192,6 +192,14 @@ final class PeopleManager: ObservableObject {
                 throw PeopleError.disconnectFailed
             }
         }
+        // [conn-reconnect-fix] Delete this contact's SentLinks too — a dangling SentLink (its
+        // Person gone) would shadow stampConnections for any reused/stale via (audit §2-B).
+        let pid = person.id
+        if let context = modelContext,
+           let links = try? context.fetch(
+               FetchDescriptor<SentLink>(predicate: #Predicate { $0.personID == pid })) {
+            for l in links { context.delete(l) }
+        }
         modelContext?.delete(person)
         try modelContext?.save()
         fetchAll()
@@ -352,33 +360,27 @@ final class PeopleManager: ObservableObject {
             guard let via = row.viaMessageID else {
                 continue   // no join key (deleted message → via set null) — skip
             }
-            // EXISTING (warm) PATH — UNCHANGED: a local SentLink maps the row to the
-            // contact I sent to, and we stamp its senderID/pairedUserID.
-            if let link = try? context.fetch(
-                FetchDescriptor<SentLink>(predicate: #Predicate { $0.messageID == via })).first {
-                guard let person = people.first(where: { $0.id == link.personID }) else { continue }
-                guard (person.senderID ?? "").isEmpty else { continue }   // already stamped
+            // WARM PATH (primary, name/contact hint): a local SentLink resolves a LIVE contact →
+            // stamp it. [conn-reconnect-fix] If the SentLink is ABSENT *or* its Person is missing/
+            // deleted (a DANGLING SentLink — audit §2-B/C), FALL THROUGH to the connected_user_id
+            // fallback instead of `continue` — so the sender re-greens from the row's DURABLE
+            // connected_user_id regardless of stale via / dangling SentLink / re-add.
+            let link = try? context.fetch(
+                FetchDescriptor<SentLink>(predicate: #Predicate { $0.messageID == via })).first
+            if let link, let person = people.first(where: { $0.id == link.personID }) {
+                if !(person.senderID ?? "").isEmpty { continue }          // already stamped
                 let y = row.connectedUserID.uuidString
-                // [p1-conn-visibility] SAME-ID GUARD: never let TWO contacts carry the
-                // same id. If a DIFFERENT contact already holds y (e.g. a prior receive
-                // auto-create), do NOT stamp a second holder — the existing holder is
-                // the one-per-id contact for y. (The fallback branch is already safe:
-                // upsertContact dedups via person(forSenderID:).)
-                if let existing = self.person(forSenderID: y), existing.id != person.id {
-                    continue
-                }
+                // [p1-conn-visibility] SAME-ID GUARD: never let TWO contacts carry the same id.
+                if let existing = self.person(forSenderID: y), existing.id != person.id { continue }
                 person.senderID    = y
-                person.pairedUserID = y                                    // mirror → PATH-1 channel
+                person.pairedUserID = y                                   // mirror → PATH-1 channel
                 didChange = true
             } else {
-                // [conn-display-fix] NO local SentLink (reinstall wiped SwiftData, or
-                // sent from another device). The connection is REAL + persisted server-
-                // side — surface it from server data so it DISPLAYS instead of silently
-                // dropping. Resolve the OTHER user (connectedUserID) → public profile →
-                // find-or-create a contact keyed on the SAME senderID (upsertContact
-                // dedups via person(forSenderID:), so no duplicate). makeActive:false →
-                // a synced connection never changes the active person. upsertContact /
-                // applySenderLocation save + fetchAll themselves.
+                // [conn-reconnect-fix] FALL-THROUGH (was: `else { continue }` on person-missing).
+                // No live SentLink contact (absent, dangling, reinstall, other-device) → the
+                // connection is REAL + server-persisted; stamp from connected_user_id (the durable
+                // key) via upsertContact (dedups on senderID → no duplicate; makeActive:false →
+                // never changes the active person). upsertContact / applySenderLocation save + fetchAll.
                 let y = row.connectedUserID
                 let profile = await connectionService.fetchPublicProfile(of: y)
                 upsertContact(senderID: y.uuidString,
