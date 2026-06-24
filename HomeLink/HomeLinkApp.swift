@@ -66,19 +66,28 @@ struct PointwardApp: App {
 
     var body: some Scene {
         WindowGroup {
-            RootView()
-                .environmentObject(container.compassManager)
-                .environmentObject(container.peopleManager)
-                .environmentObject(container.pingManager)
-                .environmentObject(container.subscriptionManager)
-                .environmentObject(container.notificationHandler)
-                .environmentObject(container.skinStore)
-                .environmentObject(container.instrumentStore)
-                .environmentObject(container.brandManager)
-                .environmentObject(container.appStateManager)
-                .environmentObject(AppEnvironment(geocodingService: container.geocodingService))
-                .modelContainer(container.modelContainer)
-                .preferredColorScheme(.dark)
+            if ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil {
+                // [ci-test-safe] Under XCTest the headless CI sim can't render the
+                // SwiftUI/Metal app (IOSurface) → host relaunch loop, 0 tests. The
+                // hermetic tests reach PeopleManager/SupabaseService via @testable
+                // import and never need the UI. nil in every real launch → prod
+                // renders RootView exactly as today.
+                Color.black
+            } else {
+                RootView()
+                    .environmentObject(container.compassManager)
+                    .environmentObject(container.peopleManager)
+                    .environmentObject(container.pingManager)
+                    .environmentObject(container.subscriptionManager)
+                    .environmentObject(container.notificationHandler)
+                    .environmentObject(container.skinStore)
+                    .environmentObject(container.instrumentStore)
+                    .environmentObject(container.brandManager)
+                    .environmentObject(container.appStateManager)
+                    .environmentObject(AppEnvironment(geocodingService: container.geocodingService))
+                    .modelContainer(container.modelContainer)
+                    .preferredColorScheme(.dark)
+            }
         }
     }
 }
