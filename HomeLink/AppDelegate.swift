@@ -13,6 +13,17 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
         _ application: UIApplication,
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
     ) -> Bool {
+        // [ci-test-safe] Under XCTest (CI / unit-test host) skip the APNs launch work.
+        // A clean simulator has no aps-environment entitlement, so registration fails
+        // AND logPushState()'s getNotificationSettings completion reads UIApplication.shared
+        // off the main thread → the host app crashes before any test runs. The env var is
+        // set by the test runner in the host process and is nil in EVERY normal launch
+        // (Debug + Release), so PATH-1 push is untouched in real runs.
+        if ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil {
+            log.info("launch: running under XCTest — skipping APNs registration")
+            return true
+        }
+
         // Phase 2: pings arrive as pushes when the app is closed.
         // Called on EVERY launch so the token stays fresh server-side.
         log.info("launch: registering for remote notifications")
@@ -55,8 +66,16 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
             case .ephemeral:     auth = "ephemeral"
             @unknown default:    auth = "unknown"
             }
-            let registered = UIApplication.shared.isRegisteredForRemoteNotifications
-            self.log.info("push chain ① device: authorization=\(auth, privacy: .public) registeredForRemote=\(registered, privacy: .public) alertsEnabled=\(settings.alertSetting == .enabled, privacy: .public)")
+            // [ci-test-safe] `UIApplication.shared` is main-thread-only, but
+            // getNotificationSettings' completion runs OFF the main thread → hop to
+            // main for the read + log. Fixes a latent main-thread-checker crash on
+            // device too (not just CI). Logged values are unchanged (`alertsEnabled`
+            // is captured from `settings` before the hop).
+            let alertsEnabled = settings.alertSetting == .enabled
+            DispatchQueue.main.async {
+                let registered = UIApplication.shared.isRegisteredForRemoteNotifications
+                self.log.info("push chain ① device: authorization=\(auth, privacy: .public) registeredForRemote=\(registered, privacy: .public) alertsEnabled=\(alertsEnabled, privacy: .public)")
+            }
             // [perm-defer] Launch-time notification request REMOVED so it never fires over the
             // received-thought animation. The ask now lives ONLY in onboarding `saveAboutYou`
             // (the final "continue →" tap, after the animation). Logging above is unchanged;
