@@ -620,6 +620,36 @@ struct MainTabView: View {
         // ── THE RECEIPT — a dedicated full-screen receive experience over the
         // TabView (tab bar hidden, no compass). Replaces the inline catch. ──
         .fullScreenCover(item: $pings.nowPlaying) { playing in
+            // [arrival-parity stage3] PATH-1 now plays the FULL sequence (envelope→transit→
+            // receipt→reveal) — closes the R1 "PATH-1 is bare" gap. The SEQUENCE is shared
+            // (ArrivalSequenceView); the POLICY stays HERE, fired via the same callbacks /
+            // .onAppear, at the same moments: opened-flip/CONSUME = markOpened (onOpened —
+            // PATH-1 DOES consume, the opposite of replay; playing.remoteID carried);
+            // dismiss+queue-advance = finishedPlaying + appState.idle (onFinished); catch-mode
+            // + aim-at-sender (.onAppear, fires at cover-appear exactly as today). beatFloor 1.6
+            // (no fetch). ORIGINAL bare ReceiptView cover preserved in #if false below.
+            ArrivalSequenceView(
+                arrival:    Arrival(ping: playing,
+                                    senderBearing: compass.rawBearingToTarget ?? 120),
+                beatFloor:  1.6,
+                earlyName:  playing.fromName,
+                onOpened:   { pings.markOpened(playing) },
+                onFinished: {
+                    pings.finishedPlaying(playing)
+                    appState.transition(to: .idle)
+                }
+            )
+            .onAppear {
+                appState.transition(to: .catchMode)
+                // Swing the needle to the sender so the alignment is real (the RECEIPT reads
+                // compass.rawBearingToTarget after this; unchanged).
+                if let sender = people.people.first(where: { $0.name == playing.fromName }),
+                   people.selectedPerson?.id != sender.id {
+                    people.select(sender)
+                    compass.start(tracking: sender)
+                }
+            }
+            #if false  // [arrival-parity stage3] ORIGINAL bare PATH-1 cover — preserved:
             ReceiptView(
                 ping: playing,
                 style: SenderStyle.from(playing.senderStyle),
@@ -638,6 +668,7 @@ struct MainTabView: View {
                     compass.start(tracking: sender)
                 }
             }
+            #endif
         }
         // The "✦ Pro" badge on the compass now opens the paywall directly
         // (the Pro tab was retired; upgrade + status live in Settings → account).
