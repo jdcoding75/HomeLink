@@ -54,9 +54,16 @@ final class SubscriptionManager: ObservableObject {
             ?? UserDefaults.standard.string(forKey: "subscription_tier") ?? ""
         tier = SubscriptionTier(rawValue: saved) ?? .free
 
-        transactionListener = listenForTransactions()
-        Task { await loadProducts() }
-        Task { await checkEntitlements() }
+        // [ci-test-safe] Skip StoreKit launch work under XCTest — the Transaction.updates/
+        // currentEntitlements async streams + the Product.products network call run on every
+        // host launch and are unsafe/wasteful in a headless test host (no StoreKit config).
+        // The env var is nil in every real launch → production StoreKit is byte-identical.
+        // transactionListener stays nil under tests (deinit cancels nil safely — :62).
+        if ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil {
+            transactionListener = listenForTransactions()
+            Task { await loadProducts() }
+            Task { await checkEntitlements() }
+        }
     }
 
     deinit { transactionListener?.cancel() }

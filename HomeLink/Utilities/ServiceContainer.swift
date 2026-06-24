@@ -27,7 +27,15 @@ final class ServiceContainer: ObservableObject {
 
     init() {
         let schema       = Schema([Person.self, Ping.self, UserProfile.self, SentLink.self])
-        modelContainer   = try! ModelContainer(for: schema)
+        // [ci-test-safe] Under XCTest the headless CI sim can't create the on-disk
+        // SwiftData store ("Failed to create file; code=2") → the host relaunch-loops
+        // (0 tests). Use an IN-MEMORY store under tests; the env var is nil in every
+        // real launch → production builds the on-disk store exactly as before. (The
+        // hermetic tests build their OWN in-memory container, so this host store is
+        // never read by them — this just keeps the host process from crashing.)
+        let underTest  = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
+        let storeConfig = ModelConfiguration(isStoredInMemoryOnly: underTest)
+        modelContainer = try! ModelContainer(for: schema, configurations: storeConfig)
         skinStore        = SkinStore()
         instrumentStore  = InstrumentStore()
         networkService   = MockNetworkService()
