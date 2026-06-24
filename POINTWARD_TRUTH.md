@@ -690,6 +690,70 @@ saving — but KEEP `supabase/migrations/`, toss only scratch).
 **DEFERRED ENHANCEMENT** — **"send one back" auto-select-sender** (auto-switch the selected person to the
 sender for an easy reply).
 
+**⭐ WEB MESSAGE TEASERS (conversion / `pointward-website`) — own focused web session, distinct from
+app-side work.** GOAL: the `/m/[id]` page shows a **2s looping per-style TEASER** — an *incomplete ritual*
+(e.g. rocket counts "3…2…" never reaching 1 + a **blurred hidden-message** rect + "*Tap to see what [Name]
+sent ✦*") that visually **echoes the app send animation** → drives install. This is THE conversion surface.
+
+- **⭐ PREREQUISITE ALREADY MET (verified live via Supabase MCP — NO app change, NO migration):**
+  `messages.instrument` exists, the app populates it on EVERY link send (`CompassView:2351` = `style.rawValue`),
+  and `get_message` returns it (`select *`). Real rows confirmed carrying `glow / bowArrow / rocket / plane /
+  birthday / firefly / fingerFlick / wand`. The web page just needs to **READ `msg.instrument` and pick a
+  teaser** — it currently ignores the field (renders one generic emoji+halo for every send).
+- **KEY = `SenderStyle.rawValue`** (the camelCase wire string == `pings.sender_style` == `messages.instrument`;
+  the column is *named* `instrument` but stores the STYLE). 9 in-scope: `glow, bowArrow, firefly, fingerFlick,
+  rocket, wand, plane, birthday, firework` + legacy `shootingStar` + `null` → generic. Keys MUST be the exact
+  camelCase strings; unknown → generic (mirrors `SenderStyle.from()` → glow).
+- **ARCHITECTURE (all inline in `pointward-website/404.html`; no build system, no external assets):**
+  (a) **TEASERS registry** `{ style → core }`; (b) **ONE shared template frame** — kicker "[Name] sent you a
+  thought" + a swappable **animated-core slot** + the sealed/blurred **hidden-message rect** + "Tap to see
+  what [Name] sent ✦" + the **2s never-completing loop** + the existing install CTA / clipboard bridge
+  (untouched); (c) **9 swappable inline core builders + 1 GENERIC fallback** (today's emoji+halo render IS the
+  fallback). `teaserFor(msg.instrument)` → core; unmapped/null → generic.
+- **VISUAL DNA:** reuse exact `DesignTokens` hex (the page already half-matches: bg `#0d0d14`, accentSoft
+  `#c4a8d4`); each core echoes its app send file's shapes/palette/motion (per-style capsules in
+  `reports/web_teaser_architecture.md`); preserve the per-style sky — **7 night/space**, **wind/firefly =
+  daytime `#87CEEB` outlier**, **birthday/firework near-black `#06–08`**.
+- **BUILD ORDER (de-risked):** shared frame → registry + GENERIC fallback (ship FIRST — every message gets the
+  generic teaser, zero regression) → cores one at a time by *wow* (**rocket, firework, birthday first**), each
+  independently shippable (unmapped → generic).
+- **⭐ PENDING PRODUCT DECISION (website-repo call):** the `/m/` page currently shows `msg.content` in CLEAR
+  text; the teaser implies HIDING it (blurred rect → tap to reveal). Decide **(i) seal/blur the content**
+  (stronger conversion — RECOMMENDED) vs **(ii) keep a short preview + the teaser core above it.**
+- **MINOR LIVE-PAGE BUG (flag, unrelated):** `404.html render()` reads `msg.short_code` but `messages` has no
+  `short_code` column (it's on `users`) → dead branch; safe to remove.
+- **TESTABILITY:** `teaserFor(style) → core` is a **pure JS function — unit-assertable** (9 keys → their
+  cores; null/unknown → generic). Visual fidelity (does the web teaser echo the app) is **irreducibly manual**
+  (eyeball web vs app side-by-side). The mapping needs no network; end-to-end render needs one live
+  `get_message` row.
+- Refs: `reports/web_teaser_architecture.md` (full); `pointward-website/404.html` (current /m/ page);
+  app key sources `SenderStyle.swift`, `Instrument.swift`, `CompassView:2351`, `migrations/…short_code_messages.sql`
+  (messages + get_message). _(Edit the website in `pointward-website`, NEVER in HomeLink.)_
+
+**ANIMATION-ARCHITECTURE CONSISTENCY PASS (app-side; SEPARATE future thread — flagged by the web-teaser
+audit §7, NOT the web work).** Structural drift in the animation system, banked for a dedicated pass (none
+blocks the web teasers — the wire key is stable):
+- **3 live sends are inline in `SenderAnimationView.swift`** (glow `:286`, rocket `:1353`, firefly/wind `:413`)
+  while bow/flick/plane/wand have dedicated `Instruments/*` files — inconsistent "where the send lives."
+- **No uniform V1/V2 scheme:** bow/flick/birthday are `*V2.swift` (V1 retired-but-present), plane/wand/firework
+  are single un-versioned files, glow/rocket/wind are inline.
+- **Special Moments mis-housed** under `Instruments/_Shared/EmojiReveal/` rather than their own folder like the
+  7 instruments.
+- **`SenderStyle.shootingStar` is an orphan** (`SenderStyle.swift:12`) — legacy inline `shootingStarSend`, no
+  instrument, not in the live dispatch; still carried through every exhaustive switch.
+- **Dispatch replicated across 4 surfaces:** `CompassView` flightToken ladder (send), `SenderAnimationView.body`
+  switch (dead birthday/firework arms), `ReceiptView` switch (receipt), `RevealAnimationRegistry` (reveal).
+- **`firefly` vs `wind` naming drift** — the live wind instrument runs under `SenderStyle.firefly` /
+  `fireflySend`; user-facing name still "firefly."
+- **`messages.instrument` stores the STYLE rawValue, not an instrument** (`CompassView:2351`) — column name
+  implies instrument; contents are style (wind→`firefly`, special moments→`birthday`/`firework`). A future
+  rename to **`sender_style`** would align it with `pings` (⚠️ migration + web-key + app coordination — NOT
+  the web teaser work, which keys on the value as-is).
+- **Wand uniquely presents `EmojiRevealView(.sent)` internally** (`WandSendAnimation.swift:52-59`) while every
+  other send file's header says it does NOT — a violated shared contract.
+- **Timing truth duplicated** across `SenderStyle.sendDuration`, `InstrumentBoundaries`, and each view's own
+  hardcoded `total` (e.g. Bow 2.30 decoupled from the enum).
+
 ---
 
 ## ⭐ FUTURE / POST-V1 — ANIMATION TIER FRAMING + IDEAS (clearly separated; not v1 work)
