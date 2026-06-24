@@ -203,6 +203,34 @@ final class PeopleManager: ObservableObject {
         people.first { $0.senderID == senderID }
     }
 
+    // ── [p1-conn-visibility] DISPLAY-ONLY reconciliation helpers (no merge) ──────
+
+    /// (d) Same-name disambiguation for the People list + pickers: when ≥2 contacts
+    /// share the same name, the 2nd/3rd… (ordered by createdAt, stable) get a
+    /// "(2)"/"(3)" suffix; the first keeps the plain name. DISPLAY-ONLY — NEVER written
+    /// into `Person.name`, NEVER used in messages/thoughts/"from [Name]".
+    func disambiguatedName(for person: Person) -> String {
+        let key = person.name.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard !key.isEmpty else { return person.name }
+        let sameName = people
+            .filter { $0.name.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == key }
+            .sorted { $0.createdAt < $1.createdAt }
+        guard sameName.count >= 2,
+              let idx = sameName.firstIndex(where: { $0.id == person.id }) else { return person.name }
+        return idx == 0 ? person.name : "\(person.name) (\(idx + 1))"
+    }
+
+    /// (c) Same-ID annotation (visibility only): if a DIFFERENT contact carries the
+    /// SAME `senderID` (rare with the (b) guard, but surfaced if present), the other
+    /// holder's name — so the list can show "same id as [Jess]". nil when the id is
+    /// unique/absent. Takes NO action (no merge); user resolves via rename/delete.
+    func sameIDOtherName(for person: Person) -> String? {
+        guard let sid = person.senderID, !sid.isEmpty else { return nil }
+        guard let other = people.first(where: { $0.id != person.id && $0.senderID == sid }) else { return nil }
+        let n = other.name.trimmingCharacters(in: .whitespacesAndNewlines)
+        return n.isEmpty ? "another contact" : n
+    }
+
     /// Silently create-or-update the contact for a received message's SENDER,
     /// keyed on the immutable senderID. Called from the receive hooks
     /// (IncomingMessageView / ShortCodeEntryView) — NEVER from the send flow,
@@ -319,6 +347,14 @@ final class PeopleManager: ObservableObject {
                 guard let person = people.first(where: { $0.id == link.personID }) else { continue }
                 guard (person.senderID ?? "").isEmpty else { continue }   // already stamped
                 let y = row.connectedUserID.uuidString
+                // [p1-conn-visibility] SAME-ID GUARD: never let TWO contacts carry the
+                // same id. If a DIFFERENT contact already holds y (e.g. a prior receive
+                // auto-create), do NOT stamp a second holder — the existing holder is
+                // the one-per-id contact for y. (The fallback branch is already safe:
+                // upsertContact dedups via person(forSenderID:).)
+                if let existing = self.person(forSenderID: y), existing.id != person.id {
+                    continue
+                }
                 person.senderID    = y
                 person.pairedUserID = y                                    // mirror → PATH-1 channel
                 didChange = true

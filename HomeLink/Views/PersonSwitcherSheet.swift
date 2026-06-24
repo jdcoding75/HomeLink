@@ -44,7 +44,7 @@ struct PersonSwitcherSheet: View {
                             HStack(spacing: 14) {
                                 Text(person.emoji)
                                     .font(.system(size: 26))
-                                Text(person.name)
+                                Text(people.disambiguatedName(for: person))   // [p1-conn-visibility] (d) (2) same-name suffix
                                     .font(.system(size: 17, weight: .medium, design: .serif))
                                     .foregroundColor(DesignTokens.Color.textPrimary)
                                 Spacer()

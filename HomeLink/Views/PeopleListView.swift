@@ -47,12 +47,14 @@ struct PeopleListView: View {
                         ForEach(people.people) { person in
                             PersonCard(
                                 person: person,
+                                displayName: people.disambiguatedName(for: person),
                                 isSelected: people.selectedPerson?.id == person.id,
                                 distanceText: distanceText(for: person),
                                 isConnected: isConnected(person),
                                 isPending: isPending(person),
                                 showLocationHint: needsLocation(person),
                                 disambiguator: disambiguator(for: person, dupes: dupes),
+                                sameIDNote: people.sameIDOtherName(for: person),
                                 hideConnectionStatus: isLinkContact(person),
                                 hasOpenedReceipt: people.contactsWithOpenedReceipt.contains(person.id),
                                 isLinkConnected: isLinkConnected(person)
@@ -272,12 +274,14 @@ extension Notification.Name {
 // distance whispered beneath.
 struct PersonCard: View {
     let person: Person
+    var displayName: String? = nil          // [p1-conn-visibility] (d) (2) same-name suffix (display-only)
     let isSelected: Bool
     let distanceText: String?
     let isConnected: Bool
     var isPending: Bool = false   // [1/3] one-sided pairing — dim, "pending"
     var showLocationHint: Bool = false      // [build6] zero-location → add-location hint
     var disambiguator: String? = nil        // [build6] same-name suffix line
+    var sameIDNote: String? = nil           // [p1-conn-visibility] (c) other contact holding same senderID
     var hideConnectionStatus: Bool = false  // [build6] suppress pairing row for link contacts
     var hasOpenedReceipt: Bool = false       // [stageC] they opened a thought I sent → "opened ✦"
     var isLinkConnected: Bool = false        // [display-polish] senderID set → show "connected ✦"
@@ -330,7 +334,7 @@ struct PersonCard: View {
             // Info
             VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: 6) {
-                    Text(person.name)
+                    Text(displayName ?? person.name)
                         .font(.system(size: 17, weight: .semibold))
                         .foregroundColor(DesignTokens.Color.textPrimary)
                     // [stageC] read-receipt — they opened (in full) a thought I sent.
@@ -341,6 +345,15 @@ struct PersonCard: View {
                     }
                 }
 
+                // [p1-conn-visibility] (c) SAME-ID ANNOTATION (visibility only): another
+                // contact carries this contact's senderID → surface it so the user can
+                // rename/delete. Display-only; no action taken (no merge).
+                if let sameIDNote {
+                    Text("same id as \(sameIDNote)")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundColor(DesignTokens.Color.accentSoft)
+                        .lineLimit(1)
+                }
                 // [build6] Location line. Priority: zero-location HINT (also kills
                 // the bogus null-island distance / name-echo) → same-name
                 // disambiguator → today's distance/address line.
