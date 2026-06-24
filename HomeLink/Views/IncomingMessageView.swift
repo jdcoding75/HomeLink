@@ -48,8 +48,12 @@ struct IncomingMessageView: View {
 
     // [a2-send-on-receive] `.sending` plays the SEND (transit) stage BEFORE the
     // receipt, so the receiver sees the thought launch + fly in, then land/reveal.
-    private enum Phase { case incoming, sending, receipt, landing, composeBack, notFound }
-    @State private var phase: Phase = .incoming
+    // [arrival-parity stage1] The visual sequence (incoming/sending/receipt) moved into
+    // ArrivalSequenceView; this view keeps only the policy phases + the resolving state.
+    // ORIGINAL: private enum Phase { case incoming, sending, receipt, landing, composeBack, notFound }
+    private enum Phase { case sequence, landing, composeBack, notFound }
+    @State private var phase: Phase = .sequence
+    @State private var arrival: Arrival? = nil   // built by begin(); fed to ArrivalSequenceView
     // [build10 shot2] Guest entry: a link-arriver who taps a landing door enters the
     // app WITHOUT the fresh-installer onboarding. RootView routes on this flag
     // (alongside hasCompletedOnboarding). Never set on the fresh-installer path.
@@ -60,7 +64,8 @@ struct IncomingMessageView: View {
     @State private var message: Message? = nil
     @State private var flipGate = OpenedFlipGate()
     @State private var started = false
-    @State private var pulse = false
+    // [arrival-parity stage1] `pulse` (envelope breathing) moved to ArrivalSequenceView,
+    // which now owns the envelope. Unused here. ORIGINAL: @State private var pulse = false
     // [envelope-name] The resolved sender name shown ON the envelope beat. Set the
     // moment the (single, existing) fetch lands — mid-beat — via resolvedSenderName
     // (local label → senderDisplayName → "someone"). Display-only; does not gate the
@@ -79,39 +84,23 @@ struct IncomingMessageView: View {
             DesignTokens.Color.background.ignoresSafeArea()
 
             switch phase {
-            case .incoming:  incomingBeat
+            // [arrival-parity stage1] The reusable sequence (envelope→transit→receipt→
+            // reveal) now lives in ArrivalSequenceView. This view keeps the POLICY:
+            // fetch+side-effects in begin(); opened-flip in onOpened; 3-door landing in
+            // onFinished. beatFloor 0 because begin()'s sleep already gates the 1.6s beat
+            // before it sets `arrival` (strict same-instant side-effects). earlyName feeds
+            // the mid-beat "from [name]" fade (PATH-2's existing resolvedName).
+            // ORIGINAL .incoming/.sending/.receipt arms relocated VERBATIM to
+            // ArrivalSequenceView.swift (incomingBeat / sendStage / the receipt + overlay).
+            case .sequence:
+                ArrivalSequenceView(
+                    arrival:    arrival,
+                    beatFloor:  0,
+                    earlyName:  resolvedName,
+                    onOpened:   { flipOpened() },
+                    onFinished: { goToLanding() }
+                )
             case .notFound:  notFoundState
-            // [a2-send-on-receive] The SEND stage, played AS-IS (no reversal/mirror),
-            // exactly as the sender sees it — then it advances to the receipt.
-            case .sending:
-                if let message {
-                    sendStage(for: message)
-                        .transition(.opacity)
-                }
-            case .receipt:
-                if let message {
-                    ReceiptView(
-                        ping:  receivedPing(from: message),
-                        style: instrumentStyle(from: message),
-                        onRevealed: { flipOpened() },          // ← completion signal
-                        onFinished: { goToLanding() }          // ← [build10] → 3-doors landing (was: dismiss)
-                    )
-                    // [build5-done] Contact auto-create for this sender already
-                    // fired at FETCH (see begin() → people.upsertContact). It is
-                    // silent by design — no prompt hangs here (TRUTH principle #6).
-                    .transition(.opacity)
-                    // [build10 fixbatch 2a] "Message from [Name]" — a clear sender label on
-                    // the arrival, OVERLAID on the receipt (ReceiptView/the animation is NOT
-                    // touched). Top, subtle, non-interactive so it never blocks the receipt's
-                    // tap-to-finish. Reinforces who it's from (the name is editable per message).
-                    .overlay(alignment: .top) {
-                        Text("Message from \(resolvedSenderName(for: message))")
-                            .font(.system(size: 13, design: .serif).italic())
-                            .foregroundColor(DesignTokens.Color.textMuted)
-                            .padding(.top, 16)
-                            .allowsHitTesting(false)
-                    }
-                }
             // [build10] LINK-ARRIVER LANDING — the "what next" moment. Previously the
             // receipt's onFinished dismissed the cover straight into the app; now it
             // lands here (3 doors). Placeholder UI; design locked in TRUTH. Additive —
@@ -187,6 +176,7 @@ struct IncomingMessageView: View {
         onFinished()
     }
 
+    #if false  // [arrival-parity stage1] RELOCATED VERBATIM to ArrivalSequenceView.swift
     // MARK: - The incoming beat (envelope, before it opens)
 
     private var incomingBeat: some View {
@@ -224,6 +214,7 @@ struct IncomingMessageView: View {
             }
         }
     }
+    #endif
 
     // MARK: - Gentle empty state (bad / expired id)
 
@@ -284,10 +275,15 @@ struct IncomingMessageView: View {
                 withAnimation(.easeInOut(duration: 0.4)) {
                     if let result {
                         message = result
-                        // [a2-send-on-receive] Go to the SEND stage FIRST; its
-                        // onComplete advances to .receipt (unchanged). The fetch-time
-                        // side effects below are UNCHANGED — they still fire here.
-                        phase = .sending
+                        // [arrival-parity stage1] Build the neutral Arrival; the shared
+                        // ArrivalSequenceView (already on screen, phase .sequence, beatFloor 0)
+                        // advances envelope→transit→receipt→reveal as soon as `arrival` is set.
+                        // The 1.6s beat is gated by the `sleep(beatDuration)` above → the beat
+                        // timing AND the fetch-time side-effects below fire on the SAME
+                        // max(beatDuration, fetch) schedule as before (strict variant).
+                        // ORIGINAL: phase = .sending   (sendStage relocated to ArrivalSequenceView)
+                        arrival = Arrival(ping: receivedPing(from: result),
+                                          senderBearing: compass.rawBearingToTarget ?? 120)
                         // [phase2 build5] A VALID message means a real sender —
                         // silently create-or-update them as a contact, keyed on
                         // the immutable senderID. Fires at FETCH (not at the
@@ -411,6 +407,7 @@ struct IncomingMessageView: View {
         return (AnimationManifest.liveInstruments.first?.instrument ?? .compass).senderStyle
     }
 
+    #if false  // [arrival-parity stage1] RELOCATED to ArrivalSequenceView.swift (transit now via AnimationDispatch)
     // MARK: - [a2-send-on-receive] The SEND (transit) stage on receive
     //
     // REPLICATED (not extracted) from CompassView's live send dispatch
@@ -459,8 +456,10 @@ struct IncomingMessageView: View {
         InstrumentTransition(exitBearing: bearing, exitPoint: .zero, instrument: instrument,
                              emoji: emoji, message: m.content, tagline: nil)
     }
+    #endif
 }
 
+#if false  // [arrival-parity stage1] RELOCATED VERBATIM to ArrivalSequenceView.swift
 // MARK: - Envelope glyph (sealed — the "before it opens" anticipation)
 
 private struct EnvelopeGlyph: View {
@@ -500,3 +499,4 @@ private struct EnvelopeGlyph: View {
         .allowsHitTesting(false)
     }
 }
+#endif
