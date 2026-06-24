@@ -301,9 +301,9 @@ xcodebuild -scheme HomeLink \
 
 ### Housekeeping
 - AudioRecorder.meterTimer retain cycle FIXED (added [weak self]).
-- ArrivalPreviewView is now an ORPHAN (0 references) — it was superseded by the
-  shared EmojiRevealView (.sent) confirmation. Kept (not deleted) pending a
-  human decision on whether to restore the arrival-preview feature.
+- ArrivalPreviewView was DELETED (0 refs; file absent — confirmed path audit 2026-06-24).
+  Superseded by the shared EmojiRevealView(.sent) confirmation. Recorded deleted in
+  POINTWARD_TRUTH.md (orphan-deletions ledger). No restore pending.
 - Tests: ~194 (162 core + the overnight AuditCoverageTests + PeopleManager gate).
 
 ### Next instrument: Flick or Wand (Joshua's choice)

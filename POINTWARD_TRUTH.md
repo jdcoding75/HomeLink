@@ -149,9 +149,9 @@ full file set: `*CompassFace`, `*SendAnimation`, `*ReceiptAnimation`,
 | **Wind** 🍃 | `firefly` | WindCompassFace | WindSendAnimation | WindReceiptAnimation | wind_send/receipt/breeze (WindSoundGenerator.py + WindBreezeGenerator.py) | 🔒 Locked (visual + sound) |
 | **Rocket** 🚀 | `rocket` | RocketCompassFace (legacy structure) | RocketSendAnimation | **RocketLandingReceiptAnimation** (merged landing) | rocket_send/receipt (RocketSoundGenerator.py) | 🔒 Receipt locked. `RocketReceiptAnimation` (parachute v2) is **test-lab only**. |
 | **Bow** 🏹 | `bowArrow` | BowCompassFace (+ two-part draw/release SoundEngine cue) | BowSendAnimationV2 | **BowReceiptAnimationV2** | bow_send/receipt (+ arrow_whistle, sparkle_dissolve) (BowSoundGenerator.py) | 🔒 Locked (visual + sound). V1 files kept, retired. |
-| **Flick** 👆 | `fingerFlick` | FlickCompassFace (legacy `FlickInstrumentView` is LIVE) | SenderAnimationView (legacy) | standardReceipt (legacy) | flick_send/receipt (FlickSoundGenerator.py) | 🔒 V2 locked (visual + sound) but **parked**: FlickDeskCompassFace + Flick*V2 are test-lab; old post-it ships live. |
+| **Flick** 👆 | `fingerFlick` | ⚠️ FACE UNRESOLVED (old `FlickInstrumentView` post-it vs `FlickDeskCompassFace` — verify in the animation-consistency pass) | **FlickSendAnimationV2 (LIVE)** _(path audit `f6ad2b4`, `CompassView:765`)_ | **FlickReceiptAnimationV2 (LIVE)** _(`ReceiptView:122`)_ | flick_send/receipt (FlickSoundGenerator.py) | 🔒 V2 send+receipt LIVE (corrects the prior "V2 parked / standardReceipt" claim); COMPASS-FACE still UNRESOLVED. |
 | **Wand** 🪄 | `wand` | WandCompassFace | WandSendAnimation | WandReceiptAnimation | wand_send/receipt (WandSoundGenerator.py) | 🔒 Locked. |
-| **Plane** ✈️ | `plane` | PlaneCompassFace | PlaneSendAnimation (base live; V2 parked) | PlaneReceiptAnimation (base live; V2 parked) | plane_flight + cue wavs (PlaneSoundGenerator.py + PlaneWindupGenerator.py) | 🔒 V2 locked (visual + sound). |
+| **Plane** ✈️ | `plane` | PlaneCompassFace | PlaneSendAnimation (LIVE) | **PlaneReceiptAnimationV2 (LIVE)** _(path audit `f6ad2b4`)_ | plane_flight + cue wavs (PlaneSoundGenerator.py + PlaneWindupGenerator.py) | 🔒 V2 locked (visual + sound). |
 
 > **Naming caveats (do not "fix" without intent):** Bow/Flick use `V1`/`V2`
 > suffixes; Plane uses base-name + `V1` + `V2` (three schemes);
@@ -295,17 +295,23 @@ wired live until explicitly upgraded. Both appear in the test lab.
 
 **⭐ Phase-2 animation-track update (later than the entries below — see the
 "Phase 2 — Animation Track (canonical commit ledger)" section + `reports/phase3_handoff.md`):**
-- **Plane + Flick V2 — believed LIVE/fixed** (promoted in ROOT-2 `e0d7576`): receipts + flick send route
-  to the V2s. _(Any residual v1/v2 question is folded into the deferred animation-cluster review — see
-  WORK CLUSTERS — not chased now.)_
+- **Plane + Flick V2 — ✅ CONFIRMED LIVE (path audit `f6ad2b4`):** `PlaneReceiptAnimationV2` (`ReceiptView:120`)
+  + `FlickReceiptAnimationV2` (`:122`) + `FlickSendAnimationV2` (`CompassView:765`) are the live dispatches.
+  The residual send/receipt v1/v2 question is CLOSED. _(⚠️ The Flick COMPASS-FACE is still UNRESOLVED — old
+  `FlickInstrumentView` post-it vs `FlickDeskCompassFace`; the audit did NOT confirm the face → verify in the
+  animation-consistency pass. See the Flick table row.)_
 - **Wand receipt — DEFERRED** (`WandReceiptAnimation` is a stub enum, not a View) → wand
-  still uses the shared turn-to-catch bucket on arrival. Net-new build, low priority.
+  still uses the shared turn-to-catch bucket on arrival. Net-new build, low priority. _(Path audit `f6ad2b4`
+  CONFIRMS: wand is the lone instrument with no dedicated receipt — falls to `standardReceipt`/bucket;
+  `ReceiptView:130-135`.)_
 - **Birthday + Firework — now first-class peer animations, COMPLETE end-to-end**
   (Special Moments Stages 1+2+3, `c38ca9d` → `624b044`): selectable `Instrument`+
   `SenderStyle` cards; **both** sender-side AND recipient (`ReceiptView`) dispatch key on
   style/selection (not the emoji). Birthday's default emoji is the intended **🎁** (the
   interim 🎂 was flipped back at Stage 3). Only **Stage 4** remains — retire the emoji
-  fallback branches once the fleet has updated.
+  fallback branches once the fleet has updated. _(Path audit S2 `f6ad2b4`: the legacy 🎂/🎆 emoji-pick
+  fallback in `CompassView case .compass` (`:311-380`) runs parallel to the first-class `.birthday`/
+  `.firework` cases — both render correctly; retire with Stage 4.)_
 - **Firework + Birthday FREEZE — FIXED** (`380d374`, re-arm CONFIRMED on device): as peer
   instruments their face persisted across sends (no destroy-on-deselect) → frozen after one
   fire; `finishSend` now bumps `instrumentResetID` for `.firework`/`.birthday` after the
@@ -401,9 +407,10 @@ double-tap audit. These have **no phase home** — they ride a different track:
 
 **ANIMATION TERRITORY** (⚠️ the *"never touch without care"* set — careful, AUDIT-FIRST,
 **batched separately** in an animation-chat session, NOT in the Phase-2 build line):
-- **#12 — Plane v1/v2 — RECONCILED:** believed LIVE/fixed (ROOT-2 `e0d7576`). No longer an active bug;
-  any residual version-resolution question gets a full review in the deferred **animation cluster**
-  (after the core/release-gating work) — not chased now.
+- **#12 — Plane v1/v2 — ✅ RESOLVED = V2 (path audit `f6ad2b4`):** `PlaneReceiptAnimationV2` is the LIVE
+  receipt dispatch (`ReceiptView:120`); `PlaneSendAnimation` is the live send (`CompassView:744`). The
+  deferred version question is CLOSED — V2 is live. Not a bug. (Stale `ReceiptView` comments still *say*
+  "standardReceipt" → see DEAD-CODE cluster R5.)
 - **#13 — Animation aiming-order** (load emoji **before** aim feels broken): the
   emoji-then-aim sequencing reads wrong in the send mechanic. Animation-chat; audit-first.
 - **#14 — Send-sound distortion.** ⚠️ Reported under a **DEBUG** build — **VERIFY in a
@@ -581,22 +588,43 @@ DB-scenario tests).**
 
 ### PRIORITY 2+ — ITERATIVE / NON-BLOCKING (batch-test after several changes; cut a line for v1 whenever satisfied)
 
+**⭐ ARRIVAL PARITY — EVERY arrival deserves the FULL experience (EXPERIENCE-QUALITY priority; own build
+thread).** Principle (John): an arrival should feel like an EVENT — **envelope → transit ("watch it fly
+in") → receipt → reveal** — regardless of how it arrived. **CURRENTLY FRAGMENTED (path audit `f6ad2b4`):**
+- **PATH-2 (link / short-code) = FULL** — envelope beat + the A2 transit send-stage (`IncomingMessageView:192`,
+  `:424-453`) → `ReceiptView` → reveal.
+- **PATH-1 (connected / direct ping) = BARE** — `PingManager.receivePing` → `nowPlaying` → `ReceiptView`
+  **directly** (`RootView:622`); **no envelope, no transit build-up.** This is the MOST-USED, most-intimate
+  path — and it skips the build-up that makes an arrival land.
+- **HISTORY REPLAY = BARE** — also drops straight into the receipt/reveal, no build-up.
+**This is WHY some arrivals feel weak.** FIX DIRECTION: ONE shared full-arrival sequence that PATH-1,
+PATH-2, AND replay all feed into (generalizes the parked "extract shared `SendStageView`" idea to the WHOLE
+arrival — envelope+transit+receipt+reveal as a reusable pipeline). Refs: `IncomingMessageView:192,:424-453`
+(PATH-2 full), `ReceiptView:732` (internal arriving phase), `RootView:622` (PATH-1 bare), the replay cover.
+
 **ANIMATION CORRECTNESS & VERIFICATION** — verify the full sequence plays correctly at ALL stages, across
-ALL send+receive paths + ALL instruments (broader than the one A2 fix). Includes: **birthday cake broken
-in send/A2** (candles double-fire → renders the **ARROW** not the cake); **foreground direct-ping plays NO
-animation** (emoji only); **A2 is LINK-path only** (NOT direct-ping — consider adding); **#12 Plane
-v1/v2** (believed fixed in ROOT-2 — review deferred to this cluster, not an active bug); **#13 aiming-order**; **#14 send-sound distortion** (⚠️ verify in
-**Release** first — may be debug-only); the large **untested animation surface + device-test debt**
-(thoughts-toggle removal, bucket-delete, replay rework, compose-uniformity, birthday default msg,
-mic-denied wind, plane/flick V2, Special Moments stages); **extract the replicated A2 dispatch → shared
-`SendStageView`**. _(The animation-stages audit answers "does every animation fire everywhere it should.")_
+ALL send+receive paths + ALL instruments. **✅ PATH AUDIT DONE (2026-06-24, `f6ad2b4`, reports/path_audit.md)
+— these feared bugs are DISPROVEN by code (stale canon, NOT regressions; do not chase):** ~~birthday cake
+renders the ARROW~~ (FALSE — `BirthdayCakeSendAnimationV2` renders the cake), ~~candles double-fire~~ (FALSE
+— single `ForEach`, 0.4s blow debounce), ~~firework box~~ (FALSE — custom `FireworkGlyph`), ~~foreground
+direct-ping plays NO animation~~ (FALSE — the FULL send animation plays on BOTH paths; `flightToken` is set
+`CompassView:2258`, BEFORE the path branch `:2336`), ~~#12 Plane v1-not-v2~~ (RESOLVED = **V2**;
+`PlaneReceiptAnimationV2` is LIVE). **The real arrival gap "A2 is LINK-path only" is reframed + promoted →
+see ⭐ ARRIVAL PARITY below.** STILL OPEN (unverified, lower priority): **#13 aiming-order**; **#14
+send-sound distortion** (⚠️ verify in **Release** first — may be debug-only); residual **device-test debt**
+(thoughts-toggle removal, bucket-delete, replay rework, compose-uniformity, birthday default msg, mic-denied
+wind, Special Moments stages). _(Replicated-dispatch extraction folded into ARRIVAL PARITY + the harness item.)_
 
 **RECEIVE-PATH / SCREENS REDUCTION** (principle: **FEWER SCREENS THE BETTER**) — map every screen across
 the scenario matrix (cold/warm × paired/unpaired × has-app/no-app), then **ELIMINATE to the fewest
 necessary**. Includes: **3-door landing reconsidered per install method** (some doors nonsensical per
-arrival — e.g. "install Pointward" to someone who just installed); **foreground-ping presentation**; **2c
-compose-back routing** (RECEIPT-not-send-out, needs device-repro). _(Combined audit with animation-stages —
-shared scenario matrix.)_
+arrival — e.g. "install Pointward" to someone who just installed; **R2/R3:** the 3-door landing is reachable
+ONLY on PATH-2 × not-onboarded, and an `enteredViaLink` guest can desync the gate so a later link re-shows
+the doors — `IncomingMessageView:336-344,:150-153`); **foreground-ping presentation** (→ ARRIVAL PARITY).
+**✅ 2c compose-back routing — RESOLVED CORRECT (path audit):** it routes to SEND-OUT (compass, pre-aimed at
+the sender via `.pointwardOpenCompass`), NOT the receipt — there is no reply affordance inside `ReceiptView`.
+The "RECEIPT-not-send-out / needs device-repro" worry is closed. _(Screen inventory: ~30 surfaces; no
+elimination beyond the 3 dead files in DEAD-CODE; `PaywallView` inert-but-kept for monetization revert.)_
 
 **COMPASS INTERACTION** — **HOLD → LOCK → TAP TO SEND** (hold aims/points at the person, locks on-target,
 single **TAP** sends — NOT auto on lock; update the instruction copy to show all 3 steps). **OVERLAPS
@@ -637,12 +665,27 @@ heads-up to avoid bait-and-switch; `PaywallView`/Pro section repurposed; define 
 message background animations on the `/m/` page** (entice install — visual works great on web); **Settings
 review** (Help/FAQ/feedback picker); **copy pass** ("mini card" voice); **health-audit Tier-1 deletes**
 (dead `ProSetupView` ~1019 lines); **structural cleanup map** (SupabaseService split, CompassView
-extraction, `pairedUserID` migration); **receive-path regression harness** (old BUILD #4).
+extraction, `pairedUserID` migration); **receive-path regression harness** (old BUILD #4). **HONEST
+DELIVERY (S1, path audit `f6ad2b4`):** the "sent to [Name] ✦" toast fires from `finishSend` UNCONDITIONALLY
+(`CompassView:2339`); a PATH-1 `sendRemote` failure only surfaces later via `sendFailedNotice`
+(`PingManager:290-304`) — so the animation + "sent" can both show while the insert later fails. Tie the
+confirmation to actual insert success (or downgrade the toast until confirmed). Small, pre-launch.
 
 **CODE CLEANUP (END-STAGE, CONDITIONAL — do LAST, only if it eases future dev or speeds runtime):** dead
 `ProSetupView` ~1019 lines · structural map · A2-dispatch → shared `SendStageView` · hard-delete the
 preserved comment blocks · test audit · AND the private/one-off **SQL scratch scripts** (nothing needs
 saving — but KEEP `supabase/migrations/`, toss only scratch).
+  **+ path-audit dead code (`f6ad2b4`):** 3 orphan view files — **BucketCatchView** (extract
+  `BucketShape`/`BucketHandleShape` FIRST, reused by BucketTipView), **SkinPickerView**, **SkinQuickPicker**
+  (0 refs each; superseded by `InstrumentOptionPicker`); **R5** stale `ReceiptView` comments
+  (`:96-100,:229-256` say bow/flick/plane use `standardReceipt` but they dispatch V2); **X1** dead emitter
+  `.pointwardOpenThoughts` (`CompassView:1577,1599`, receiver commented `RootView:660`); **X2** commented
+  `/pair`,`/join` branch (`RootView:270-285`, AASA still lists `/pair/*`); **R6** Birthday/Firework dead
+  receipt helpers (`FireworkReceipt:268-383`, `BirthdayCakeReceiptV2:92-102`).
+  **+ test-hardening (path audit):** extract pure `sendAnimationKind(for:)` / `receiptKind(for:)` from the
+  inline `CompassView` flightToken ladder + `ReceiptView` switch → makes "path X stage Y → animation Z"
+  UNIT-assertable with NO device (path selection, instrument→style→dispatch, share-defer, 3-door gate,
+  short-code split). Highest-value harness add; pairs with the ARRIVAL PARITY extraction.
 
 **DEFERRED ENHANCEMENT** — **"send one back" auto-select-sender** (auto-switch the selected person to the
 sender for an easy reply).
