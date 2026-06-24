@@ -150,8 +150,29 @@ struct PersonDetailView: View {
         .fullScreenCover(item: $pings.replayRequest) { request in
             ZStack {
                 DesignTokens.Color.background.ignoresSafeArea()
-                // [6/6] Same EmojiRevealView as the live receipt — the world
-                // (ambient) follows the thought's instrument.
+                // [arrival-parity stage2b] Full sequence (envelope→transit→receipt→reveal)
+                // for this single-item surface, with the opened-flip SUPPRESSED (onOpened {} =
+                // re-feel, NOT consume — locked decision #1; remoteID nil). onFinished dismisses
+                // (this surface dismisses on tap/6s today — ReceiptView→EmojiRevealView(onDismiss:
+                // {onFinished()}) carries the tap/6s). ENV: PersonDetail holds `compass`+`pings`
+                // (@EnvironmentObject :16-17) → the cover inherits them for ReceiptView (iOS-17
+                // SwiftUI propagates env to fullScreenCover content); build clean → left as-is.
+                // If a missing-env ever surfaces on this path, add:
+                //   .environmentObject(compass).environmentObject(pings)
+                // ORIGINAL bare reveal preserved in #if false below.
+                ArrivalSequenceView(
+                    arrival: Arrival(
+                        ping: PingManager.ReceivedPing(
+                            fromName: person.name, emoji: request.emoji, timestamp: .now,
+                            remoteID: nil, senderStyle: request.styleRaw ?? "",
+                            message: request.message, tagline: request.tagline, isTest: false),
+                        senderBearing: request.bearingDegrees),
+                    beatFloor: 1.6,
+                    earlyName: person.name,
+                    onOpened:  { },                            // ← SUPPRESS (re-feel only)
+                    onFinished:{ pings.replayRequest = nil }   // ← dismiss as today (tap/6s)
+                )
+                #if false  // [arrival-parity stage2b] ORIGINAL bare reveal — preserved:
                 EmojiRevealView(
                     emoji: request.emoji,
                     message: request.message,
@@ -160,6 +181,7 @@ struct PersonDetailView: View {
                     ambient: RevealAmbient.forStyle(SenderStyle.from(request.styleRaw)),
                     onDismiss: { pings.replayRequest = nil }
                 )
+                #endif
                 VStack {
                     Spacer()
                     Text("tap to dismiss")
