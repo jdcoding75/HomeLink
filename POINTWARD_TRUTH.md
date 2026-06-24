@@ -42,6 +42,13 @@
   `jlbgdlgwtrkmqcfnomlr` — log in as **OWNER (GitHub jdcoding)** or "no access"; migrations written to
   `supabase/migrations/`, **owner applies SQL in dashboard**. TestFlight public:
   `testflight.apple.com/join/rjAS4cnk`. **v1 ships 100% FREE.**
+- **VERIFICATION IS MOSTLY SELF-SERVICE.** LOGIC → the embedded test harness (`HomeLinkTests`, run anytime,
+  no phones); DB/SERVER → the planning chat queries Supabase MCP directly; CODE → git / a pasted URL.
+  Reserve the **human two-phone pass for the irreducible only** (real APNs, cold install, actual UI render,
+  live socket). Default to self-verifying; surface to John only what needs a **device or a decision**.
+- **BATCH verification when safe.** Prefer ONE test run / ONE device pass across several INDEPENDENT changes
+  over a cycle per change (the "5-fix batch → one clean test" pattern). Only batch independent/safe changes
+  — isolate risky/interacting ones so a failure isn't ambiguous. **Goal: fewest test cycles.**
 
 ### CURRENT STATE (what's done / what's next — update each session)
 - **RELEASE GATE = PAIRING CLUSTER → BUILT + VERIFIED (logic + server).** P3 realtime (`366fe79`), P2
@@ -56,13 +63,13 @@
   auto-merge/merge-tool/name-matching). P1 = visibility only. P2 = one-directional disconnect = the
   linchpin that makes cleanup stick. Contacts-pick PREFERRED (firm name/address/channel; auto-addressed
   first send; stores send-channel = wrong-person PREVENTION; P2+P1 = safety net).
-- **NEXT PRIORITIES.** (1) **Two-phone verify** the pairing cluster (the manual checklist). (2) **Phase-2
-  canon REDUCTION** (this file is ~2.5k lines — consolidate/archive obsolete content; propose-first). (3)
+- **NEXT PRIORITIES.** (1) **Two-phone verify** the pairing cluster (the manual checklist). (2) **canon reduction — pass 1 DONE
+  (`5088027`); pass-2/3 consistency + reduction polish applied**. (3)
   Then the **iterative/non-blocking clusters** (animation-correctness, screens-reduction, compass
   HOLD·LOCK·TAP, contact model, pre-launch polish) per WORK CLUSTERS — cut a line for v1 whenever satisfied.
 - **EFFICIENCY STACK (this session).** Supabase MCP both sides (planning chat verified working; Claude
   Code add pending auth); CLAUDE.md consolidated standing workflow (`1f89605`); write-to-file→`copyreport`
-  is the clean handoff; GitHub URL-fetch works (partial on big files).
+  is the clean handoff; GitHub URL-fetch works (partial on big files). **GitHub MCP = SKIP** for Claude Code (local git + `gh` cover it); **Supabase MCP = the add.** **Testing aids:** `HomeLinkTests` harness (logic) · **P2 delete doubles as a test-RESET tool** (clear connections on demand) · a **DevTools dev-send**.
 - **POINTER.** Full history, design rationale, and the detailed WORK CLUSTERS are below. (Phase-2 reduction
   will archive the oldest history.)
 
@@ -273,8 +280,9 @@ wired live until explicitly upgraded. Both appear in the test lab.
 
 **⭐ Phase-2 animation-track update (later than the entries below — see the
 "Phase 2 — Animation Track (canonical commit ledger)" section + `reports/phase3_handoff.md`):**
-- **Plane + Flick V2 — now LIVE** (promoted to live dispatch in ROOT-2 `e0d7576`):
-  receipts + flick send route to the V2s (`ReceiptView` + the CompassView send Group).
+- **Plane + Flick V2 — believed LIVE/fixed** (promoted in ROOT-2 `e0d7576`): receipts + flick send route
+  to the V2s. _(Any residual v1/v2 question is folded into the deferred animation-cluster review — see
+  WORK CLUSTERS — not chased now.)_
 - **Wand receipt — DEFERRED** (`WandReceiptAnimation` is a stub enum, not a View) → wand
   still uses the shared turn-to-catch bucket on arrival. Net-new build, low priority.
 - **Birthday + Firework — now first-class peer animations, COMPLETE end-to-end**
@@ -328,21 +336,9 @@ Birthday V2 · Firework compass fuse position.
 
 ---
 
-## Pivot Session (next major)
-
-The next major effort is the **Phase 2 — Link Delivery Model** (see that section
-below). The pivot is **link-BASED** (`pointward.app/m/[messageID]`): it does
-**not** remove link delivery — link delivery *is* the new model. What it removes
-is **pairing** — manual codes, typed IDs, the `connections` table, and
-`PairAcceptView` — replacing it with a real sent message that carries the
-sender's identity in the link.
-
-> The authoritative removal mechanics — the load-bearing step order and the exact
-> seams to cut — live in **PAIRING_AUDIT.md §5** ("Suggested order for the
-> pivot"). Defer to that file; the order is intentionally **not** reproduced here,
-> to avoid drift.
-
----
+## Pivot — DONE
+Pivot DONE — link delivery is live, pairing removed (codes / `connections` table / `PairAcceptView`
+gone); the link carries the sender's identity. See WORK CLUSTERS. _(Original "Pivot Session" archived below.)_
 
 ## Never Touch
 
@@ -384,40 +380,15 @@ identity layer must never need re-architecting.
 - **the connection record** — `link_connections` (below): links sender ↔ receiver
   via the message they opened.
 
-### ⭐ DISPLAY-POLISH BATCH — ✅ BUILT + COMMITTED (`90422fd`) — needs clean device verify
-Three display-only improvements — **built, Release-compiles, 248 tests green, committed**
-(`reports/display_polish_build.md`). Identity is stable, hardening deferred. **Still needs
-a CLEAN device check** (the churn blocked it — see NEXT SESSION below):
-1. **ARRIVAL NAME** (`reports/arrival_name_audit.md`): `IncomingMessageView` —
-   `receivedPing` (208–211) + `historyPing` (228–231). Add a **name-precedence** helper:
-   (1) recipient's **LOCAL contact name** via `people.person(forSenderID:)` [the "Husband"
-   enhancement], (2) `m.senderDisplayName` [baseline], (3) `"someone"` [last resort]. ONE
-   shared helper; updates **ALL** receipt captions (they read `ping.fromName`). **Fixes the
-   "Someone" arrivals** (root cause = wife's null `display_name`; see Identity gotcha).
-2. **CONNECTION INDICATOR** (`reports/connection_indicator_audit.md`): `PeopleListView`
-   ONLY. The green "connected" indicator **already EXISTS** but is hidden for link
-   contacts — **re-surface it driven by `senderID`** (`isLinkContact = senderID set`) as
-   **"connected ✦"** (green **#5dcaa5**); render **nothing for nil** (no false "not yet
-   linked"). Display-only. (This IS finding #3 above — the connection-status indicator.)
-3. **CONTACT ICON → INITIAL:** standardize the avatar on the INITIAL, stop displaying the
-   per-person emoji. ⚠️ The cited `PersonDetailView:338` was the **WRONG target** — that
-   line is `prepareInvite()`'s `ownerEmoji` (the **invite payload**, pairing-era), NOT the
-   displayed icon — **left intact.** The real avatars were fixed: **`PersonDetailView:56`**
-   (header; had NO monogram fallback → emoji-less contacts showed BLANK — now the initial,
-   also fixes that gap) + **`PeopleListView.PersonCard`** (list avatar → initial-only;
-   emoji branch commented). `UserProfile.emoji` / `Person.emoji` **FIELDS KEPT** (only
-   their use as the icon removed; `UserProfile.emoji` still feeds the invite at `:338`, so
-   removal is not clean). Ties to the banked "[build 8/10] onboarding-emoji" field audit.
-
 ### ⭐ REMAINING BUGS (unphased) — no phase home (stragglers)
 The bugs above are folded into their phase homes (11b/Stage C · 9b · 10) + the separate
 double-tap audit. These have **no phase home** — they ride a different track:
 
 **ANIMATION TERRITORY** (⚠️ the *"never touch without care"* set — careful, AUDIT-FIRST,
 **batched separately** in an animation-chat session, NOT in the Phase-2 build line):
-- **#12 — Plane v1-not-v2 regression.** Sent with Plane → arrival played **Plane v1**, but
-  **Plane v2 is LOCKED** as gold-standard. Send/receive resolves the OLD version — a real
-  regression. Needs a careful audit of where the version is resolved on send/receive.
+- **#12 — Plane v1/v2 — RECONCILED:** believed LIVE/fixed (ROOT-2 `e0d7576`). No longer an active bug;
+  any residual version-resolution question gets a full review in the deferred **animation cluster**
+  (after the core/release-gating work) — not chased now.
 - **#13 — Animation aiming-order** (load emoji **before** aim feels broken): the
   emoji-then-aim sequencing reads wrong in the send mechanic. Animation-chat; audit-first.
 - **#14 — Send-sound distortion.** ⚠️ Reported under a **DEBUG** build — **VERIFY in a
@@ -432,126 +403,15 @@ double-tap audit. These have **no phase home** — they ride a different track:
   is clean: a **cold-start / warm-up** pattern (asset/first-run priming), not a logic bug;
   observe. (If pursued → animation territory.)
 
-### ⭐ SESSION CONTINUED — contact/unread fixes + 9b AUDIT DONE + open threads
-
-**COMMITTED THIS SESSION (beyond the batch + push):**
-- **PersonDetailView reconcile (`73cceaa`)** — `isConnected` now **senderID-primary**, compose
-  row **ungated**. **Device-verified:** a connected contact shows **"Connected ✓"** + message
-  history + reachable compose (was wrongly "not yet linked"). Closes finding #1.
-- **Unread-badge fix Option A (`7c0f956`)** — `SupabaseService.markAllMyPingsOpened()` on
-  foreground + the kept `setBadgeCount(0)`. **On-device log "marked all opened ✓"** (no RLS
-  block; `pings` has no RLS → inherits `markPingOpened`'s permission). **Badge = "unseen since
-  open"**; `opened_at` now means **seen/acknowledged** (so the sender's "opened ✦" receipt
-  fires on app-open — accepted trade-off). Closes finding #2. _(Both verified committed —
-  HEAD `7c0f956`; tree clean.)_
-
-**⭐ 9b CLEANUP AUDIT — DONE** (`reports/ninebee_cleanup_audit.md`) — removal plan ready.
-PRESERVE-LIST confirmed (PATH-1 survives, re-keyed to senderID): `pings` / `sendRemote` /
-`sendPing` / realtime+felt / `syncMissedThoughts` / `Person.senderID` / push chain /
-`markPingOpened` / `markAllMyPingsOpened` / `stampConnections` / `link_connections` / the
-connection signal.
-- **⚠️ CATCH 1 — `connectedFriendID` is LOAD-BEARING** (read LIVE by `PingView` send-timing,
-  `:1094/1171/1195`) → **do NOT remove**; only drop the PersonDetailView *clause* referencing
-  it (B5).
-- **⚠️ CATCH 2 — `claimOutcome` + its tests are now APP-ORPHANED** (`redeem`'s callers are all
-  `#if false`) → TRUTH's earlier "redeem/claimOutcome tests STAY" is **SUPERSEDED.** **DECISION
-  for Joshua next session:** retire `redeem`+`claimOutcome`+tests together, **OR** keep
-  `claimOutcome` as a tested pure-function island. _(Recommend retire-together.)_
-- **RECOMMENDED REMOVAL ORDER (5 batches; won't tangle; each builds + tests green):**
-  - **B1 — dead VIEWS hard-delete:** `ConnectView.swift` (incl. the now-orphaned
-    `MessageComposerView`), `PairAcceptView.swift`, RootView `#if false 518-679`, AccountView
-    `#if false` blocks, PersonDetailView's `#if false` invite code. _(Confirm AccountView's
-    Settings presenter is gone first.)_ Zero behavior change (all already `#if false`).
-  - **B2 — SupabaseService pairing API + DI:** `redeemCode` / `createProfileInvite` /
-    `lookupInvite` / `insertFromInvite` / `redeem`(+`claimOutcome` per decision);
-    `PairingServiceProtocol` / `MockPairingService` + the ServiceContainer field (declared +
-    assigned but **never read**).
-  - **B3 — PeopleManager funcs + TEST migration:** migrate **`SkipOnboardingTests:51` →
-    `person(forSenderID:)`** (1 line; Sarah's mirror keeps them equal); retire/split
-    `PairingScenarioTests` (18 tests); then delete `addFromInvite` / `bindConnection` /
-    `insertFromInvite` / `person(forPairedUserID:)`. **Test count will change.**
-  - **B4 — mutual-pointing unwire (NEED-CARE, own batch):** the cluster is DORMANT-WIRED (live
-    code that never fires because `reportPointing` is a no-op). PingManager state +
-    `presenceFelt` + `checkMutualPointing` → NotificationHandler **"pointing" branch (⚠️ KEEP
-    the live thought/PATH-1 `else` branch)** → CompassManager `reportPointingIfNeeded` / timer
-    → CompassView **edge-glow (`:897-909`)** → `reportPointing` no-op stub. **Build +
-    device-glance** (CompassView touched).
-  - **B5 — PersonDetailView `isConnected` simplify:** drop `connectedNow` + the
-    `connectedFriendID` clause → collapses to senderID-only.
-  - **Server-side (Joshua):** delete the `rapid-action` stray Edge Function; retire the Edge
-    Function's `compass_bearings`/"pointing" branch (with B4).
-
-**OPEN THREADS / NOT STARTED:**
-- **ANIMATION — queued, NOT started:** a prompt was drafted/sent to a separate animation chat
-  but **not worked through** (no audit reviewed, no build — effectively un-started). Items:
-  **#12 Plane v1-not-v2 [priority]**, #13 aiming-order, #14 send-sound (**verify in RELEASE
-  first**). ⚠️ **Do NOT run an animation BUILD and a 9b BUILD in the repo simultaneously.**
-- **NOTES:** **unfeelable-backlog** (missed pings older than the newest aren't replayable —
-  future item); `markPingOpened`/`markAllMyPingsOpened` would need a **recipient-UPDATE RLS
-  policy IF `pings` RLS is ever enabled** (today it's off).
-- **Pending device checks (opportunistic, single-phone/recipient):** the unread visual
-  badge-clear (recipient backlog → open → badge clears + stays clear).
-
-**REMAINING WORK:** the **9b removals (B1–B5, plan above — START next session)**, **Build 10**
-onboarding + **#6** name-persist, **Settings-tab review**, **Phase-2 test suite (#11)**, final
-cleanup (hard-delete remaining commented code, gitignore `reports/`).
+### PATH-1 preserve-list (survives 9b, re-keyed to senderID)
+`pings` · `sendRemote` · `sendPing` · realtime+felt · `syncMissedThoughts` · `Person.senderID` · push
+chain · `markPingOpened` · `markAllMyPingsOpened` · `stampConnections` · `link_connections`. _(Full
+session-continued narrative — PersonDetailView reconcile, unread-badge fix, 9b audit — archived below.)_
 
 ### Three LOCKED bucket decisions (Joshua, this session)
 1. **Replay-from-history does NOT flip opened** — replay = re-feel, not consume.
 2. **Bucket is ALL senders** — per-person scoping dropped ("fill my bucket" intent).
 3. **50-cap stays**; opened link messages count toward it.
-
-### Re-sequenced Build Order (back half) — replaces the prior 9→10→11
-Builds 5–9-safe-half are ✅ DONE (see ledger). The remaining order was re-sequenced
-this session — **the safe-half mechanical chunk was front-loaded; what's left is the
-decision-heavy, fresh-mind work.**
-
-- **5** ✅ DONE — contact auto-create on receive `[3cd8328]`
-- **6** ✅ DONE — People tab rework `[bde566e]`
-- **7** ✅ DONE — compass seeded-bearing degradation `[5595104]`
-- **8** ✅ DONE — strip pairing UI `[26c59ff]`
-- **9 (safe half)** ✅ DONE — unified bucket + pure-pairing retirement + Sarah
-  repoint `[2919f1f]`
-- **11b — IMPLEMENT THE TWO-PATH SEND** (per the locked SEND MODEL + connection-signal
-  spec above) — **THE PIVOT CUTOVER.** Now **STAGED A→B→C** (the design-audit is DONE —
-  `reports/connection_signal_build_spec.md`):
-  - **A** (no schema, ships): un-gate the link + remove the unconditional legacy send +
-    add (S1) `SentLink`. = PATH-2 "a link for everyone."
-  - **B**: the `link_connections` migration + receiver write/sweep (S2) + sender stamp.
-  - **C**: two-path `if/else` (connected → DIRECT re-keyed; else LINK) + poll receipts.
-  - **⚠️ Family-test gate is AFTER C** (link-every-time feels clunky to close contacts).
-  - **🐞 FOLDED BUGS (finish the send model's experience):** #1 PATH-1 push not firing
-    app-closed [HIGH — keystone] · #2 share/invitation text "Someone" → "[John]" [HIGH] ·
-    #3 name on the envelope [MED] · #15 display-polish batch clean device verify [owed].
-    (See *CLEAN TWO-PHONE TEST → NEXT-SESSION PRIORITIES*.)
-- **9b — retire genuinely-DEAD pairing plumbing ONLY** (NOT the direct-delivery
-  channel — that survives as PATH 1, re-keyed to `senderID`). The earlier "retire the
-  delivery backbone" wording is **SUPERSEDED** by the locked SEND MODEL. Only the dead
-  pairing bits (`connections` remnants, etc.) retire; the pings direct channel +
-  realtime receive STAY (re-keyed).
-  - **🐞 FOLDED BUGS:** #5 legacy "connect with [name]" screen (bypassable; retire →
-    tap-to-compose) · #4 forced-send-on-contact-add + remove the cold "[John] added you"
-    notification.
-- **10 — onboarding rewrite** — see **ONBOARDING / ARRIVAL NORTH-STAR** below (the
-  earlier "subtractive cut" of the dead connection-code screen is **ABSORBED** into
-  this redesign, not a separate build). Also touches `redeem`/`createInvite` (B1) and
-  `myPairingCode` (B5).
-  - **🐞 FOLDED BUGS:** #6 onboarding name-not-persisting + skip lingering-screen
-    (re-index artifact; **ROOT of the wife's NULL display_name → "Someone" arrivals**) ·
-    #7 Settings profile section (self name/address; Settings-review project) · #9 "someone
-    who loves you" caption + bucket-catch old-phase copy cleanup.
-- **11 — Phase 2 test suite** (automated scenarios).
-- **12 — SHOW-THE-MESSAGE web page** ✅ **BUILT · DEPLOYED · LIVE-TESTED**
-  (`pointward.app/m/[id]`, in the separate **pointward-website** repo — commit
-  `2d319d4` — live on GitHub Pages). Renders a real `/m/<id>` via anon `getMessage`;
-  empty state for a bad id. **One open dependency:** the install button uses a
-  TestFlight-link placeholder (no public link until external review / App Store). Full
-  status + shipped design/copy in **WEB PAGE (Build 12)** below.
-- **cleanup pass** — tighten/consolidate transitional logic (the mirror-write
-  bridge etc.), **hard-delete** the commented code, test audit, final TRUTH cleanup.
-
-> b10 / 11b are the **decision-heavy / fresh-mind** builds; b9 safe-half was the
-> last mechanical chunk (front-loaded deliberately).
 
 ### ⭐ BUILD 10 — OUTCOME + LOCKED DECISIONS (shipped `b10190f`)
 Onboarding = **sign-in → about-you** (name at the send-moment; location 3-option skip/type/use-current;
@@ -560,58 +420,14 @@ showcase optional/deferred). **Link-arriver path:** tap → message plays (no ga
 **friction-free + require-when-used + tutorial-as-setup**. Patch-not-rebuild (paged TabView trimmed).
 _(Full design-session reasoning, link-arriver structure, and phone-walkthrough findings archived below.)_
 
-### ⭐ WEB PAGE (Build 12) — BUILT · DEPLOYED · LIVE-TESTED ✅
-**STATUS:** the show-the-message page is **DONE and deployed** to the separate
-**pointward-website** repo (commit `2d319d4`, "add show-the-message page (404.html,
-path-style /m/<id>)"), live on **GitHub Pages at pointward.app**. **Live-tested
-working:** a real `/m/<id>` renders the real message; a bad id shows the empty state.
-**First production proof** that a static page fetches Pointward messages anonymously.
-- **SERVING:** **`404.html` at the repo root.** GitHub Pages has no SPA / path-wildcard,
-  so path-style `/m/<id>` links resolve via the 404.html fallback (reads the id from the
-  path, renders). **No app-side link-format change** (chosen over a `?id=` query form,
-  which would've forced an app change).
-- **DATA:** the anon **`get_message` RPC** (`POST …/rest/v1/rpc/get_message`, body
-  `{"p_id":"<uuid>"}`, array-wrapped → `rows[0]`; fields `emoji` / `content` /
-  `sender_display_name`; `[]` for unknown / expired). CORS verified from the page
-  origin. The anon key is public / shippable.
-- **BRAND: DARK PURPLE** (matches the live `index.html`: bg `#0d0d14`, text `#e8e0f0`,
-  accents `#3a2e50` / `#7c6b8e` / `#c4a8d4`). **SUPERSEDES the earlier "warm cream
-  palette" note** (placeholder, written before the real palette was known). Shimmer /
-  glow look better on dark.
-- **COPY (as shipped):** kicker *"[sender] sent you a thought ✦ it moves when it
-  arrives"*; glowing / floating emoji; serif message; *"from [sender]"*; **HERO** *"see
-  the full animation — the way [sender] intended ✦"*; **bonuses** *send one back · send
-  custom animations to others · save it · and more*; **button "Open Pointward"**;
-  **trust-line** *"free · no ads · for real"* (truthful — Pointward monetizes via the
-  paywall, NOT ads; keep that promise); quiet short-code fallback; faint drifting
-  instrument hints.
-- **DOES NOT `mark_opened`:** the web page **displays but does NOT flip opened** —
-  preserving the locked definition (*read = opened IN FULL IN-APP, the way the sender
-  intended*; a web glance is not a read). **The audit's "optional `mark_opened`" was
-  deliberately DECLINED.**
-- **✅ INSTALL BUTTON — LIVE (2026-06-22).** Both "Open / get Pointward" buttons now point at
-  the real public TestFlight link **`https://testflight.apple.com/join/rjAS4cnk`** (the
-  `TESTFLIGHT_LINK_PLACEHOLDER`/`XXXXXXXX` were replaced in `404.html` + `index.html`, committed
-  to pointward-website). **Web funnel verified END TO END on device:** web page → "get Pointward"
-  → TestFlight → install. **Routing (locked):** straight-to-install (no landing-page hop). _(was:
-  placeholder pending external review — now resolved; see the 2026-06-22 session block.)_
-- **TWO INVITE SURFACES (locked):** (1) the **share-sheet message text** in the
-  recipient's Messages thread (*"[sender] sent you a custom animated message ✦ tap to
-  preview"*) + the **iOS auto-preview card** (shapeable via the page's `og:` meta tags —
-  already added); (2) **this web page.** Surface 1 entices the tap; surface 2 catches
-  the no-app tap.
-- **Wiring is DONE** (the real, do-once work): message id from URL → anon
-  `getMessage(id)` → render. Look / copy is **cheap to change anytime** now that it's
-  wired.
-- **THREE-TIER ANIMATION LADDER:**
-  - **T1 (now):** static + cheap CSS shimmer + simple peripheral hints.
-  - **T2 (between Phase 2/3, END of the list):** recreate **simplified
-    onboarding-grade** instrument animations in CSS/SVG — **POC ONE instrument first**
-    (possibly as an onboarding-screen trial) to gauge easy-vs-painful before committing
-    to all.
-  - **T3 (Phase 3):** the full in-app animation rebuilt in the browser.
-  - ⚠️ The onboarding minis are **100% native SwiftUI — NOT web-portable.** Recreation,
-    not reuse; use them as **visual reference** only.
+### ⭐ WEB PAGE (Build 12) — DONE (the `/m/<id>` page)
+Live in the `pointward-website` repo (GitHub Pages at pointward.app). Locked decisions:
+- **Serving:** `404.html` at repo root (no path-wildcard on Pages) → path-style `/m/<id>` resolves; no app-side link-format change.
+- **Data:** anon `get_message` RPC (emoji/content/sender; `[]` → empty state; anon key public/shippable).
+- **Does NOT `mark_opened`** — a web glance is not a read (read = opened-in-full in-app).
+- **Install button LIVE** → `testflight.apple.com/join/rjAS4cnk`; web funnel verified end-to-end on device.
+- **Brand:** dark purple; trust-line "free · no ads · for real" — true: **v1 ships 100% FREE (no paywall).**
+_(Full shipped copy, og-tags, three-tier animation ladder + original write-up archived below — stale "monetizes via paywall" corrected to v1-100%-free.)_
 
 ### ⭐ PATH-1 NOTIFICATION + LIFESPAN + GROWTH
 - **PATH 1 push:** reuse the **EXISTING notification setup** (already mocked up). Copy
@@ -639,7 +455,7 @@ usage. More use → more people → don't pause for edge-perfection.
 
 ## ⭐ WORK CLUSTERS (prioritized) — PAIRING = RELEASE GATE
 
-_The live priority view (supersedes the POST-TEST QUEUE below as the "what's next" ledger; that queue is
+_The live priority view (supersedes the POST-TEST QUEUE (now archived) as the "what's next" ledger; that queue is
 kept for history). **One cluster gates the release; the rest is iterative polish — batch-test, cut a line
 for v1 whenever satisfied.**_
 
@@ -708,7 +524,7 @@ connection grounds.**
 ALL send+receive paths + ALL instruments (broader than the one A2 fix). Includes: **birthday cake broken
 in send/A2** (candles double-fire → renders the **ARROW** not the cake); **foreground direct-ping plays NO
 animation** (emoji only); **A2 is LINK-path only** (NOT direct-ping — consider adding); **#12 Plane
-v1-not-v2** wrong-version regression; **#13 aiming-order**; **#14 send-sound distortion** (⚠️ verify in
+v1/v2** (believed fixed in ROOT-2 — review deferred to this cluster, not an active bug); **#13 aiming-order**; **#14 send-sound distortion** (⚠️ verify in
 **Release** first — may be debug-only); the large **untested animation surface + device-test debt**
 (thoughts-toggle removal, bucket-delete, replay rework, compose-uniformity, birthday default msg,
 mic-denied wind, plane/flick V2, Special Moments stages); **extract the replicated A2 dispatch → shared
@@ -1387,6 +1203,227 @@ Headlines only — the durable detail (scope, decisions, reasoning, file:line) l
 
 _Relocated from the live flow in canon reduction pass 1 (additive-move, nothing deleted). The full
 unmodified original is `POINTWARD_TRUTH_ARCHIVE_2026-06-23.md`._
+
+
+_(archived 2026-06-23 from "⭐ WEB PAGE (Build 12) — BUILT · DEPLOYED · LIVE-TESTED ")_
+### ⭐ WEB PAGE (Build 12) — BUILT · DEPLOYED · LIVE-TESTED ✅
+**STATUS:** the show-the-message page is **DONE and deployed** to the separate
+**pointward-website** repo (commit `2d319d4`, "add show-the-message page (404.html,
+path-style /m/<id>)"), live on **GitHub Pages at pointward.app**. **Live-tested
+working:** a real `/m/<id>` renders the real message; a bad id shows the empty state.
+**First production proof** that a static page fetches Pointward messages anonymously.
+- **SERVING:** **`404.html` at the repo root.** GitHub Pages has no SPA / path-wildcard,
+  so path-style `/m/<id>` links resolve via the 404.html fallback (reads the id from the
+  path, renders). **No app-side link-format change** (chosen over a `?id=` query form,
+  which would've forced an app change).
+- **DATA:** the anon **`get_message` RPC** (`POST …/rest/v1/rpc/get_message`, body
+  `{"p_id":"<uuid>"}`, array-wrapped → `rows[0]`; fields `emoji` / `content` /
+  `sender_display_name`; `[]` for unknown / expired). CORS verified from the page
+  origin. The anon key is public / shippable.
+- **BRAND: DARK PURPLE** (matches the live `index.html`: bg `#0d0d14`, text `#e8e0f0`,
+  accents `#3a2e50` / `#7c6b8e` / `#c4a8d4`). **SUPERSEDES the earlier "warm cream
+  palette" note** (placeholder, written before the real palette was known). Shimmer /
+  glow look better on dark.
+- **COPY (as shipped):** kicker *"[sender] sent you a thought ✦ it moves when it
+  arrives"*; glowing / floating emoji; serif message; *"from [sender]"*; **HERO** *"see
+  the full animation — the way [sender] intended ✦"*; **bonuses** *send one back · send
+  custom animations to others · save it · and more*; **button "Open Pointward"**;
+  **trust-line** *"free · no ads · for real"* (truthful — **v1 ships 100% FREE, no
+  paywall**; keep that promise);
+  instrument hints.
+- **DOES NOT `mark_opened`:** the web page **displays but does NOT flip opened** —
+  preserving the locked definition (*read = opened IN FULL IN-APP, the way the sender
+  intended*; a web glance is not a read). **The audit's "optional `mark_opened`" was
+  deliberately DECLINED.**
+- **✅ INSTALL BUTTON — LIVE (2026-06-22).** Both "Open / get Pointward" buttons now point at
+  the real public TestFlight link **`https://testflight.apple.com/join/rjAS4cnk`** (the
+  `TESTFLIGHT_LINK_PLACEHOLDER`/`XXXXXXXX` were replaced in `404.html` + `index.html`, committed
+  to pointward-website). **Web funnel verified END TO END on device:** web page → "get Pointward"
+  → TestFlight → install. **Routing (locked):** straight-to-install (no landing-page hop). _(was:
+  placeholder pending external review — now resolved; see the 2026-06-22 session block.)_
+- **TWO INVITE SURFACES (locked):** (1) the **share-sheet message text** in the
+  recipient's Messages thread (*"[sender] sent you a custom animated message ✦ tap to
+  preview"*) + the **iOS auto-preview card** (shapeable via the page's `og:` meta tags —
+  already added); (2) **this web page.** Surface 1 entices the tap; surface 2 catches
+  the no-app tap.
+- **Wiring is DONE** (the real, do-once work): message id from URL → anon
+  `getMessage(id)` → render. Look / copy is **cheap to change anytime** now that it's
+  wired.
+- **THREE-TIER ANIMATION LADDER:**
+  - **T1 (now):** static + cheap CSS shimmer + simple peripheral hints.
+  - **T2 (between Phase 2/3, END of the list):** recreate **simplified
+    onboarding-grade** instrument animations in CSS/SVG — **POC ONE instrument first**
+    (possibly as an onboarding-screen trial) to gauge easy-vs-painful before committing
+    to all.
+  - **T3 (Phase 3):** the full in-app animation rebuilt in the browser.
+  - ⚠️ The onboarding minis are **100% native SwiftUI — NOT web-portable.** Recreation,
+    not reuse; use them as **visual reference** only.
+
+
+_(archived 2026-06-23 from "Re-sequenced Build Order (back half) — replaces the pri")_
+### Re-sequenced Build Order (back half) — replaces the prior 9→10→11
+Builds 5–9-safe-half are ✅ DONE (see ledger). The remaining order was re-sequenced
+this session — **the safe-half mechanical chunk was front-loaded; what's left is the
+decision-heavy, fresh-mind work.**
+
+- **5** ✅ DONE — contact auto-create on receive `[3cd8328]`
+- **6** ✅ DONE — People tab rework `[bde566e]`
+- **7** ✅ DONE — compass seeded-bearing degradation `[5595104]`
+- **8** ✅ DONE — strip pairing UI `[26c59ff]`
+- **9 (safe half)** ✅ DONE — unified bucket + pure-pairing retirement + Sarah
+  repoint `[2919f1f]`
+- **11b — IMPLEMENT THE TWO-PATH SEND** (per the locked SEND MODEL + connection-signal
+  spec above) — **THE PIVOT CUTOVER.** Now **STAGED A→B→C** (the design-audit is DONE —
+  `reports/connection_signal_build_spec.md`):
+  - **A** (no schema, ships): un-gate the link + remove the unconditional legacy send +
+    add (S1) `SentLink`. = PATH-2 "a link for everyone."
+  - **B**: the `link_connections` migration + receiver write/sweep (S2) + sender stamp.
+  - **C**: two-path `if/else` (connected → DIRECT re-keyed; else LINK) + poll receipts.
+  - **⚠️ Family-test gate is AFTER C** (link-every-time feels clunky to close contacts).
+  - **🐞 FOLDED BUGS (finish the send model's experience):** #1 PATH-1 push not firing
+    app-closed [HIGH — keystone] · #2 share/invitation text "Someone" → "[John]" [HIGH] ·
+    #3 name on the envelope [MED] · #15 display-polish batch clean device verify [owed].
+    (See *CLEAN TWO-PHONE TEST → NEXT-SESSION PRIORITIES*.)
+- **9b — retire genuinely-DEAD pairing plumbing ONLY** (NOT the direct-delivery
+  channel — that survives as PATH 1, re-keyed to `senderID`). The earlier "retire the
+  delivery backbone" wording is **SUPERSEDED** by the locked SEND MODEL. Only the dead
+  pairing bits (`connections` remnants, etc.) retire; the pings direct channel +
+  realtime receive STAY (re-keyed).
+  - **🐞 FOLDED BUGS:** #5 legacy "connect with [name]" screen (bypassable; retire →
+    tap-to-compose) · #4 forced-send-on-contact-add + remove the cold "[John] added you"
+    notification.
+- **10 — onboarding rewrite** — see **ONBOARDING / ARRIVAL NORTH-STAR** below (the
+  earlier "subtractive cut" of the dead connection-code screen is **ABSORBED** into
+  this redesign, not a separate build). Also touches `redeem`/`createInvite` (B1) and
+  `myPairingCode` (B5).
+  - **🐞 FOLDED BUGS:** #6 onboarding name-not-persisting + skip lingering-screen
+    (re-index artifact; **ROOT of the wife's NULL display_name → "Someone" arrivals**) ·
+    #7 Settings profile section (self name/address; Settings-review project) · #9 "someone
+    who loves you" caption + bucket-catch old-phase copy cleanup.
+- **11 — Phase 2 test suite** (automated scenarios).
+- **12 — SHOW-THE-MESSAGE web page** ✅ **BUILT · DEPLOYED · LIVE-TESTED**
+  (`pointward.app/m/[id]`, in the separate **pointward-website** repo — commit
+  `2d319d4` — live on GitHub Pages). Renders a real `/m/<id>` via anon `getMessage`;
+  empty state for a bad id. **One open dependency:** the install button uses a
+  TestFlight-link placeholder (no public link until external review / App Store). Full
+  status + shipped design/copy in **WEB PAGE (Build 12)** below.
+- **cleanup pass** — tighten/consolidate transitional logic (the mirror-write
+  bridge etc.), **hard-delete** the commented code, test audit, final TRUTH cleanup.
+
+> b10 / 11b are the **decision-heavy / fresh-mind** builds; b9 safe-half was the
+> last mechanical chunk (front-loaded deliberately).
+
+
+_(archived 2026-06-23 from "⭐ SESSION CONTINUED — contact/unread fixes + 9b AUDIT D")_
+### ⭐ SESSION CONTINUED — contact/unread fixes + 9b AUDIT DONE + open threads
+
+**COMMITTED THIS SESSION (beyond the batch + push):**
+- **PersonDetailView reconcile (`73cceaa`)** — `isConnected` now **senderID-primary**, compose
+  row **ungated**. **Device-verified:** a connected contact shows **"Connected ✓"** + message
+  history + reachable compose (was wrongly "not yet linked"). Closes finding #1.
+- **Unread-badge fix Option A (`7c0f956`)** — `SupabaseService.markAllMyPingsOpened()` on
+  foreground + the kept `setBadgeCount(0)`. **On-device log "marked all opened ✓"** (no RLS
+  block; `pings` has no RLS → inherits `markPingOpened`'s permission). **Badge = "unseen since
+  open"**; `opened_at` now means **seen/acknowledged** (so the sender's "opened ✦" receipt
+  fires on app-open — accepted trade-off). Closes finding #2. _(Both verified committed —
+  HEAD `7c0f956`; tree clean.)_
+
+**⭐ 9b CLEANUP AUDIT — DONE** (`reports/ninebee_cleanup_audit.md`) — removal plan ready.
+PRESERVE-LIST confirmed (PATH-1 survives, re-keyed to senderID): `pings` / `sendRemote` /
+`sendPing` / realtime+felt / `syncMissedThoughts` / `Person.senderID` / push chain /
+`markPingOpened` / `markAllMyPingsOpened` / `stampConnections` / `link_connections` / the
+connection signal.
+- **⚠️ CATCH 1 — `connectedFriendID` is LOAD-BEARING** (read LIVE by `PingView` send-timing,
+  `:1094/1171/1195`) → **do NOT remove**; only drop the PersonDetailView *clause* referencing
+  it (B5).
+- **⚠️ CATCH 2 — `claimOutcome` + its tests are now APP-ORPHANED** (`redeem`'s callers are all
+  `#if false`) → TRUTH's earlier "redeem/claimOutcome tests STAY" is **SUPERSEDED.** **DECISION
+  for Joshua next session:** retire `redeem`+`claimOutcome`+tests together, **OR** keep
+  `claimOutcome` as a tested pure-function island. _(Recommend retire-together.)_
+- **RECOMMENDED REMOVAL ORDER (5 batches; won't tangle; each builds + tests green):**
+  - **B1 — dead VIEWS hard-delete:** `ConnectView.swift` (incl. the now-orphaned
+    `MessageComposerView`), `PairAcceptView.swift`, RootView `#if false 518-679`, AccountView
+    `#if false` blocks, PersonDetailView's `#if false` invite code. _(Confirm AccountView's
+    Settings presenter is gone first.)_ Zero behavior change (all already `#if false`).
+  - **B2 — SupabaseService pairing API + DI:** `redeemCode` / `createProfileInvite` /
+    `lookupInvite` / `insertFromInvite` / `redeem`(+`claimOutcome` per decision);
+    `PairingServiceProtocol` / `MockPairingService` + the ServiceContainer field (declared +
+    assigned but **never read**).
+  - **B3 — PeopleManager funcs + TEST migration:** migrate **`SkipOnboardingTests:51` →
+    `person(forSenderID:)`** (1 line; Sarah's mirror keeps them equal); retire/split
+    `PairingScenarioTests` (18 tests); then delete `addFromInvite` / `bindConnection` /
+    `insertFromInvite` / `person(forPairedUserID:)`. **Test count will change.**
+  - **B4 — mutual-pointing unwire (NEED-CARE, own batch):** the cluster is DORMANT-WIRED (live
+    code that never fires because `reportPointing` is a no-op). PingManager state +
+    `presenceFelt` + `checkMutualPointing` → NotificationHandler **"pointing" branch (⚠️ KEEP
+    the live thought/PATH-1 `else` branch)** → CompassManager `reportPointingIfNeeded` / timer
+    → CompassView **edge-glow (`:897-909`)** → `reportPointing` no-op stub. **Build +
+    device-glance** (CompassView touched).
+  - **B5 — PersonDetailView `isConnected` simplify:** drop `connectedNow` + the
+    `connectedFriendID` clause → collapses to senderID-only.
+  - **Server-side (Joshua):** delete the `rapid-action` stray Edge Function; retire the Edge
+    Function's `compass_bearings`/"pointing" branch (with B4).
+
+**OPEN THREADS / NOT STARTED:**
+- **ANIMATION — queued, NOT started:** a prompt was drafted/sent to a separate animation chat
+  but **not worked through** (no audit reviewed, no build — effectively un-started). Items:
+  **#12 Plane v1-not-v2 [priority]**, #13 aiming-order, #14 send-sound (**verify in RELEASE
+  first**). ⚠️ **Do NOT run an animation BUILD and a 9b BUILD in the repo simultaneously.**
+- **NOTES:** **unfeelable-backlog** (missed pings older than the newest aren't replayable —
+  future item); `markPingOpened`/`markAllMyPingsOpened` would need a **recipient-UPDATE RLS
+  policy IF `pings` RLS is ever enabled** (today it's off).
+- **Pending device checks (opportunistic, single-phone/recipient):** the unread visual
+  badge-clear (recipient backlog → open → badge clears + stays clear).
+
+**REMAINING WORK:** the **9b removals (B1–B5, plan above — START next session)**, **Build 10**
+onboarding + **#6** name-persist, **Settings-tab review**, **Phase-2 test suite (#11)**, final
+cleanup (hard-delete remaining commented code, gitignore `reports/`).
+
+
+_(archived 2026-06-23 from "⭐ DISPLAY-POLISH BATCH — ✅ BUILT + COMMITTED (`90422fd`")_
+### ⭐ DISPLAY-POLISH BATCH — ✅ BUILT + COMMITTED (`90422fd`) — needs clean device verify
+Three display-only improvements — **built, Release-compiles, 248 tests green, committed**
+(`reports/display_polish_build.md`). Identity is stable, hardening deferred. **Still needs
+a CLEAN device check** (the churn blocked it — see NEXT SESSION below):
+1. **ARRIVAL NAME** (`reports/arrival_name_audit.md`): `IncomingMessageView` —
+   `receivedPing` (208–211) + `historyPing` (228–231). Add a **name-precedence** helper:
+   (1) recipient's **LOCAL contact name** via `people.person(forSenderID:)` [the "Husband"
+   enhancement], (2) `m.senderDisplayName` [baseline], (3) `"someone"` [last resort]. ONE
+   shared helper; updates **ALL** receipt captions (they read `ping.fromName`). **Fixes the
+   "Someone" arrivals** (root cause = wife's null `display_name`; see Identity gotcha).
+2. **CONNECTION INDICATOR** (`reports/connection_indicator_audit.md`): `PeopleListView`
+   ONLY. The green "connected" indicator **already EXISTS** but is hidden for link
+   contacts — **re-surface it driven by `senderID`** (`isLinkContact = senderID set`) as
+   **"connected ✦"** (green **#5dcaa5**); render **nothing for nil** (no false "not yet
+   linked"). Display-only. (This IS finding #3 above — the connection-status indicator.)
+3. **CONTACT ICON → INITIAL:** standardize the avatar on the INITIAL, stop displaying the
+   per-person emoji. ⚠️ The cited `PersonDetailView:338` was the **WRONG target** — that
+   line is `prepareInvite()`'s `ownerEmoji` (the **invite payload**, pairing-era), NOT the
+   displayed icon — **left intact.** The real avatars were fixed: **`PersonDetailView:56`**
+   (header; had NO monogram fallback → emoji-less contacts showed BLANK — now the initial,
+   also fixes that gap) + **`PeopleListView.PersonCard`** (list avatar → initial-only;
+   emoji branch commented). `UserProfile.emoji` / `Person.emoji` **FIELDS KEPT** (only
+   their use as the icon removed; `UserProfile.emoji` still feeds the invite at `:338`, so
+   removal is not clean). Ties to the banked "[build 8/10] onboarding-emoji" field audit.
+
+
+_(archived 2026-06-23 from "Pivot Session (next major)")_
+## Pivot Session (next major)
+
+The next major effort is the **Phase 2 — Link Delivery Model** (see that section
+below). The pivot is **link-BASED** (`pointward.app/m/[messageID]`): it does
+**not** remove link delivery — link delivery *is* the new model. What it removes
+is **pairing** — manual codes, typed IDs, the `connections` table, and
+`PairAcceptView` — replacing it with a real sent message that carries the
+sender's identity in the link.
+
+> The authoritative removal mechanics — the load-bearing step order and the exact
+> seams to cut — live in **PAIRING_AUDIT.md §5** ("Suggested order for the
+> pivot"). Defer to that file; the order is intentionally **not** reproduced here,
+> to avoid drift.
+
+---
+
 
 _(archived 2026-06-23 — detail behind: Phase 2 — Link Delivery: COMPLETE (builds 1–9 ship)_
 ### Phase 2 Progress Ledger (DONE + verified)
