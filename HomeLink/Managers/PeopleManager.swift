@@ -6,6 +6,15 @@ import Combine
 import SwiftData
 import CoreLocation
 
+// [conn-di-seam] The server calls PeopleManager makes for the connection cluster
+// (the 256e854 fallback's profile resolve + P2's delete-disconnect). Default =
+// SupabaseService.shared (production); tests inject a mock. Reversible.
+protocol ConnectionService {
+    func fetchPublicProfile(of user: UUID) async -> SupabaseService.PublicProfile?
+    func deleteConnection(other: UUID) async -> Bool
+}
+extension SupabaseService: ConnectionService {}
+
 @MainActor
 final class PeopleManager: ObservableObject {
 
@@ -19,10 +28,13 @@ final class PeopleManager: ObservableObject {
     @Published private(set) var contactsWithOpenedReceipt: Set<UUID> = []
 
     private let subscriptionManager: SubscriptionManager
+    private let connectionService: ConnectionService   // [conn-di-seam]
     private var modelContext: ModelContext?
 
-    init(subscriptionManager: SubscriptionManager) {
+    init(subscriptionManager: SubscriptionManager,
+         connectionService: ConnectionService = SupabaseService.shared) {   // [conn-di-seam] defaults → prod
         self.subscriptionManager = subscriptionManager
+        self.connectionService = connectionService
     }
 
     func configure(with context: ModelContext) {
@@ -176,7 +188,7 @@ final class PeopleManager: ObservableObject {
     // instead. A manual contact (no senderID) has no server row → local-delete as before.
     func deletePerson(_ person: Person) async throws {
         if let sid = person.senderID, !sid.isEmpty, let other = UUID(uuidString: sid) {
-            guard await SupabaseService.shared.deleteConnection(other: other) else {
+            guard await connectionService.deleteConnection(other: other) else {
                 throw PeopleError.disconnectFailed
             }
         }
@@ -368,7 +380,7 @@ final class PeopleManager: ObservableObject {
                 // a synced connection never changes the active person. upsertContact /
                 // applySenderLocation save + fetchAll themselves.
                 let y = row.connectedUserID
-                let profile = await SupabaseService.shared.fetchPublicProfile(of: y)
+                let profile = await connectionService.fetchPublicProfile(of: y)
                 upsertContact(senderID: y.uuidString,
                               displayName: profile?.displayName,
                               makeActive: false)
