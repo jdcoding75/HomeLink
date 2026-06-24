@@ -59,8 +59,11 @@ from these, never hardcode.
 - InstrumentBoundaries.swift — screen coordinate
   rules + instrument generation spec
 Note: instrumentHints is the designated source of
-truth for instrument copy but is NOT yet wired
-into the live send flow (open item).
+truth for instrument copy and IS wired into compose
+(suggestion option + last seed fallback,
+CompassView:1863/1897; 7 of 9 styles, birthday/
+firework none). (Corrected 2026-06-24 — "not yet
+wired" was stale.)
 
 ## BUILD CHECKLIST — run before every commit:
 // New emoji added? → Update CuratedEmoji, soundMap, RevealAnimationRegistry

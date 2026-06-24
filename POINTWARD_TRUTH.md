@@ -144,8 +144,11 @@ never hardcode.
 
 **Known wiring gaps (carry forward — do not assume wired):**
 - `TaglineSystem.instrumentHints` is the *designated* source of truth for
-  instrument copy but is **not yet wired** into the live send flow (Session 8
-  open item). Live send currently uses the per-person poetic tagline.
+  instrument copy and **IS wired** into compose (corrected 2026-06-24 — the old
+  "not yet wired" was STALE): a suggestion option (`CompassView:1863`) + the LAST
+  seed fallback (`:1897`). 7 of 9 styles have a hint; **birthday/firework have none**.
+  Seed precedence: manifest `defaultMessage` → per-emoji `CuratedEmoji.defaultMessage`
+  → this hint. The traveling poetic tagline still rides from the person, separately.
 - `CuratedEmoji.soundMap` and `RevealAnimationRegistry` still list some retired
   emojis and omit live `.pro` 🙏 (falls back to `.bloom`). Reconcile when next
   touching the emoji set.
@@ -785,8 +788,10 @@ blocks the web teasers — the wire key is stable):
   7 instruments.
 - **`SenderStyle.shootingStar` is an orphan** (`SenderStyle.swift:12`) — legacy inline `shootingStarSend`, no
   instrument, not in the live dispatch; still carried through every exhaustive switch.
-- **Dispatch replicated across 4 surfaces:** `CompassView` flightToken ladder (send), `SenderAnimationView.body`
-  switch (dead birthday/firework arms), `ReceiptView` switch (receipt), `RevealAnimationRegistry` (reveal).
+- **Dispatch — send+receipt SELECTION now CONSOLIDATED** into the pure `AnimationDispatch` (`00e97b6`,
+  unit-tested), consumed by `CompassView` flightToken + `ReceiptView` + `ArrivalSequenceView`. REMAINING:
+  `SenderAnimationView.body`'s inner inline-send switch (the `.shared` styles glow/shootingStar/firefly/rocket
+  + dead birthday/firework arms) + `RevealAnimationRegistry` (the reveal layer).
 - **`firefly` vs `wind` naming drift** — the live wind instrument runs under `SenderStyle.firefly` /
   `fireflySend`; user-facing name still "firefly."
 - **`messages.instrument` stores the STYLE rawValue, not an instrument** (`CompassView:2351`) — column name
@@ -797,6 +802,22 @@ blocks the web teasers — the wire key is stable):
   other send file's header says it does NOT — a violated shared contract.
 - **Timing truth duplicated** across `SenderStyle.sendDuration`, `InstrumentBoundaries`, and each view's own
   hardcoded `total` (e.g. Bow 2.30 decoupled from the enum).
+- **Manifest live-row LABEL vs DISPATCH mismatch:** `AnimationManifest.liveInstruments` filters out
+  `V2`/`Parachute`/`Legs-down` → labels **V1** as the live row for bow/flick/plane/birthday, but the views /
+  `AnimationDispatch` actually dispatch **V2**. (Cleanup C4 fixes the labels.)
+- **Under-wired manifest data:** `defaultEmoji` is a blanket `🤗` for 7 of 9 (only birthday 🎁 / firework 🎆
+  override); `defaultTagline` was unwired (0 readers) → **REMOVED 2026-06-24 (cleanup C3)**; `instrumentHints`
+  is wired only as the fallback (see SOURCES OF TRUTH). **Wand has no dedicated receipt (R4)** →
+  `standardReceipt` (`ReceiptView:130-135`).
+- **➡ ROADMAP = `reports/animation_consistency_map.md`** — the per-style bundle + the ranked,
+  independently-shippable cleanup plan (C1–C10) for THIS pass. **Pre-launch-safe slices DONE (this commit):
+  C1 (docs) + C3 (drop unwired `defaultTagline`).** The rest are **post-TestFlight, AUDIT-FIRST** (they touch
+  animation/instrument/receipt/reveal files): C2 hard-delete the `#if false [arrival-parity]` originals (after
+  the arrival two-phone verify) · C4 manifest version labels · C5 inline sends→dedicated files · C6 re-house
+  special moments · C9 `shootingStar` · C10 wand receipt · C7 per-style bundle. ⚠️ **C8 (`firefly`→`wind`
+  rename) is WIRE-BREAKING** — `SenderStyle.rawValue "firefly"` is PERSISTED (history) + on the WIRE
+  (`pings.sender_style`, `messages.instrument`) + the WEB-TEASER key → **post-launch ONLY, with a migration.**
+  None of C2–C10 is a v1 blocker (the system works — path audit + arrival parity confirmed).
 
 ---
 

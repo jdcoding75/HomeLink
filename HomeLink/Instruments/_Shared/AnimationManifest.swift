@@ -86,12 +86,10 @@ struct AnimationDefinition: Identifiable, Hashable {
     /// hardcoded at the seed site. Only Birthday sets a value today.
     var defaultMessage: String? = nil
 
-    /// [per-instrument default tagline] FIELD ONLY — not yet wired (no values set). The
-    /// traveling tagline currently rides from the selected PERSON
-    /// (`people.selectedPerson?.tagline`), a different/entangled path than the message seed,
-    /// so wiring is deliberately deferred. Added now so the manifest is the future home for a
-    /// per-instrument tagline default. Default nil → zero effect today.
-    var defaultTagline: String? = nil
+    // [animation-cleanup C3, 2026-06-24] `defaultTagline: String? = nil` REMOVED — it was
+    // unwired (no row set it; 0 readers — grep-verified). The traveling tagline rides from
+    // the selected PERSON, not the manifest. Re-add here if a per-instrument tagline default
+    // is ever actually wired. (Distinct from `TaglineSystem.defaultTagline`, which stays.)
 
     /// Stable id, e.g. "bow.v2" / "firework" / "compass".
     var id: String {
