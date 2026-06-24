@@ -60,29 +60,36 @@
   things; automate all logic.
 
 ### CURRENT STATE (what's done / what's next — update each session)
-- **RELEASE GATE = PAIRING CLUSTER → SERVER SIDE DONE; CLIENT reconcile + DB-scenario tests REMAINING.**
-  P1/P2/P3 + harness 9/9 are the HAPPY path (P3 `366fe79`, P2 `bcee4fe`, P1 `2c2f535`, harness `9cf858f`;
-  server policies MCP-verified). The 2026-06-23 delete→reconnect gap (sender never re-greens) had its
-  **SERVER side FIXED** (`07c770c` `[conn-reconnect-fix]`): `record_connection` now does `on conflict
-  (sender_id, connected_user_id) do update set via_message_id = excluded.via_message_id, connected_at =
-  now()` (was `do nothing`) → a reconnect re-fires + refreshes the via, so the stale-via symptom is gone
-  server-side; the LIVE RPC is verified upsert. **REMAINING / unverified:** the CLIENT reconcile (does
-  `stampConnections` match on `connected_user_id`, and the receiver re-fire on re-open so the sender
-  re-greens) + the **DB-scenario test suite** (clean-connect · delete→reconnect · one-sided · both · churn,
-  via Supabase MCP). P3 realtime publication is LIVE (`link_connections` in `supabase_realtime`, DB-verified).
-  See WORK CLUSTERS P1 + `reports/device_test_2026-06-23.md`.
+- **✅ RELEASE GATE = PAIRING CLUSTER → CONNECTION GATE CLOSED for v1 (delete→reconnect re-green FIXED +
+  VERIFIED end-to-end).** P1/P2/P3 + harness (P3 `366fe79`, P2 `bcee4fe`, P1 `2c2f535`, harness `9cf858f`;
+  server policies MCP-verified). **SERVER:** `record_connection` upserts (`07c770c` `[conn-reconnect-fix]`:
+  `on conflict (sender_id, connected_user_id) do update set via_message_id = excluded.via_message_id,
+  connected_at = now()` — was `do nothing`) → a reconnect re-fires + refreshes the via (stale-via gone);
+  migration `20260624000000` applied + MCP-verified. **CLIENT (built + unit-proven):** `stampConnections`
+  falls through to `connected_user_id` when the SentLink is dangling/absent (`07c770c`), `deletePerson`
+  deletes the contact's SentLinks, `record_connection` re-fires on EVERY open (not gated), realtime
+  `onConnection` re-runs `syncConnections`. **VERIFIED:** S1–S5 (within the 16/16 `ConnectionClusterTests`,
+  incl. testS2 = the bug) + **DB-scenario S6/S7/S8 PASS via Supabase MCP** (S6 old-link-reopen idempotent ·
+  S7 upsert semantics · S8 RLS scoping) + **S9 two-phone DEVICE-CONFIRMED** (clean connect greens; then
+  delete→reconnect → sender RE-GREENS, server-verified row reformed with updated via). Re-greens on
+  foreground-sync, not live (realtime INSERT-only caveat; acceptable). P3 realtime publication LIVE
+  (`link_connections` in `supabase_realtime`). **v1 is no longer blocked on connection grounds.** See WORK
+  CLUSTERS P1 + `reports/connection_fix_bank.md` (S6–S8) / `reports/s9_device_result.md` (S9) /
+  `reports/audit_perside_client_reconcile.md` (client code). **DEFERRED (post-v1, NOT gating):** the deeper
+  per-side-state MACHINE (pending/recorded/consumed/expired/failed per side) + an optional live-DB assertion
+  layer vs the hermetic mock.
 - **PAIRING DESIGN (decided).** ONE CONTACT PER USER ID (senderID sticks; incoming ID auto-attaches, never
   double-creates; server name never overwrites user name; "let it live, user cleans up" — NO
   auto-merge/merge-tool/name-matching). P1 = visibility only. P2 = one-directional disconnect = the
   linchpin that makes cleanup stick. Contacts-pick PREFERRED (firm name/address/channel; auto-addressed
   first send; stores send-channel = wrong-person PREVENTION; P2+P1 = safety net).
-- **NEXT PRIORITIES.** (1) **VERIFY the CLIENT reconcile** for delete→reconnect — the server upsert is in
-  (`07c770c`); confirm `stampConnections` matches on `connected_user_id` + the receiver re-fires on re-open
-  so the sender re-greens — then ship the **DB-scenario test suite** (clean-connect · delete→reconnect ·
-  one-sided · both · churn, via Supabase MCP). (2) **repo-hygiene:** write the already-live realtime +
-  `record_connection`-upsert SQL into `supabase/migrations/` for the record (the DB already has both — NOT a
-  DB-state gap; see WORK CLUSTERS P1). (3) the **iterative/non-blocking clusters** per WORK CLUSTERS (incl.
-  the contact-UX bugs). _(Canon reduction passes 1–3 DONE.)_
+- **NEXT PRIORITIES.** **The connection gate is CLOSED → v1 is no longer blocked on connection grounds.**
+  (1) the **iterative/non-blocking clusters** per WORK CLUSTERS (animation-correctness / ARRIVAL PARITY,
+  screens-reduction, compass HOLD·LOCK·TAP, contact-UX bugs, pre-launch polish, web teasers). (2)
+  **repo-hygiene:** write the already-live realtime + `record_connection`-upsert SQL into
+  `supabase/migrations/` for the record (the DB already has both — NOT a DB-state gap). **Deferred (post-v1,
+  not gating):** the deeper per-side-state MACHINE; the live-DB assertion layer vs the hermetic mock; the
+  realtime UPDATE subscription (live reconnect re-green). _(Canon reduction passes 1–3 DONE.)_
 - **CI (GitHub Actions auto-run on push) — SHELVED pre-launch.** Reason: the headless runner launches the
   full app as the test host → unbounded per-subsystem launch crashes (APNs / SwiftData / StoreKit / Supabase
   SDK). Durable fix = host-less tests, which need `ENABLE_DEBUG_DYLIB = NO` on the app target (the Xcode-16
@@ -546,15 +553,18 @@ policies live, `record_connection` SECURITY DEFINER, no bilateral RPC. REMAINING
 pass (real APNs-to-closed-app, true cold install, UI render incl. "(2)"/"same id as" rows, P3 live socket;
 `reports/connection_test_harness.md`).
 
-**🟡 PARTIALLY CLOSED — SERVER FIXED (`07c770c`); CLIENT reconcile + DB-scenario tests REMAIN (was: MISSING
-PER-SIDE CONNECTION STATE).** The connection is modeled as ONE shared fact, signalled ONE-SHOT +
-ONE-DIRECTIONAL: `record_connection` fires on the receiver's open; PK `(sender_id, connected_user_id)`.
-**SERVER FIX IS IN** (`[conn-reconnect-fix]`, `07c770c`): the RPC now does `on conflict do update set
-via_message_id = excluded.via_message_id, connected_at = now()` (was `do nothing`) → a reconnect re-fires +
-refreshes the via, so the stale-via symptom is gone server-side (LIVE RPC verified upsert). **REMAINING:**
-verify the CLIENT reconcile (`stampConnections` match on `connected_user_id`; receiver re-fire on re-open →
-sender re-greens) + the DB-scenario test suite. **No per-side state MACHINE yet** (each side's independent
-view) — the deeper model is still future work, but the shipping delete→reconnect bug is server-closed.
+**✅ CLOSED for v1 — delete→reconnect re-green FIXED + VERIFIED end-to-end (was: MISSING PER-SIDE CONNECTION
+STATE).** **SERVER:** `record_connection` upserts (`[conn-reconnect-fix]`, `07c770c`: `on conflict do update
+set via_message_id = excluded.via_message_id, connected_at = now()` — was `do nothing`) → reconnect re-fires
++ refreshes the via (stale-via gone); migration `20260624000000` applied + MCP-verified. **CLIENT (built):**
+`stampConnections` falls through to `connected_user_id` on a dangling/absent SentLink (`07c770c`),
+`deletePerson` deletes the contact's SentLinks, `record_connection` re-fires on EVERY open, realtime
+`onConnection` re-runs `syncConnections`. **VERIFIED:** S1–S5 (within 16/16 `ConnectionClusterTests`, incl.
+testS2 = the bug) + **DB-scenario S6/S7/S8 PASS via MCP** (`reports/connection_fix_bank.md`) + **S9 two-phone
+DEVICE-CONFIRMED** (`reports/s9_device_result.md`: clean connect greens → delete→reconnect → sender RE-GREENS,
+server-verified). Client-code trace: `reports/audit_perside_client_reconcile.md`. **DEFERRED (post-v1, NOT
+gating):** an explicit per-side state MACHINE (pending/recorded/consumed/expired/failed per side) + an
+optional live-DB assertion layer vs the hermetic mock. _(Symptom/root-cause kept below for the record.)_
 - **Symptom:** John sends Jess a link → she opens → SHE greens John; FIRST-CLEAN connection → John ALSO
   greens (both sides aligned). Then **John deletes Jess (P2 clears only HIS row) + re-sends; Jess's phone
   still thinks they're connected → her open reports nothing new → John never re-greens.** Diverged sides
@@ -596,9 +606,10 @@ sender-only RLS delete; bilateral PARKED Option B — v1-acceptable) · **connec
 receiver open** (server-verified, multiple fresh rows) · **first-clean sender-green worked once**
 post-publication-fix.
 
-**➡ This cluster's HAPPY path is built (P3→P2→P1) + harness 9/9 — but the per-side-state KNOWN GAP above is
-the REMAINING release gate: v1 is NOT shippable on connection grounds until it's designed + fixed (+ its
-DB-scenario tests).**
+**✅➡ This cluster is CLOSED for v1: HAPPY path (P3→P2→P1) + the delete→reconnect re-green fix
+(server upsert `07c770c` + client reconcile, built) VERIFIED end-to-end — S1–S5 (16/16) + S6–S8 (MCP) + S9
+two-phone device-confirm. v1 is SHIPPABLE on connection grounds. (Deeper per-side-state MACHINE = post-v1,
+not gating.)**
 
 ### PRIORITY 2+ — ITERATIVE / NON-BLOCKING (batch-test after several changes; cut a line for v1 whenever satisfied)
 
