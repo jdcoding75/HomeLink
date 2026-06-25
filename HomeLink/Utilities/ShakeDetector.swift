@@ -34,7 +34,11 @@ final class ShakeDetector: ObservableObject {
     // fill the crystal (≈34 % each). Was 2.5 g / 5 shakes, which felt like a
     // workout.
     static let shakesToFull = 3
-    private let shakeThreshold: Double = 1.2    // [mechanism-reset PART 5] was 1.5 g (×0.8, more sensitive) — a gentle, deliberate shake
+    // [wand-fix] reverted 1.2 → 1.5 — restores the 0.3 g hysteresis gap (fire 1.5 / reset 1.2)
+    // the multi-shake counter needs. 1.2 collided with resetThreshold (zero gap) → only one
+    // shake counted → never reached full → never fired. See reports/wand_regression.md.
+    // Invariant: shakeThreshold > resetThreshold. PRIOR (broken): 1.2 [mechanism-reset PART 5] ×0.8
+    private let shakeThreshold: Double = 1.5    // g — a firm, deliberate shake (gap above resetThreshold 1.2)
     private let resetThreshold: Double = 1.2    // must fall below before next
     private let minInterval: Double    = 0.12   // seconds between counted shakes
 
