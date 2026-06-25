@@ -34,13 +34,14 @@ final class ShakeDetector: ObservableObject {
     // fill the crystal (≈34 % each). Was 2.5 g / 5 shakes, which felt like a
     // workout.
     static let shakesToFull = 3
-    // [wand-fix] reverted 1.2 → 1.5 — restores the 0.3 g hysteresis gap (fire 1.5 / reset 1.2)
-    // the multi-shake counter needs. 1.2 collided with resetThreshold (zero gap) → only one
-    // shake counted → never reached full → never fired. See reports/wand_regression.md.
-    // Invariant: shakeThreshold > resetThreshold. PRIOR (broken): 1.2 [mechanism-reset PART 5] ×0.8
-    private let shakeThreshold: Double = 1.5    // g — a firm, deliberate shake (gap above resetThreshold 1.2)
-    private let resetThreshold: Double = 1.2    // must fall below before next
-    private let minInterval: Double    = 0.12   // seconds between counted shakes
+    // [wand-mechanic] Metric is now |magnitude − 1.0| (gravity-removed, see start()) → ~0 at rest
+    // AND at each stroke turnaround, so re-arm is reliable during CONTINUOUS shaking (raw-with-gravity
+    // never dipped below 1.2 g between strokes → shakes 2-3 dropped). Thresholds rescaled to that
+    // gravity-removed baseline. Invariant: shakeThreshold > resetThreshold. Device-tunable STARTING values.
+    // PRIOR (raw magnitude incl. gravity, [wand-fix]): shakeThreshold 1.5 / resetThreshold 1.2 / minInterval 0.12
+    private let shakeThreshold: Double = 0.45   // g of net motion above gravity — a deliberate shake
+    private let resetThreshold: Double = 0.15   // must settle below before the next shake counts (0.30 g gap)
+    private let minInterval: Double    = 0.08   // seconds between counted shakes (was 0.12 — snappier)
 
     #if canImport(CoreMotion)
     private let motion = CMMotionManager()
@@ -59,8 +60,12 @@ final class ShakeDetector: ObservableObject {
         motion.accelerometerUpdateInterval = 1.0 / 50.0   // 50 Hz
         motion.startAccelerometerUpdates(to: .main) { [weak self] data, _ in
             guard let self, let a = data?.acceleration else { return }
-            let magnitude = (a.x * a.x + a.y * a.y + a.z * a.z).squareRoot()
-            self.consume(magnitude: magnitude, at: data?.timestamp ?? 0)
+            // [wand-mechanic] gravity-removed shake intensity: deviation of total accel from the
+            // 1 g baseline. ~0 at rest and at each stroke turnaround → reliable re-arm during
+            // continuous shaking. PRIOR: let magnitude = (a.x*a.x + a.y*a.y + a.z*a.z).squareRoot()  // incl. gravity
+            let raw = (a.x * a.x + a.y * a.y + a.z * a.z).squareRoot()   // includes gravity (~1 g at rest)
+            let intensity = abs(raw - 1.0)                              // gravity-removed
+            self.consume(magnitude: intensity, at: data?.timestamp ?? 0)
         }
         motionAvailable = true
         #else
