@@ -16,8 +16,12 @@ final class CompassManager: NSObject, ObservableObject {
     #if DEBUG
     /// [restore-tap selftest] When true, updateCompassState forces alignment (relativeBearing=0)
     /// so the live holdTick can reach lock in the Simulator. Driven only by -compassSelfTest.
-    var forceAlignedTest = false
+    var forceAlignedTest = false        // [hands-free selftest] relativeBearing → 0 (aimed)
+    var forceMisalignedTest = false     // [hands-free selftest] relativeBearing → 90 (turned away → re-arm)
     func pokeStateForTest() { isHeadingAvailable = true; updateCompassState() }
+    /// [hands-free selftest] Simulate "set down" (flat AND dead-still) directly, since the Simulator
+    /// delivers no deviceMotion. The holdTick set-down guard reads these two flags.
+    func setSetDownForTest(_ on: Bool) { isDeviceStill = on; isDeviceFlat = on }
     #endif
 
     private let skinStore: SkinStore
@@ -330,6 +334,7 @@ final class CompassManager: NSObject, ObservableObject {
         // [restore-tap selftest] Force perfect alignment so the live holdTick can lock in the
         // Simulator (no magnetometer). Toggled only by the -compassSelfTest harness.
         if forceAlignedTest { relativeBearing = 0 }
+        else if forceMisalignedTest { relativeBearing = 90 }   // turned away → holdTick re-arms
         #endif
         let bearingDiff  = min(relativeBearing, 360 - relativeBearing)
         let isNowLocked  = bearingDiff <= lockThresholdDegrees
