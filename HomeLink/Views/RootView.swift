@@ -551,9 +551,10 @@ struct MainTabView: View {
     @EnvironmentObject var appState:     AppStateManager
 
     @State private var selectedTab = 0
-    // The compass "✦ Pro" badge opens the paywall directly now that the Pro tab
-    // is retired (status + upgrade also live in Settings → account).
-    @State private var showPaywall = false
+    // [hide-pro] v1 is free — the "✦ Pro" → $2.99 paywall receiver is hidden (preserved).
+    // The "✦ Pro" badge opened the paywall directly; receiver below disabled. The badge LABEL
+    // itself is CompassView:1068 (other tab) — flagged for the CompassView pass.
+    // @State private var showPaywall = false
 
     var body: some View {
         TabView(selection: $selectedTab) {
@@ -670,12 +671,13 @@ struct MainTabView: View {
             }
             #endif
         }
-        // The "✦ Pro" badge on the compass now opens the paywall directly
-        // (the Pro tab was retired; upgrade + status live in Settings → account).
-        .sheet(isPresented: $showPaywall) { PaywallView() }
-        .onReceive(NotificationCenter.default.publisher(for: .pointwardOpenPro)) { _ in
-            showPaywall = true
-        }
+        // [hide-pro] v1 free — the "✦ Pro" badge → $2.99 PaywallView is hidden. The badge LABEL
+        // is in CompassView:1068 (other tab); hiding this receiver stops the paywall from opening.
+        // Preserved:
+        // .sheet(isPresented: $showPaywall) { PaywallView() }
+        // .onReceive(NotificationCenter.default.publisher(for: .pointwardOpenPro)) { _ in
+        //     showPaywall = true
+        // }
         .onReceive(NotificationCenter.default.publisher(for: .pointwardOpenSettings)) { _ in
             selectedTab = 2   // Settings is tab 2 now (Pro tab removed)
         }
