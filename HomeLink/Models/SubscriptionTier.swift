@@ -12,9 +12,12 @@ enum SubscriptionTier: String, Codable {
     case institutional   // reserved for School Edition
 
     var maxPeople: Int {
+        // [hide-pro] v1 is free — a generous 10-person limit for ALL tiers so the people-limit
+        // paywall never bites (no dead "+" button, no $2.99 surface). PRIOR: free 1 · pro 5 ·
+        // institutional Int.max. (institutional stays unlimited — already ≥10, no limit issue.)
         switch self {
-        case .free:          return 1
-        case .pro:      return 5   // was Int.max — "up to 5 people"
+        case .free:          return 10   // was 1
+        case .pro:           return 10   // was 5
         case .institutional: return Int.max
         }
     }
