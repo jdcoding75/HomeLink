@@ -283,6 +283,13 @@ struct CompassView: View {
             // gone, only the text label remains.
             DesignTokens.Color.background
                 .ignoresSafeArea()
+                // [mechanism-reset PART 3] Tap OUTSIDE the compass circle = universal cancel.
+                // Reaches the existing cancelInstrument() (self-guards selectedToken != nil →
+                // no-op/no haptic when nothing is armed). Anything reaching this back layer is
+                // outside the face circle and off all controls; the compose scrim (on top) still
+                // owns outside-taps while composing, and the face's own tap owns inside-circle.
+                .contentShape(Rectangle())
+                .onTapGesture { cancelInstrument() }
 
             if people.people.isEmpty {
                 // ── Warm empty state — no one to point toward yet ────────────
