@@ -39,10 +39,13 @@ struct CompassView: View {
     @State private var lockGlowActive = false
     @State private var emojiScaled    = false
     @State private var lockBadgeShown = false
-    // [explicit send] Compass: once the hold completes the compass LOCKS and waits
-    // for an explicit tap to send (point → hold → lock → tap). No auto-send on
-    // alignment anymore. Set in holdTick at holdProgress>=1.0; consumed by tapFace().
-    @State private var compassAwaitingTap = false
+    // [mechanism-reset PART 2] Compass point-and-hold + hysteresis (the tap is dropped):
+    // point → hold → fire directly, then DISARM. Re-arm only after the phone swings AWAY
+    // past compassReArmThreshold, then realigns. `compassArmed` gates the holdTick fire.
+    @State private var compassArmed = true
+    // PRIOR (the tap workaround — once the hold completed the compass LOCKED and waited
+    // for an explicit tap to send; consumed by tapFace()):
+    // @State private var compassAwaitingTap = false
 
     // Ping animation
     @State private var pingRingActive  = false
@@ -166,6 +169,10 @@ struct CompassView: View {
     // matter what mid-send state the instrument was holding internally.
     @State private var instrumentResetID = 0
     private let holdDuration = 1.33   // [6/7] reduced 1/3 (was 2.0) — more responsive
+    // [mechanism-reset PART 2] Re-arm hysteresis: after a fire the compass disarms; it
+    // re-arms only once the phone swings AWAY past this angle (sits just above the 25°
+    // drift band and well outside the 15° fire window). Device-tunable starting value.
+    private let compassReArmThreshold: Double = 28
     private let holdTick = Timer.publish(every: 0.05, on: .main, in: .common).autoconnect()
 
     private var holdToSendActive: Bool {
@@ -1185,24 +1192,29 @@ struct CompassView: View {
             // user explicitly picks an emoji.
             guard instrumentStore.selected == .compass, flightToken == nil else {
                 if holdProgress > 0 { holdProgress = 0 }
-                compassAwaitingTap = false       // [explicit send] reset off-compass / while sending
                 return
             }
-            // [explicit send] Once locked and awaiting the tap, FREEZE the hold —
-            // don't re-accumulate or re-fire the lock cue; tapFace() does the send.
-            if compassAwaitingTap { return }
-            // [3/5] SOFT LOCK — the hold STARTS within 15°, but once it has
-            // begun it tolerates drift up to 30° (hysteresis), so a small
-            // wobble of the phone never breaks the lock or freezes the hold.
+            // [mechanism-reset PART 2] DISARM + hysteresis re-arm. After a fire the compass
+            // is disarmed; holding/jitter does NOT re-fire. It re-arms only after the phone
+            // swings AWAY past compassReArmThreshold (~28°), then a realign + hold fires again.
+            if !compassArmed {
+                if holdProgress > 0 { holdProgress = 0 }
+                if sendAlignDiff >= compassReArmThreshold { compassArmed = true }
+                return
+            }
+            // [3/5] SOFT LOCK — the hold STARTS within 15°, but once it has begun it
+            // tolerates drift up to 25° (hysteresis), so a small wobble never breaks it.
             let holding = holdProgress > 0
-            if sendAlignDiff <= 15 || (holding && sendAlignDiff <= 30) {
+            if sendAlignDiff <= 15 || (holding && sendAlignDiff <= 25) {
                 holdProgress += 0.05 / holdDuration
                 if holdProgress >= 1.0 {
                     holdProgress = 0
-                    HapticEngine.compassSend()      // [5/5] now the LOCK confirmation
-                    // [explicit send] LOCK, don't auto-send — wait for the tap.
-                    compassAwaitingTap = true
-                    // PRIOR (auto-send on hold complete): sendThought(effectiveToken)
+                    // [mechanism-reset PART 2] FIRE on alignment+hold, then DISARM immediately
+                    // (covers the Demo Dan path, which early-returns before finishSend runs).
+                    compassArmed = false
+                    HapticEngine.compassSend()
+                    sendThought(effectiveToken)
+                    // PRIOR (lock then wait for the tap): compassAwaitingTap = true
                 }
             } else if holdProgress > 0 {
                 withAnimation(.easeOut(duration: 0.3)) { holdProgress = 0 }
@@ -1711,15 +1723,15 @@ struct CompassView: View {
 
     /// Tap the face: it answers — pulse, brief bearing readout, soft haptic.
     private func tapFace() {
-        // [explicit send] When the compass has locked and is awaiting the tap, a
-        // single tap SENDS (point → hold → lock → tap). Otherwise keep the
-        // existing bearing-flash behavior below.
-        if compassAwaitingTap {
-            compassAwaitingTap = false
-            HapticEngine.compassSend()
-            sendThought(effectiveToken)
-            return
-        }
+        // [mechanism-reset PART 2] The tap-to-send path is DROPPED — point → hold → fire
+        // now auto-sends, so the face tap only "answers" (pulse + brief bearing readout).
+        // PRIOR (tap completed the point→hold→lock→tap send):
+        // if compassAwaitingTap {
+        //     compassAwaitingTap = false
+        //     HapticEngine.compassSend()
+        //     sendThought(effectiveToken)
+        //     return
+        // }
         HapticEngine.personSelected()
         withAnimation(.spring(response: 0.35, dampingFraction: 0.55)) { faceTapPulse = true }
         withAnimation(.easeIn(duration: 0.3)) { bearingFlash = true }
@@ -2027,7 +2039,8 @@ struct CompassView: View {
         HapticEngine.caughtConfirmation()        // soft confirmation tap
         // Cut any in-flight hold/load progress so nothing fires after a cancel.
         holdProgress = 0
-        compassAwaitingTap = false               // [latch fix] clear the compass awaiting-tap latch on cancel
+        compassArmed = true                      // [mechanism-reset PART 2] explicit cancel = clean ready state (holdProgress already 0 above)
+        // PRIOR: compassAwaitingTap = false      // [latch fix] cleared the compass awaiting-tap latch on cancel
         loadFlightToken = nil
         loadFlightProgress = 0
         messageFocused = false                   // [5/7] close the message editor
@@ -2302,6 +2315,10 @@ struct CompassView: View {
         // "all type-1/2" == "!= .compass".
         if instrumentStore.selected != .compass {
             instrumentResetID += 1
+        } else {
+            // [mechanism-reset PART 2] compass (type 3) disarms — it keeps its LIVE bearing
+            // (no rebuild) and re-arms only via the away-swing hysteresis in holdTick.
+            compassArmed = false
         }
         // PRIOR (firework/birthday only):
         // if instrumentStore.selected == .firework || instrumentStore.selected == .birthday {
