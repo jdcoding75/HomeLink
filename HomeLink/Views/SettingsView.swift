@@ -200,6 +200,8 @@ struct SettingsView: View {
 
     private var aboutSection: some View {
         settingsGroup {
+            // [copy-declutter ITEM 6 Part A] Giving Back / charity row hidden (preserved for paywall re-add).
+            #if false
             // Giving back — half of every Pro purchase does good. Lives here now.
             settingsRow {
                 Text("❤️")
@@ -222,6 +224,7 @@ struct SettingsView: View {
             .onTapGesture { showGivingBack = true }
 
             Divider().background(DesignTokens.Color.border).padding(.leading, 44)
+            #endif
 
             settingsRow {
                 Image(systemName: "heart.text.square")
@@ -324,6 +327,10 @@ struct SettingsView: View {
                 }
             }
 
+            // [copy-declutter ITEM 6 Part A] Pro status + Restore purchase rows hidden
+            // (preserved for paywall re-add; the leading divider goes with them so the
+            // signed-in sign-out block keeps a single clean separator after identity).
+            #if false
             Divider().background(DesignTokens.Color.border).padding(.leading, 44)
 
             // Pro status — "Pro ✦" or "Free · upgrade" (tap free to upgrade).
@@ -363,6 +370,7 @@ struct SettingsView: View {
             .onTapGesture {
                 Task { await subscription.restorePurchases() }
             }
+            #endif
 
             // Sign out — at the bottom, only when there's a session to leave.
             if signedInUserID != nil {
