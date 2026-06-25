@@ -353,7 +353,9 @@ struct WandInstrumentView: View {
         // irrelevant; the magic simply goes.
         if full {
             fullChargeSeconds += 0.1
-            if fullChargeSeconds >= 0.67 { release() }   // [6/7] hold reduced 1/3 (was 1.0)
+            // [wand-mechanic] sustain trimmed 0.67 → 0.2 s — keeps a small "magic pause" without the
+            // ~0.7 s dead delay. PRIOR: if fullChargeSeconds >= 0.67 { release() }   // [6/7] (was 1.0)
+            if fullChargeSeconds >= 0.2 { release() }
         }
     }
 
@@ -379,10 +381,11 @@ struct WandInstrumentView: View {
         // 1 · the wand points at the person, tip brightening, label in
         HapticEngine.lockOn()
         SoundEngine.shared.play(for: "style.shimmer")
-        withAnimation(.easeInOut(duration: 0.5)) { pointing = true }
+        withAnimation(.easeInOut(duration: 0.3)) { pointing = true }   // [wand-mechanic] beat 0.5 → 0.3
         withAnimation(.easeIn(duration: 0.3)) { showSendingLabel = true }
         // 2 · after the swing settles, implode → explode toward them
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+        // [wand-mechanic] match the 0.3 swing (was + 0.5). Implode (0.18) UNCHANGED below.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
             withAnimation(.easeIn(duration: 0.18)) { imploding = true }
             withAnimation(.easeOut(duration: 0.2)) { showSendingLabel = false }
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.18) {
