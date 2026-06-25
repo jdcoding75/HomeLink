@@ -106,6 +106,135 @@
 
 _Last updated: see **START HERE / CURRENT STATE** (top) for the live state. Full session-by-session running log archived in `## ARCHIVE` below + `POINTWARD_TRUTH_ARCHIVE_2026-06-23.md`._
 
+## ⭐⭐ SESSION RECONCILIATION — 2026-06-25 (current true state)
+
+_Reconciles the §A–§O pre-launch correction batch + this session's commits against the live repo. Records
+STATUS only — sequencing is the user's call. Build/commit facts cross-checked `git log --since=2026-06-24` +
+clean `xcodebuild`._
+
+### ⛔ SHOW-STOPPER — COMPASS MECHANISM IS NON-FUNCTIONAL ON DEVICE
+- **State:** at current HEAD (`55dbced`) the compass **does not fire / launch a thought when physically aiming
+  on a real device.** Ship-blocking. **NOT resolved.**
+- **Sim-verified ≠ working.** The autonomous hands-free attempt (`55dbced`) was committed and passed a 4-phase
+  `-compassSelfTest` + `simctl log stream` check — **but the Simulator has no magnetometer/motion; the harness
+  force-fed alignment (`forceAlignedTest`) and faked the set-down flags.** So the sim proved the *gate logic*,
+  not real-world firing. On device it does not fire.
+- **History (factual):** `45bbf0d` dropped the original tap mechanic → auto-fire-on-alignment → false-fire →
+  a guard cascade each of which over- or under-blocked: device-upright `gravity.z` (`3560853`) → revert
+  (`52b4587`) → stillness (`304dadb`) → still-AND-flat (`e2710d8`) → on-face touch gate (`26e09ed`) → restore
+  the original point-hold-**TAP** (`037d0d6`) → autonomous hands-free re-attempt (`55dbced`). None fires on
+  device.
+- **What the user wants:** **HANDS-FREE** (aim → hold → sends; **no tap, no finger**). He recalls it worked
+  hands-free *before* `45bbf0d`. The four requirements: (1) hands-free aim+hold→send; (2) does NOT fire
+  repeatedly while held/aimed; (3) set-down does NOT auto-fire; (4) after a send, turn away + re-aim + hold
+  sends again.
+- **What it needs:** a fresh **device-grounded** fix (real magnetometer/motion in hand), NOT another
+  chat-relayed guess and NOT another sim-only "verified." Treat sim self-test as necessary-not-sufficient.
+- _DEBUG scaffolding currently in the tree (zero release impact, behind `#if DEBUG` + `-compassSelfTest`):_
+  the self-test harness + milestone logs in `CompassView`, and `forceAlignedTest`/`forceMisalignedTest`/
+  `setSetDownForTest`/`pokeStateForTest` in `CompassManager`.
+
+### STEP-0 BUILD TRIAGE (read-only)
+- **(a) Builds? YES** — clean `xcodebuild` = **BUILD SUCCEEDED**.
+- **(b) Errors vs warnings:** **ZERO compile errors.** All output is warnings: Supabase SDK deprecations
+  (`subscribe`/`postgresChange`, SupabaseService.swift), Swift-6-mode main-actor `Encodable`/`shared`
+  conformance warnings (`SupabaseService.PingPayload` :322/:337; **`PeopleManager.swift:35`** — the cited one —
+  is a *warning* on the `SupabaseService.shared` default-arg pattern, not an error), RootView `detectPatterns`
+  deprecation, ProSetup/InstrumentOptionPicker init warnings. All pre-existing, none from today's edits.
+- **(c) Do any touch compass / animation / send?** **No — none are real errors, and none relate to the compass
+  failure.** The compass problem is purely **runtime/behavioral on device**, not a compile issue. (Not fixing
+  any of these now; logged for record.)
+
+### §A–§O LAUNCH BATCH — STATUS BY ITEM
+| § | Item | Status | Commit / note |
+|---|---|---|---|
+| **§A** | Wind mic bug — delete `fallbackHoldTick` auto-fire; static no-mic note | ✅ **DONE** | `6d89f63` (remove auto-fire loop) + `2a1cb5d` (no-mic card) + `77c2a90` (leaf/breath tuning). Sim always shows no-mic; real blow = device-only. |
+| **§B** | **Compass send screen (B1–B6)** | ⛔ **LARGELY NOT DONE** — see per-item below. Session diverted into the compass MECHANISM saga instead. | |
+| §B-B1 | Instruction text on all 9 (spec'd blocks) | ❌ **NOT DONE** | `830964a` only set the compass tail to "point · hold · turn away to reset" — now **stale** (mechanism changed) and ≠ the spec'd 9 blocks. |
+| §B-B2 | Drop the dynamic turn-by-turn line (`alignmentInstruction`, `:1417-1422`) | ❌ **NOT DONE** | |
+| §B-B3 | Degree readout "{name} is at {N}°" from `rawBearingToTarget` (hide when nil) | ❌ **NOT DONE** | |
+| §B-B4 | Alignment model — fixed top mark, use existing needle (no new rim marker) | ❌ **NOT DONE** (design decided) | |
+| §B-B5 | Wheel rework — 15° notches / red index mark / Vintage skin only | ❌ **NOT DONE** | |
+| §B-B6 | Flick face — drop in-face text, use standard instruction line | ❌ **NOT DONE** | |
+| **§C** | Recipient flow → binary onboard-or-view (one CTA, drop 2 doors + menu, viewer-can't-send send-guard) | ❌ **NOT DONE** | no commit; locked spec only (audit `recipient_flow_audit.md`). |
+| **§D** | People add+edit | ✅ **DONE** | D1+D2 collapse add to one screen + hide emoji = `0c6969e`; D3 hide edit emoji = `cd089c5`; D4 edit-location-showed-name bug = `892a99d`. |
+| **§E** | One `defaultMessage` per emoji, drop suggestion arrays + overline; keep freeform field | ✅ **DONE** | `e22587c` (drop suggestions, unify 🎓 dup, add birthday/firework hints). |
+| **§F** | Cut redundant middle "Message from {name}"; add reveal spacing | ✅ **DONE** | `aa0950c`. |
+| **§G** | Bucket badge — one line "New thoughts in your bucket", hide at 0, keep numeric icon badge | ✅ **DONE** | `902241e` (+ `083485b` bucket-catch ✦ consistency). |
+| **§H** | Disable share-card "share this moment" for v1 (comment, preserve) | ✅ **DONE** | `832bbdb`. |
+| **§I** | Cut discovery hint "tap the words to explore" | ✅ **DONE** | `3999a1b`. |
+| **§J** | Short code — keep infra, remove recipient-facing text | 🟡 **PARTIAL** | Web removal = `65708a5` (website repo). **App-side suffix STILL PRESENT** — `MessageLink.swift:56` `"· no app? open Pointward and enter {code}"` NOT removed → app-side NOT DONE. 9d "got a code?" People-tab button keep/retire = still open. |
+| **§K** | Wand receipt mis-wire | 🔎 **AUDITED, FIX NOT DONE** | Re-audit confirmed (`batch_final_audit.md` Part 1): a dedicated `WandLanding` receipt EXISTS (the Lab "Wand V1" renders it; `InstrumentLandingView.swift:43`), but live `.wand` routes to `standardReceipt` because `AnimationDispatch.receiptKind` maps `.wand → .standard`. Fix = add a `.wand ReceiptKind` + route `.wand → .wand` + bridge `WandLanding`'s single `onComplete`. **Routing fix, not a build. Not applied.** = the "wand fires on device but receipt doesn't show" symptom. |
+
+### THIS SESSION'S OTHER COMMITS (DONE — mapped)
+- **WAND mechanic (fires on device now):** `81ff2e4` (restore shake hysteresis gap 1.2→1.5) → `df1147c`
+  (gravity-removed `|mag−1|` shake metric — reliable re-arm) → `b3ddd85` (**onFull-driven release — fixed the
+  dead `tick` heartbeat timer; release/onSend never fired before**) → `ce64461` (cut full-charge sustain +
+  beat ~1.4s→~0.7s). **Wand FIRES on device; the RECEIPT not showing = §K above.**
+- **Birthday:** `b562e38` (parametric centered, center-tall candle layout for any count) + `830964a` (3 candles).
+- **Pro/paywall hide (v1-free):** `a8801b6` (hide "✦ Pro → paywall" receiver in RootView) + `7633ebe`
+  (free `maxPeople` 1→10, people-limit paywall unreachable) + `1625744` (hide Giving Back / Pro / Restore rows
+  in Settings).
+- **Copy batch:** `008354e` (receipt sender sentence → "{name} sent you something ✦" across Compass/Wind/
+  Rocket/Plane/Flick) · `247313b` (connection status → lowercase "connected ✓") · `9b6df1f` (version →
+  "version {x}") · `456b829` (Edit "save changes" → "save") · `083485b` (bucket catch ✦) · `eaf4993`
+  (AboutView story copy).
+- **Feedback table:** Supabase `feedback` table created + verified, **RLS insert-only (anon + auth)** — the
+  in-app form build is staged (see NEW below).
+- **Wind:** `6d89f63` (remove mic-denied auto-fire loop, ship-blocker) + `2a1cb5d` (no-mic card + Settings pill
+  + "breathe into mic") + `77c2a90` (leaf/breath tuning).
+- **Declutter batch (§E–§I above are part of it):** `e22587c aa0950c 902241e 3999a1b eaf4993 1625744 832bbdb
+  0c6969e cd089c5 892a99d`.
+- **Web short-code removal:** `65708a5` (website repo).
+- **Mechanism-reset batch (rocket/cancel/wind):** `fd4974b` (uniform post-send `finishSend` reset) · `3054664`
+  (tap-outside-the-circle = universal cancel) · `b706ba7` (rocket — remove lock, widen fire cone 5°→10°).
+
+### NEW THIS SESSION — to record in canon
+- **🛠 SELF-PROFILE EDIT (NET-NEW, needed — CONFIRMED ABSENT):** there is **no post-onboarding screen where the
+  user can edit THEIR OWN name + home address/location.** `OnboardingView`'s about-you screen sets them at first
+  run only; `EditPersonView` edits OTHER people; **`SettingsView`/`AboutView` reference no `UserProfile` editor**
+  (grep-confirmed). So a returning user cannot change their own name/home. **NET-NEW, needed.**
+- **🛠 Feedback form** — Supabase `feedback` table built + verified (RLS insert-only anon+auth); the in-app form
+  build prompt is staged (Settings "Send feedback" → sheet; integration audit `feedback_integration_audit.md`).
+- **🛠 Permissions tab** — audit done, build prompt staged: **Mic / Location [critical] / Notifications**;
+  **Contacts excluded.**
+- **🅿️ CompassView.swift SPLIT (POST-TESTFLIGHT, contributor infrastructure):** the ~2700-line monolith blocks
+  parallel/outside contribution. Splitting it (per-instrument files / animation-pipeline seams) lets the user's
+  son + volunteers each own one instrument's file without colliding. **Enables parallel dev + safe outside
+  contribution.** Structural, post-TestFlight.
+
+### v3 / PHASE-3 BANKING (verbatim — lose nothing)
+- **10-MECHANIC BRAINSTORM (sender-side embodied initiation):** (1) **voice recording** — `AudioRecorder`
+  already BUILT, orphaned in the unreachable `ProSetupView`; **nearest-ready**. (2) yell-to-send. (3) heartbeat
+  via camera pulse. (4) photo backdrop. (5) point-at-a-star. (6) drag-to-load. (7) tilt-to-pour. (8) walk.
+  (9) camera-gesture (smile / peace). (10) hold-phone-to-heart.
+- **DEFERRED TRACKS:**
+  - **§K wand receipt re-wire** — add `.wand` `ReceiptKind`, route `.wand → .wand`, bridge `WandLanding`;
+    spin-bucket `standardReceipt` → Animation-Lab-only.
+  - **Wand orbits-frozen cosmetic** — the orbital rings don't spin (the same unstable `tick` `Timer.publish`
+    that broke firing, now bypassed for firing; cosmetic only — make `tick` stable to restore spin).
+  - **CompassView Pro-surface hide** — "✦ Pro" badge label (`:1068`), skin paywall (`:1175`), `lock.fill`
+    (`:1988`), `InstrumentOptionPicker` (`:111`).
+  - **Item 6 Part B — v1-excluded-features hide** — extra skins / mix / emoji-picker / multi-person
+    (display-only hide; the gate stays intact).
+  - **Onboarding simplification.**
+  - **Poetic-libraries consolidation** — `TaglineSystem.poeticLibrary` + `DistanceFun.thoughtTaglines`,
+    ~7 duplicates (user reviewing).
+  - **CompassManager motion-plumbing battery cleanup** — the `deviceMotion`/`isDeviceStill`/`isDeviceFlat`
+    stream is unused if the compass mechanism stops reading it (depends on the device-grounded compass fix).
+
+### STILL-OWED ROLL-UP (for quick scan — status only, no ordering)
+- ⛔ **Compass mechanism** — broken on device (show-stopper). · ❌ **§B B1–B6** compass send screen. ·
+  ❌ **§C** recipient binary flow. · 🟡 **§J** app-side code-text suffix (`MessageLink.swift:56`) + 9d button. ·
+  🔎 **§K** wand receipt routing fix. · 🛠 NEW: self-profile edit, feedback form, permissions tab. ·
+  🅿️ CompassView split + the v3/deferred tracks above.
+
+---
+_Sources: `git log --since=2026-06-24`, clean `xcodebuild` (BUILD SUCCEEDED, warnings-only), grep of
+SettingsView/AboutView (no self-profile editor), `MessageLink.swift:56` (suffix present), the §A–§O batch spec,
++ reports: wind_mic_bug, recipient_flow_audit, batch_final_audit (§K), feedback_integration_audit,
+compass_*/wand_* (mechanism history). READ-ONLY reconciliation — nothing implemented; this section only records
+current true state._
 ## What Pointward Is
 
 Pointward is a SwiftUI + SwiftData iOS app for sending small, emotional
