@@ -1205,9 +1205,14 @@ struct CompassView: View {
         // [3/6] Compass send mechanic: hold within 15° for 2 s → auto-send.
         // Built-in, every tier — the tap button is gone.
         .onReceive(holdTick) { _ in
-            // [redesign] No longer gated on `selectedToken` — a default always
-            // supplies a payload, so a hold within 15° sends even before the
-            // user explicitly picks an emoji.
+            // [compass-diag] TOP-OF-TICK — does the holdTick timer fire AT ALL on device? + the guard state.
+            // If these lines NEVER appear → the timer is DEAD (the bug). If they appear with
+            // flightTokenNil=false → a stuck send-state blocks the loop. (Remove after diagnosis.)
+            if Date.now.timeIntervalSince(lastCompassDiag) > 0.4 {
+                lastCompassDiag = .now
+                CompassView.log.notice("[compass-diag] tick selected=\(instrumentStore.selected.rawValue, privacy: .public) flightTokenNil=\(flightToken == nil) awaitingTap=\(compassAwaitingTap) alignDiff=\(sendAlignDiff, format: .fixed(precision: 1)) holdProgress=\(holdProgress, format: .fixed(precision: 2)) headingAvail=\(compass.isHeadingAvailable) appState=\(appState.currentState.rawValue, privacy: .public)")
+            }
+            // [redesign] No longer gated on `selectedToken` — a default always supplies a payload.
             guard instrumentStore.selected == .compass, flightToken == nil else {
                 if holdProgress > 0 { holdProgress = 0 }
                 compassAwaitingTap = false       // [restore-tap] reset off-compass / while sending
@@ -1218,12 +1223,6 @@ struct CompassView: View {
             // the upright/stillness/still-AND-flat sensor guards, and the isPressingCompass touch gate —
             // all of which broke firing. See @State note + git 45bbf0d…26e09ed.)
             if compassAwaitingTap { return }   // [restore-tap] locked — frozen until tapFace sends
-            // [compass-diag] DEVICE TELEMETRY (remove after diagnosis) — throttled every 0.4s: is the
-            // alignment ever ≤15°? does holdProgress climb to 1.0? is a real heading available?
-            if Date.now.timeIntervalSince(lastCompassDiag) > 0.4 {
-                lastCompassDiag = .now
-                CompassView.log.notice("[compass-diag] alignDiff=\(sendAlignDiff, format: .fixed(precision: 1)) holdProgress=\(holdProgress, format: .fixed(precision: 2)) headingAvail=\(compass.isHeadingAvailable) rawBearingNil=\(compass.rawBearingToTarget == nil) appState=\(appState.currentState.rawValue, privacy: .public)")
-            }
             // [3/5] SOFT LOCK — the hold STARTS within 15°, but once it has begun it tolerates drift
             // up to 30° (hysteresis on the AIM, not a re-arm), so a small wobble never breaks the lock.
             let holding = holdProgress > 0
