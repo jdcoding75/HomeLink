@@ -416,7 +416,8 @@ struct EditPersonView: View {
             }
             Divider().background(DesignTokens.Color.border)
             Button { savePerson() } label: {
-                Text("save changes")
+                // [copy 2026-06-25] unified to "save" (matches AddPersonView). was: "save changes"
+                Text("save")
                     .font(DesignTokens.Font.label)
                     .foregroundColor(DesignTokens.Color.textPrimary)
                     .frame(maxWidth: .infinity)
