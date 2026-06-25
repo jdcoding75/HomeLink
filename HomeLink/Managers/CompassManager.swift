@@ -4,6 +4,9 @@
 import Foundation
 import CoreLocation
 import Combine
+#if canImport(CoreMotion)        // [compass-falsefire] device-orientation (gravity) guard
+import CoreMotion
+#endif
 
 @MainActor
 final class CompassManager: NSObject, ObservableObject {
@@ -13,6 +16,18 @@ final class CompassManager: NSObject, ObservableObject {
 
     private let skinStore: SkinStore
     private let locationManager = CLLocationManager()
+    #if canImport(CoreMotion)
+    // [compass-falsefire] A phone AIMED at a person is held roughly upright/tilted; a phone
+    // set FLAT on a table is NOT — and its magnetometer heading is degenerate there. We read
+    // gravity.z to suppress the hold-to-fire while the phone lies flat. See CompassView holdTick.
+    private let motion = CMMotionManager()
+    #endif
+    /// True while the phone is upright enough to be aiming; FALSE when flat on a surface.
+    /// Defaults TRUE so it never blocks before the first sample / where CoreMotion is absent.
+    @Published private(set) var isDeviceUpright = true
+    /// |gravity.z| below this = upright/aiming; at/above = flat (face-up z≈-1, vertical z≈0,
+    /// tilted-back aiming z≈-0.5…-0.7). Device-tunable (~32° from flat). [compass-falsefire]
+    private let uprightZBand: Double = 0.85
     // Published so list views can show live distances per person
     @Published private(set) var userLocation: CLLocation?
     private var currentHeading: Double = 0
@@ -51,6 +66,7 @@ final class CompassManager: NSObject, ObservableObject {
         locationManager.requestWhenInUseAuthorization()
         locationManager.startUpdatingLocation()
         locationManager.startUpdatingHeading()
+        startDeviceMotion()   // [compass-falsefire] gravity guard on with heading
         // If we already have a location from earlier, refresh bearing/distance now
         updateCompassState()
     }
@@ -115,6 +131,7 @@ final class CompassManager: NSObject, ObservableObject {
     func stop() {
         locationManager.stopUpdatingLocation()
         locationManager.stopUpdatingHeading()
+        stopDeviceMotion()   // [compass-falsefire]
     }
 
     #if DEBUG
@@ -141,6 +158,28 @@ final class CompassManager: NSObject, ObservableObject {
     }
     #endif
 
+    // ── [compass-falsefire] Device-orientation (gravity) updates ──────────
+    // Started/stopped on the SAME lifecycle as the magnetometer (start/resume ↔
+    // stop/pause) so it carries the same foreground-only battery discipline.
+    private func startDeviceMotion() {
+        #if canImport(CoreMotion)
+        guard motion.isDeviceMotionAvailable, !motion.isDeviceMotionActive else { return }
+        motion.deviceMotionUpdateInterval = 1.0 / 30.0   // 30 Hz — a cheap orientation gate
+        motion.startDeviceMotionUpdates(to: .main) { [weak self] data, _ in
+            MainActor.assumeIsolated {                   // .main queue == MainActor (see setMockHeading)
+                guard let self, let g = data?.gravity else { return }
+                self.isDeviceUpright = abs(g.z) < self.uprightZBand
+            }
+        }
+        #endif
+    }
+    private func stopDeviceMotion() {
+        #if canImport(CoreMotion)
+        if motion.isDeviceMotionActive { motion.stopDeviceMotionUpdates() }
+        #endif
+        isDeviceUpright = true   // default OPEN when not sampling — never block on resume
+    }
+
     // ── Battery: foreground-only sensors ─────────────────────────────────
     // The magnetometer (heading) and GPS are the compass's biggest battery
     // draw. There is nothing to point at while backgrounded, so we stop both
@@ -152,6 +191,7 @@ final class CompassManager: NSObject, ObservableObject {
         guard targetPerson != nil else { return }
         locationManager.stopUpdatingHeading()
         locationManager.stopUpdatingLocation()
+        stopDeviceMotion()   // [compass-falsefire] gravity guard off with heading
         // [9b · B4] stopPresenceTimer() removed (presenceTimer retired with mutual-pointing).
         #if DEBUG
         stopMockHeadingTimer()   // never let a test toggle spin in the background
@@ -166,6 +206,7 @@ final class CompassManager: NSObject, ObservableObject {
         locationManager.desiredAccuracy = kCLLocationAccuracyHundredMeters
         locationManager.startUpdatingLocation()
         locationManager.startUpdatingHeading()
+        startDeviceMotion()   // [compass-falsefire] gravity guard back on with heading
         updateCompassState()   // correct the face immediately on return
     }
 

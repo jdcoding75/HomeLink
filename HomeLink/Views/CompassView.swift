@@ -1212,7 +1212,13 @@ struct CompassView: View {
             // [3/5] SOFT LOCK — the hold STARTS within 15°, but once it has begun it
             // tolerates drift up to 25° (hysteresis), so a small wobble never breaks it.
             let holding = holdProgress > 0
-            if sendAlignDiff <= 15 || (holding && sendAlignDiff <= 25) {
+            // [compass-falsefire] Require the phone to be UPRIGHT (not flat on a table) to
+            // accumulate or complete a hold — a flat/still phone has a frozen, degenerate
+            // heading that could read ≤15° with nobody aiming. When not upright, control
+            // falls to the decay branch below, so a hold also CANCELS the moment the phone
+            // goes flat. (`&&` binds tighter than `||` → the alignment clause stays grouped.)
+            // PRIOR: if sendAlignDiff <= 15 || (holding && sendAlignDiff <= 25) {
+            if compass.isDeviceUpright && (sendAlignDiff <= 15 || (holding && sendAlignDiff <= 25)) {
                 holdProgress += 0.05 / holdDuration
                 if holdProgress >= 1.0 {
                     holdProgress = 0
