@@ -146,7 +146,7 @@ struct EmojiRevealView: View {
           Text(context.headlineText)
             .font(.system(size: 17, design: .serif).italic())
             .foregroundColor(Color(hex: "#c4a8d4").opacity(0.75))
-            .padding(.top, 10)
+            .padding(.top, 28)   // [copy-declutter] was 10 — more breathing room between message & headline
             .opacity(contextVisible ? 1 : 0)
             .animation(.easeOut(duration: 0.5), value: contextVisible)
 

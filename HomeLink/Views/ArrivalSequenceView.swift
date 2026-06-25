@@ -76,6 +76,9 @@ struct ArrivalSequenceView: View {
                         onFinished: { onFinished() }
                     )
                     .transition(.opacity)
+                    // [copy-declutter] CUT redundant middle name-show — envelope "from {name}"
+                    // (incomingBeat) + reveal "from {name} ✦" remain; ReceiptView render untouched.
+                    /*
                     // [build10 fixbatch 2a] "Message from [Name]" — relocated verbatim.
                     .overlay(alignment: .top) {
                         Text("Message from \(arrival.senderName)")
@@ -84,6 +87,7 @@ struct ArrivalSequenceView: View {
                             .padding(.top, 16)
                             .allowsHitTesting(false)
                     }
+                    */
                 }
             }
         }
