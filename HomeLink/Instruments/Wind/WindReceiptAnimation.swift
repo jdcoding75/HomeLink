@@ -372,7 +372,8 @@ struct WindReceiptAnimation: View {
     private func message(elapsed: Double) -> String {
         let name = fromName.isEmpty ? "someone" : fromName
         let lt = elapsed - Self.enterEnd            // drift-local seconds
-        if lt < 2.0   { return "\(name) is thinking of you ✦" }
+        // [copy 2026-06-25] unified sender sentence. was: "\(name) is thinking of you ✦"
+        if lt < 2.0   { return "\(name) sent you something ✦" }
         if lt < 3.5   { return "a feeling is on its way ✦" }
         return "almost here ✦"
     }

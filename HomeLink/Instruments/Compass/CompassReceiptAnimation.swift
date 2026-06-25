@@ -198,7 +198,8 @@ struct CompassReceiptAnimation: View {
     private var messageLine: String {
         let name = fromName.isEmpty ? "someone" : fromName
         if sink > 0.01      { return "almost here ✦" }
-        if arrive < 0.9     { return "\(name) is thinking of you ✦" }
+        // [copy 2026-06-25] unified sender sentence. was: "\(name) is thinking of you ✦"
+        if arrive < 0.9     { return "\(name) sent you something ✦" }
         return "arriving ✦"
     }
 

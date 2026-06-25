@@ -273,7 +273,8 @@ struct FlickReceiptAnimationV2: View {
 
   private func message(elapsed: Double) -> String {
     let name = fromName.isEmpty ? "someone" : fromName
-    if elapsed < Self.landAt { return "\(name) flicked you a thought ✦" }
+    // [copy 2026-06-25] unified sender sentence. was: "\(name) flicked you a thought ✦"
+    if elapsed < Self.landAt { return "\(name) sent you something ✦" }
     return "landed ✦"
   }
 

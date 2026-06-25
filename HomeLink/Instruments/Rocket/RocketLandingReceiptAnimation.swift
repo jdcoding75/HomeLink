@@ -369,7 +369,8 @@ struct RocketLandingReceiptAnimation: View {
 
     private var messageLine: String {
         let name = fromName.isEmpty ? "someone" : fromName
-        if descend < 0.85 { return "\(name) is landing ✦" }
+        // [copy 2026-06-25] unified sender sentence. was: "\(name) is landing ✦"
+        if descend < 0.85 { return "\(name) sent you something ✦" }
         if noseOpen < 1   { return "touchdown ✦" }
         return "almost here ✦"
     }

@@ -247,7 +247,8 @@ struct PlaneReceiptAnimationV2: View {
 
     private func message(_ e: Double) -> String {
         let name = fromName.isEmpty ? "someone" : fromName
-        if e < Self.deployEnd  { return "\(name) sent something ✦" }
+        // [copy 2026-06-25] unified sender sentence. was: "\(name) sent something ✦"
+        if e < Self.deployEnd  { return "\(name) sent you something ✦" }
         if e < Self.descendEnd { return "drifting down ✦" }
         return "caught it ✦"
     }
