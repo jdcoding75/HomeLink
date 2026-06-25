@@ -38,9 +38,12 @@ enum BirthdayCakeV2 {
     static let warmGold = Color(hex: "#d4a030")
 
     // Candle layout (relative to the cake centre, at scale 1)
-    static let candleDX: [CGFloat]     = [-28, -14, 0, 14, 28]
-    static let candleHeight: [CGFloat] = [22, 28, 34, 28, 22]   // staggered
-    static let candleColors: [Color]   = [lavender, gold, pink, gold, lavender]
+    // [candle-layout] Hardcoded 5-position layout REPLACED by the parametric formulas in
+    // candle(_:center:scale:) below (centers + shapes any candleCount; N=5 reproduces these
+    // exactly, N=3 → centered {-28,0,28} / center-tall {28,34,28}). Preserved for reference:
+    // static let candleDX: [CGFloat]     = [-28, -14, 0, 14, 28]
+    // static let candleHeight: [CGFloat] = [22, 28, 34, 28, 22]   // staggered
+    // static let candleColors: [Color]   = [lavender, gold, pink, gold, lavender]
 
     // Tier sizing at scale 1
     static let bottomW: CGFloat = 120, bottomH: CGFloat = 44
@@ -64,14 +67,27 @@ enum BirthdayCakeV2 {
     /// Geometry for candle i, scaled and positioned around `center`.
     static func candle(_ i: Int, center: CGPoint, scale: CGFloat) -> CandleSpec {
         let topTopY = topTierTopY(center: center, scale: scale)
-        let h = candleHeight[i] * scale
+        // [candle-layout] PARAMETRIC on candleCount — centered, center-tall, symmetric
+        // flanking-short. N=5 reproduces the old hardcoded arrays exactly (verified); N=3 →
+        // dx {-28,0,28}, h {28,34,28}, colors {gold,pink,gold}. Tunables: span/baseTall/step/bands.
+        let n = candleCount
+        let span: CGFloat = 56                                  // outer width (matches the old 5-layout)
+        let dx = n <= 1 ? 0 : -span / 2 + span / CGFloat(n - 1) * CGFloat(i)
+        let mid  = Double(n - 1) / 2
+        let dist = abs(Double(i) - mid)
+        let h = (34 - CGFloat(dist) * 6) * scale                // baseTall 34, step 6
+        let color: Color = dist < 0.5 ? pink : (dist < 1.5 ? gold : lavender)
         return CandleSpec(
-            x: center.x + candleDX[i] * scale,
+            x: center.x + dx * scale,
             bottomY: topTopY,
             wickY: topTopY - h,
-            color: candleColors[i],
+            color: color,
             width: 5 * scale
         )
+        // PRIOR (indexed the hardcoded 5-arrays):
+        // let h = candleHeight[i] * scale
+        // return CandleSpec(x: center.x + candleDX[i] * scale, bottomY: topTopY,
+        //                   wickY: topTopY - h, color: candleColors[i], width: 5 * scale)
     }
 }
 
