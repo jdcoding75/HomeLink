@@ -22,6 +22,9 @@ enum TaglineSystem {
         "firefly":     "carried this to you on the wind ✦",          // Wind
         "wand":        "a little magic headed your way ✦",           // Wand
         "plane":       "air mail · on its way to you ✦",             // Plane
+        // [copy-declutter] special-moment instrument hints added (was: birthday/firework absent)
+        "birthday":    "happy birthday ✦",                           // Birthday (special moment)
+        "firework":    "light it up ✦",                              // Firework (special moment)
     ]
 
     /// The instrument hint for a SenderStyle raw value (nil if none).

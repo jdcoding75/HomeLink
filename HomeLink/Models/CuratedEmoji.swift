@@ -27,22 +27,23 @@ enum CuratedEmoji {
     // ── FREE THOUGHTS ─────────────────────────────────────────────────────
     /// The emojis with sounds wired — selectable, always visible, free for all.
     static let base: [Item] = [
-        Item(emoji: "🤗", label: "hug",         defaultMessage: "sending you a big hug ✦", access: .free,
-             suggestions: ["wish I could hug you ✦", "a warm squeeze ✦", "here for you ✦"]),
+        // [copy-declutter] suggestion arrays retired — one defaultMessage per emoji
+        Item(emoji: "🤗", label: "hug",         defaultMessage: "sending you a big hug ✦", access: .free),
+        // [copy-declutter] removed suggestions: ["wish I could hug you ✦", "a warm squeeze ✦", "here for you ✦"]
         Item(emoji: "😘", label: "kiss",        defaultMessage: "thinking of you ✦",        access: .free,
-             glowColor: "#FF69B4",
-             suggestions: ["miss you ✦", "xoxo ✦", "you're on my mind ✦"]),
+             glowColor: "#FF69B4"),
+        // [copy-declutter] removed suggestions: ["miss you ✦", "xoxo ✦", "you're on my mind ✦"]
         // [removed] 🙌 Celebration — replaced by 👏 clap (see `pro`).
         // Item(emoji: "🙌", label: "celebration", defaultMessage: "yes! so proud of you ✦", access: .free,
         //      suggestions: ["you did it! ✦", "amazing news ✦", "celebrating you ✦"]),
         // [6/6] 👊 (punch) replaced in the free base set by 🤜🤛 (fist bump).
         Item(emoji: "🤜🤛", label: "fist bump", defaultMessage: "you got this ✦",           access: .free,
-             glowColor: "#FF8C42",
-             suggestions: ["go get 'em ✦", "proud of you ✦", "stay strong ✦"]),
-        Item(emoji: "🖐️", label: "high five",   defaultMessage: "nice work ✦",              access: .free,
-             suggestions: ["well done ✦", "crushed it ✦", "high five! ✦"]),
-        Item(emoji: "🫶", label: "support",     defaultMessage: "sending you love ✦",       access: .free,
-             suggestions: ["love you ✦", "always here for you ✦", "thinking of you ✦"]),
+             glowColor: "#FF8C42"),
+        // [copy-declutter] removed suggestions: ["go get 'em ✦", "proud of you ✦", "stay strong ✦"]
+        Item(emoji: "🖐️", label: "high five",   defaultMessage: "nice work ✦",              access: .free),
+        // [copy-declutter] removed suggestions: ["well done ✦", "crushed it ✦", "high five! ✦"]
+        Item(emoji: "🫶", label: "support",     defaultMessage: "sending you love ✦",       access: .free),
+        // [copy-declutter] removed suggestions: ["love you ✦", "always here for you ✦", "thinking of you ✦"]
     ]
 
     // ── PRO THOUGHTS ──────────────────────────────────────────────────────
@@ -56,14 +57,14 @@ enum CuratedEmoji {
 
         // [promoted] 🙏 Gratitude — graduated from coming-soon to a real .pro
         // send; uses the shared BLOOM reveal (RevealAnimationRegistry fallback).
-        Item(emoji: "🙏", label: "gratitude",       defaultMessage: "so grateful for you ✦",          access: .pro,
-             suggestions: ["thank you so so much ✦", "you mean so much ✦", "couldn't do it without you ✦"]),
+        Item(emoji: "🙏", label: "gratitude",       defaultMessage: "so grateful for you ✦",          access: .pro),
+        // [copy-declutter] removed suggestions: ["thank you so so much ✦", "you mean so much ✦", "couldn't do it without you ✦"]
 
         // [added] 👏 Clapping hands — replaces 🙌 celebration. [promoted 2026-06-13]
         // its clap reveal animation is built, so it's now a real selectable .pro send.
         Item(emoji: "👏", label: "clapping hands",  defaultMessage: "you nailed it ✦",                access: .pro,
-             glowColor: "#FFD700",
-             suggestions: ["you absolutely nailed it ✦", "that took courage ✦", "standing ovation ✦"]),
+             glowColor: "#FFD700"),
+        // [copy-declutter] removed suggestions: ["you absolutely nailed it ✦", "that took courage ✦", "standing ovation ✦"]
 
         // [removed] 🤝 Thinking of you — dropped.
         // Item(emoji: "🤝", label: "thinking of you", defaultMessage: "just thinking of you ✦", access: .comingSoon),
@@ -75,12 +76,12 @@ enum CuratedEmoji {
     /// sounds + reveal animations wired, so they are real .pro entries (not
     /// "coming soon"). Glow colours mirror RevealAnimationRegistry.
     static let proAnimated: [Item] = [
-        Item(emoji: "💭", label: "thinking",   defaultMessage: "thinking of you ✦",            access: .pro, glowColor: "#c4a8d4",
-             suggestions: ["you crossed my mind ✦", "quietly thinking of you ✦", "you're on my mind ✦"]),
+        Item(emoji: "💭", label: "thinking",   defaultMessage: "thinking of you ✦",            access: .pro, glowColor: "#c4a8d4"),
+        // [copy-declutter] removed suggestions: ["you crossed my mind ✦", "quietly thinking of you ✦", "you're on my mind ✦"]
         // [removed] 💌 Love note — reserved for Special Moments (Valentine's Day card).
         // Item(emoji: "💌", label: "love note",  defaultMessage: "sending you love ✦", access: .pro, glowColor: "#FF6B9D"),
-        Item(emoji: "💥", label: "boom",       defaultMessage: "amazing ✦",                    access: .pro, glowColor: "#FF4530",
-             suggestions: ["this is massive ✦", "did you hear that?! ✦", "big news ✦"]),
+        Item(emoji: "💥", label: "boom",       defaultMessage: "amazing ✦",                    access: .pro, glowColor: "#FF4530"),
+        // [copy-declutter] removed suggestions: ["this is massive ✦", "did you hear that?! ✦", "big news ✦"]
         Item(emoji: "🎁", label: "a gift",     defaultMessage: "a little something for you ✦", access: .pro, glowColor: "#FF5CA8"),
         // [removed] 🎆 Firework — conflicts with the Firework instrument; the emoji
         // renders as a box. (Lives on as a Special Moment / instrument.)
@@ -159,6 +160,7 @@ enum CuratedEmoji {
         Item(emoji: "🎄", label: "happy holidays",  defaultMessage: "thinking of you this season ✦", access: .comingSoon),
         Item(emoji: "💐", label: "for mum",         defaultMessage: "love you so much ✦",            access: .comingSoon),
         Item(emoji: "🎇", label: "july 4th",        defaultMessage: "light it up ✦",                 access: .comingSoon),
-        Item(emoji: "🎓", label: "graduation",      defaultMessage: "look how far you've come ✦",    access: .comingSoon),
+        // [copy-declutter] 🎓 unified to proAnimated's "so proud of you ✦" (dropped dup "look how far you've come ✦")
+        Item(emoji: "🎓", label: "graduation",      defaultMessage: "so proud of you ✦",             access: .comingSoon),
     ]
 }

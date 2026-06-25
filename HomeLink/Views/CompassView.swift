@@ -1793,6 +1793,11 @@ struct CompassView: View {
                                 .stroke(DesignTokens.Color.accentMid, lineWidth: 1))
                     )
 
+                    // [copy-declutter] "or tap a suggestion" list removed — one
+                    // defaultMessage per emoji (still pre-fills via seedMessage); the
+                    // freeform field above stays. composeSuggestions/instrumentHint
+                    // helpers preserved (now uncalled) for a future re-add.
+                    /*
                     // Suggested alternatives for this feeling — tap to use.
                     Text("or tap a suggestion")
                         .font(DesignTokens.Font.overline)
@@ -1833,6 +1838,7 @@ struct CompassView: View {
                             .buttonStyle(.plain)
                         }
                     }
+                    */
                 }
                 .padding(16)
                 .background(
