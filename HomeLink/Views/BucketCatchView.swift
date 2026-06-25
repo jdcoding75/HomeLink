@@ -265,7 +265,8 @@ struct BucketCatchView: View {
 
     private var guidance: some View {
         VStack(spacing: 6) {
-            Text("\(ping.fromName) sent you something")
+            // [copy 2026-06-25] added ✦ to match unified sentence. was: "\(ping.fromName) sent you something"
+            Text("\(ping.fromName) sent you something ✦")
                 .font(.system(size: 24, design: .serif))
                 .foregroundColor(Self.lavender)
             Text(guidanceLine2)
