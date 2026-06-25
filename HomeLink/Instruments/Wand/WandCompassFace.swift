@@ -133,7 +133,7 @@ struct WandInstrumentView: View {
                 imploding = false
                 fullChargeSeconds = 0
                 shake.onShake = { onShakeCounted($0) }
-                shake.onFull  = { HapticEngine.wandFull() }
+                shake.onFull  = { scheduleWandRelease() }   // [wand-fire] event-driven release (was: HapticEngine.wandFull())
                 shake.start()
             }
         }
@@ -143,7 +143,7 @@ struct WandInstrumentView: View {
                 imploding = false
                 fullChargeSeconds = 0
                 shake.onShake = { onShakeCounted($0) }
-                shake.onFull  = { HapticEngine.wandFull() }   // [5/5] rapid triple
+                shake.onFull  = { scheduleWandRelease() }   // [wand-fire] event-driven release (was: HapticEngine.wandFull() // [5/5])
                 shake.start()
             } else {
                 shake.stop()
@@ -368,6 +368,17 @@ struct WandInstrumentView: View {
         if !shake.motionAvailable {
             shake.holdCharge(1.0 / Double(ShakeDetector.shakesToFull))
         }
+    }
+
+    /// [wand-fire] Full-charge → release, driven by the RELIABLE `onFull` event (fired
+    /// synchronously by ShakeDetector the instant charge hits full, one-shot via `didFire`)
+    /// instead of the `tick` heartbeat countdown — that timer (a recreated
+    /// `Timer.publish().autoconnect()` `let`) never delivered, so `release()`/`onSend()` never
+    /// fired. Keeps the existing full-charge haptic + the 0.2 s "magic pause" sustain.
+    /// `release()` guards `!released`, so this is idempotent (safe vs any stray heartbeat tick).
+    private func scheduleWandRelease() {
+        HapticEngine.wandFull()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { release() }
     }
 
     /// The most magical send in the app. [2/7] First a 500 ms DIRECTIONAL
