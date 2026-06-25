@@ -1,5 +1,10 @@
 # Pointward — Project Truth Document
 
+> ⚠️ **THE ONE LIVE DOC = THIS FILE** (`POINTWARD_TRUTH.md`, repo root). The only other
+> truth file — **`POINTWARD_TRUTH_ARCHIVE_2026-06-23.md`** (same folder) — is FROZEN
+> HISTORY: read-only, never edit it, never confuse it for the live doc. There are no
+> other copies anywhere on disk.
+
 > **This is the ONE document any future Claude Code session reads to understand
 > Pointward completely.** It supersedes the fragmented bootstrap paste and is the
 > canonical reference going forward. `SESSION_LOG.md` (running history) and
