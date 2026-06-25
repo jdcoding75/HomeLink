@@ -424,7 +424,8 @@ struct PersonCard: View {
                         Circle()
                             .fill(Color(hex: "#5dcaa5"))
                             .frame(width: 6, height: 6)
-                        Text("connected ✦")
+                        // [copy 2026-06-25] unified connection status. was: "connected ✦"
+                        Text("connected ✓")
                             .font(.system(size: 10))
                             .foregroundColor(Color(hex: "#5dcaa5"))
                             .lineLimit(1)

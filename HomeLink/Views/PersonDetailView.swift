@@ -202,7 +202,8 @@ struct PersonDetailView: View {
             VStack(spacing: 6) {
                 HStack(spacing: 8) {
                     Circle().fill(Color(hex: "#5dcaa5")).frame(width: 8, height: 8)
-                    Text("Connected ✓")
+                    // [copy 2026-06-25] unified to lowercase. was: "Connected ✓"
+                    Text("connected ✓")
                         .font(.system(size: 15, weight: .semibold))
                         .foregroundColor(Color(hex: "#5dcaa5"))
                 }
