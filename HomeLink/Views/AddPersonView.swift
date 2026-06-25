@@ -26,7 +26,8 @@ struct AddPersonView: View {
     let geocodingService: GeocodingServiceProtocol
 
     // MARK: - Step state
-    @State private var step: Int = 1
+    // [copy-declutter ITEM 8a] step machine removed — single-screen form.
+    // @State private var step: Int = 1
 
     // Step 1
     @State private var name: String = ""
@@ -65,17 +66,14 @@ struct AddPersonView: View {
                 // Header
                 sheetHeader
 
-                // Progress
-                progressDots
-                    .padding(.bottom, 8)
+                // [copy-declutter ITEM 8a] progressDots removed — single-screen form.
 
-                // Step content
+                // Single-screen form: contacts → name → optional address
                 ScrollView {
                     VStack(alignment: .leading, spacing: 0) {
-                        switch step {
-                        case 1:  stepOne
-                        default: stepThree
-                        }
+                        // [copy-declutter ITEM 8a] merged stepOne + stepThree onto one screen
+                        stepOne
+                        stepThree
                     }
                     .padding(.horizontal, DesignTokens.Spacing.lg)
                     .padding(.bottom, DesignTokens.Spacing.xl)
@@ -106,13 +104,9 @@ struct AddPersonView: View {
 
     private var sheetHeader: some View {
         HStack {
-            if step > 1 {
-                Button("back") { withAnimation(.easeOut(duration: 0.25)) { step -= 1 } }
-                    .font(DesignTokens.Font.label)
-                    .foregroundColor(DesignTokens.Color.accentSoft)
-            }
+            // [copy-declutter ITEM 8a] step "back" button removed (single-screen form)
             Spacer()
-            Text(step == 1 ? "add person" : "location")
+            Text("add person")
                 .font(DesignTokens.Font.label)
                 .foregroundColor(DesignTokens.Color.textPrimary)
             Spacer()
@@ -126,6 +120,8 @@ struct AddPersonView: View {
 
     // MARK: - Progress dots
 
+    // [copy-declutter ITEM 8a] step progress dots removed — single-screen form (preserved).
+    #if false
     private var progressDots: some View {
         HStack(spacing: 6) {
             ForEach(1...2, id: \.self) { s in
@@ -140,6 +136,7 @@ struct AddPersonView: View {
             }
         }
     }
+    #endif
 
     // MARK: - Step 1: Name + Emoji
 
@@ -189,9 +186,11 @@ struct AddPersonView: View {
                 .formInput()
                 .padding(.bottom, DesignTokens.Spacing.sm)
 
-            formLabel("their emoji")
-            EmojiPickerRow(selected: $emoji)
-                .padding(.bottom, DesignTokens.Spacing.sm)
+            // [copy-declutter ITEM 8b] emoji picker hidden (preserved); @State emoji = "🏠"
+            // is kept and still flows to Person.emoji at save.
+            // formLabel("their emoji")
+            // EmojiPickerRow(selected: $emoji)
+            //     .padding(.bottom, DesignTokens.Spacing.sm)
         }
     }
 
@@ -214,7 +213,9 @@ struct AddPersonView: View {
             .overlay(Capsule().stroke(DesignTokens.Color.accentMid.opacity(0.25), lineWidth: 1))
             .padding(.vertical, DesignTokens.Spacing.md)
 
-            formLabel("their address")
+            // [copy-declutter ITEM 8a] address labeled optional — bottom "save" (name-only)
+            // already saves a no-address person, so the field is skippable.
+            formLabel("their address (optional)")
 
             // Address input with clear button
             HStack {
@@ -263,6 +264,10 @@ struct AddPersonView: View {
                     .padding(.top, 8)
             }
 
+            // [copy-declutter ITEM 8a] inline "skip — add address later" button DROPPED —
+            // redundant on the collapsed one-screen form (the bottom name-only "save"
+            // already saves a no-address person; the field is labeled optional). Preserved:
+            /*
             // [contacts-pick] 1e — don't force an address. Save now and add it later
             // (the compass shows the add-location hint until then). Hidden once an
             // address has resolved (the primary "save" CTA covers that case).
@@ -279,9 +284,11 @@ struct AddPersonView: View {
                 }
                 .padding(.top, 8)
             }
+            */
         }
     }
 
+    // [copy-declutter ITEM 8a] isGeocodeSuccess preserved (only the skip button used it).
     /// True once Step-2 geocoding has resolved a location (drives the CTA + hides skip).
     private var isGeocodeSuccess: Bool {
         if case .success = geocodeState { return true }
@@ -391,30 +398,29 @@ struct AddPersonView: View {
         .background(DesignTokens.Color.background)
     }
 
+    // [copy-declutter ITEM 8a] single-screen form: always "save", enabled on name-only
+    // (address is optional). Old step-based rules preserved below.
     private var ctaLabel: String {
-        switch step {
-        case 1:  return "next"
-        default: return "save"
-        }
+        "save"
+        // switch step { case 1: return "next"; default: return "save" }
     }
 
     private var ctaEnabled: Bool {
-        switch step {
-        case 1:  return !name.trimmingCharacters(in: .whitespaces).isEmpty
-        default:
-            if case .success = geocodeState { return true }
-            return false
-        }
+        !name.trimmingCharacters(in: .whitespaces).isEmpty
+        // switch step {
+        // case 1:  return !name.trimmingCharacters(in: .whitespaces).isEmpty
+        // default:
+        //     if case .success = geocodeState { return true }
+        //     return false
+        // }
     }
 
     // MARK: - Actions
 
     private func handleCTA() {
         saveError = nil
-        if step < 2 {
-            withAnimation(.easeOut(duration: 0.25)) { step += 1 }
-            return
-        }
+        // [copy-declutter ITEM 8a] step<2 advance branch removed — single-screen form saves directly.
+        // if step < 2 { withAnimation(.easeOut(duration: 0.25)) { step += 1 }; return }
         savePerson()
     }
 
