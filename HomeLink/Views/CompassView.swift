@@ -43,6 +43,9 @@ struct CompassView: View {
     // point → hold → fire directly, then DISARM. Re-arm only after the phone swings AWAY
     // past compassReArmThreshold, then realigns. `compassArmed` gates the holdTick fire.
     @State private var compassArmed = true
+    // [compass-touch] A FINGER on the compass face is the unambiguous "is the user aiming?" signal —
+    // sensors (upright / still / flat) all over- or under-blocked. A set-down phone has no finger → never fires.
+    @State private var isPressingCompass = false
     // PRIOR (the tap workaround — once the hold completed the compass LOCKED and waited
     // for an explicit tap to send; consumed by tapFace()):
     // @State private var compassAwaitingTap = false
@@ -608,6 +611,15 @@ struct CompassView: View {
                         )
                         .contentShape(Circle())
                         .onTapGesture { tapFace() }
+                        // [compass-touch] Finger down/up → isPressingCompass (the hold-to-send gate).
+                        // minimumDistance 0 so it tracks a STILL hold; simultaneous so it coexists with
+                        // the tap (bearing flash) and the long-press picker. Only the compass holdTick
+                        // reads the flag → harmless for other instruments.
+                        .simultaneousGesture(
+                            DragGesture(minimumDistance: 0)
+                                .onChanged { _ in isPressingCompass = true }
+                                .onEnded   { _ in isPressingCompass = false }
+                        )
                         // [2/6] SIMULTANEOUS long-press → instrument picker, so it
                         // fires on EVERY instrument even when the instrument owns
                         // its own drag gesture (e.g. the plane's circular swirl).
@@ -616,6 +628,10 @@ struct CompassView: View {
                         .simultaneousGesture(
                             LongPressGesture(minimumDuration: 0.5)
                                 .onEnded { _ in
+                                    // [compass-touch] On compass, press-and-hold IS the send gesture →
+                                    // don't pop the picker mid-send. Switch instruments via the "animation"
+                                    // box (:1524). Other instruments: unchanged.
+                                    guard instrumentStore.selected != .compass else { return }
                                     HapticEngine.personSelected()
                                     withAnimation(.easeOut(duration: 0.3)) { showSkinOverlay = true }
                                 }
@@ -1227,7 +1243,11 @@ struct CompassView: View {
             // tremor → fires; only flat-AND-motionless (laid down) is blocked (false-fire still caught).
             // PRIOR (still-alone — over-blocked a steady upright aim):
             // if !compass.isDeviceStill && (sendAlignDiff <= 10 || (holding && sendAlignDiff <= 25)) {
-            if !(compass.isDeviceStill && compass.isDeviceFlat) && (sendAlignDiff <= 10 || (holding && sendAlignDiff <= 25)) {
+            // [compass-touch] Require an ACTIVE TOUCH on the face to accumulate/complete a hold. Finger up
+            // (or phone set down) → clause fails → the decay branch below cancels. Replaces the sensor guards
+            // (upright/still/flat all over-blocked). compassArmed hysteresis above is unchanged.
+            // PRIOR (still AND flat): if !(compass.isDeviceStill && compass.isDeviceFlat) && (sendAlignDiff <= 10 || (holding && sendAlignDiff <= 25)) {
+            if isPressingCompass && (sendAlignDiff <= 10 || (holding && sendAlignDiff <= 25)) {
                 holdProgress += 0.05 / holdDuration
                 if holdProgress >= 1.0 {
                     holdProgress = 0
