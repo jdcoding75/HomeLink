@@ -1214,13 +1214,13 @@ struct CompassView: View {
             // tolerates drift up to 25° (hysteresis), so a small wobble never breaks it.
             // [compass-window 15→10] fire window tightened to reduce accidental aligned sends.
             let holding = holdProgress > 0
-            // [compass-falsefire] Require the phone to be UPRIGHT (not flat on a table) to
-            // accumulate or complete a hold — a flat/still phone has a frozen, degenerate
-            // heading that could read ≤15° with nobody aiming. When not upright, control
-            // falls to the decay branch below, so a hold also CANCELS the moment the phone
-            // goes flat. (`&&` binds tighter than `||` → the alignment clause stays grouped.)
-            // PRIOR: if sendAlignDiff <= 15 || (holding && sendAlignDiff <= 25) {   [compass-window 15→10]
-            if compass.isDeviceUpright && (sendAlignDiff <= 10 || (holding && sendAlignDiff <= 25)) {
+            // [compass-falsefire · COMMIT A revert] The UPRIGHT (gravity.z) guard blocked firing
+            // on a normal flat-ish aiming hold → compass unusable. Reverted to the plain 10°
+            // window to restore firing immediately. The false-fire fix is re-landed as a device
+            // STILLNESS gate (!compass.isDeviceStill) in COMMIT B. Upright-gated line preserved:
+            // PRIOR (upright guard): if compass.isDeviceUpright && (sendAlignDiff <= 10 || (holding && sendAlignDiff <= 25)) {
+            // PRIOR (pre-window):    if sendAlignDiff <= 15 || (holding && sendAlignDiff <= 25) {   [compass-window 15→10]
+            if sendAlignDiff <= 10 || (holding && sendAlignDiff <= 25) {
                 holdProgress += 0.05 / holdDuration
                 if holdProgress >= 1.0 {
                     holdProgress = 0
