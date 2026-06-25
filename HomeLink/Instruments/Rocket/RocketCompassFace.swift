@@ -39,8 +39,11 @@ struct RocketInstrumentView: View {
     // [3/5] SPIN-TO-AIM + LOCK-FIRST (like the bow). Aim by spinning the rocket
     // with a finger on the rim; lock onto the person at 5° before you can fuel.
     @State private var spinAngle: Double = 0      // rocket facing (degrees, 0 = up)
-    @State private var lockedAim = false          // locked on → can't rotate, can fuel
-    @State private var lockHapticFired = false
+    // [mechanism-reset PART 4] lock removed — the rocket is never frozen (re-aim freely,
+    // even mid-fuel). On-target (≤10°) is now a CONTINUOUS gate for fuel/launch; cancel
+    // via tap-outside (PART 3); post-send reset via finishSend rebuild (PART 1). Preserved:
+    // @State private var lockedAim = false          // locked on → can't rotate, can fuel
+    // @State private var lockHapticFired = false
     @State private var lastFingerAngle: Double = 0
     private let spinRingInner: CGFloat = 118
 
@@ -63,7 +66,9 @@ struct RocketInstrumentView: View {
         BearingCalculator.alignmentError(relativeBearing: spinAngle - aimTarget)
     }
     private var aligned: Bool { alignDiff <= 15 }
-    private var onTarget: Bool { alignDiff <= 5 }     // lock threshold
+    // [mechanism-reset PART 4] fire/fuel window widened 5° → 10° (replaces the lock's
+    // "don't drift while fueling" job). The 15° `aligned` display feedback is unchanged.
+    private var onTarget: Bool { alignDiff <= 10 }    // was <= 5 (lock threshold)
     private var fueled: Bool { fuelSegments >= 5 }
 
     /// Steady stars, frozen at first appearance so they don't reroll.
@@ -102,8 +107,9 @@ struct RocketInstrumentView: View {
                                showHint: false,
                                approachError: alignDiff)
 
-            // ── [3/5] SPIN RING — drag the rim to aim (hidden once locked) ──
-            if loadedToken != nil && !lockedAim {
+            // ── [3/5] SPIN RING — drag the rim to aim ──
+            // [mechanism-reset PART 4] always shown while loaded (no lock) → re-aim freely.
+            if loadedToken != nil {   // was: loadedToken != nil && !lockedAim
                 ZStack {
                     Circle()
                         .stroke(Self.lavender.opacity(0.18),
@@ -142,7 +148,7 @@ struct RocketInstrumentView: View {
         .gesture(spinGesture)            // [3/5] drag the rim to aim
         .animation(.easeOut(duration: 0.25), value: showMissHint)
         .animation(.easeOut(duration: 0.25), value: showLaunchPrompt)
-        .animation(.easeOut(duration: 0.3), value: lockedAim)
+        .animation(.easeOut(duration: 0.3), value: onTarget)   // [mechanism-reset PART 4] was: value: lockedAim
         .onAppear {
             aimTarget = bearingDegrees           // [3/5] seed the frozen target
             withAnimation(AnimationSystem.easeInOutSine(1.5)
@@ -167,7 +173,8 @@ struct RocketInstrumentView: View {
             if !launched {
                 withAnimation(.easeOut(duration: 0.3)) {
                     fuelSegments = 0
-                    lockedAim = false
+                    // [mechanism-reset PART 4] lockedAim removed.
+                    // lockedAim = false
                 }
                 showLaunchPrompt = false
             }
@@ -357,7 +364,7 @@ struct RocketInstrumentView: View {
                 .shadow(color: Self.orange.opacity(0.8), radius: 8)
                 .transition(.scale(scale: 0.7).combined(with: .opacity))
         } else if showMissHint {
-            Text("lock onto \(personName) first")
+            Text("aim at \(personName) first")   // [mechanism-reset PART 4] was "lock onto … first" (no lock now)
                 .font(.system(size: 22, weight: .bold, design: .rounded))
                 .foregroundColor(Self.amber)
                 .minimumScaleFactor(0.7).lineLimit(1)
@@ -366,7 +373,7 @@ struct RocketInstrumentView: View {
             // [3/5] step-by-step: spin to aim · lock · fuel · blast off
             Text(rocketStep)
                 .font(.system(size: 22, weight: .bold, design: .rounded))
-                .foregroundColor(lockedAim ? Color(hex: "#FFD27a") : Self.lavender.opacity(0.9))
+                .foregroundColor(onTarget ? Color(hex: "#FFD27a") : Self.lavender.opacity(0.9))   // [mechanism-reset PART 4] was: lockedAim ? … (gold when within 10°)
                 .minimumScaleFactor(0.7).lineLimit(1)
                 .shadow(color: Self.lavender.opacity(0.4), radius: 5)
                 .transition(.opacity)
@@ -381,10 +388,9 @@ struct RocketInstrumentView: View {
         //                      : "spin to aim at \(personName)"
         //   }
         //   return "locked ✦ tap to fuel · \(fuelSegments)/5"
-        if !lockedAim {
-            return "aim, tap rocket to fuel"
-        }
-        return "aim, tap rocket to fuel · \(fuelSegments)/5"
+        // [mechanism-reset PART 4] no lock — show the count once fueling has started.
+        return fuelSegments > 0 ? "aim, tap rocket to fuel · \(fuelSegments)/5"
+                                : "aim, tap rocket to fuel"
     }
 
     // ── Mechanic ────────────────────────────────────────────────────────────
@@ -406,7 +412,8 @@ struct RocketInstrumentView: View {
     private var spinGesture: some Gesture {
         DragGesture(minimumDistance: 1)
             .onChanged { value in
-                guard loadedToken != nil, !lockedAim, !launched else { return }
+                // [mechanism-reset PART 4] rotation always allowed (no lock) — re-aim freely.
+                guard loadedToken != nil, !launched else { return }   // was: …, !lockedAim, …
                 let r = hypot(value.startLocation.x - 185, value.startLocation.y - 185)
                 guard r > spinRingInner else { return }
                 if lastFingerAngle == 0 { lastFingerAngle = angleFromCenter(value.startLocation) }
@@ -416,11 +423,14 @@ struct RocketInstrumentView: View {
                 while d < -180 { d += 360 }
                 lastFingerAngle = cur
                 spinAngle += d
-                checkLock()
+                // [mechanism-reset PART 4] checkLock() removed — no lock.
             }
             .onEnded { _ in lastFingerAngle = 0 }
     }
 
+    // [mechanism-reset PART 4] checkLock() retired — there is no lock now. Fueling/launch
+    // gate on `onTarget` (≤10°) continuously instead. Preserved verbatim:
+    /*
     /// Lock onto the person at 5° — a strong snap; the rocket can't rotate
     /// after this, and fueling becomes available.
     private func checkLock() {
@@ -433,6 +443,7 @@ struct RocketInstrumentView: View {
             withAnimation(.easeOut(duration: 0.3)) { showFuelHint = false }
         }
     }
+    */
 
     /// One tap pumps a fuel segment. Each tap: flame burst, smoke puff, body
     /// shudder, mechanical click, and a haptic that strengthens with level.
@@ -442,8 +453,9 @@ struct RocketInstrumentView: View {
             HapticEngine.personSelected()
             return
         }
-        // [3/5] LOCK FIRST — can't fuel until aimed and locked onto them.
-        guard lockedAim else {
+        // [mechanism-reset PART 4] AIM FIRST — fuel only while on-target (≤10°); no lock,
+        // so drifting off-target between taps just blocks the next pump (re-aim to resume).
+        guard onTarget else {   // was: guard lockedAim
             HapticEngine.sendSoft()
             withAnimation { showMissHint = true }
             DispatchQueue.main.asyncAfter(deadline: .now() + 2.2) {
@@ -485,7 +497,7 @@ struct RocketInstrumentView: View {
         HapticEngine.rocketReady()
         // Auto-launch after a held beat
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-            guard fueled, lockedAim, !launched else { return }
+            guard fueled, onTarget, !launched else { return }   // [mechanism-reset PART 4] was: lockedAim
             launch()
         }
     }
@@ -493,8 +505,8 @@ struct RocketInstrumentView: View {
     /// Heartbeat — detect lock (in case the aim is already on target without a
     /// drag) and arm once the tank is full.
     private func autoLaunchCheck() {
-        if !lockedAim { checkLock() }
-        guard fueled, lockedAim, !launched, !showLaunchPrompt else { return }
+        // [mechanism-reset PART 4] no lock — arm when fueled AND on-target (≤10°).
+        guard fueled, onTarget, !launched, !showLaunchPrompt else { return }
         armLaunch()
     }
 
