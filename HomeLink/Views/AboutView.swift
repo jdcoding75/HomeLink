@@ -62,10 +62,18 @@ struct AboutView: View {
                     .padding(.bottom, 36)
 
                 // The story
+                // [copy-declutter] story copy replaced. Was:
+                // """
+                // Pointward was made for the feeling of distance. \
+                // For the moment you wonder which direction home is. \
+                // For everyone who has someone worth pointing toward.
+                // """
                 Text("""
-                Pointward was made for the feeling of distance. \
-                For the moment you wonder which direction home is. \
-                For everyone who has someone worth pointing toward.
+                Pointward is my first app — a tiny experiment that turned into something I really love. Right now it's completely free, because I want people to try it, break it, enjoy it, and tell me what feels magical (or not).
+
+                If it takes off, I'll add more animations, more polish, and maybe one day a mix of free + paid features so I can keep building at a good pace. But for now, it's just me, making this better piece by piece.
+
+                Thanks for being here. Your thoughts help shape this thing ✦
                 """)
                 .font(.system(size: 15).italic())
                 .foregroundColor(DesignTokens.Color.textSecondary)
