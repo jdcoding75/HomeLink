@@ -102,8 +102,9 @@ struct CompassView: View {
     @State private var breathePulse = false
 
     // Shareable compass moment
-    @State private var showShareMoment = false
-    @State private var shareCard: Image? = nil
+    // [copy-declutter ITEM 7] Share-card affordance disabled for v1 (preserved).
+    // @State private var showShareMoment = false
+    // @State private var shareCard: Image? = nil
 
     // Bottom-zone distance line: 0 standard · 1 funny (Pro) · 2 light speed
     @State private var distanceMode = 0
@@ -1051,6 +1052,8 @@ struct CompassView: View {
                 }
             }
 
+            // ── [copy-declutter ITEM 7] Shareable compass moment disabled for v1 (preserved) ──
+            #if false
             // ── Shareable compass moment — appears briefly after lock ─────────
             if showShareMoment, let card = shareCard {
                 VStack {
@@ -1078,6 +1081,7 @@ struct CompassView: View {
                 }
                 .transition(.opacity)
             }
+            #endif
 
             // ── [copy-declutter] Discovery hint retired (vestigial) ───────────
             /*
@@ -2650,17 +2654,17 @@ struct CompassView: View {
                     }
                 }
             }
-            // Shareable moment — offer briefly after the needle settles
-            shareCard = renderShareCard()
-            withAnimation(.easeIn(duration: 0.5).delay(0.8)) { showShareMoment = true }
-            Task {
-                try? await Task.sleep(nanoseconds: 8_000_000_000)
-                withAnimation(.easeOut(duration: 0.6)) { showShareMoment = false }
-            }
+            // [copy-declutter ITEM 7] Shareable moment disabled for v1 (preserved):
+            // shareCard = renderShareCard()
+            // withAnimation(.easeIn(duration: 0.5).delay(0.8)) { showShareMoment = true }
+            // Task {
+            //     try? await Task.sleep(nanoseconds: 8_000_000_000)
+            //     withAnimation(.easeOut(duration: 0.6)) { showShareMoment = false }
+            // }
         } else {
             withAnimation(.easeOut(duration: 0.5)) { steadyLock = false }
             withAnimation(.easeOut(duration: 0.3)) {
-                showShareMoment = false
+                // [copy-declutter ITEM 7] showShareMoment = false
                 breathePulse = false
             }
         }
@@ -2885,6 +2889,8 @@ struct CompassView: View {
 
     // MARK: - Share card
 
+    // [copy-declutter ITEM 7] Share-card renderer disabled for v1 (preserved).
+    /*
     /// Renders the shareable compass moment as an image.
     private func renderShareCard() -> Image? {
         guard let person = people.selectedPerson else { return nil }
@@ -2900,6 +2906,7 @@ struct CompassView: View {
         guard let uiImage = renderer.uiImage else { return nil }
         return Image(uiImage: uiImage)
     }
+    */
 
     private func handlePersonChange() {
         // Re-trigger tagline fade-out → fade-in

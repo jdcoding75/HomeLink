@@ -9,6 +9,10 @@ import SwiftUI
 
 // MARK: - ShareCardView
 
+// [copy-declutter ITEM 7] Share-card disabled for v1 (preserved; only caller was
+// CompassView.renderShareCard(), also disabled). Re-enable both together.
+#if false
+
 /// The shareable compass moment — skin-toned face, real bearing, the words.
 struct ShareCardView: View {
 
@@ -89,3 +93,5 @@ struct ShareCardView: View {
         .cornerRadius(24)
     }
 }
+
+#endif // [copy-declutter ITEM 7] ShareCardView
