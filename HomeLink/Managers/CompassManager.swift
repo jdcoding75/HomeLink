@@ -22,12 +22,24 @@ final class CompassManager: NSObject, ObservableObject {
     // gravity.z to suppress the hold-to-fire while the phone lies flat. See CompassView holdTick.
     private let motion = CMMotionManager()
     #endif
-    /// True while the phone is upright enough to be aiming; FALSE when flat on a surface.
-    /// Defaults TRUE so it never blocks before the first sample / where CoreMotion is absent.
-    @Published private(set) var isDeviceUpright = true
-    /// |gravity.z| below this = upright/aiming; at/above = flat (face-up z≈-1, vertical z≈0,
-    /// tilted-back aiming z≈-0.5…-0.7). Device-tunable (~32° from flat). [compass-falsefire]
-    private let uprightZBand: Double = 0.85
+    // [compass-falsefire · COMMIT B] Upright (gravity.z) signal SUPERSEDED by the stillness
+    // guard below — orientation blocked normal flat-ish aiming holds. Preserved:
+    // /// True while the phone is upright enough to be aiming; FALSE when flat on a surface.
+    // @Published private(set) var isDeviceUpright = true
+    // /// |gravity.z| below this = upright/aiming; at/above = flat. Device-tunable (~32° from flat).
+    // private let uprightZBand: Double = 0.85
+
+    /// [compass-falsefire · stillness] TRUE only when the phone has been essentially MOTIONLESS
+    /// (set down) for `stillDwell` — a hand-held aiming hold always has enough micro-tremor to
+    /// stay FALSE. The holdTick gates on `!isDeviceStill`. Defaults FALSE so it never blocks
+    /// before the first sample / where CoreMotion is absent (default OPEN).
+    @Published private(set) var isDeviceStill = false
+    /// Device-tunable STARTING values. Both magnitudes must stay below these for `stillDwell`s.
+    private let stillAccelThreshold: Double    = 0.02   // g — userAcceleration magnitude (gravity removed)
+    private let stillRotationThreshold: Double = 0.05   // rad/s — rotationRate magnitude
+    private let stillDwell: TimeInterval       = 0.6    // s sustained below BOTH → still
+    /// CMDeviceMotion.timestamp when the current motionless streak began; nil while moving.
+    private var stillSince: TimeInterval? = nil
     // Published so list views can show live distances per person
     @Published private(set) var userLocation: CLLocation?
     private var currentHeading: Double = 0
@@ -167,8 +179,23 @@ final class CompassManager: NSObject, ObservableObject {
         motion.deviceMotionUpdateInterval = 1.0 / 30.0   // 30 Hz — a cheap orientation gate
         motion.startDeviceMotionUpdates(to: .main) { [weak self] data, _ in
             MainActor.assumeIsolated {                   // .main queue == MainActor (see setMockHeading)
-                guard let self, let g = data?.gravity else { return }
-                self.isDeviceUpright = abs(g.z) < self.uprightZBand
+                // [compass-falsefire · stillness] Replaces the gravity.z upright read. A phone set
+                // DOWN is essentially motionless; an in-hand aiming hold always carries micro-tremor.
+                // Both magnitudes must stay below threshold for `stillDwell`s → isDeviceStill.
+                guard let self, let d = data else { return }
+                let ua = d.userAcceleration, rr = d.rotationRate
+                let accelMag = (ua.x * ua.x + ua.y * ua.y + ua.z * ua.z).squareRoot()
+                let rotMag   = (rr.x * rr.x + rr.y * rr.y + rr.z * rr.z).squareRoot()
+                if accelMag < self.stillAccelThreshold && rotMag < self.stillRotationThreshold {
+                    if self.stillSince == nil { self.stillSince = d.timestamp }
+                    if let since = self.stillSince, d.timestamp - since >= self.stillDwell {
+                        self.isDeviceStill = true
+                    }
+                } else {
+                    self.stillSince = nil
+                    self.isDeviceStill = false
+                }
+                // PRIOR (upright guard): self.isDeviceUpright = abs(g.z) < self.uprightZBand
             }
         }
         #endif
@@ -177,7 +204,10 @@ final class CompassManager: NSObject, ObservableObject {
         #if canImport(CoreMotion)
         if motion.isDeviceMotionActive { motion.stopDeviceMotionUpdates() }
         #endif
-        isDeviceUpright = true   // default OPEN when not sampling — never block on resume
+        // [compass-falsefire · stillness] default NOT-still (OPEN) when not sampling — never block on resume.
+        isDeviceStill = false
+        stillSince = nil
+        // PRIOR: isDeviceUpright = true
     }
 
     // ── Battery: foreground-only sensors ─────────────────────────────────
