@@ -262,7 +262,8 @@ struct SettingsView: View {
                 Text("version")
                     .settingsLabel()
                 Spacer()
-                Text(appVersion)
+                // [copy 2026-06-25] unified version format. was: Text(appVersion)
+                Text("version \(appVersion)")
                     .font(DesignTokens.Font.caption)
                     .foregroundColor(DesignTokens.Color.textMuted)
             }

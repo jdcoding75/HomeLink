@@ -93,7 +93,8 @@ struct AboutView: View {
                     }
                     .foregroundColor(Color(hex: "#5dcaa5"))
 
-                    Text("v\(appVersion)")
+                    // [copy 2026-06-25] unified version format. was: "v\(appVersion)"
+                    Text("version \(appVersion)")
                         .font(.system(size: 10))
                         .foregroundColor(DesignTokens.Color.textDim)
                 }
