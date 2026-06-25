@@ -38,8 +38,9 @@ struct WindInstrumentView: View {
     }
 
     @State private var seeds: [Seed] = []
-    @State private var holdProgress: Double = 0      // fallback hold-to-send
-    @State private var lastPulseHaptic = Date.distantPast
+    @State private var holdProgress: Double = 0      // fallback hold-to-send (now always 0 in mic-denied — fallback removed; still feeds `charge`)
+    // [wind-fallback-removed] lastPulseHaptic only drove fallbackHoldTick's whisper pulse (now gone):
+    // @State private var lastPulseHaptic = Date.distantPast
     @State private var lifting = false               // [4/7] leaf lifts on send
     // [single-shot 2026-06-20] Per-send cooldown for the breath path — after one
     // breath-send, ignore further exhales for a beat so a re-armed detector can't
@@ -48,7 +49,8 @@ struct WindInstrumentView: View {
     private let breathSendCooldown: TimeInterval = 2.0   // device-tunable
 
     private let driftTick = Timer.publish(every: 0.7, on: .main, in: .common).autoconnect()
-    private let holdTick  = Timer.publish(every: 0.05, on: .main, in: .common).autoconnect()
+    // [wind-fallback-removed] holdTick only drove the mic-denied auto-fire fallback (now gone):
+    // private let holdTick  = Timer.publish(every: 0.05, on: .main, in: .common).autoconnect()
 
     // Sky palette
     private static let skyTop    = Color(hex: "#87CEEB")
@@ -127,7 +129,9 @@ struct WindInstrumentView: View {
         }
         .onDisappear { breath.stop() }
         .onReceive(driftTick) { _ in driftSeeds() }
-        .onReceive(holdTick) { _ in fallbackHoldTick() }
+        // [wind-fallback-removed] mic-denied auto-fire loop deleted — the ungated holdTick →
+        // fallbackHoldTick() timer self-sent every ~1.9s with no press/cooldown (ship-blocker).
+        // .onReceive(holdTick) { _ in fallbackHoldTick() }
     }
 
     // ── The sky window ────────────────────────────────────────────────────
@@ -277,7 +281,7 @@ struct WindInstrumentView: View {
             if breath.micDenied {
                 Button(action: openSettings) {
                     VStack(spacing: 2) {
-                        Text("allow microphone for breath sending")
+                        Text("wind needs mic access — or pick another instrument")   // [wind-fallback-removed] was "allow microphone for breath sending"
                             .font(.system(size: 11, design: .serif).italic())
                             .foregroundColor(Self.slate.opacity(0.75))
                         Text("tap to enable in Settings")
@@ -393,6 +397,12 @@ struct WindInstrumentView: View {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { lifting = false }
     }
 
+    // [wind-fallback-removed] The mic-DENIED fallback auto-fired without any blow: an ungated
+    // 0.05s timer (holdTick) charged holdProgress to 1.0 (~1.33s) and called onSend(), then
+    // looped (~1.9s/send), trapping the compose screen on the Simulator (no mic → micDenied)
+    // and on any mic-denied device. REMOVED per decision (not gated to a press). The mic-denied
+    // state now shows a static note (micPermissionPrompt) and fires nothing. Preserved verbatim:
+    /*
     /// [3/7] Fallback path (mic denied): just hold for ~2 seconds — still no
     /// direction required.
     private func fallbackHoldTick() {
@@ -413,6 +423,7 @@ struct WindInstrumentView: View {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { lifting = false }
         }
     }
+    */
 }
 
 // ════════════════════════════════════════════════════════════════════════
