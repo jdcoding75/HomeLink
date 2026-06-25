@@ -45,6 +45,7 @@ struct CompassView: View {
     // isPressingCompass touch gate — all removed). Once the hold completes the compass LOCKS and
     // waits for an explicit TAP to send. Set in holdTick at holdProgress>=1.0; consumed by tapFace().
     @State private var compassAwaitingTap = false
+    @State private var lastCompassDiag = Date.distantPast   // [compass-diag] throttle for device telemetry (remove after)
     // [restore-tap] REMOVED (each broke firing). Preserved:
     // @State private var compassArmed = true              // [mechanism-reset PART 2] hysteresis re-arm
     // @State private var isPressingCompass = false        // [compass-touch] finger/touch gate
@@ -1217,22 +1218,29 @@ struct CompassView: View {
             // the upright/stillness/still-AND-flat sensor guards, and the isPressingCompass touch gate —
             // all of which broke firing. See @State note + git 45bbf0d…26e09ed.)
             if compassAwaitingTap { return }   // [restore-tap] locked — frozen until tapFace sends
+            // [compass-diag] DEVICE TELEMETRY (remove after diagnosis) — throttled every 0.4s: is the
+            // alignment ever ≤15°? does holdProgress climb to 1.0? is a real heading available?
+            if Date.now.timeIntervalSince(lastCompassDiag) > 0.4 {
+                lastCompassDiag = .now
+                CompassView.log.notice("[compass-diag] alignDiff=\(sendAlignDiff, format: .fixed(precision: 1)) holdProgress=\(holdProgress, format: .fixed(precision: 2)) headingAvail=\(compass.isHeadingAvailable) rawBearingNil=\(compass.rawBearingToTarget == nil) appState=\(appState.currentState.rawValue, privacy: .public)")
+            }
             // [3/5] SOFT LOCK — the hold STARTS within 15°, but once it has begun it tolerates drift
             // up to 30° (hysteresis on the AIM, not a re-arm), so a small wobble never breaks the lock.
             let holding = holdProgress > 0
             if sendAlignDiff <= 15 || (holding && sendAlignDiff <= 30) {
+                let wasZero = holdProgress == 0
                 holdProgress += 0.05 / holdDuration
+                if wasZero { CompassView.log.notice("[compass-diag] hold STARTED (alignDiff=\(sendAlignDiff, format: .fixed(precision: 1)))") }
                 if holdProgress >= 1.0 {
                     holdProgress = 0
                     HapticEngine.compassSend()      // [5/5] the LOCK confirmation
                     // [restore-tap] LOCK, don't auto-send — wait for the TAP (tapFace → sendThought).
                     compassAwaitingTap = true
-                    #if DEBUG
-                    CompassView.log.debug("holdTick: LOCKED (holdProgress reached 1.0) → awaiting tap")
-                    #endif
+                    CompassView.log.notice("[compass-diag] LOCKED (holdProgress reached 1.0) → awaiting tap")
                     // PRIOR (broken — auto-send + disarm): compassArmed = false; sendThought(effectiveToken)
                 }
             } else if holdProgress > 0 {
+                CompassView.log.notice("[compass-diag] hold BROKE (alignDiff=\(sendAlignDiff, format: .fixed(precision: 1)) lost progress=\(holdProgress, format: .fixed(precision: 2)))")
                 withAnimation(.easeOut(duration: 0.3)) { holdProgress = 0 }
             }
         }
@@ -1767,17 +1775,13 @@ struct CompassView: View {
         // [restore-tap] When the compass has LOCKED and is awaiting the tap, a single tap SENDS
         // (point → hold → lock → tap). Otherwise the bearing-flash answer below.
         if compassAwaitingTap {
-            #if DEBUG
-            CompassView.log.debug("tapFace: locked → SEND (compassAwaitingTap true) → sendThought")
-            #endif
+            CompassView.log.notice("[compass-diag] tapFace: LOCKED → SEND → sendThought")
             compassAwaitingTap = false
             HapticEngine.compassSend()
             sendThought(effectiveToken)
             return
         }
-        #if DEBUG
-        CompassView.log.debug("tapFace: not locked → bearing-flash answer only (no send)")
-        #endif
+        CompassView.log.notice("[compass-diag] tapFace: NOT locked → bearing-flash only (no send) — alignDiff=\(sendAlignDiff, format: .fixed(precision: 1))")
         HapticEngine.personSelected()
         withAnimation(.spring(response: 0.35, dampingFraction: 0.55)) { faceTapPulse = true }
         withAnimation(.easeIn(duration: 0.3)) { bearingFlash = true }
@@ -2415,13 +2419,15 @@ struct CompassView: View {
     /// SenderAnimationView owns the haptics and the style voice; the
     /// thought's own sound still plays here.
     private func sendThought(_ token: String) {
+        CompassView.log.notice("[compass-diag] sendThought ENTER token=\(token, privacy: .public) appState=\(appState.currentState.rawValue, privacy: .public)")
         // One state at a time — a catch in progress owns the screen
         guard appState.transition(to: .sending) else {
             // The gesture succeeded but the screen is owned (catch mode) —
             // never lose the moment silently; the selection stays loaded.
-            CompassView.log.warning("send: blocked by app state \(appState.currentState.rawValue, privacy: .public) — try again when free")
+            CompassView.log.warning("[compass-diag] send: BLOCKED by app state \(appState.currentState.rawValue, privacy: .public) — try again when free")
             return
         }
+        CompassView.log.notice("[compass-diag] sendThought PROCEEDING (appState→sending OK) token=\(token, privacy: .public)")
         // [3/6] NO emoji sound on send — only the INSTRUMENT sound plays during
         // the flight (the style voice in SenderAnimationView + each instrument's
         // own sounds). The emoji's own sound is reserved for the REVEAL moment
