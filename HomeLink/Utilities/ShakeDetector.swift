@@ -34,7 +34,7 @@ final class ShakeDetector: ObservableObject {
     // fill the crystal (≈34 % each). Was 2.5 g / 5 shakes, which felt like a
     // workout.
     static let shakesToFull = 3
-    private let shakeThreshold: Double = 1.5    // g — a gentle, deliberate shake
+    private let shakeThreshold: Double = 1.2    // [mechanism-reset PART 5] was 1.5 g (×0.8, more sensitive) — a gentle, deliberate shake
     private let resetThreshold: Double = 1.2    // must fall below before next
     private let minInterval: Double    = 0.12   // seconds between counted shakes
 

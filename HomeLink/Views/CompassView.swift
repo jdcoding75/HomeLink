@@ -2136,7 +2136,7 @@ struct CompassView: View {
         //   .wand:    "choose emoji · message · shake · release"
         //   .plane:   "choose emoji · message · wind · fly"
         switch instrumentStore.selected {
-        case .compass: return "point · hold"
+        case .compass: return "point · hold · turn away to reset"   // [mechanism-reset PART 5] was "point · hold" (matches the new hold→fire→hysteresis mechanic; no "tap"; degree readout parked)
         case .bow:     return "aim · draw · release"
         case .firefly: return "breathe"          // wind
         case .flick:   return "flick"

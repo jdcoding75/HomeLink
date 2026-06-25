@@ -17,7 +17,7 @@ import SwiftUI
 // 5 candles. Locked.
 enum BirthdayCakeV2 {
 
-    static let candleCount = 5
+    static let candleCount = 3   // [mechanism-reset PART 5] was 5 — single source; allLit is count-agnostic
 
     // Palette (approved spec)
     static let bottomA = Color(hex: "#ca658b")
