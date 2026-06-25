@@ -59,7 +59,7 @@ final class BreathDetector: ObservableObject {
     private let spikeJumpDb: Float = 16    // a sharp jump = tap onset (was 12)
     // [anti-ambient 2026-06-20] Sustain RAISED back up (toward the original 1.6 s)
     // so a momentary in-band blip doesn't count — a real exhale is a long hill.
-    private let requiredSeconds   = 1.3    // (was 0.8 → too twitchy; orig 1.6)
+    private let requiredSeconds   = 1.04   // [wind-polish] ×0.8 (was 1.3) — less sustained breath effort to trigger; device-tunable. (earlier: 0.8 too twitchy; orig 1.6)
     // Live-arc normalization: map silence → full breath onto 0…1.
     private let arcFloorDb: Float   = -42  // very dim lavender
     private let arcCeilingDb: Float = -16  // full glow

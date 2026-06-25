@@ -1179,10 +1179,9 @@ struct SenderAnimationView<Symbol: View>: View {
 
         case .firefly:
             // [4/5] FIX C — the leaf lifts from the bottom and SWIRLS lazily
-            // around the sky for ~8 s (the most beautiful send, worth waiting
-            // for), gathers for 1 s, then catches the wind and departs toward
-            // the person.
-            // PHASE 1 · SWIRL (8 s)   the leaf drifts the interior, in no hurry.
+            // around the sky for ~6 s ([wind-polish] cut from ~8 s — ≤3 turns),
+            // gathers for 1 s, then catches the wind and departs toward the person.
+            // PHASE 1 · SWIRL (6 s)   the leaf drifts the interior, in no hurry.
             // PHASE 2 · GATHER (1 s)  the wander settles, the wind picks a way.
             // PHASE 3 · SEND (2.5 s)  the leaf accelerates toward them and fades.
             HapticEngine.sendSoft()
@@ -1199,26 +1198,30 @@ struct SenderAnimationView<Symbol: View>: View {
                             .repeatForever(autoreverses: true)) {
                 orbPulse = true
             }
-            // PHASE 2 — GATHER at 8.0 s: the wander shrinks, the leaf orients.
-            DispatchQueue.main.asyncAfter(deadline: .now() + 8.0) {
+            // [wind-polish] SWIRL phase cut 8.0s → 6.0s so the leaf makes ≤3 up/down
+            // turns (orbPulse swing ≈ 2.4s → 6.0/2.4 ≈ 2.5, was 8.0/2.4 ≈ 3.3) and the
+            // long-standing over-long send is 2s snappier. Dependent timings shifted
+            // −2.0s each. Device-tunable starting value. PRIOR: 8.0 / 9.0 / 11.2 / 11.4.
+            // PHASE 2 — GATHER at 6.0 s: the wander shrinks, the leaf orients.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 6.0) {   // was 8.0
                 withAnimation(.easeInOut(duration: 1.0)) { windFloating = false }
             }
-            // PHASE 3 — DEPART at 9.0 s: accelerate to the screen edge.
-            DispatchQueue.main.asyncAfter(deadline: .now() + 9.0) {
+            // PHASE 3 — DEPART at 7.0 s: accelerate to the screen edge.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 7.0) {   // was 9.0
                 progress = 1
                 withAnimation(AnimationSystem.easeInOutSine(fireflyFlight)) {
                     flightScale = 1.3
                 }
             }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 11.2) {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 9.2) {   // was 11.2
                 faded = true
             }
             // The sky recedes as the leaf leaves; gentle landing tap.
-            DispatchQueue.main.asyncAfter(deadline: .now() + 11.4) {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 9.4) {   // was 11.4
                 windSky = false
                 impact(flash: false)
             }
-            finish(after: 11.4 + AnimationSystem.Trail.lingerMax + 0.45)
+            finish(after: 9.4 + AnimationSystem.Trail.lingerMax + 0.45)   // was 11.4 + …
 
         case .fingerFlick:
             // SLINGSHOT LAUNCH — blazing 600 ms. The thought explodes from the
