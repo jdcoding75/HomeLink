@@ -2295,9 +2295,18 @@ struct CompassView: View {
         // `finishSend` is every send-out onComplete's terminal call, i.e. AFTER the send
         // flight has finished — so the face rebuilds fresh (lit/sent reset), restoring
         // exactly that reset. Gated to firework/birthday so no other instrument is touched.
-        if instrumentStore.selected == .firework || instrumentStore.selected == .birthday {
+        // [mechanism-reset PART 1] UNIFORM post-send reset. Every type-1/type-2 instrument
+        // now rebuilds to a clean idle/ready state (was firework/birthday ONLY — that
+        // asymmetry was the bug). Compass (type 3) is special-cased: it must keep its LIVE
+        // bearing, so it does NOT rebuild — it disarms instead (compassArmed, added in PART 2).
+        // "all type-1/2" == "!= .compass".
+        if instrumentStore.selected != .compass {
             instrumentResetID += 1
         }
+        // PRIOR (firework/birthday only):
+        // if instrumentStore.selected == .firework || instrumentStore.selected == .birthday {
+        //     instrumentResetID += 1
+        // }
         // [#1 share-on-animation-complete] The send flight has finished — signal PingManager
         // so a PATH-2 link send presents its share sheet NOW (or the instant the insert
         // returns, if still in flight). No-op for PATH-1 / demo sends (no pending link).
