@@ -48,18 +48,39 @@ struct EditPersonView: View {
         // Pre-populate from model
         _name            = State(initialValue: person.name)
         _emoji           = State(initialValue: person.emoji)
-        _addressText     = State(initialValue: person.displayAddress)
 
-        // Show the stored location as already-confirmed so the save button is enabled
-        let stored = GeocodedLocation(
-            displayName: person.locationDisplayName,
-            fullAddress: person.displayAddress,
-            coordinate:  person.coordinate,
-            country:     nil,
-            postalCode:  nil
-        )
-        _geocodeState     = State(initialValue: .success(stored))
-        _geocodedLocation = State(initialValue: stored)
+        // [copy-declutter ITEM 8d] FIX: a person saved without an address has
+        // Person.locationDisplayName falling back to `name` (Person.swift:72 —
+        // shared, relied on by PersonDetail/switcher, so left untouched). The old
+        // init always seeded `.success(stored)`, so the location summary +
+        // livePreviewCard showed the NAME (e.g. "Momma") as the location. Now we
+        // only seed a stored location when a real address exists; otherwise start
+        // in the empty address-entry state so no name-as-location is shown.
+        let hasAddress = !person.displayAddress.trimmingCharacters(in: .whitespaces).isEmpty
+        if hasAddress {
+            _addressText = State(initialValue: person.displayAddress)
+            // Show the stored location as already-confirmed so the save button is enabled
+            let stored = GeocodedLocation(
+                displayName: person.locationDisplayName,
+                fullAddress: person.displayAddress,
+                coordinate:  person.coordinate,
+                country:     nil,
+                postalCode:  nil
+            )
+            _geocodeState     = State(initialValue: .success(stored))
+            _geocodedLocation = State(initialValue: stored)
+        } else {
+            _addressText      = State(initialValue: "")
+            _geocodeState     = State(initialValue: .idle)
+            _geocodedLocation = State(initialValue: nil)
+        }
+        // PRIOR (preserved) — always seeded .success(stored) from locationDisplayName:
+        // _addressText     = State(initialValue: person.displayAddress)
+        // let stored = GeocodedLocation(displayName: person.locationDisplayName,
+        //     fullAddress: person.displayAddress, coordinate: person.coordinate,
+        //     country: nil, postalCode: nil)
+        // _geocodeState     = State(initialValue: .success(stored))
+        // _geocodedLocation = State(initialValue: stored)
     }
 
     // MARK: - Body
