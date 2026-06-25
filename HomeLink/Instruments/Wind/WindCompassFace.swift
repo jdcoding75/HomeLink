@@ -279,19 +279,53 @@ struct WindInstrumentView: View {
         VStack {
             Spacer()
             if breath.micDenied {
-                Button(action: openSettings) {
-                    VStack(spacing: 2) {
-                        Text("wind needs mic access — or pick another instrument")   // [wind-fallback-removed] was "allow microphone for breath sending"
-                            .font(.system(size: 11, design: .serif).italic())
-                            .foregroundColor(Self.slate.opacity(0.75))
-                        Text("tap to enable in Settings")
-                            .font(.system(size: 10))
-                            .foregroundColor(Self.slate.opacity(0.55))
+                // [wind-polish] Readable no-mic CARD, dropped below the compass face.
+                // Was a tiny low-contrast (`slate` #3a5a72 — DARK, invisible on black),
+                // bottom-pinned overlapping the circle. Now light text on a dark card
+                // with an obvious Settings pill. offset(y:) is device-tuned.
+                VStack(spacing: 8) {
+                    Text("wind needs mic access")
+                        .font(.system(size: 16, weight: .semibold, design: .serif))
+                        .foregroundColor(Color(hex: "#e8e0f0"))
+                        .multilineTextAlignment(.center)
+                    Text("or pick another instrument")
+                        .font(.system(size: 13, design: .serif).italic())
+                        .foregroundColor(Color(hex: "#c4a8d4").opacity(0.85))
+                    Button(action: openSettings) {
+                        HStack(spacing: 6) {
+                            Image(systemName: "gearshape.fill").font(.system(size: 12, weight: .semibold))
+                            Text("Open Settings to enable the mic")
+                                .font(.system(size: 14, weight: .semibold))
+                        }
+                        .foregroundColor(Color(hex: "#0d0d14"))
+                        .padding(.horizontal, 16).padding(.vertical, 9)
+                        .background(Capsule().fill(Color(hex: "#c4a8d4")))
                     }
+                    .buttonStyle(.plain)
+                    .padding(.top, 2)
                 }
-                .buttonStyle(.plain)
-                .padding(.top, 6)
+                .padding(18)
+                .background(
+                    RoundedRectangle(cornerRadius: 16)
+                        .fill(Color(hex: "#1e1828").opacity(0.92))
+                        .overlay(RoundedRectangle(cornerRadius: 16)
+                            .stroke(Color(hex: "#7c6b8e").opacity(0.55), lineWidth: 1))
+                )
+                .padding(.horizontal, 20)
+                .offset(y: 60)   // [wind-polish · device-tuned] drop the card below the compass circle
                 .transition(.opacity)
+                // PRIOR (tiny, dark, bottom-pinned, overlapping the face):
+                // Button(action: openSettings) {
+                //     VStack(spacing: 2) {
+                //         Text("wind needs mic access — or pick another instrument")
+                //             .font(.system(size: 11, design: .serif).italic())
+                //             .foregroundColor(Self.slate.opacity(0.75))
+                //         Text("tap to enable in Settings")
+                //             .font(.system(size: 10))
+                //             .foregroundColor(Self.slate.opacity(0.55))
+                //     }
+                // }
+                // .buttonStyle(.plain).padding(.top, 6).transition(.opacity)
             }
         }
         .padding(.bottom, 4)

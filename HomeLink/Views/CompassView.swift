@@ -2138,7 +2138,7 @@ struct CompassView: View {
         switch instrumentStore.selected {
         case .compass: return "point · hold · turn away to reset"   // [mechanism-reset PART 5] was "point · hold" (matches the new hold→fire→hysteresis mechanic; no "tap"; degree readout parked)
         case .bow:     return "aim · draw · release"
-        case .firefly: return "breathe"          // wind
+        case .firefly: return "breathe into mic"          // [wind-polish] wind — was "breathe"
         case .flick:   return "flick"
         case .rocket:  return "aim · fuel · blast"
         case .wand:    return "shake · release"
@@ -2155,7 +2155,7 @@ struct CompassView: View {
         switch instrumentStore.selected {
         case .compass: return "hold toward \(name) to send"
         case .bow:     return "spin to aim, then draw toward \(name)"
-        case .firefly: return "breathe to send to \(name)"   // wind
+        case .firefly: return "breathe into mic to send to \(name)"   // [wind-polish] wind — was "breathe to send to …"
         case .flick:   return "flick toward \(name) to send"
         case .rocket:  return "fuel the rocket toward \(name)"
         case .wand:    return "shake · release toward \(name)"
