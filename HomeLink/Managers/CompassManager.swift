@@ -13,6 +13,12 @@ final class CompassManager: NSObject, ObservableObject {
 
     @Published var state: CompassState = .empty
     @Published var isHeadingAvailable  = false
+    #if DEBUG
+    /// [restore-tap selftest] When true, updateCompassState forces alignment (relativeBearing=0)
+    /// so the live holdTick can reach lock in the Simulator. Driven only by -compassSelfTest.
+    var forceAlignedTest = false
+    func pokeStateForTest() { isHeadingAvailable = true; updateCompassState() }
+    #endif
 
     private let skinStore: SkinStore
     private let locationManager = CLLocationManager()
@@ -318,8 +324,13 @@ final class CompassManager: NSObject, ObservableObject {
             rawBearingToTarget = nil                             // the "this is seeded" signal
             distance = 0                                          // no real distance; UI hides it
         }
-        let relativeBearing = (absoluteBearing - currentHeading + 360)
+        var relativeBearing = (absoluteBearing - currentHeading + 360)
             .truncatingRemainder(dividingBy: 360)
+        #if DEBUG
+        // [restore-tap selftest] Force perfect alignment so the live holdTick can lock in the
+        // Simulator (no magnetometer). Toggled only by the -compassSelfTest harness.
+        if forceAlignedTest { relativeBearing = 0 }
+        #endif
         let bearingDiff  = min(relativeBearing, 360 - relativeBearing)
         let isNowLocked  = bearingDiff <= lockThresholdDegrees
         if isNowLocked && !wasLocked {
