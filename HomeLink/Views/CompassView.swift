@@ -76,9 +76,10 @@ struct CompassView: View {
     @State private var personTagline: String? = nil
     @State private var showTaglinePicker = false
 
+    // [copy-declutter] discovery hint retired (vestigial — predates the bottom picker UI)
     // Discovery hint — "tap the words to change them", first three launches
-    @AppStorage("discoveryHintCount") private var discoveryHintCount = 0
-    @State private var showDiscoveryHint = false
+    // @AppStorage("discoveryHintCount") private var discoveryHintCount = 0
+    // @State private var showDiscoveryHint = false
 
     // Person switcher sheet (tap the name)
     @State private var showPersonSwitcher = false
@@ -1078,6 +1079,8 @@ struct CompassView: View {
                 .transition(.opacity)
             }
 
+            // ── [copy-declutter] Discovery hint retired (vestigial) ───────────
+            /*
             // ── Discovery hint — first three launches only ────────────────────
             if showDiscoveryHint {
                 VStack {
@@ -1090,6 +1093,7 @@ struct CompassView: View {
                 .allowsHitTesting(false)
                 .transition(.opacity)
             }
+            */
 
             // ── THE ONE PICKER — long-press any instrument, choose your
             // style: compass variants (free) + instruments (pro) ──────────────
@@ -1222,6 +1226,8 @@ struct CompassView: View {
                     + TaglineSystem.poeticLibrary.indices.filter { $0 != thoughtTaglineLocked }.shuffled()
                 taglinePosition = 0
             }
+            // [copy-declutter] Discovery hint trigger retired (vestigial)
+            /*
             // Discovery hint — first three launches only
             if discoveryHintCount < 3 {
                 discoveryHintCount += 1
@@ -1232,6 +1238,7 @@ struct CompassView: View {
                     withAnimation(.easeOut(duration: 0.8)) { showDiscoveryHint = false }
                 }
             }
+            */
         }
         .onChange(of: people.selectedPerson) { _, newPerson in
             if let person = newPerson {
