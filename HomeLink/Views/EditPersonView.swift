@@ -100,7 +100,9 @@ struct EditPersonView: View {
                             .background(DesignTokens.Color.border)
                             .padding(.bottom, DesignTokens.Spacing.lg)
                         nameSection
-                        emojiSection
+                        // [copy-declutter ITEM 8c] emoji picker hidden (preserved); @State emoji
+                        // + "🏠" default kept and still saved to Person.emoji.
+                        // emojiSection
                         addressSection
                         deleteSection
                     }
@@ -188,6 +190,9 @@ struct EditPersonView: View {
 
     // MARK: - Emoji
 
+    // [copy-declutter ITEM 8c] emoji picker section hidden (preserved). @State emoji,
+    // the "🏠" default, and `person.emoji = emoji` at save all remain.
+    #if false
     private var emojiSection: some View {
         VStack(alignment: .leading, spacing: 8) {
             formLabel("emoji")
@@ -195,6 +200,7 @@ struct EditPersonView: View {
                 .padding(.bottom, DesignTokens.Spacing.md)
         }
     }
+    #endif
 
     // MARK: - Address
 
