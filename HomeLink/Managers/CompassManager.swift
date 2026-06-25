@@ -40,6 +40,12 @@ final class CompassManager: NSObject, ObservableObject {
     private let stillDwell: TimeInterval       = 0.6    // s sustained below BOTH → still
     /// CMDeviceMotion.timestamp when the current motionless streak began; nil while moving.
     private var stillSince: TimeInterval? = nil
+    /// [still-and-flat] TRUE when the phone lies flat on a surface (gravity normal ≈ out of the screen).
+    /// The holdTick suppresses the send ONLY when still AND flat (= genuinely set down) — a steady UPRIGHT
+    /// aiming hold reads still but NOT flat, so it's no longer blocked. Default FALSE (open) pre-sample /
+    /// where CoreMotion is absent.
+    @Published private(set) var isDeviceFlat = false
+    private let flatZBand: Double = 0.85   // |gravity.z| >= this = flat (the preserved old uprightZBand)
     // Published so list views can show live distances per person
     @Published private(set) var userLocation: CLLocation?
     private var currentHeading: Double = 0
@@ -195,6 +201,10 @@ final class CompassManager: NSObject, ObservableObject {
                     self.stillSince = nil
                     self.isDeviceStill = false
                 }
+                // [still-and-flat] Flat-on-a-surface signal (gravity normal out of the screen). Combined
+                // with isDeviceStill at the holdTick so ONLY a set-down (flat AND motionless) phone is
+                // suppressed — a steady upright aim is still but not flat → fires.
+                self.isDeviceFlat = abs(d.gravity.z) >= self.flatZBand
                 // PRIOR (upright guard): self.isDeviceUpright = abs(g.z) < self.uprightZBand
             }
         }
@@ -206,6 +216,7 @@ final class CompassManager: NSObject, ObservableObject {
         #endif
         // [compass-falsefire · stillness] default NOT-still (OPEN) when not sampling — never block on resume.
         isDeviceStill = false
+        isDeviceFlat  = false   // [still-and-flat] default open when not sampling
         stillSince = nil
         // PRIOR: isDeviceUpright = true
     }

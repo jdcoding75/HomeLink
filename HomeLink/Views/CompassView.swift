@@ -1222,7 +1222,12 @@ struct CompassView: View {
             // (`&&` binds tighter than `||` → the alignment clause stays grouped.)
             // PRIOR (COMMIT A, no gate): if sendAlignDiff <= 10 || (holding && sendAlignDiff <= 25) {
             // PRIOR (upright guard):     if compass.isDeviceUpright && (sendAlignDiff <= 10 || (holding && sendAlignDiff <= 25)) {
-            if !compass.isDeviceStill && (sendAlignDiff <= 10 || (holding && sendAlignDiff <= 25)) {
+            // [still-and-flat] Suppress ONLY when still AND flat (= set down). A steady UPRIGHT aim
+            // reads still but not flat → fires (fixes the 2nd-hold block); a flat-ish moving aim has
+            // tremor → fires; only flat-AND-motionless (laid down) is blocked (false-fire still caught).
+            // PRIOR (still-alone — over-blocked a steady upright aim):
+            // if !compass.isDeviceStill && (sendAlignDiff <= 10 || (holding && sendAlignDiff <= 25)) {
+            if !(compass.isDeviceStill && compass.isDeviceFlat) && (sendAlignDiff <= 10 || (holding && sendAlignDiff <= 25)) {
                 holdProgress += 0.05 / holdDuration
                 if holdProgress >= 1.0 {
                     holdProgress = 0
