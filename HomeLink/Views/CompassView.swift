@@ -174,7 +174,11 @@ struct CompassView: View {
     private let holdDuration = 1.33   // [6/7] reduced 1/3 (was 2.0) — more responsive
     // [restore-tap] REMOVED — hysteresis re-arm threshold (the whole re-arm mechanism is gone).
     // PRIOR: private let compassReArmThreshold: Double = 28   // [mechanism-reset PART 2]
-    private let holdTick = Timer.publish(every: 0.05, on: .main, in: .common).autoconnect()
+    // [compass-timer-fix] Was `private let` — recreated on EVERY re-render, which restarted the 0.05s
+    // countdown before it could fire, so the hold loop NEVER ran on device (constant heading re-renders).
+    // That's why it never locked when held, AND why it only "fired" when set down (re-renders stopped →
+    // timer survived → false-fire). @State persists ONE publisher across re-renders → it ticks reliably.
+    @State private var holdTick = Timer.publish(every: 0.05, on: .main, in: .common).autoconnect()
 
     private var holdToSendActive: Bool {
         holdToSendEnabled && subscription.tier != .free
