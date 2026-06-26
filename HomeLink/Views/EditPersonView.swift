@@ -528,13 +528,14 @@ struct EditPersonView: View {
     private func savePerson() {
         saveError = nil
 
-        // Resolve final location — stored coordinate unless the address was edited
-        let finalLocation = addressChanged ? geocodedLocation : storedLocation
-
-        guard let location = finalLocation else {
-            saveError = "Please confirm a location before saving."
-            return
-        }
+        // [editperson-fix-2026-06] Resolve final location GRACEFULLY — never hard-block
+        // the save. If the address was edited AND geocoded, use the new coords; otherwise
+        // keep the PRIOR stored coords (storedLocation is non-optional). Matches
+        // AddPersonView (save with whatever coords are available — no geocode-gate dead-end).
+        // PRIOR: let finalLocation = addressChanged ? geocodedLocation : storedLocation
+        //        guard let location = finalLocation else {
+        //            saveError = "Please confirm a location before saving."; return }
+        let location = (addressChanged ? geocodedLocation : storedLocation) ?? storedLocation
 
         // Mutate the SwiftData model directly (it's a reference type)
         person.name                = name.trimmingCharacters(in: .whitespaces)
@@ -581,12 +582,11 @@ struct EditPersonView: View {
     }
 
     private var saveEnabled: Bool {
-        let nameOk = !name.trimmingCharacters(in: .whitespaces).isEmpty
-        if addressChanged {
-            if case .success = geocodeState { return nameOk }
-            return false
-        }
-        return nameOk
+        // [editperson-fix-2026-06] save gates on NAME only (matches AddPersonView).
+        // Address change that fails to geocode no longer permanently disables save —
+        // saves with prior stored coords or zero coords if no geocode succeeded.
+        // PRIOR: if addressChanged { if case .success = geocodeState { return nameOk }; return false }
+        return !name.trimmingCharacters(in: .whitespaces).isEmpty
     }
 
     private func coordString(_ coord: CLLocationCoordinate2D) -> String {
