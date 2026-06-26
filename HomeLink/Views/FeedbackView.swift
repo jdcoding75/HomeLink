@@ -17,22 +17,23 @@ struct FeedbackView: View {
 
     private enum Phase { case idle, sending, sent }
     @State private var phase: Phase = .idle
-    @State private var category = "broken"        // default-selected (first option) → the NOT-NULL column is always set
+    @State private var category = "bug"           // [feedback chips 2026-06] default-selected (first option) → the NOT-NULL column is always set
     @State private var bodyText = ""
     @State private var errorText: String? = nil
 
     private static let bodyLimit = 4000
 
     /// 6 options → internal category keys (the row stores the KEY, a readable slug).
-    /// [feedback copy fix 2026-06-25] labels + set + keys replaced to spec; the chip
-    /// SELECTION mechanic (FlowChips) is unchanged.
+    /// [feedback chips 2026-06] labels + keys replaced to spec; the chip SELECTION
+    /// mechanic (FlowChips) is unchanged. Historical rows keep their old keys (free-text
+    /// column, no migration) — old rows = old keys, new rows = new keys.
     private let chips: [(key: String, label: String)] = [
-        ("broken",          "Something didn't work right"),
-        ("more_animations", "I want more animations"),
-        ("personalization", "I want more ways to personalize thoughts"),
-        ("sending_options", "I want better sending options"),
-        ("confused",        "I'm confused about something"),
-        ("idea",            "I have an idea ✦")
+        ("bug",       "Bug Report"),
+        ("animation", "Animation Idea"),
+        ("feature",   "Feature Idea"),
+        ("general",   "General Feedback"),
+        ("how_do_i",  "How Do I…"),
+        ("other",     "Other")
     ]
 
     private var trimmedBody: String { bodyText.trimmingCharacters(in: .whitespacesAndNewlines) }
