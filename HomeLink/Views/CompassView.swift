@@ -660,7 +660,12 @@ struct CompassView: View {
                     // [recipe moved up] Mechanism recipe (+ compass-only aim hint),
                     // sitting JUST UNDER the instrument it describes — it took the
                     // retired dots' slot. (Previously lived in bottomBandRedesign.)
-                    instrumentHelperLines
+                    // [rearm-card-move-2026-06] Re-arm card overlays this slot (below face, above controls);
+                    // covers the tagline while shown, tap → gone → tagline visible again. Face never covered.
+                    ZStack {
+                        instrumentHelperLines
+                        if showReArmPrompt { reArmCard }
+                    }
                         .padding(.top, 26)
 
                     // [permission-rework-2026-06] soft fallback when location is denied — sits below
@@ -1497,6 +1502,23 @@ struct CompassView: View {
     /// directional aim hint. Relocated here out of `bottomBandRedesign` so the
     /// recipe sits with the instrument it describes (it also fills the slot the
     /// retired stage-completion dots used to occupy).
+    // [rearm-card-move-2026-06] The post-send re-arm card — now lives in the text slot below the face (not
+    // over it). Tap = re-arm + snap away → the tagline beneath becomes visible again.
+    private var reArmCard: some View {
+        Text("Tap to send again ✦")
+            .font(.system(size: 18, design: .serif).italic())
+            .foregroundColor(DesignTokens.Color.accentSoft)
+            .multilineTextAlignment(.center)
+            .padding(.horizontal, 22).padding(.vertical, 16)
+            .background(DesignTokens.Color.backgroundCard)
+            .cornerRadius(DesignTokens.Radius.card)
+            .overlay(RoundedRectangle(cornerRadius: DesignTokens.Radius.card)
+                .stroke(DesignTokens.Color.border, lineWidth: 1))
+            .contentShape(Rectangle())
+            .onTapGesture { compassArmed = true; showReArmPrompt = false }
+            .transition(.opacity)
+    }
+
     private var instrumentHelperLines: some View {
         // [tagline rework 2026-06-26] ONE single line now (was the 2-line `mechanismRecipe`
         // recipe + compass `degreeReadout`). Reserve the prior 2-line height and CENTER the one
@@ -1517,6 +1539,15 @@ struct CompassView: View {
                     .font(.system(size: 16, weight: .semibold))   // [tagline-rework-2026-06] was size: 20
                     .foregroundColor(DesignTokens.Color.accentSoft)
                     .multilineTextAlignment(.center)               // (no lineLimit → natural 2-line wrap)
+            }
+            // [rotation-hint-2026-06] AIM-by-rotating instruments (rocket · bow) get a subtle "turn to aim"
+            // cue. Compass has its own aim line; wind's tagline says blow; flick/wand/plane/birthday/firework
+            // need no rotation guidance.
+            if instrumentStore.selected == .rocket || instrumentStore.selected == .bow {
+                Text("turn phone to aim ✦")
+                    .font(.system(size: 12))
+                    .foregroundColor(DesignTokens.Color.accentSoft.opacity(0.6))
+                    .multilineTextAlignment(.center)
             }
             // [tagline-rework-2026-06] compass B3 degree readout — BENEATH the action tagline, real-GPS only
             // (nil-hidden when seeded, as the old compass tagline behaved). Relocated from instrumentTagline.
@@ -2305,7 +2336,7 @@ struct CompassView: View {
             return "Aim to \(Int(degree.rounded()))° and hold to lock, then push your thought…"
         case .bow:      return "Aim, draw, and release thought"
         case .flick:    return "Flick toward \(name)"
-        case .firefly:  return "Blow thru mic toward \(name)"
+        case .firefly:  return "Blow or breathe toward \(name)…"   // [wind-tagline-2026-06] was: "Blow thru mic toward \(name)"
         case .rocket:   return "Aim · Tap to fuel · Launch thought"
         case .wand:     return "Shake a magic thought to \(name)"
         case .plane:    return "Spin prop to start takeoff"   // ⚑ copy only; plane anim regression = separate audit
@@ -2788,28 +2819,22 @@ struct CompassView: View {
                 .shadow(color: pivotGlow, radius: 4)
                 .zIndex(4)
 
-            // [re-arm-overlay 2026-06] Post-send re-arm card — calm, centered over the face. The compass
-            // stays DISARMED (no angle auto-re-arm) until this deliberate tap. Tap = re-arm + snap away
-            // (no dismiss animation). Fades in (0.3s) via the withAnimation in finishSend. Compass-only,
-            // non-demo (only finishSend raises it for the compass).
-            if showReArmPrompt {
-                Text("Tap to send again ✦")
-                    .font(.system(size: 18, design: .serif).italic())
-                    .foregroundColor(DesignTokens.Color.accentSoft)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 22).padding(.vertical, 16)
-                    .background(DesignTokens.Color.backgroundCard)
-                    .cornerRadius(DesignTokens.Radius.card)
-                    .overlay(RoundedRectangle(cornerRadius: DesignTokens.Radius.card)
-                        .stroke(DesignTokens.Color.border, lineWidth: 1))
-                    .contentShape(Rectangle())
-                    .onTapGesture {
-                        compassArmed = true          // re-arm ON the deliberate tap (the only re-arm path now)
-                        showReArmPrompt = false      // snap away — compass is live again (no dismiss anim)
-                    }
-                    .transition(.opacity)
-                    .zIndex(5)
-            }
+            // [rearm-card-move-2026-06] Re-arm card RELOCATED to the instrumentHelperLines slot (below the
+            // face, above the controls) so it no longer covers the face/needle. See `reArmCard` + the ZStack
+            // around `instrumentHelperLines`. Preserved (was here in compassFace's ZStack):
+            //   if showReArmPrompt {
+            //       Text("Tap to send again ✦")
+            //           .font(.system(size: 18, design: .serif).italic())
+            //           .foregroundColor(DesignTokens.Color.accentSoft)
+            //           .multilineTextAlignment(.center)
+            //           .padding(.horizontal, 22).padding(.vertical, 16)
+            //           .background(DesignTokens.Color.backgroundCard)
+            //           .cornerRadius(DesignTokens.Radius.card)
+            //           .overlay(RoundedRectangle(cornerRadius: DesignTokens.Radius.card).stroke(DesignTokens.Color.border, lineWidth: 1))
+            //           .contentShape(Rectangle())
+            //           .onTapGesture { compassArmed = true; showReArmPrompt = false }
+            //           .transition(.opacity).zIndex(5)
+            //   }
         }
     }
 
