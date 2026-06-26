@@ -1549,15 +1549,15 @@ struct CompassView: View {
                     .foregroundColor(DesignTokens.Color.accentSoft)
                     .multilineTextAlignment(.center)               // (no lineLimit → natural 2-line wrap)
             }
-            // [rotation-hint-2026-06] AIM-by-rotating instruments (rocket · bow) get a subtle "turn to aim"
-            // cue. Compass has its own aim line; wind's tagline says blow; flick/wand/plane/birthday/firework
-            // need no rotation guidance.
-            if instrumentStore.selected == .rocket || instrumentStore.selected == .bow {
-                Text("turn phone to aim ✦")
-                    .font(.system(size: 12))
-                    .foregroundColor(DesignTokens.Color.accentSoft.opacity(0.6))
-                    .multilineTextAlignment(.center)
-            }
+            // [rotation-hint-removed-2026-06] "turn phone to aim ✦" REMOVED for rocket + bow — rocket/bow are
+            // aimed by FINGER, not by turning the phone, so it taught the wrong gesture. No replacement (correct
+            // finger-aim guidance is a separate upcoming review; the slot stays empty for now). Preserved:
+            //   if instrumentStore.selected == .rocket || instrumentStore.selected == .bow {
+            //       Text("turn phone to aim ✦")
+            //           .font(.system(size: 12))
+            //           .foregroundColor(DesignTokens.Color.accentSoft.opacity(0.6))
+            //           .multilineTextAlignment(.center)
+            //   }
             // [tagline-rework-2026-06] compass B3 degree readout — BENEATH the action tagline, real-GPS only
             // (nil-hidden when seeded, as the old compass tagline behaved). Relocated from instrumentTagline.
             if instrumentStore.selected == .compass, let raw = compass.rawBearingToTarget {
