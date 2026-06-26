@@ -42,6 +42,7 @@ struct SettingsView: View {
     @State private var showGivingBack = false
     @State private var showAbout      = false
     @State private var showPaywall    = false
+    @State private var showPermissions = false   // [permissions] Settings → Permissions screen
     #if DEBUG
     @State private var showTestSheet        = false
     @State private var showAnimationLab     = false
@@ -74,6 +75,9 @@ struct SettingsView: View {
                     sectionHeader("about Pointward")
                     aboutSection
 
+                    sectionHeader("permissions")
+                    permissionsSection
+
                     sectionHeader("account")
                     accountSection
 
@@ -95,6 +99,7 @@ struct SettingsView: View {
         .sheet(isPresented: $showGivingBack) { GivingBackView() }
         .sheet(isPresented: $showAbout) { AboutView() }
         .sheet(isPresented: $showPaywall) { PaywallView() }
+        .sheet(isPresented: $showPermissions) { PermissionsView() }
         #if DEBUG
         .sheet(isPresented: $showTestSheet) {
             TestMessageSheet().environmentObject(devPings)
@@ -278,6 +283,29 @@ struct SettingsView: View {
                     .foregroundColor(DesignTokens.Color.accentSoft)
                 Spacer()
             }
+        }
+    }
+
+    // MARK: - Permissions
+
+    /// One row → the Permissions screen (mic · location · notifications; Contacts excluded).
+    private var permissionsSection: some View {
+        settingsGroup {
+            settingsRow {
+                Image(systemName: "hand.raised.fill").settingsIcon()
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("permissions").settingsLabel()
+                    Text("microphone · location · notifications")
+                        .font(.system(size: 11))
+                        .foregroundColor(DesignTokens.Color.textDim)
+                }
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 12))
+                    .foregroundColor(DesignTokens.Color.textDim)
+            }
+            .contentShape(Rectangle())
+            .onTapGesture { showPermissions = true }
         }
     }
 
