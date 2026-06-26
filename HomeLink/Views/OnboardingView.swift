@@ -35,18 +35,25 @@ struct OnboardingView: View {
     // across the button path, commit-on-leave, and finishToApp (skips redundant writes).
     @State private var lastCommittedName: String = ""
     @State private var emoji: String = "❤️"
+    // [location-stripped-2026-06] own-profile location is name-only now — the address /
+    // geocode state is PRESERVED (re-enable-ready), not deleted. `locationManager` below
+    // stays LIVE: it requests the COMPASS device-location permission (not profile data).
+    #if false
     @State private var addressText: String = ""
     @StateObject private var autocomplete = AddressAutocompleteService()
     @State private var selectedAddressText: String? = nil
     @State private var geocodeState:     GeocodeState = .idle
     @State private var geocodedLocation: GeocodedLocation? = nil
     @State private var geocodeTask:      Task<Void, Never>? = nil
+    #endif
 
-    private let locationManager = CLLocationManager()
+    private let locationManager = CLLocationManager()   // [location-stripped-2026-06] KEEP — compass device-location permission
     // [build10] "Use current location" — one-shot grab → reverse-geocode → the SAME
     // geocoded path a typed address uses. @State holds one stable instance.
-    @State private var oneShotLocation = OneShotLocationProvider()
-    @State private var locating = false
+    #if false
+    @State private var oneShotLocation = OneShotLocationProvider()   // [location-stripped-2026-06]
+    @State private var locating = false                              // [location-stripped-2026-06]
+    #endif
     @State private var notificationsRequested = false
     @State private var showContactPicker = false
 
@@ -120,18 +127,20 @@ struct OnboardingView: View {
         if !resolved.isEmpty {
             name = resolved
         }
-        // Pre-fill and geocode their address so "set my compass" is one
-        // tap away when the contact card already knows where they live
-        if let postal = contact.postalAddresses.first?.value {
-            let formatted = CNPostalAddressFormatter.string(from: postal, style: .mailingAddress)
-                .replacingOccurrences(of: "\n", with: ", ")
-                .trimmingCharacters(in: .whitespaces)
-            if !formatted.isEmpty {
-                selectedAddressText = formatted   // don't re-trigger the suggestion search
-                addressText         = formatted
-                geocodeTypedAddress()
-            }
-        }
+        // [location-stripped-2026-06] own-profile location removed — keep only the NAME prefill.
+        // The address pre-fill + geocode is PRESERVED for re-enable:
+        // // Pre-fill and geocode their address so "set my compass" is one
+        // // tap away when the contact card already knows where they live
+        // if let postal = contact.postalAddresses.first?.value {
+        //     let formatted = CNPostalAddressFormatter.string(from: postal, style: .mailingAddress)
+        //         .replacingOccurrences(of: "\n", with: ", ")
+        //         .trimmingCharacters(in: .whitespaces)
+        //     if !formatted.isEmpty {
+        //         selectedAddressText = formatted   // don't re-trigger the suggestion search
+        //         addressText         = formatted
+        //         geocodeTypedAddress()
+        //     }
+        // }
     }
 
     private var pageDots: some View {
@@ -557,32 +566,32 @@ struct OnboardingView: View {
                     // fieldLabel("your emoji")
                     // EmojiPickerRow(selected: $emoji)
 
-                    // Where you are — MKLocalSearch autocomplete
-                    fieldLabel("Home Location (optional but recommended)")   // [build10 shot3a] relabel; [fixbatch] +optional hint
-                    addressAutocompleteField
-
-                    // [build10] USE CURRENT LOCATION — the 3rd Home-Location option
-                    // (Skip / Type / Use current). One-time when-in-use grab → reverse-
-                    // geocode → writes into the SAME geocodedLocation/geocodeState path the
-                    // typed address uses, so commitProfile sends lat/lng identically.
-                    Button { useCurrentLocation() } label: {
-                        HStack(spacing: 6) {
-                            Image(systemName: "location.fill").font(.system(size: 11))
-                            Text(locating ? "finding your location…" : "Use current location")
-                        }
-                        .font(.system(size: 13))
-                        .foregroundColor(Self.lavender)
-                    }
-                    .disabled(locating)
-                    .padding(.top, 4)
-
-                    Text("your location lets people you connect with point\ntoward you — share only what you're comfortable with")
-                        // [build10] legibility bump (device feedback: too small/faint) —
-                        // 11 → 13 (just below the screen's 14 body helper) + textDim → textMuted
-                        // (the screen's standard muted helper color). Still subordinate, now readable.
-                        .font(.system(size: 13, design: .serif).italic())
-                        .foregroundColor(DesignTokens.Color.textMuted)
-                        .fixedSize(horizontal: false, vertical: true)
+                    // [location-stripped-2026-06] own-profile location removed — about-you is
+                    // NAME ONLY now. The Home-Location field + "Use current location" + helper
+                    // are PRESERVED below for re-enable (the plumbing lives under #if false):
+                    // // Where you are — MKLocalSearch autocomplete
+                    // fieldLabel("Home Location (optional but recommended)")
+                    // addressAutocompleteField
+                    //
+                    // // [build10] USE CURRENT LOCATION — the 3rd Home-Location option
+                    // // (Skip / Type / Use current). One-time when-in-use grab → reverse-
+                    // // geocode → writes into the SAME geocodedLocation/geocodeState path the
+                    // // typed address uses, so commitProfile sends lat/lng identically.
+                    // Button { useCurrentLocation() } label: {
+                    //     HStack(spacing: 6) {
+                    //         Image(systemName: "location.fill").font(.system(size: 11))
+                    //         Text(locating ? "finding your location…" : "Use current location")
+                    //     }
+                    //     .font(.system(size: 13))
+                    //     .foregroundColor(Self.lavender)
+                    // }
+                    // .disabled(locating)
+                    // .padding(.top, 4)
+                    //
+                    // Text("your location lets people you connect with point\ntoward you — share only what you're comfortable with")
+                    //     .font(.system(size: 13, design: .serif).italic())
+                    //     .foregroundColor(DesignTokens.Color.textMuted)
+                    //     .fixedSize(horizontal: false, vertical: true)
                 }
                 .padding(.horizontal, 30)
 
@@ -635,6 +644,9 @@ struct OnboardingView: View {
     }
 
     /// The shared address field with live MKLocalSearch suggestions.
+    // [location-stripped-2026-06] PRESERVED for re-enable — the own-profile address field is
+    // no longer rendered (about-you is name-only). Dormant under #if false.
+    #if false
     private var addressAutocompleteField: some View {
         VStack(alignment: .leading, spacing: 6) {
             TextField("your address or city", text: $addressText)
@@ -701,6 +713,7 @@ struct OnboardingView: View {
             }
         }
     }
+    #endif  // [location-stripped-2026-06] addressAutocompleteField (dormant)
 
     /// [#6 fix] Commit the profile — LOCAL save + the SERVER `display_name` write,
     /// UNCONDITIONALLY (a name guarantees `users.display_name`, address or not). Idempotent
@@ -712,16 +725,17 @@ struct OnboardingView: View {
         guard !trimmed.isEmpty, trimmed != lastCommittedName else { return }
         lastCommittedName = trimmed
 
-        var geocoded: GeocodedLocation? = nil
-        if case .success(let location) = geocodeState { geocoded = location }
-        people.saveProfile(name: trimmed, emoji: emoji, geocoded: geocoded)   // LOCAL
+        // [location-stripped-2026-06] own-profile location removed — name only. The geocode
+        // read + lat/lng send are PRESERVED for re-enable:
+        // var geocoded: GeocodedLocation? = nil
+        // if case .success(let location) = geocodeState { geocoded = location }
+        people.saveProfile(name: trimmed, emoji: emoji)   // LOCAL (no geocoded — paths are nil-safe)
 
-        // SERVER mirror — display_name + emoji ALWAYS; lat/lng only when geocoded.
+        // SERVER mirror — display_name + emoji (lat/lng dropped with the strip).
         Task {
-            await SupabaseService.shared.updateUserProfile(
-                name: trimmed, emoji: emoji,
-                latitude: geocoded?.coordinate.latitude,
-                longitude: geocoded?.coordinate.longitude)
+            await SupabaseService.shared.updateUserProfile(name: trimmed, emoji: emoji)
+            // [location-stripped-2026-06] was: latitude: geocoded?.coordinate.latitude,
+            //                                  longitude: geocoded?.coordinate.longitude
         }
     }
 
@@ -803,6 +817,10 @@ struct OnboardingView: View {
 
     // MARK: - Address autocomplete (same implementation as AddPersonView)
 
+    // [location-stripped-2026-06] own-profile geocode plumbing PRESERVED for re-enable
+    // (handleAddressInput · selectSuggestion · geocodeTypedAddress · useCurrentLocation).
+    // Dormant under #if false now that about-you is name-only.
+    #if false
     private func handleAddressInput(_ text: String) {
         guard text != selectedAddressText else { return }
         selectedAddressText = nil
@@ -884,6 +902,7 @@ struct OnboardingView: View {
             }
         }
     }
+    #endif  // [location-stripped-2026-06] geocode plumbing (dormant)
 }
 
 // [build10 shot3a] CompletionMoment ("your compass is set ✦") — HARD-DELETED.

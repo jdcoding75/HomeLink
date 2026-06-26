@@ -39,6 +39,7 @@ struct SettingsView: View {
     // [arrival-preview removed] `@AppStorage("arrivalPreviewEnabled")` deleted — the
     // setting it backed is gone (fully dead; see notificationsSection).
 
+    @State private var showProfile     = false   // [your-name] Settings → Your Name self-editor
     @State private var showGivingBack = false
     @State private var showAbout      = false
     @State private var showPaywall    = false
@@ -61,6 +62,9 @@ struct SettingsView: View {
             DesignTokens.Color.background.ignoresSafeArea()
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
+
+                    sectionHeader("your name")
+                    profileSection
 
                     sectionHeader("send preferences")
                     sendPreferencesSection
@@ -97,6 +101,7 @@ struct SettingsView: View {
                 .padding(.horizontal, DesignTokens.Spacing.lg)
             }
         }
+        .sheet(isPresented: $showProfile) { YourProfileView() }
         .sheet(isPresented: $showGivingBack) { GivingBackView() }
         .sheet(isPresented: $showAbout) { AboutView() }
         .sheet(isPresented: $showPaywall) { PaywallView() }
@@ -324,6 +329,28 @@ struct SettingsView: View {
             }
             .contentShape(Rectangle())
             .onTapGesture { showPermissions = true }
+        }
+    }
+
+    // [your-name] the name-only self-editor (own-location stripped → name is the
+    // only editable identity). Pre-filled, saves via the onboarding save path.
+    private var profileSection: some View {
+        settingsGroup {
+            settingsRow {
+                Image(systemName: "person.fill").settingsIcon()
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("your name").settingsLabel()
+                    Text("the name people see")
+                        .font(.system(size: 11))
+                        .foregroundColor(DesignTokens.Color.textDim)
+                }
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 12))
+                    .foregroundColor(DesignTokens.Color.textDim)
+            }
+            .contentShape(Rectangle())
+            .onTapGesture { showProfile = true }
         }
     }
 
