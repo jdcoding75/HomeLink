@@ -44,7 +44,6 @@ struct CompassView: View {
     // now because the holdTick timer is FIXED (e47912e: it was a recreated `private let` publisher that never
     // ticked on device — the real root cause behind both "never locks when held" AND the set-down false-fire).
     @State private var compassArmed = true
-    @State private var lastCompassDiag = Date.distantPast   // [compass-diag] throttle for device telemetry (remove after)
     // [hands-free] Tap-to-send retired (auto-fire on hold). Preserved as a one-line fallback:
     // @State private var compassAwaitingTap = false
     // @State private var isPressingCompass = false        // [compass-touch] finger/touch gate (removed)
@@ -1210,13 +1209,6 @@ struct CompassView: View {
         // [3/6] Compass send mechanic: hold within 15° for 2 s → auto-send.
         // Built-in, every tier — the tap button is gone.
         .onReceive(holdTick) { _ in
-            // [compass-diag] TOP-OF-TICK — does the holdTick timer fire AT ALL on device? + the guard state.
-            // If these lines NEVER appear → the timer is DEAD (the bug). If they appear with
-            // flightTokenNil=false → a stuck send-state blocks the loop. (Remove after diagnosis.)
-            if Date.now.timeIntervalSince(lastCompassDiag) > 0.4 {
-                lastCompassDiag = .now
-                CompassView.log.notice("[compass-diag] tick selected=\(instrumentStore.selected.rawValue, privacy: .public) flightTokenNil=\(flightToken == nil) armed=\(compassArmed) alignDiff=\(sendAlignDiff, format: .fixed(precision: 1)) holdProgress=\(holdProgress, format: .fixed(precision: 2)) headingAvail=\(compass.isHeadingAvailable) appState=\(appState.currentState.rawValue, privacy: .public)")
-            }
             // [redesign] No longer gated on `selectedToken` — a default always supplies a payload.
             guard instrumentStore.selected == .compass, flightToken == nil else {
                 if holdProgress > 0 { holdProgress = 0 }
@@ -1227,28 +1219,21 @@ struct CompassView: View {
             // makes it fire ONCE per aim (no rapid-fire) AND enables repeat sends.
             if !compassArmed {
                 if holdProgress > 0 { holdProgress = 0 }
-                if sendAlignDiff >= compassReArmThreshold {
-                    compassArmed = true
-                    CompassView.log.notice("[compass-diag] RE-ARMED (turned away \(sendAlignDiff, format: .fixed(precision: 0))° ≥ \(compassReArmThreshold, format: .fixed(precision: 0))°)")
-                }
+                if sendAlignDiff >= compassReArmThreshold { compassArmed = true }
                 return
             }
             // SOFT LOCK — the hold STARTS within 15°, then tolerates drift up to 30° (aim hysteresis) so a
             // small wobble never breaks it.
             let holding = holdProgress > 0
             if sendAlignDiff <= 15 || (holding && sendAlignDiff <= 30) {
-                let wasZero = holdProgress == 0
                 holdProgress += 0.05 / holdDuration
-                if wasZero { CompassView.log.notice("[compass-diag] hold STARTED (alignDiff=\(sendAlignDiff, format: .fixed(precision: 1)))") }
                 if holdProgress >= 1.0 {
                     holdProgress = 0
                     compassArmed = false            // [hands-free] disarm AT fire — fires once; re-arm via turn-away
                     HapticEngine.compassSend()
                     sendThought(effectiveToken)     // [hands-free] AUTO-SEND on hold complete — no tap
-                    CompassView.log.notice("[compass-diag] FIRED → sendThought (disarmed; re-arm via turn-away)")
                 }
             } else if holdProgress > 0 {
-                CompassView.log.notice("[compass-diag] hold BROKE (alignDiff=\(sendAlignDiff, format: .fixed(precision: 1)) lost progress=\(holdProgress, format: .fixed(precision: 2)))")
                 withAnimation(.easeOut(duration: 0.3)) { holdProgress = 0 }
             }
         }
@@ -2420,15 +2405,13 @@ struct CompassView: View {
     /// SenderAnimationView owns the haptics and the style voice; the
     /// thought's own sound still plays here.
     private func sendThought(_ token: String) {
-        CompassView.log.notice("[compass-diag] sendThought ENTER token=\(token, privacy: .public) appState=\(appState.currentState.rawValue, privacy: .public)")
         // One state at a time — a catch in progress owns the screen
         guard appState.transition(to: .sending) else {
             // The gesture succeeded but the screen is owned (catch mode) —
             // never lose the moment silently; the selection stays loaded.
-            CompassView.log.warning("[compass-diag] send: BLOCKED by app state \(appState.currentState.rawValue, privacy: .public) — try again when free")
+            CompassView.log.warning("send: blocked by app state \(appState.currentState.rawValue, privacy: .public) — try again when free")
             return
         }
-        CompassView.log.notice("[compass-diag] sendThought PROCEEDING (appState→sending OK) token=\(token, privacy: .public)")
         // [3/6] NO emoji sound on send — only the INSTRUMENT sound plays during
         // the flight (the style voice in SenderAnimationView + each instrument's
         // own sounds). The emoji's own sound is reserved for the REVEAL moment
