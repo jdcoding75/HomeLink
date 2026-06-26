@@ -127,7 +127,17 @@ _Reconciles the §A–§O pre-launch correction batch + this session's commits a
 STATUS only — sequencing is the user's call. Build/commit facts cross-checked `git log --since=2026-06-24` +
 clean `xcodebuild`._
 
-### ⛔ SHOW-STOPPER — COMPASS MECHANISM IS NON-FUNCTIONAL ON DEVICE
+### ✅ RESOLVED 2026-06-25 — (was ⛔ SHOW-STOPPER) COMPASS NOW WORKS ON DEVICE
+> **RESOLVED.** Root cause was a **DEAD `holdTick` TIMER** — a recreated `private let Timer.publish().autoconnect()`
+> that never ticked on a real device (constant heading re-renders restarted its countdown), so the hold loop
+> never ran: it never locked when held, and "fired" only when set down (re-renders stop → timer survives). Fix =
+> persist with `@State` (`e47912e`). Mechanic is now **HANDS-FREE aim→hold→auto-fire** (`649794b`) + 1.5s grace +
+> disarmed-start so opening/setting-down while aligned can't auto-send (`ae7f0ae`), DEVICE-CONFIRMED (all 4
+> checks). The dead-timer explains the WHOLE saga — every sensor guard chased a symptom. See the
+> "PRELAUNCH BATCH — FULL SPECS & COPY" subsection below + `reports/compass_handsfree.md`. _The original
+> show-stopper text is kept below for the record; it is SUPERSEDED._
+
+### ⛔ (SUPERSEDED — see above) COMPASS MECHANISM IS NON-FUNCTIONAL ON DEVICE
 - **State:** at current HEAD (`55dbced`) the compass **does not fire / launch a thought when physically aiming
   on a real device.** Ship-blocking. **NOT resolved.**
 - **Sim-verified ≠ working.** The autonomous hands-free attempt (`55dbced`) was committed and passed a 4-phase
@@ -250,6 +260,83 @@ SettingsView/AboutView (no self-profile editor), `MessageLink.swift:56` (suffix 
 + reports: wind_mic_bug, recipient_flow_audit, batch_final_audit (§K), feedback_integration_audit,
 compass_*/wand_* (mechanism history). READ-ONLY reconciliation — nothing implemented; this section only records
 current true state._
+
+---
+
+## ⭐⭐ PRELAUNCH BATCH — FULL SPECS & COPY (banked verbatim 2026-06-25)
+
+_Reconciles the recovered `prelaunch_correction_batch` doc into canon: the SPECS/COPY (not just status) that the
+prior partial-bank missed, plus today's completions. ADD-only; supersedes stale bits explicitly. Full audit:
+`reports/canon_reconcile_prelaunch.md`._
+
+### STATUS UPDATES (supersede the §A–§O table above)
+- ✅ NOW DONE: **B2** (turn-by-turn line replaced by the readout, `ae7f0ae`) · **B3** (`0330000`/`ae7f0ae`) ·
+  **B5** (`89dba36`) · **B6** (`b886a51`) · **§J app-side** suffix removed (`5e38782`; web `65708a5`).
+- ✅ **COMPASS MECHANISM RESOLVED** (hands-free; dead-timer fix) — see the RESOLVED banner above; the
+  "NON-FUNCTIONAL ON DEVICE" show-stopper is SUPERSEDED.
+- ✅ **WAND mechanic FIRES on device** (`df1147c` gravity-removed shake metric + `b3ddd85` onFull-driven release
+  [the wand's own dead-timer] + `ce64461` cut delay). The receipt-not-showing is **§K** (below).
+- ✅ **WIND mechanic** fixed (§A).
+
+### B1 — the NINE instruction strings (NOT YET IMPLEMENTED; instruments show terse tails)
+Apply verbatim, `\n` between the two lines; rendered as `mechanismRecipe`, 20pt. **COMPASS reworded for
+HANDS-FREE** (the recovered doc's "tap to release" is STALE — no tap; the "at [x]°" lives in the separate
+degree-readout line). **FLICK gets its sentence** (John 2026-06-25 — un-suppress it; overrides "flick text-free").
+
+| instrument | text |
+|---|---|
+| COMPASS | "Align the compass to [Name]'s direction" / "Hold on that direction to release your thought." |
+| BOW | "Aim the bow toward [Name]" / "Draw back, hold, then release your thought." |
+| WIND | "Blow into the mic to float your thought to [Name]." |
+| FLICK | "Flick your thought toward [Name]." |
+| ROCKET | "Point the rocket toward [Name]" / "Tap to fuel it up and launch your thought." |
+| WAND | "Shake to gather magic for [Name]" / "Let the magic appear toward [Name]." |
+| PLANE | "Set the plane on the runway toward [Name]" / "Wind it up, then let it fly with your thought." |
+| BIRTHDAY | "Light the candles for [Name]." |
+| FIREWORK | "Light the fuse to send it toward [Name]." |
+
+### B3 — absolute-bearing wiring (footgun-prevention; SHIPPED)
+The readout MUST source the **ABSOLUTE** bearing `compass.rawBearingToTarget`, NOT the relative
+`state.bearingDegrees` (reads 0 at alignment, swings — would never match a fixed "310°"). **HIDE when
+`rawBearingToTarget == nil`** (seeded / Demo Dan / no-GPS), mirroring the distance-hide — Demo Dan is the
+first-run demo. SHIPPED `0330000`/`ae7f0ae` (lives in the helper line, replacing the old "is to your {dir}").
+
+### B4/B5/B6 — model + decisions (SHIPPED)
+Fixed top-center index mark (lubber line) + the dial rotates; the **existing needle** is the "lines up at top"
+indicator — **NO new rim person-marker** (double-counting-heading footgun; center emoji fixed, correct).
+**B5 wheel = VINTAGE SKIN ONLY** (15° notches, minor ticks removed, numbers every 30°, fixed red index mark).
+**B6 = flick face TEXT-FREE** today (weak-flick "flick a little harder ✦" kept) — but B1 (above) will give flick
+its sentence. SHIPPED `89dba36` / `b886a51`.
+
+### §C — RECIPIENT FLOW = BINARY onboard-or-view (DECIDED; NOT BUILT)
+After the reveal (ALWAYS plays first — gift-before-ask), not-onboarded → **ONE CTA "Send one back to {name} ✦"**
++ dismiss. REMOVE the other two doors + the recurring 3-door menu (`LinkArriverLandingView`). "Send one back" →
+the **EXISTING** onboarding screen (`ComposeBackView`, reuse — unify with `OnboardingView`; do NOT author a new
+one). Dismiss → app as a **VIEWER** (can browse, **CANNOT send**; a send attempt routes to onboarding). The one
+net-new piece = a **send-path guard**. Audit-first (touches the send path). Map: `reports/recipient_flow_audit.md`.
+
+### §K — ⚑ CATCH-BUCKET-INTENTIONAL (CONFLICTS WITH A PARKED BUG — STAYS PARKED)
+**Catch-bucket on the COMPASS receipt is INTENTIONAL — John put it there to illustrate "catching" an incoming
+thought. NOT cruft; do not purge.** ⚑ **CONFLICT:** this opposes a PARKED symptom — John observed *"no arrival /
+no bucket, just the emoji"* sending from the compass screen. **Resolve by John's device walk-through BEFORE any
+arrival/bucket/§K code change.** Status **PARKED, not actionable.** (§K's routing finding — `WandLanding` exists,
+live `.wand → .standard` mis-wire — is already in canon; not duplicated.)
+
+### §L — banked facts (no action)
+**Personalization sheets:** LIVE = `InstrumentOptionPicker` ("your style") + `TaglinePickerSheet` ("their
+tagline", compose long-press — NOT EditPerson). DORMANT/orphaned (root `ProSetupView` retired) =
+`EmojiPickerView` ("your six") → `EmojiLibrarySheet` → `CreateThoughtSheet` — **leave dormant, keep for future.**
+**DEMO DAN persists until user-deleted** (auto-removal retired; people are LOCAL SwiftData) — **NO code change.**
+**Default emoji** = blanket 🤗 for 7 of 9 (birthday 🎁 / firework 🎆 differ) — future polish.
+
+### §O + NET-NEW to-dos
+- **O-1 Wind RECEIPT captions (DECIDED, NOT DONE):** cut the multi-tier ("a feeling is on its way ✦" / "almost
+  here ✦", `WindReceiptAnimation.swift:377-378`) to ONE line, keep "{name} is thinking of you ✦".
+- **O-5 9d "got a code?" button** (`PeopleListView:114/231`) — keep or retire: **OPEN** (the §J text removal is
+  done; the entry button is separate).
+- **🛠 NET-NEW — PERMISSIONS settings screen:** Mic / Location[critical] / Notifications; **Contacts excluded.**
+- **🛠 NET-NEW — in-app FEEDBACK form:** Supabase `feedback` table built + verified (RLS insert-only); screen not.
+
 ## What Pointward Is
 
 Pointward is a SwiftUI + SwiftData iOS app for sending small, emotional
