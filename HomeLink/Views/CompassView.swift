@@ -43,7 +43,15 @@ struct CompassView: View {
     // AWAY past compassReArmThreshold (~30°), then re-aims → fires ONCE per aim, no rapid-fire. This is viable
     // now because the holdTick timer is FIXED (e47912e: it was a recreated `private let` publisher that never
     // ticked on device — the real root cause behind both "never locks when held" AND the set-down false-fire).
-    @State private var compassArmed = true
+    // Starts DISARMED so opening the app (or setting the phone down) while ALREADY aligned can't auto-fire —
+    // a fire requires a deliberate turn-away-past-30°-then-re-aim. Normal first use re-arms instantly (you start
+    // pointed away from the person and turn ONTO them).
+    @State private var compassArmed = false
+    // [compass-grace] Set when the compass becomes active (app open / screen appear / person change). The
+    // holdTick suppresses ALL firing for `compassGrace` seconds after it, so the startup heading settle
+    // (currentHeading 0 → actual sweeps past 30° then aligns) can't auto-send on open. Device-tunable.
+    @State private var compassReadyAt = Date.distantPast
+    private let compassGrace: TimeInterval = 1.5   // covers the heading settle; short enough not to block a deliberate aim. Device-tunable.
     // [hands-free] Tap-to-send retired (auto-fire on hold). Preserved as a one-line fallback:
     // @State private var compassAwaitingTap = false
     // @State private var isPressingCompass = false        // [compass-touch] finger/touch gate (removed)
@@ -313,8 +321,8 @@ struct CompassView: View {
                     if compass.rawBearingToTarget != nil {
                         distanceLine
                             .padding(.top, 6)
-                        degreeReadout              // [§B3] absolute-bearing readout (same nil-gate as distance)
-                            .padding(.top, 3)
+                        // [§B3] degree readout MOVED to instrumentHelperLines (replaces the old "is to your
+                        // {direction}" aim line) — no longer here in the top zone.
                     }
 
                     Spacer(minLength: 12)
@@ -1216,6 +1224,14 @@ struct CompassView: View {
                 if holdProgress > 0 { holdProgress = 0 }
                 return
             }
+            // [compass-grace] Suppress EVERYTHING (no arm, no accumulate, no fire) for the first few seconds
+            // after the compass becomes active — so the startup heading settle (or re-opening the app while
+            // aimed) can't auto-send. After the grace, normal hands-free logic resumes (disarmed → needs a
+            // deliberate turn-away-then-aim).
+            if Date.now.timeIntervalSince(compassReadyAt) < compassGrace {
+                if holdProgress > 0 { holdProgress = 0 }
+                return
+            }
             // [hands-free] DISARMED after a fire — do NOT accumulate or re-fire. Re-arm ONLY once the phone
             // swings AWAY past compassReArmThreshold (~30°), then a re-aim fires again. This is the reset that
             // makes it fire ONCE per aim (no rapid-fire) AND enables repeat sends.
@@ -1247,6 +1263,7 @@ struct CompassView: View {
             // Hard guard — free tier renders Minimal only. Silent and
             // immediate, before the compass face appears.
             skinStore.enforceTier(subscription.tier)
+            compassReadyAt = .now   // [compass-grace] start the no-auto-fire window on app open / screen appear
             if let person = people.selectedPerson {
                 compass.start(tracking: person)
             }
@@ -1450,20 +1467,20 @@ struct CompassView: View {
             // the flick face already carries its own edge text ("pointing toward
             // [name]" / "flick toward the point ✦"), so the bare "flick" recipe
             // line was redundant. Shown for every other instrument.
+            // [§B font +50%] 13 → 20pt. (Still suppressed for flick — its in-face text was removed in §B6
+            // and John confirmed he likes flick text-free; flag: flick now has no instruction line at all.)
             if instrumentStore.selected != .flick {
                 Text(mechanismRecipe)
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(.system(size: 20, weight: .semibold))
                     .foregroundColor(DesignTokens.Color.accentSoft)
                     .multilineTextAlignment(.center)
             }
 
-            // Aim hint — compass ONLY (the one instrument that aims by turning
-            // the phone). Live alignment guidance via `alignmentInstruction`.
-            if isAimInstrument {
-                Text(alignmentInstruction)
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundColor(DesignTokens.Color.textMuted)
-                    .multilineTextAlignment(.center)
+            // [§B2/B3] Aim readout — compass ONLY. REPLACES the old "[Name] is to your {direction}"
+            // (alignmentInstruction) line with the absolute-bearing degree readout "{name} is at {N}°".
+            // Hidden when seeded (rawBearingToTarget == nil), like the distance. PRIOR: Text(alignmentInstruction)
+            if isAimInstrument, compass.rawBearingToTarget != nil {
+                degreeReadout
             }
         }
         // Recede during a receipt, exactly as the dots did.
@@ -1597,9 +1614,10 @@ struct CompassView: View {
     /// `rawBearingToTarget != nil` gate (hidden for seeded / Demo-Dan / no-GPS, like the distance).
     private var degreeReadout: some View {
         Text("\(compass.state.personName) is at \(Int((compass.rawBearingToTarget ?? 0).rounded()))°")
-            .font(.system(size: 14, design: .serif).italic())
+            .font(.system(size: 20, weight: .medium))   // [§B] +~50% field-text size (was 14)
             .foregroundColor(DesignTokens.Color.textMuted)
             .monospacedDigit()
+            .multilineTextAlignment(.center)
     }
 
     private var distanceLineText: String {
@@ -2088,7 +2106,7 @@ struct CompassView: View {
         HapticEngine.caughtConfirmation()        // soft confirmation tap
         // Cut any in-flight hold/load progress so nothing fires after a cancel.
         holdProgress = 0
-        compassArmed = true                      // [hands-free] explicit cancel = clean ready state
+        compassArmed = false                     // [hands-free] cancel → disarmed (no surprise re-fire on a sitting-aligned phone; re-arm via turn-away)
         loadFlightToken = nil
         loadFlightProgress = 0
         messageFocused = false                   // [5/7] close the message editor
@@ -2992,6 +3010,8 @@ struct CompassView: View {
     */
 
     private func handlePersonChange() {
+        compassReadyAt = .now   // [compass-grace] new aim context → restart the no-auto-fire window
+        compassArmed = false    // and disarm, so switching to a person you're already pointed at can't fire
         // Re-trigger tagline fade-out → fade-in
         withAnimation {
             taglineKey = UUID()
