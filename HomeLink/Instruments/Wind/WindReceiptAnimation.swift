@@ -371,11 +371,15 @@ struct WindReceiptAnimation: View {
 
     private func message(elapsed: Double) -> String {
         let name = fromName.isEmpty ? "someone" : fromName
-        let lt = elapsed - Self.enterEnd            // drift-local seconds
-        // [copy 2026-06-25] unified sender sentence. was: "\(name) is thinking of you ✦"
-        if lt < 2.0   { return "\(name) sent you something ✦" }
-        if lt < 3.5   { return "a feeling is on its way ✦" }
-        return "almost here ✦"
+        // [O-1 2026-06-25] Cut the 3-tier caption to ONE line — keeps the unified
+        // sender sentence from the 008354e copy pass (NOT "is thinking of you ✦", to
+        // avoid re-diverging wind from the other instruments). Preserved removed tiers:
+        //   let lt = elapsed - Self.enterEnd            // drift-local seconds
+        //   // [copy 2026-06-25] unified sender sentence. was: "\(name) is thinking of you ✦"
+        //   if lt < 2.0   { return "\(name) sent you something ✦" }
+        //   if lt < 3.5   { return "a feeling is on its way ✦" }
+        //   return "almost here ✦"
+        return "\(name) sent you something ✦"
     }
 
     // ── Easing + interpolation ──────────────────────────────────────────────
