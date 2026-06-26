@@ -43,6 +43,7 @@ struct SettingsView: View {
     @State private var showAbout      = false
     @State private var showPaywall    = false
     @State private var showPermissions = false   // [permissions] Settings → Permissions screen
+    @State private var showFeedback    = false   // [feedback] Settings → Send feedback sheet
     #if DEBUG
     @State private var showTestSheet        = false
     @State private var showAnimationLab     = false
@@ -100,6 +101,7 @@ struct SettingsView: View {
         .sheet(isPresented: $showAbout) { AboutView() }
         .sheet(isPresented: $showPaywall) { PaywallView() }
         .sheet(isPresented: $showPermissions) { PermissionsView() }
+        .sheet(isPresented: $showFeedback) { FeedbackView() }
         #if DEBUG
         .sheet(isPresented: $showTestSheet) {
             TestMessageSheet().environmentObject(devPings)
@@ -243,6 +245,22 @@ struct SettingsView: View {
             }
             .contentShape(Rectangle())
             .onTapGesture { showAbout = true }
+
+            Divider().background(DesignTokens.Color.border).padding(.leading, 44)
+
+            // [feedback] in-app feedback form → public.feedback (anon-allowed insert)
+            settingsRow {
+                Image(systemName: "bubble.left.and.text.bubble.right")
+                    .settingsIcon()
+                Text("send feedback")
+                    .settingsLabel()
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 12))
+                    .foregroundColor(DesignTokens.Color.textDim)
+            }
+            .contentShape(Rectangle())
+            .onTapGesture { showFeedback = true }
 
             Divider().background(DesignTokens.Color.border).padding(.leading, 44)
 
