@@ -807,9 +807,20 @@ the sender via `.pointwardOpenCompass`), NOT the receipt — there is no reply a
 The "RECEIPT-not-send-out / needs device-repro" worry is closed. _(Screen inventory: ~30 surfaces; no
 elimination beyond the 3 dead files in DEAD-CODE; `PaywallView` inert-but-kept for monetization revert.)_
 
-**COMPASS INTERACTION** — **HOLD → LOCK → TAP TO SEND** (hold aims/points at the person, locks on-target,
-single **TAP** sends — NOT auto on lock; update the instruction copy to show all 3 steps). **OVERLAPS
-parked Compass v2** (red marker + haptic + lock-on-target) — same work, do together.
+**COMPASS INTERACTION** — **HANDS-FREE: AIM → HOLD → AUTO-FIRE** (no tap). _(Supersedes the old
+"HOLD → LOCK → TAP" — 2026-06-25.)_ Hold the phone pointed at the person; once aligned (≤15°) for ~1.33 s it
+**sends on its own**. After a fire it **DISARMS** and re-arms only when the phone swings AWAY past ~**30°**
+(`compassReArmThreshold`) then re-aims → **fires ONCE per aim, no rapid-fire**, and a turn-away-then-re-aim sends
+again. **⭐ THE REAL ROOT CAUSE (the whole compass saga) was a DEAD TIMER** — `holdTick` was a `private let
+Timer.publish(…).autoconnect()`, recreated on every re-render, so on a real device (constant heading re-renders)
+the hold loop **never ticked**: it never locked when held, and "fired" only when set down (re-renders stop → the
+timer survives). FIX = persist it with `@State` (`e47912e`); **device-confirmed firing.** That is also why every
+sensor-guard (upright/stillness/still-AND-flat/touch) was a dead end — they chased a symptom. Mechanic = git
+`fd867cd` (tap, reverted) → hands-free + reset re-applied on the fixed timer (DEVICE-tunable: fire 15° / drift
+30° / re-arm 30° / hold 1.33 s). Tap-to-send preserved commented as a one-line fallback. Residual edge: a phone
+set down *exactly* on the person's bearing can fire ONCE (the reset stops repeats) — add a fresh-aim-onset gate
+only if it shows up on device. **OVERLAPS parked Compass v2** (red marker + haptic) + the still-owed **§B
+send-screen spec** (instruction text on all 9 · "{name} is at {N}°" degree readout · 15°-notch Vintage wheel).
 
 **CONTACT MODEL / UX** — per-person emoji maybe unnecessary (review); **PHOTO on the contact list** (may
 SUPERSEDE the emoji — pair these decisions).

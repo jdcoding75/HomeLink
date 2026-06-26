@@ -39,16 +39,15 @@ struct CompassView: View {
     @State private var lockGlowActive = false
     @State private var emojiScaled    = false
     @State private var lockBadgeShown = false
-    // [mechanism-reset PART 2] Compass point-and-hold + hysteresis (the tap is dropped):
-    // [restore-tap] ORIGINAL point → hold → LOCK → TAP mechanic restored (was fd4974b; broken by
-    // 45bbf0d's hysteresis + the later upright/stillness/still-AND-flat sensor guards + the
-    // isPressingCompass touch gate — all removed). Once the hold completes the compass LOCKS and
-    // waits for an explicit TAP to send. Set in holdTick at holdProgress>=1.0; consumed by tapFace().
-    @State private var compassAwaitingTap = false
+    // [hands-free] Aim → hold → AUTO-FIRE (no tap). After a fire DISARM; re-arm only after the phone swings
+    // AWAY past compassReArmThreshold (~30°), then re-aims → fires ONCE per aim, no rapid-fire. This is viable
+    // now because the holdTick timer is FIXED (e47912e: it was a recreated `private let` publisher that never
+    // ticked on device — the real root cause behind both "never locks when held" AND the set-down false-fire).
+    @State private var compassArmed = true
     @State private var lastCompassDiag = Date.distantPast   // [compass-diag] throttle for device telemetry (remove after)
-    // [restore-tap] REMOVED (each broke firing). Preserved:
-    // @State private var compassArmed = true              // [mechanism-reset PART 2] hysteresis re-arm
-    // @State private var isPressingCompass = false        // [compass-touch] finger/touch gate
+    // [hands-free] Tap-to-send retired (auto-fire on hold). Preserved as a one-line fallback:
+    // @State private var compassAwaitingTap = false
+    // @State private var isPressingCompass = false        // [compass-touch] finger/touch gate (removed)
 
     // Ping animation
     @State private var pingRingActive  = false
@@ -172,8 +171,10 @@ struct CompassView: View {
     // matter what mid-send state the instrument was holding internally.
     @State private var instrumentResetID = 0
     private let holdDuration = 1.33   // [6/7] reduced 1/3 (was 2.0) — more responsive
-    // [restore-tap] REMOVED — hysteresis re-arm threshold (the whole re-arm mechanism is gone).
-    // PRIOR: private let compassReArmThreshold: Double = 28   // [mechanism-reset PART 2]
+    // [hands-free] After a fire the compass disarms; it re-arms only once the phone swings AWAY past this
+    // angle (then a re-aim fires again). 30° sits clearly above the 15° fire window → a deliberate turn-away
+    // resets it, an in-aim wobble never does. Device-tunable (John: ~30 is enough).
+    private let compassReArmThreshold: Double = 30
     // [compass-timer-fix] Was `private let` — recreated on EVERY re-render, which restarted the 0.05s
     // countdown before it could fire, so the hold loop NEVER ran on device (constant heading re-renders).
     // That's why it never locked when held, AND why it only "fired" when set down (re-renders stopped →
@@ -1214,21 +1215,26 @@ struct CompassView: View {
             // flightTokenNil=false → a stuck send-state blocks the loop. (Remove after diagnosis.)
             if Date.now.timeIntervalSince(lastCompassDiag) > 0.4 {
                 lastCompassDiag = .now
-                CompassView.log.notice("[compass-diag] tick selected=\(instrumentStore.selected.rawValue, privacy: .public) flightTokenNil=\(flightToken == nil) awaitingTap=\(compassAwaitingTap) alignDiff=\(sendAlignDiff, format: .fixed(precision: 1)) holdProgress=\(holdProgress, format: .fixed(precision: 2)) headingAvail=\(compass.isHeadingAvailable) appState=\(appState.currentState.rawValue, privacy: .public)")
+                CompassView.log.notice("[compass-diag] tick selected=\(instrumentStore.selected.rawValue, privacy: .public) flightTokenNil=\(flightToken == nil) armed=\(compassArmed) alignDiff=\(sendAlignDiff, format: .fixed(precision: 1)) holdProgress=\(holdProgress, format: .fixed(precision: 2)) headingAvail=\(compass.isHeadingAvailable) appState=\(appState.currentState.rawValue, privacy: .public)")
             }
             // [redesign] No longer gated on `selectedToken` — a default always supplies a payload.
             guard instrumentStore.selected == .compass, flightToken == nil else {
                 if holdProgress > 0 { holdProgress = 0 }
-                compassAwaitingTap = false       // [restore-tap] reset off-compass / while sending
                 return
             }
-            // [restore-tap] Once LOCKED and awaiting the tap, FREEZE the hold — don't re-accumulate
-            // or re-fire the lock cue; tapFace() performs the send. (Removed: compassArmed hysteresis,
-            // the upright/stillness/still-AND-flat sensor guards, and the isPressingCompass touch gate —
-            // all of which broke firing. See @State note + git 45bbf0d…26e09ed.)
-            if compassAwaitingTap { return }   // [restore-tap] locked — frozen until tapFace sends
-            // [3/5] SOFT LOCK — the hold STARTS within 15°, but once it has begun it tolerates drift
-            // up to 30° (hysteresis on the AIM, not a re-arm), so a small wobble never breaks the lock.
+            // [hands-free] DISARMED after a fire — do NOT accumulate or re-fire. Re-arm ONLY once the phone
+            // swings AWAY past compassReArmThreshold (~30°), then a re-aim fires again. This is the reset that
+            // makes it fire ONCE per aim (no rapid-fire) AND enables repeat sends.
+            if !compassArmed {
+                if holdProgress > 0 { holdProgress = 0 }
+                if sendAlignDiff >= compassReArmThreshold {
+                    compassArmed = true
+                    CompassView.log.notice("[compass-diag] RE-ARMED (turned away \(sendAlignDiff, format: .fixed(precision: 0))° ≥ \(compassReArmThreshold, format: .fixed(precision: 0))°)")
+                }
+                return
+            }
+            // SOFT LOCK — the hold STARTS within 15°, then tolerates drift up to 30° (aim hysteresis) so a
+            // small wobble never breaks it.
             let holding = holdProgress > 0
             if sendAlignDiff <= 15 || (holding && sendAlignDiff <= 30) {
                 let wasZero = holdProgress == 0
@@ -1236,11 +1242,10 @@ struct CompassView: View {
                 if wasZero { CompassView.log.notice("[compass-diag] hold STARTED (alignDiff=\(sendAlignDiff, format: .fixed(precision: 1)))") }
                 if holdProgress >= 1.0 {
                     holdProgress = 0
-                    HapticEngine.compassSend()      // [5/5] the LOCK confirmation
-                    // [restore-tap] LOCK, don't auto-send — wait for the TAP (tapFace → sendThought).
-                    compassAwaitingTap = true
-                    CompassView.log.notice("[compass-diag] LOCKED (holdProgress reached 1.0) → awaiting tap")
-                    // PRIOR (broken — auto-send + disarm): compassArmed = false; sendThought(effectiveToken)
+                    compassArmed = false            // [hands-free] disarm AT fire — fires once; re-arm via turn-away
+                    HapticEngine.compassSend()
+                    sendThought(effectiveToken)     // [hands-free] AUTO-SEND on hold complete — no tap
+                    CompassView.log.notice("[compass-diag] FIRED → sendThought (disarmed; re-arm via turn-away)")
                 }
             } else if holdProgress > 0 {
                 CompassView.log.notice("[compass-diag] hold BROKE (alignDiff=\(sendAlignDiff, format: .fixed(precision: 1)) lost progress=\(holdProgress, format: .fixed(precision: 2)))")
@@ -1758,17 +1763,15 @@ struct CompassView: View {
     /// each stage. Temporary scaffold; remove once the mechanic is verified on a real device.
     private func runCompassSelfTestIfRequested() {
         guard CommandLine.arguments.contains("-compassSelfTest") else { return }
-        CompassView.log.debug("SELFTEST: armed — forcing alignment in 2.5s")
+        CompassView.log.notice("[compass-diag] SELFTEST: forcing alignment in 2.5s (hands-free → should AUTO-FIRE)")
         DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
             compass.forceAlignedTest = true
             compass.pokeStateForTest()
-            CompassView.log.debug("SELFTEST: alignment forced (sendAlignDiff=\(sendAlignDiff, format: .fixed(precision: 1))) — live holdTick should now accumulate → lock")
-            // Give the 1.33s hold time to complete, then simulate the TAP.
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1.7) {
-                CompassView.log.debug("SELFTEST: pre-tap state — compassAwaitingTap=\(compassAwaitingTap) holdProgress=\(holdProgress, format: .fixed(precision: 2))")
-                tapFace()   // the user's tap → should send when locked
+            CompassView.log.notice("[compass-diag] SELFTEST: alignment forced (alignDiff=\(sendAlignDiff, format: .fixed(precision: 1))) — live holdTick should accumulate → FIRE on its own")
+            // Hands-free: no tap; the holdTick should reach 1.0 and auto-send within ~1.33s.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
                 compass.forceAlignedTest = false
-                CompassView.log.debug("SELFTEST: done — compassAwaitingTap now \(compassAwaitingTap)")
+                CompassView.log.notice("[compass-diag] SELFTEST: done — armed=\(compassArmed) holdProgress=\(holdProgress, format: .fixed(precision: 2))")
             }
         }
     }
@@ -1777,14 +1780,10 @@ struct CompassView: View {
     private func tapFace() {
         // [restore-tap] When the compass has LOCKED and is awaiting the tap, a single tap SENDS
         // (point → hold → lock → tap). Otherwise the bearing-flash answer below.
-        if compassAwaitingTap {
-            CompassView.log.notice("[compass-diag] tapFace: LOCKED → SEND → sendThought")
-            compassAwaitingTap = false
-            HapticEngine.compassSend()
-            sendThought(effectiveToken)
-            return
-        }
-        CompassView.log.notice("[compass-diag] tapFace: NOT locked → bearing-flash only (no send) — alignDiff=\(sendAlignDiff, format: .fixed(precision: 1))")
+        // [hands-free] Tap is NOT a send (auto-fires on hold). A tap just "answers" with the bearing flash.
+        // Tap-to-send fallback preserved (flip back here + restore compassAwaitingTap if hands-free is ever
+        // reverted):
+        // if compassAwaitingTap { compassAwaitingTap = false; HapticEngine.compassSend(); sendThought(effectiveToken); return }
         HapticEngine.personSelected()
         withAnimation(.spring(response: 0.35, dampingFraction: 0.55)) { faceTapPulse = true }
         withAnimation(.easeIn(duration: 0.3)) { bearingFlash = true }
@@ -2092,8 +2091,7 @@ struct CompassView: View {
         HapticEngine.caughtConfirmation()        // soft confirmation tap
         // Cut any in-flight hold/load progress so nothing fires after a cancel.
         holdProgress = 0
-        compassAwaitingTap = false               // [restore-tap] clear the compass awaiting-tap latch on cancel
-        // PRIOR (removed): compassArmed = true   // [mechanism-reset PART 2] hysteresis re-arm
+        compassArmed = true                      // [hands-free] explicit cancel = clean ready state
         loadFlightToken = nil
         loadFlightProgress = 0
         messageFocused = false                   // [5/7] close the message editor
