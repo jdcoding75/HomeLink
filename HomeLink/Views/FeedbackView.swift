@@ -31,7 +31,7 @@ struct FeedbackView: View {
         ("bug",       "Bug Report"),
         ("animation", "Animation Idea"),
         ("feature",   "Feature Idea"),
-        ("general",   "General Feedback"),
+        ("loved_it",  "Loved It"),
         ("how_do_i",  "How Do I…"),
         ("other",     "Other")
     ]
