@@ -2522,7 +2522,8 @@ struct CompassView: View {
         // asymmetry was the bug). Compass (type 3) is special-cased: it must keep its LIVE
         // bearing, so it does NOT rebuild — it disarms instead (compassArmed, added in PART 2).
         // "all type-1/2" == "!= .compass".
-        if instrumentStore.selected != .compass {
+        // [wind-doublesend-fix-2026-06] wind exempt from rebuild — preserves lastBreathSend cooldown.
+        if instrumentStore.selected != .compass && instrumentStore.selected != .firefly {
             instrumentResetID += 1
         }
         // [restore-tap] compass (type 3) keeps its LIVE bearing — no rebuild. tapFace already
