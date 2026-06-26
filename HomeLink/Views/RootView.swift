@@ -233,6 +233,10 @@ struct RootView: View {
         .fullScreenCover(item: $messageOpenRequest) { request in
             IncomingMessageView(messageID: request.id) {
                 messageOpenRequest = nil
+                // [item16-fix] drain the next queued /m/ message. Async so this cover's
+                // dismissal settles before the next fullScreenCover presents (avoids the
+                // SwiftUI present-while-dismissing race that would drop the second message).
+                DispatchQueue.main.async { presentPendingMessageIfReady() }
             }
         }
         // [phase2 4b] short-code claim → play the NEWEST through the SAME 4a chain.
@@ -245,11 +249,12 @@ struct RootView: View {
                 presentPendingMessageIfReady()
             }
         }
-        // [double-tap fix · Layer 2] Re-check readiness whenever the pending slot
+        // [double-tap fix · Layer 2] Re-check readiness whenever the pending QUEUE
         // changes — covers a SceneDelegate cold-launch capture that lands AFTER
-        // onAppear has already run (the slot is set from outside the SwiftUI funnels).
-        .onChange(of: pendingLink.messageID) { _, id in
-            if id != nil { presentPendingMessageIfReady() }
+        // onAppear has already run (the queue is set from outside the SwiftUI funnels).
+        // [item16-fix] observe `queue` (was the single `messageID` slot).
+        .onChange(of: pendingLink.queue) { _, q in
+            if !q.isEmpty { presentPendingMessageIfReady() }
         }
         // ([5/6] replay cover moved onto the TabView in MainTabView —
         //  presenting from here failed while a child sheet was up)

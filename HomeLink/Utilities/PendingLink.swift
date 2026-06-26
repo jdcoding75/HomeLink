@@ -28,20 +28,30 @@ final class PendingLink: ObservableObject {
 
     static let shared = PendingLink()
 
-    /// The most recent inbound /m/<id> message id awaiting presentation, or nil.
-    /// @Published so RootView re-checks readiness when a SceneDelegate capture
-    /// lands after RootView's onAppear has already run.
-    @Published var messageID: UUID?
+    /// [item16-fix] FIFO QUEUE of inbound /m/<id> ids awaiting presentation. Was a single
+    /// slot (last-write-wins) → two quick /m/ links clobbered each other so only one ever
+    /// played. Now each DISTINCT id queues; presenting drains FIFO (arrival order).
+    /// @Published so RootView re-checks readiness when a SceneDelegate capture lands after
+    /// RootView's onAppear has already run.
+    // PRIOR (single-slot last-write-wins, preserved):
+    // @Published var messageID: UUID?
+    @Published var queue: [UUID] = []
 
     private init() {}
 
-    /// Record an inbound message id (last-write-wins; presenting clears it).
-    func set(_ id: UUID) { messageID = id }
+    var isEmpty: Bool { queue.isEmpty }
 
-    /// Atomically read-and-clear — RootView calls this only at the moment it
-    /// actually presents, so a not-yet-ready read never loses the id.
+    /// Record an inbound message id. Appends (FIFO); DEDUPED — the same id is set from BOTH
+    /// the SceneDelegate cold-launch boundary AND the SwiftUI funnel for ONE tap, so the
+    /// contains-guard prevents the same message presenting twice.
+    // PRIOR: func set(_ id: UUID) { messageID = id }   // last-write-wins (deduped by overwrite)
+    func set(_ id: UUID) { if !queue.contains(id) { queue.append(id) } }
+
+    /// Pop the OLDEST id — RootView calls this only at the moment it actually presents, so a
+    /// not-yet-ready read never loses an id.
+    // PRIOR: func take() -> UUID? { defer { messageID = nil }; return messageID }
     func take() -> UUID? {
-        defer { messageID = nil }
-        return messageID
+        guard !queue.isEmpty else { return nil }
+        return queue.removeFirst()
     }
 }
