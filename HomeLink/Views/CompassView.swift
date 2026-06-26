@@ -2504,7 +2504,9 @@ struct CompassView: View {
         // [re-arm-overlay 2026-06] Compass post-send: stay DISARMED + raise the deliberate-tap re-arm card
         // (kills auto-re-arm-while-walking). Compass instrument ONLY; skip Demo Dan (test sends need no re-arm).
         // Subtle 0.3s fade-in after the flight; the tap re-arms + snaps it away (see compassFace).
-        if instrumentStore.selected == .compass && !isDemoSelected {
+        // [demo-simplification-2026-06] removed `&& !isDemoSelected` — Demo Dan shows the
+        // tap-to-re-arm card like any compass send. PRIOR: == .compass && !isDemoSelected
+        if instrumentStore.selected == .compass {
             withAnimation(.easeIn(duration: 0.3)) { showReArmPrompt = true }
         }
         // [firework/birthday freeze fix] FireworkCompassFace + BirthdayCakeCompassFaceV2
