@@ -36,7 +36,7 @@ struct LinkArriverLandingView: View {
     /// Door 3 — quiet exit into the app.
     var onDismiss: () -> Void = {}
 
-    @State private var showShowcase = false
+    // [§C binary] showcase removed — @State private var showShowcase = false
 
     private var name: String {
         if let n = senderName?.trimmingCharacters(in: .whitespaces), !n.isEmpty { return n }
@@ -59,36 +59,27 @@ struct LinkArriverLandingView: View {
                     .foregroundColor(DesignTokens.Color.textPrimary)
                     .multilineTextAlignment(.center)
 
-                VStack(spacing: 14) {
-                    // ── Door 1 — primary ──────────────────────────────────
-                    door(title: "Send one back to \(name)", primary: true) {
-                        // TODO (Shot 2): real compose-straight-back to [Name]
-                        // (prefilled recipient, no signup wall). For now, route to
-                        // the existing send surface (the compass) on dismiss.
-                        onSendBack()
-                    }
-
-                    // ── Door 2 — showcase ─────────────────────────────────
-                    door(title: "See what Pointward is", primary: false) {
-                        withAnimation(.easeInOut(duration: 0.3)) { showShowcase = true }
-                    }
-
-                    // ── Door 3 — quiet exit ───────────────────────────────
-                    door(title: "I'm good for now", primary: false) {
-                        onDismiss()
-                    }
+                // [§C binary] ONE CTA + a quiet dismiss (binary onboard-or-view). The two extra doors
+                // ("See what Pointward is" → showcase, "I'm good for now") and the showcase overlay are
+                // REMOVED. PRIOR (3-door menu) preserved:
+                //   door(title: "See what Pointward is", primary: false) { withAnimation { showShowcase = true } }
+                //   door(title: "I'm good for now",      primary: false) { onDismiss() }
+                door(title: "Send one back to \(name) ✦", primary: true) {
+                    onSendBack()    // → the EXISTING onboarding screen (ComposeBackView reuse), via beginComposeBack
                 }
                 .padding(.horizontal, 32)
 
-                Spacer()
-                Spacer()
-            }
+                // [§C binary] Quiet dismiss → into the app as a VIEWER (enterAppAsGuest; can browse, can't send
+                // until the deferred send-guard lands). Copy/placement = 9b/9c polish, DEFERRED — structure only.
+                Button { onDismiss() } label: {
+                    Text("maybe later")
+                        .font(.system(size: 15, design: .serif).italic())
+                        .foregroundColor(DesignTokens.Color.textMuted)
+                }
+                .padding(.top, 2)
 
-            // ── Placeholder showcase overlay (door 2) ─────────────────────
-            if showShowcase {
-                showcaseOverlay
-                    .transition(.opacity)
-                    .zIndex(5)
+                Spacer()
+                Spacer()
             }
         }
     }
@@ -113,8 +104,8 @@ struct LinkArriverLandingView: View {
         }
     }
 
-    // MARK: - Showcase placeholder (door 2)
-
+    // MARK: - Showcase placeholder (door 2) — [§C binary] REMOVED (door-2 gone). Preserved for reference:
+    /*
     private var showcaseOverlay: some View {
         ZStack {
             DesignTokens.Color.background.ignoresSafeArea()
@@ -123,27 +114,15 @@ struct LinkArriverLandingView: View {
                 Text("this is Pointward ✦")
                     .font(.system(size: 22, design: .serif).italic())
                     .foregroundColor(DesignTokens.Color.textPrimary)
-
-                // The existing showcase component (placeholder: one instrument).
-                // TODO (polish): the full carousel / relocated onboarding showcase.
                 InstrumentPreview(instrument: .compass)
                     .frame(width: 220, height: 220)
-
                 Text("a quiet way to point a thought toward someone you love")
                     .font(.system(size: 14, design: .serif).italic())
                     .foregroundColor(DesignTokens.Color.textMuted)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 40)
-
                 Spacer()
-
-                // [build10 fixbatch 2b] The showcase's PRIMARY exit now routes INTO THE APP
-                // (the same guest dismiss-into-app the other doors use, via onDismiss) —
-                // previously it returned to the landing doors. So "See what Pointward is" →
-                // showcase → enter the app, not back to the menu.
-                Button {
-                    onDismiss()
-                } label: {
+                Button { onDismiss() } label: {
                     Text("enter Pointward →")
                         .font(DesignTokens.Font.label)
                         .foregroundColor(DesignTokens.Color.textPrimary)
@@ -157,4 +136,5 @@ struct LinkArriverLandingView: View {
             }
         }
     }
+    */
 }
