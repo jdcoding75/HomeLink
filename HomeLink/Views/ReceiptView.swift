@@ -25,6 +25,11 @@ struct ReceiptView: View {
     let style: SenderStyle
     let onRevealed: () -> Void
     let onFinished: () -> Void
+    /// [catch-bucket-removed-2026-06] DEFAULT false = live: NO spin-to-catch + NO bucket — the
+    /// thought arrives then plays the per-instrument landing → reveal (Decision X). Only the
+    /// Animation Lab passes `true` to render the preserved interactive spin-to-catch receipt.
+    /// (Wand still routes here via its unchanged receiptKind — §K parked — just without the bucket.)
+    var interactiveCatch: Bool = false
 
     @EnvironmentObject var compass: CompassManager
     @EnvironmentObject var pings:   PingManager
@@ -513,11 +518,12 @@ struct ReceiptView: View {
                             .padding(.horizontal, 30)
                     }
                 }
-            } else {
+            } else if interactiveCatch {
                 // [1/5] The bucket is CENTRED in the middle band — and since the
                 // band is the screen's middle 60%, that puts the bucket at ~50%
                 // vertical, with breathing room all around. (The incoming thought
                 // + sender marker now live in full-screen space — see body.)
+                // [catch-bucket-removed-2026-06] Lab-only now; live skips straight to .landing.
                 bucket
             }
         }
@@ -573,7 +579,8 @@ struct ReceiptView: View {
                 Text("tap anywhere to continue")
                     .font(.system(size: 13, design: .serif).italic())
                     .foregroundColor(DesignTokens.Color.textMuted)
-            } else {
+            } else if interactiveCatch {
+                // [catch-bucket-removed-2026-06] spin guidance is Lab-only (live has no spin).
                 VStack(spacing: 8) {
                     Text(guidanceLine)
                         .font(.system(size: 22, weight: .bold, design: .rounded))
@@ -759,7 +766,17 @@ struct ReceiptView: View {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
             withAnimation(.easeIn(duration: 0.4)) { arrivalPulse = false }
         }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { enterSeeking() }
+        // [catch-bucket-removed-2026-06] live (interactiveCatch == false) skips the spin-to-catch:
+        // a brief arrival beat, then straight to the per-instrument landing → reveal. The Lab
+        // (interactiveCatch == true) keeps the full seek/lock spin.
+        if interactiveCatch {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { enterSeeking() }
+        } else {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                guard phase == .arriving else { return }
+                withAnimation(.easeInOut(duration: 0.3)) { phase = .landing }
+            }
+        }
     }
 
     private func enterSeeking() {

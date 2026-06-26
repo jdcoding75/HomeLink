@@ -33,6 +33,11 @@ struct AnimationTestLabView: View {
     }
     @State private var run: Run?
 
+    // [catch-bucket-removed-2026-06] preserved catch-bucket receipts, viewable here ONLY
+    // (the bucket is gated OFF in the live app via showBucket/interactiveCatch defaults).
+    struct CatchDemo: Identifiable { let style: SenderStyle; var id: String { style.rawValue } }
+    @State private var catchDemo: CatchDemo?
+
     private static let lavender = Color(hex: "#c4a8d4")
     private static let gold     = Color(hex: "#e0a85a")
     private static let stageOrder: [AnimationStage] = [.compass, .send, .receipt]
@@ -51,6 +56,7 @@ struct AnimationTestLabView: View {
                         ForEach(AnimationManifest.all) { def in
                             section(for: def)
                         }
+                        catchReceiptsSection   // [catch-bucket-removed-2026-06] preserved bucket showcase
                         Spacer(minLength: 30)
                     }
                     .padding(.horizontal, 20).padding(.top, 10)
@@ -66,6 +72,74 @@ struct AnimationTestLabView: View {
         }
         .preferredColorScheme(.dark)
         .fullScreenCover(item: $run) { playerOverlay($0) }
+        .fullScreenCover(item: $catchDemo) { catchPlayer($0.style) }   // [catch-bucket-removed-2026-06]
+    }
+
+    // ── Interactive Catch Receipts — the retired bucket animations, preserved ──
+    // [catch-bucket-removed-2026-06] These play the REAL bucket versions (showBucket /
+    // interactiveCatch = true). The live app keeps the flags at their `false` default,
+    // so this Lab section is the only place the bucket catch still appears.
+    private let catchStyles: [SenderStyle] = [.bowArrow, .fingerFlick, .firefly, .plane, .rocket, .wand]
+
+    private var catchReceiptsSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 8) {
+                Text("🪣").font(.system(size: 22))
+                Text("Interactive Catch Receipts")
+                    .font(.system(size: 15, weight: .semibold, design: .serif))
+                    .foregroundColor(DesignTokens.Color.textPrimary)
+            }
+            Text("the original spin-to-catch / land-in-bucket receipts — retired from v1, kept here to view")
+                .font(.system(size: 10, design: .serif).italic())
+                .foregroundColor(DesignTokens.Color.textMuted)
+            LazyVGrid(columns: cols, spacing: 10) {
+                ForEach(catchStyles, id: \.self) { s in
+                    Button { catchDemo = CatchDemo(style: s) } label: {
+                        Text(s.rawValue)
+                            .font(.system(size: 13, weight: .medium, design: .serif))
+                            .foregroundColor(DesignTokens.Color.textPrimary)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 12)
+                            .background(DesignTokens.Color.backgroundCard)
+                            .cornerRadius(DesignTokens.Radius.card)
+                            .overlay(RoundedRectangle(cornerRadius: DesignTokens.Radius.card)
+                                .stroke(Self.lavender.opacity(0.4), lineWidth: 1))
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func catchPlayer(_ style: SenderStyle) -> some View {
+        let e = randomEmoji
+        let done: () -> Void = { catchDemo = nil }
+        switch style {
+        case .bowArrow:
+            BowReceiptAnimationV2(senderBearing: 120, emoji: e, fromName: "them",
+                                  onFinished: done, showBucket: true)
+        case .fingerFlick:
+            FlickReceiptAnimationV2(senderBearing: 120, emoji: e, fromName: "them",
+                                    onFinished: done, showBucket: true)
+        case .firefly:
+            WindReceiptAnimation(senderBearing: 120, emoji: e, fromName: "them",
+                                 onFinished: done, showBucket: true)
+        case .plane:
+            PlaneReceiptAnimationV2(senderBearing: 120, emoji: e, fromName: "them",
+                                    onFinished: done, showBucket: true)
+        case .rocket:
+            RocketLandingReceiptAnimation(senderBearing: 120, emoji: e, fromName: "them",
+                                          onFinished: done, showBucket: true)
+        default:
+            // wand / shootingStar → the INTERACTIVE spin-to-catch (the shared receipt),
+            // with the bucket + finger-spin ON. Inherits compass/pings from the app env.
+            ReceiptView(
+                ping: PingManager.ReceivedPing(fromName: "them", emoji: e, timestamp: Date(),
+                                               senderStyle: style.rawValue),
+                style: style, onRevealed: {}, onFinished: done,
+                interactiveCatch: true)
+        }
     }
 
     // ── A section per manifest definition ──────────────────────────────────

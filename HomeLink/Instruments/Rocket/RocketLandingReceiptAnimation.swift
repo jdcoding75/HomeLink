@@ -36,6 +36,9 @@ struct RocketLandingReceiptAnimation: View {
     let fromName: String
     var onRevealed: () -> Void = {}
     var onFinished: () -> Void = {}
+    /// [catch-bucket-removed-2026-06] DEFAULT false = live (no bucket; the emoji's post-land
+    /// arc re-centers to the reveal — the rocket's earth-horizon landing is unchanged). Lab passes true.
+    var showBucket: Bool = false
 
     // ── Palette (shared with the parachute receipt) ─────────────────────────
     private static let accentSoft = Color(hex: "#c4a8d4")
@@ -79,7 +82,7 @@ struct RocketLandingReceiptAnimation: View {
                         InstrumentBackground.deepSpace.ignoresSafeArea()
                         stars(geo: geo)
                         earthHorizon(geo: geo)
-                        bucket(geo: geo)
+                        if showBucket { bucket(geo: geo) }   // [catch-bucket-removed-2026-06]
                         rocketUnit(geo: geo)
                         ejectedEmoji(geo: geo)
                         label(geo: geo)
@@ -127,6 +130,9 @@ struct RocketLandingReceiptAnimation: View {
     /// The bucket sits SEATED on the earth, lightly planted (base ~34pt below the
     /// surface) at its x — so the rocket and bucket share one grounded horizon.
     private func bucketPoint(_ size: CGSize) -> CGPoint {
+        // [catch-bucket-removed-2026-06] bucketless (live) → the emoji's post-land arc re-centers
+        // to the reveal focal point. (The rocket's descent/legs/earth horizon are untouched.)
+        guard showBucket else { return CGPoint(x: size.width / 2, y: size.height * 0.46) }
         let bx = size.width * 0.66
         return CGPoint(x: bx, y: earthSurfaceY(size, atX: bx) - 34)
     }

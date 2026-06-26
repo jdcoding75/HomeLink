@@ -29,6 +29,8 @@ struct FlickReceiptAnimationV2: View {
   let fromName: String
   var onRevealed: () -> Void = {}
   var onFinished: () -> Void = {}
+  /// [catch-bucket-removed-2026-06] DEFAULT false = live (no bucket, re-center to reveal). Lab passes true.
+  var showBucket: Bool = false
 
   // ── Source-of-truth timing ─────────────────────────────────────────────
   static let duration: Double = InstrumentBoundaries.Receipt.flick   // 2.8
@@ -84,7 +86,7 @@ struct FlickReceiptAnimationV2: View {
                 .ignoresSafeArea()
                 .opacity(boardIn ? 1 : 0)
 
-              bucket(geo: geo)
+              if showBucket { bucket(geo: geo) }   // [catch-bucket-removed-2026-06]
               dust(geo: geo)
               trail(geo: geo, elapsed: elapsed)
               ball(geo: geo, elapsed: elapsed)
@@ -125,7 +127,9 @@ struct FlickReceiptAnimationV2: View {
   // ── Geometry — one quadratic bezier, left edge → bucket mouth ────────────
 
   private func bucketPoint(_ size: CGSize) -> CGPoint {
-    CGPoint(x: size.width - 80, y: size.height - 95)
+    // [catch-bucket-removed-2026-06] bucketless (live) → re-center to the reveal focal point.
+    showBucket ? CGPoint(x: size.width - 80, y: size.height - 95)
+               : CGPoint(x: size.width / 2, y: size.height * 0.46)
   }
 
   private func ballPos(geo: GeometryProxy, elapsed: Double) -> CGPoint {

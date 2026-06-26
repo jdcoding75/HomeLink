@@ -35,6 +35,8 @@ struct PlaneReceiptAnimationV2: View {
     let fromName: String
     var onRevealed: () -> Void = {}
     var onFinished: () -> Void = {}
+    /// [catch-bucket-removed-2026-06] DEFAULT false = live (no bucket, re-center to reveal). Lab passes true.
+    var showBucket: Bool = false
 
     static let duration: Double = InstrumentBoundaries.Receipt.plane   // 5.0
 
@@ -78,7 +80,7 @@ struct PlaneReceiptAnimationV2: View {
                                 .ignoresSafeArea()
                                 .opacity(skyIn ? 1 : 0)
 
-                            bucket(geo: geo)
+                            if showBucket { bucket(geo: geo) }   // [catch-bucket-removed-2026-06]
                             flyoverPlane(geo: geo, elapsed: e)
                             parachute(geo: geo, elapsed: e)
 
@@ -127,7 +129,9 @@ struct PlaneReceiptAnimationV2: View {
     }
 
     private func bucketPoint(_ size: CGSize) -> CGPoint {
-        CGPoint(x: size.width - 80, y: size.height - 95)
+        // [catch-bucket-removed-2026-06] bucketless (live) → re-center to the reveal focal point.
+        showBucket ? CGPoint(x: size.width - 80, y: size.height - 95)
+                   : CGPoint(x: size.width / 2, y: size.height * 0.46)
     }
 
     // ── The fly-over plane — continues the send's flight across the TOP ──────

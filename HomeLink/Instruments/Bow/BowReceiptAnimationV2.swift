@@ -26,6 +26,10 @@ struct BowReceiptAnimationV2: View {
     let fromName: String
     var onRevealed: () -> Void = {}
     var onFinished: () -> Void = {}
+    /// [catch-bucket-removed-2026-06] DEFAULT false = live (no bucket; landing re-centers to the
+    /// reveal focal point — Decision X). Only the Animation Lab passes `true` to render the
+    /// preserved bucket animation. Never accidentally re-enabled without an explicit Lab call.
+    var showBucket: Bool = false
 
     static let duration: Double = InstrumentBoundaries.Receipt.bow   // 3.5
 
@@ -67,7 +71,7 @@ struct BowReceiptAnimationV2: View {
                             LinearGradient(colors: [Self.skyTop, Self.skyBot],
                                            startPoint: .top, endPoint: .bottom).ignoresSafeArea()
                             stars(geo: geo)
-                            bucket(geo: geo)
+                            if showBucket { bucket(geo: geo) }   // [catch-bucket-removed-2026-06] was: bucket(geo: geo)
                             sparkleBurst(geo: geo)
                             arrow(geo: geo, elapsed: e)        // sticks + freezes
                             fallingEmoji(geo: geo)
@@ -114,7 +118,11 @@ struct BowReceiptAnimationV2: View {
     }
 
     private func bucketPoint(_ size: CGSize) -> CGPoint {
-        CGPoint(x: size.width * 0.73, y: size.height - 145)
+        // [catch-bucket-removed-2026-06] bucketless (live) → re-center: the arrow stick + emoji
+        // drop both derive from this point, so the whole landing retargets to the reveal focal
+        // point. Bucket position kept for the Lab (showBucket).
+        showBucket ? CGPoint(x: size.width * 0.73, y: size.height - 145)
+                   : CGPoint(x: size.width / 2,  y: size.height * 0.46)
     }
     private func bucketMouth(_ size: CGSize) -> CGPoint {
         let p = bucketPoint(size); return CGPoint(x: p.x, y: p.y - Self.bucketH * 0.30)

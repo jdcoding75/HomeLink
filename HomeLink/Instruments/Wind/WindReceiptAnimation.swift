@@ -36,6 +36,8 @@ struct WindReceiptAnimation: View {
     var onRevealed: () -> Void = {}
     /// The reveal was dismissed (tap) — the receipt is complete.
     var onFinished: () -> Void = {}
+    /// [catch-bucket-removed-2026-06] DEFAULT false = live (no bucket, re-center to reveal). Lab passes true.
+    var showBucket: Bool = false
 
     // ── Source-of-truth timing + sound (live beside the instrument) ──────
     static let duration: Double = InstrumentBoundaries.Receipt.wind   // 7.2
@@ -105,7 +107,7 @@ struct WindReceiptAnimation: View {
                                 .opacity(skyIn ? 1 : 0)
 
                             clouds(geo: geo, elapsed: elapsed)
-                            bucket(geo: geo)
+                            if showBucket { bucket(geo: geo) }   // [catch-bucket-removed-2026-06]
                             seedTrail(geo: geo, elapsed: elapsed)
                             seedBurstView(geo: geo)
                             leaf(geo: geo, elapsed: elapsed)
@@ -184,8 +186,10 @@ struct WindReceiptAnimation: View {
 
     private func bucketPoint(_ size: CGSize) -> CGPoint {
         // Bucket at the bottom (RULE 6): height - bucketHeight - 6% margin.
-        CGPoint(x: size.width / 2,
-                y: size.height - Self.bucketH - size.height * 0.06)
+        // [catch-bucket-removed-2026-06] bucketless (live) → re-center to the reveal focal point.
+        showBucket ? CGPoint(x: size.width / 2,
+                             y: size.height - Self.bucketH - size.height * 0.06)
+                   : CGPoint(x: size.width / 2, y: size.height * 0.46)
     }
 
     private func leafPos(geo: GeometryProxy, elapsed: Double) -> CGPoint {
