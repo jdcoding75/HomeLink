@@ -1,11 +1,11 @@
 // TestMessageSheet.swift
 // Pointward › Views
 //
-// DEBUG ONLY — send yourself a test thought without a second phone or network.
-// Tapping send creates a ReceivedPing locally and triggers the FULL receipt
-// experience (catch mode, landing animation, bucket fill, replay).
+// Send yourself a test thought without a second phone or network. Tapping send
+// creates a ReceivedPing locally and triggers the FULL receipt experience
+// (catch mode, landing animation, bucket fill, replay). Ships in release — a
+// fun self-preview for all users; uses the ship-safe ThoughtPreview helper.
 
-#if DEBUG
 import SwiftUI
 
 struct TestMessageSheet: View {
@@ -167,10 +167,9 @@ struct TestMessageSheet: View {
         dismiss()
         NotificationCenter.default.post(name: .pointwardOpenCompass, object: nil)
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
-            DevTools.sendTestThought(pings: pings, style: style, emoji: emoji,
-                                     message: message, tagline: snapshotTagline,
-                                     fromName: snapshotFrom)
+            ThoughtPreview.sendTestThought(pings: pings, style: style, emoji: emoji,
+                                           message: message, tagline: snapshotTagline,
+                                           fromName: snapshotFrom)
         }
     }
 }
-#endif

@@ -1,7 +1,7 @@
 // AnimationTestLabView.swift
 // Pointward › Views
 //
-// THE ANIMATION TEST LAB — DEBUG ONLY. Stage-driven and fed entirely by
+// THE ANIMATION LAB — an exploration view (ships in release). Stage-driven and fed entirely by
 // AnimationManifest (the single source of truth). For every catalogued
 // animation (instrument · version · emoji mechanism) the lab offers:
 //
@@ -14,7 +14,6 @@
 // Labels come straight from the manifest: "<Instrument> <Version> — <Stage>"
 // and "<Instrument> <Version> — Full Workflow". Nothing is hand-maintained here.
 
-#if DEBUG
 import SwiftUI
 
 struct AnimationTestLabView: View {
@@ -43,7 +42,7 @@ struct AnimationTestLabView: View {
     private static let gold     = Color(hex: "#e0a85a")
     private static let stageOrder: [AnimationStage] = [.compass, .send, .receipt]
 
-    private var randomEmoji: String { DevTools.testEmojis.randomElement() ?? "💜" }
+    private var randomEmoji: String { ThoughtPreview.previewEmojis.randomElement() ?? "💜" }
     private func emoji(for def: AnimationDefinition) -> String { def.fixedEmoji ?? randomEmoji }
 
     private let cols = [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)]
@@ -695,4 +694,3 @@ struct AnimationFeedbackView: View {
         }
     }
 }
-#endif

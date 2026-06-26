@@ -16,9 +16,9 @@ struct SettingsView: View {
     private static let log = Logger(subsystem: "com.jdcoding75.pointward", category: "settings-account")
 
     @EnvironmentObject var subscription: SubscriptionManager
-    #if DEBUG
-    @EnvironmentObject var devPings: PingManager
-    #endif
+    // Real root-injected PingManager (HomeLinkApp → container.pingManager).
+    // Used to drive the always-visible "Send myself a test thought" preview.
+    @EnvironmentObject var pings: PingManager
 
     // Sign-in state — drives the account section (button when signed out,
     // static identity when signed in). Seeded from the persisted session.
@@ -45,9 +45,9 @@ struct SettingsView: View {
     @State private var showPaywall    = false
     @State private var showPermissions = false   // [permissions] Settings → Permissions screen
     @State private var showFeedback    = false   // [feedback] Settings → Send feedback sheet
+    @State private var showTestSheet    = false   // explore: self-preview (ships)
+    @State private var showAnimationLab = false   // explore: animation lab (ships)
     #if DEBUG
-    @State private var showTestSheet        = false
-    @State private var showAnimationLab     = false
     @State private var showAnimationFeedback = false
     #endif
 
@@ -86,6 +86,9 @@ struct SettingsView: View {
                     sectionHeader("account")
                     accountSection
 
+                    sectionHeader("explore")
+                    exploreSection
+
                     #if DEBUG
                     sectionHeader("developer")
                     developerSection
@@ -107,13 +110,13 @@ struct SettingsView: View {
         .sheet(isPresented: $showPaywall) { PaywallView() }
         .sheet(isPresented: $showPermissions) { PermissionsView() }
         .sheet(isPresented: $showFeedback) { FeedbackView() }
-        #if DEBUG
         .sheet(isPresented: $showTestSheet) {
-            TestMessageSheet().environmentObject(devPings)
+            TestMessageSheet().environmentObject(pings)
         }
         .fullScreenCover(isPresented: $showAnimationLab) {
             AnimationTestLabView()
         }
+        #if DEBUG
         .sheet(isPresented: $showAnimationFeedback) {
             AnimationFeedbackView()
         }
@@ -521,15 +524,65 @@ struct SettingsView: View {
         return hash.map { String(format: "%02x", $0) }.joined()
     }
 
+    // MARK: - Explore (visible to ALL users, incl. release / TestFlight)
+    //
+    // A light exploration area — preview a thought to yourself, and browse the
+    // animation lab. Nothing here sends to anyone else or touches real data.
+
+    private var exploreSection: some View {
+        settingsGroup {
+            // Send yourself a test thought — full receipt experience, no 2nd phone.
+            Button { showTestSheet = true } label: {
+                settingsRow {
+                    Image(systemName: "paperplane.fill").settingsIcon()
+                        .foregroundColor(Color(hex: "#c4a8d4"))
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Send myself a test thought").settingsLabel()
+                        Text("preview the full receipt — only you see it")
+                            .font(.system(size: 11)).foregroundColor(DesignTokens.Color.textMuted)
+                    }
+                    Spacer()
+                    Image(systemName: "chevron.right").font(.system(size: 12))
+                        .foregroundColor(DesignTokens.Color.textDim)
+                }
+            }
+            .buttonStyle(.plain)
+
+            Divider().background(DesignTokens.Color.border).padding(.leading, 44)
+
+            // Animation Lab — browse every send + land animation, in isolation.
+            Button { showAnimationLab = true } label: {
+                settingsRow {
+                    Image(systemName: "theatermasks").settingsIcon()
+                        .foregroundColor(Color(hex: "#c4a8d4"))
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Animation Lab").settingsLabel()
+                        Text("explore every thought animation, just for fun")
+                            .font(.system(size: 11)).foregroundColor(DesignTokens.Color.textMuted)
+                    }
+                    Spacer()
+                    Image(systemName: "chevron.right").font(.system(size: 12))
+                        .foregroundColor(DesignTokens.Color.textDim)
+                }
+            }
+            .buttonStyle(.plain)
+        }
+    }
+
     #if DEBUG
     // MARK: - Developer (DEBUG only — never ships)
     //
-    // Minimal: the animation lab, a self-send, and build info. Simulate
-    // far/nearby, auto-catch-all, and pairing/connection-testing tools were
-    // removed — see SESSION_LOG.md for history.
+    // Build info only. The self-send + animation lab moved to exploreSection
+    // (now ship to all users); simulate far/nearby, auto-catch-all, and
+    // pairing/connection-testing tools were removed — see SESSION_LOG.md.
 
     private var developerSection: some View {
         settingsGroup {
+            // [explore-ungate 2026-06-26] "Send myself a test thought" + "Animation
+            // Lab" MOVED OUT of this DEBUG-only section into the always-visible
+            // `exploreSection` — they now ship to ALL users (incl. release/TestFlight).
+            // Originals preserved here per the never-delete rule:
+            /*
             // Send yourself a test thought — full receipt, no 2nd phone.
             Button { showTestSheet = true } label: {
                 settingsRow {
@@ -562,6 +615,7 @@ struct SettingsView: View {
                 }
             }
             .buttonStyle(.plain)
+            */
 
             // [fix 2026-06-13] REMOVED "View animation feedback" dev option — it has
             // no functional implementation and cluttered the developer section.
@@ -589,9 +643,8 @@ struct SettingsView: View {
             .buttonStyle(.plain)
             */
 
-            Divider().background(DesignTokens.Color.border).padding(.leading, 44)
-
-            // Build info.
+            // Build info. (Leading divider removed — build info is the only row left
+            // in this DEBUG section after the explore rows moved out.)
             settingsRow {
                 Image(systemName: "hammer").settingsIcon()
                 VStack(alignment: .leading, spacing: 2) {
