@@ -337,6 +337,125 @@ tagline", compose long-press — NOT EditPerson). DORMANT/orphaned (root `ProSet
 - **🛠 NET-NEW — PERMISSIONS settings screen:** Mic / Location[critical] / Notifications; **Contacts excluded.**
 - **🛠 NET-NEW — in-app FEEDBACK form:** Supabase `feedback` table built + verified (RLS insert-only); screen not.
 
+## ⭐⭐ CONSOLIDATED SESSION BANK — 2026-06-25 (build-session close)
+
+_Single authoritative roll-up of the 2026-06-25 build session. SUPERSEDES the matching rows in the §A–§O table
+and the PRELAUNCH BATCH "STATUS UPDATES" above where they conflict. Every ✅ below is repo-verified
+(`git show --stat` + spec spot-check, HEAD `7f5e1fb`). ADD-ONLY: nothing above is removed; this is the newest
+layer. Reports: `reports/canon_session_bank_0625.md` (+ the per-item reports it cites)._
+
+### ✅ COMPLETIONS (verified, with hash)
+- **§B-B1 — instruction text on ALL 9 instruments** — ✅ DONE `55750ff` (`CompassView.swift`). The nine strings
+  banked verbatim in "B1 — the NINE instruction strings" above are now LIVE (rendered as `mechanismRecipe`, 20pt).
+  **FLICK GETS its sentence** ("Flick your thought toward [Name].") per John's 2026-06-25 override (un-suppress;
+  overrides the older "flick text-free"). **COMPASS reworded HANDS-FREE** — "Align the compass to [Name]'s
+  direction" / "Hold on that direction to release your thought." (**NO "tap"**; the old "point · hold · turn away
+  to reset" tail is superseded). → **§B compass send screen is now COMPLETE end-to-end** (mechanism RESOLVED +
+  B1–B6 all shipped): B1 `55750ff`, B2/B3 `ae7f0ae`+`0330000`, B5 `89dba36`, B6 `b886a51`, B4 design-decided.
+- **§J — app-side short-code suffix** — ✅ DONE `5e38782` (`MessageLink.swift`). Recipient-facing
+  "· no app? open Pointward and enter {code}" suffix removed. **Infra KEPT** (the `shortCode` param retained;
+  short-code claim path intact) — text-only removal, as specified. (Web side was `65708a5`, website repo.)
+- **§C PART 1 — link-arriver landing collapse** — ✅ DONE `1878fe0` (`LinkArriverLandingView.swift` only).
+  Binary onboard-or-view: ONE CTA **"Send one back to {name} ✦"** → existing onboarding screen (ComposeBackView
+  reuse, via `beginComposeBack`) + a quiet **"maybe later"** dismiss → `enterAppAsGuest` (viewer). The two extra
+  doors ("See what Pointward is", "I'm good for now") + the `showcaseOverlay` + recurring 3-door menu are
+  **retired-commented** (preserved, not deleted). **Gift-before-ask UNTOUCHED** (the reveal/`ArrivalSequenceView`
+  plays first; landing is its post-`onFinished` UI). _(PART 2 send-guard still OPEN — see below.)_
+- **Permissions screen (NET-NEW)** — ✅ DONE `39d2d11` (`PermissionsView.swift` new + `SettingsView.swift` rows).
+  Mic / Location[critical] / Notifications; **Contacts excluded**. **Uniform deep-link to Settings, NO native
+  prompts, NO batch "enable all" button.** Location status read via a **throwaway `CLLocationManager`** —
+  **`CompassManager` UNTOUCHED**.
+- **§O-1 — Wind receipt caption** — ✅ DONE `4400942` (`WindReceiptAnimation.swift`). **Option A:** cut the 3-tier
+  caption to the **unified single line "{name} sent you something ✦"**. **SUPERSEDES** the "O-1 … keep
+  '{name} is thinking of you ✦'" note above — unified per the `008354e` copy pass. (Old tiers preserved as
+  comments at `:378-381`.)
+- **Feedback form (NET-NEW)** — ✅ DONE `7f5e1fb` (`SupabaseService+Feedback.swift` new + `FeedbackView.swift` new
+  + `SettingsView.swift` row). **Option A: apikey-only REST insert.** Anonymous insert **confirmed 201
+  signed-out AND signed-in**. **Throws on non-2xx**; metadata is **crash-safe**. (The global-apikey migration is
+  NOT done — out of scope; this path uses the apikey directly.)
+
+### 🔒 DECISIONS BANKED (this session)
+- **9d "got a code?" button (`PeopleListView:114/231`) = KEEP for v1.** It is the **only in-app short-code
+  recovery path** (the §J text removal stripped the prompt copy, not the entry). **Revisit post-launch with
+  real link-failure data.** (Was O-5 "OPEN" above — now DECIDED keep.)
+- **Demo Dan = NO code change** (re-affirms the §L bank — `[keep-demo]` no-code note STANDS; cross-ref, not a
+  new decision). Persistent SwiftData row once seeded; seeds **only when `people.isEmpty`**; **no `demoSeeded`
+  flag**. John restores via a clean reinstall.
+- **Contact / people cluster — RESOLVED:** **address-on-add = OPTIONAL, kept.** **Contacts-pick name precedence =
+  the typed name is KEPT** (a contacts pick does not overwrite a typed name). **Send-channel fork = RESOLVED on
+  `Person.sendChannel`** (channel stored on the Person; the fork reads it).
+
+### 🟡 OPEN / DEFERRED — RELEASE-RELEVANT (kept VISIBLE — NOT done)
+- **§C PART 2 — viewer-can't-send GUARD (the one remaining §C piece; gates v1).** The binary is **NOT enforced
+  until this lands** — a dismissed viewer can still send. Spec (banked, ready to build):
+  - **Insertion:** top of `sendThought(_:)` at **`CompassView.swift:2441`** (the single send chokepoint — all 9
+    instrument `onSend` closures + the hold path funnel through it; covers all entries before the send animation).
+  - **Predicate = `SupabaseService.localUserID != nil`, NOT `hasCompletedOnboarding`** — `ComposeBackView` signs
+    in (grants `localUserID`) without setting `hasCompletedOnboarding`, so a just-composed-back replier must NOT
+    be blocked; sending also requires `localUserID` or `insertMessage` throws `.notSignedIn`.
+  - **CompassView-scoped run** (or lift the exclusion). Pairs with the **ComposeBackView ↔ OnboardingView
+    unification** (one shared minimal onboard). Audit/map: `reports/recipient_flow_c_run.md`.
+
+### 🅿️ PARKED — pending John's DEVICE WALK-THROUGH (not actionable yet)
+- **§K wand receipt + "no arrival / no bucket, just the emoji" symptom + the CATCH-BUCKET-INTENTIONAL conflict.**
+  Already banked at "§K — ⚑ CATCH-BUCKET-INTENTIONAL" above — **cross-ref, not duplicated.** Catch-bucket on the
+  compass receipt is INTENTIONAL (John put it there) and CONFLICTS with the parked "no bucket" symptom →
+  **resolve by device walk-through BEFORE any arrival/bucket/§K code change.** (The §K routing finding —
+  `WandLanding` exists, live `.wand → .standard` mis-wire — is the separate already-banked piece.)
+- **§B-B1 long-string wrapping** — PLANE / WAND / ROCKET at 20pt may wrap to 3 lines; a one-line font/spacing
+  nudge if a device glance shows it's ugly. Cosmetic, device-confirm first.
+- **Flick-text keep-or-resuppress** — John overrode flick to text-ON this session; a one-line revert is available
+  if the on-device look argues against it.
+- **Signed-out Feedback UI tap-through** — the request shape is proven (201 signed-out); the literal SwiftUI
+  signed-out presentation path is a final device glance.
+
+## ⭐⭐ DEVICE WALK-THROUGH — 2026-06-25 (clean-install pass)
+
+_On-device verification + findings from a clean-install walk. Follows the CONSOLIDATED SESSION BANK above.
+ADD-ONLY. Report: `reports/canon_walkthrough_0625.md`._
+
+### ✅ VERIFIED ON DEVICE (clean install) — confirmed
+- **Clean install + Demo Dan re-seed works.** Wife-connection **survived** (server-side data intact; only LOCAL
+  state was wiped — expected behaviour for a reinstall).
+- **B1 instruction text renders** on the instruments.
+- **Compass hands-free mechanism + guards** still good (the dead-`holdTick` fix + grace/disarmed-start hold).
+- **B3 degree readout** stacks UNDER the instruction line.
+- **B5 vintage wheel** good.
+- **Wind receipt caption** single-line ("{name} sent you something ✦") good.
+- **9d "got a code?" button = KEEP stands** (unchanged; `PeopleListView:114/231`). John notes it's tucked
+  away / not prominent — that **hidden state is FINE / intended**. No action, no reachability concern.
+
+### 🟡 OPEN DECISIONS (bank as OPEN — decide on a fresh-head day, NOT now)
+- **⭐ CATCH-BUCKET (wand receipt) — MYSTERY PARTIALLY RESOLVED.** The catch-bucket **DOES appear** on the
+  RECEIVER-side wand animation — this **reconciles with the "catch-bucket intentional" recovered decision**; the
+  earlier *"no bucket, just the emoji"* symptom was **likely churn-fogged device state**. **BUT it does NOT
+  actually catch the thought when aligned — present-but-broken.** **§K reframes** from *"missing receipt"* →
+  *"catch behaviour broken."* **DECISION for Phase 1 (OPEN):** keep it here + fix it to work / keep it somewhere
+  else / drop for v1. **Stays PARKED pending John's decision.** (Supersedes the §K parked framing above —
+  the receipt-routing question is closed; the live question is the broken catch behaviour.)
+- **ARRIVAL SEQUENCE ORDER (new observation).** As a receiver, the sequence is **envelope → "you were sent…" →
+  animation**. John suspects the ORDER may be backwards. **Bank as an OPEN review item** — examine whether the
+  envelope / sender-line / animation order is right. Fresh-head review.
+
+### 🔄 SPEC CHANGE (DECIDED REVERSAL)
+- **⭐ ARRIVAL-COMPASS → MATCH SEND-COMPASS.** John now wants the **ARRIVAL/receipt compass changed to look like
+  the CURRENT SEND compass** (the B5 vintage wheel — good tick marks, close to what he wants). **This REVERSES /
+  SUPERSEDES the prior canon direction** (which had it as unify the send-side TOWARD the receipt compass,
+  §K-adjacent). **New canonical direction: the receipt compass adopts the SEND compass's look.** (Banked
+  explicitly so the two don't get crossed.)
+
+### 🔎 REVIEW-LATER CLUSTER — "COMPASS SEND-SCREEN fresh-eyes review day" (NOT tonight; "ok for now")
+One review pass, fresh eyes, on the compass send screen (expands the parked B1-wrapping/flick items above):
+- **B1 instruction lines TOO LONG + inconsistent across instruments** — needs a rework pass.
+- **Compass B1 line does NOT say "align to [N]°"** — confusion between expected vs shipped; resolve in the pass.
+- **B3 readout PLACEMENT** — appears under the instruction line, but John believes the update doc specified
+  something different; **reconcile shipped-vs-spec**, clear the confusion.
+- **Flick text** — fine for now; include in the same fresh-eyes pass.
+
+### ⏳ STILL PENDING (need a SECOND DEVICE — deferred)
+- **§C PART 1 landing-collapse** device check (single "Send one back ✦" CTA vs the old 3-door).
+- **Signed-out Feedback UI tap-through** (request shape proven 201; the literal signed-out UI path is unrun).
+
 ## What Pointward Is
 
 Pointward is a SwiftUI + SwiftData iOS app for sending small, emotional
@@ -3196,3 +3315,5 @@ _Build 12 web page BUILT · DEPLOYED · LIVE-TESTED (pointward-website `2d319d4`
 _Onboarding walk-through banked (Build 10 North-Star): DROP the pairing-code screen (absorbed; loopFlick-guard caution); NAME PRE-FILL LOCKED (recipient's fill-in pre-filled with the sender's label for them, warm + editable, no "is this you?"); ADDRESS/LOCATION at onboarding FOR CONSIDERATION (need-at-all / Apple-home-autofill / as-is — resolve "what is it for?" + address-vs-rough-location first)._
 _PRODUCT DIRECTION DUMP banked (future work, decided-vs-for-thought): APP CONCEPT/positioning (primary=emotional-connection via intent+meaning; secondary=anti-card-app); HELP/FAQ/HOW-TO + About (Settings-top, optional, the explorable home for the onboarding showcase); SETTINGS-tab review project (+ planned: Help, "turn off send-actions" advanced toggle [check-if-exists], structured feedback picker, "catch in bucket" toggle default-OFF); OCCASION notifications (parked); LAUNCH/MONETIZATION (seed-free-then-monetize principle endorsed; founding-cohort + propagating-free-Pro direction; specifics open for a dedicated session)._
 _STAGE B VERIFIED end-to-end (two-phone test, 2 real Apple IDs → link_connections row formed — the back-channel is PROVEN). Findings banked: arrival shows "Someone" not sender_display_name (BUG) + recipient-local-name enhancement; Plane v1-not-v2 wrong-animation regression (careful audit-first, future); connection-status indicator (driven by senderID, pairs with Stage C); don't-seed-Alex-into-People; remove "[John] added you" notification (pairing-era); widget surface + Phase-3 live-location payoff; address-on-add PARKED + contacts-permission RESOLVED (ask only on pick-from-contacts) + send-channel fork (open); MANUAL PAIRING RESOLVED — do NOT re-add (re-tappable link is the fallback)._
+_Session bank 2026-06-25 (build-session close): repo-verified completions banked — §B-B1 nine instruction strings `55750ff` (flick gets text per John override; compass reworded hands-free, NO "tap") → §B compass send screen now COMPLETE end-to-end; §J app-side short-code suffix removed `5e38782` (infra/`shortCode` kept); §C PART 1 landing collapse `1878fe0` (single "Send one back ✦" CTA + "maybe later"; extra doors retired-commented; gift-before-ask untouched); Permissions screen `39d2d11` (deep-link only, no native prompts/batch, CompassManager untouched); §O-1 wind receipt unified "{name} sent you something ✦" `4400942` (Option A, SUPERSEDES "thinking of you"); Feedback form `7f5e1fb` (apikey REST insert, 201 anon+auth). DECISIONS: 9d "got a code?" KEEP-for-v1; Demo Dan no-code (re-affirm); contact cluster resolved (address optional, typed-name precedence, send-channel on `Person.sendChannel`). OPEN (gates v1): §C PART 2 send-guard at `CompassView.swift:2441`, predicate `localUserID != nil`. PARKED for device walk-through: §K catch-bucket conflict (cross-ref, not duplicated), B1 long-string wrapping, flick-text keep/resuppress, signed-out Feedback glance._
+_Device walk-through 2026-06-25 (clean install): VERIFIED — Demo-Dan re-seed + wife-connection survives reinstall (server data intact, local wiped), B1 text / hands-free compass / B3-under-instruction / B5 vintage wheel / single-line wind caption all good; 9d "got a code?" KEEP + tucked-away-is-fine. OPEN (fresh-head): ⭐ catch-bucket reframed — present on receiver wand animation (reconciles "intentional"; old "no bucket" = churn-fogged) BUT does NOT catch when aligned → §K now "catch behaviour broken," keep-fix/move/drop-for-v1 TBD; arrival sequence ORDER (envelope→"you were sent"→animation) maybe backwards, review. REVERSAL: arrival/receipt compass → MATCH the SEND compass look (B5 vintage), supersedes prior "unify send toward receipt." REVIEW-LATER cluster ("compass send-screen fresh-eyes day"): B1 too-long/inconsistent, compass line missing "align to [N]°", B3 placement shipped-vs-spec, flick text. PENDING (2nd device): §C part-1 landing-collapse check, signed-out Feedback UI tap-through._
