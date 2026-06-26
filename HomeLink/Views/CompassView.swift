@@ -1467,14 +1467,12 @@ struct CompassView: View {
             // the flick face already carries its own edge text ("pointing toward
             // [name]" / "flick toward the point ✦"), so the bare "flick" recipe
             // line was redundant. Shown for every other instrument.
-            // [§B font +50%] 13 → 20pt. (Still suppressed for flick — its in-face text was removed in §B6
-            // and John confirmed he likes flick text-free; flag: flick now has no instruction line at all.)
-            if instrumentStore.selected != .flick {
-                Text(mechanismRecipe)
-                    .font(.system(size: 20, weight: .semibold))
-                    .foregroundColor(DesignTokens.Color.accentSoft)
-                    .multilineTextAlignment(.center)
-            }
+            // [§B1] Instruction block — shown for ALL instruments incl. flick now (§B6 removed flick's
+            // in-face text; B1 gives it the standard line "Flick your thought toward [Name]."). [§B] 20pt.
+            Text(mechanismRecipe)
+                .font(.system(size: 20, weight: .semibold))
+                .foregroundColor(DesignTokens.Color.accentSoft)
+                .multilineTextAlignment(.center)
 
             // [§B2/B3] Aim readout — compass ONLY. REPLACES the old "[Name] is to your {direction}"
             // (alignmentInstruction) line with the absolute-bearing degree readout "{name} is at {N}°".
@@ -2194,16 +2192,22 @@ struct CompassView: View {
         //   .rocket:  "choose emoji · message · aim · fuel · blast"
         //   .wand:    "choose emoji · message · shake · release"
         //   .plane:   "choose emoji · message · wind · fly"
+        // [§B1] Full per-instrument instruction blocks (John-approved 2026-06-25). `\n` = two lines;
+        // \(name) = the person. COMPASS reworded for HANDS-FREE (no "tap"); the "at [x]°" is the degree
+        // readout line below. PRIOR terse tails (preserved): compass "point · hold · turn away to reset" ·
+        // bow "aim · draw · release" · firefly "breathe into mic" · flick "flick" · rocket "aim · fuel · blast" ·
+        // wand "shake · release" · plane "wind · fly" · birthday "light the candles" · firework "light the fuse".
+        let name = compass.state.personName
         switch instrumentStore.selected {
-        case .compass: return "point · hold · turn away to reset"   // [mechanism-reset PART 5] was "point · hold" (matches the new hold→fire→hysteresis mechanic; no "tap"; degree readout parked)
-        case .bow:     return "aim · draw · release"
-        case .firefly: return "breathe into mic"          // [wind-polish] wind — was "breathe"
-        case .flick:   return "flick"
-        case .rocket:  return "aim · fuel · blast"
-        case .wand:    return "shake · release"
-        case .plane:   return "wind · fly"
-        case .birthday: return "light the candles"
-        case .firework: return "light the fuse"
+        case .compass:  return "Align the compass to \(name)'s direction\nHold on that direction to release your thought."
+        case .bow:      return "Aim the bow toward \(name)\nDraw back, hold, then release your thought."
+        case .firefly:  return "Blow into the mic to float your thought to \(name)."
+        case .flick:    return "Flick your thought toward \(name)."
+        case .rocket:   return "Point the rocket toward \(name)\nTap to fuel it up and launch your thought."
+        case .wand:     return "Shake to gather magic for \(name)\nLet the magic appear toward \(name)."
+        case .plane:    return "Set the plane on the runway toward \(name)\nWind it up, then let it fly with your thought."
+        case .birthday: return "Light the candles for \(name)."
+        case .firework: return "Light the fuse to send it toward \(name)."
         }
     }
 
