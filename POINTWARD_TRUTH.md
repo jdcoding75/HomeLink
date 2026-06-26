@@ -26,6 +26,9 @@
   investigations write a report; end with "write findings to `HomeLink/reports/<name>.md`". (Claude Code
   reads `CLAUDE.md` for the full standing workflow — repo confirm, git pull, build cmd, tagging, commit
   trailer, migration handoff.)
+- **SIMPLEST SOLUTION FIRST (standing).** When recommending or explaining, LEAD with the simplest clean
+  solution. Do NOT build out complexity unless John asks. Flag complexity BRIEFLY if relevant — don't bombard.
+  Drive toward clarity on the simplest, cleanest item.
 - **CAPABILITY-AWARENESS — USE YOUR OWN TOOLS, don't make John relay what you can fetch.** The **planning
   chat has a LIVE Supabase MCP connection** to project `jlbgdlgwtrkmqcfnomlr` ("pointward") — read
   schema/tables/rows/RLS/policies/migration-state **DIRECTLY** (use `tool_search "supabase"`, then query).
@@ -455,6 +458,64 @@ One review pass, fresh eyes, on the compass send screen (expands the parked B1-w
 ### ⏳ STILL PENDING (need a SECOND DEVICE — deferred)
 - **§C PART 1 landing-collapse** device check (single "Send one back ✦" CTA vs the old 3-door).
 - **Signed-out Feedback UI tap-through** (request shape proven 201; the literal signed-out UI path is unrun).
+
+## ⭐⭐ CONSOLIDATED SESSION BANK — 2026-06-26 (session close)
+
+_Authoritative roll-up of the 2026-06-26 work. SUPERSEDES matching rows above where they conflict. Every ✅ is
+repo-verified (`git log` subject match, HEAD `471b9a9`). ADD-ONLY. Report: `reports/canon_final_0626.md`._
+
+### ✅ COMPLETIONS (verified, with hash)
+- **Permissions screen — location row to the TOP** (critical) — ✅ `cbb9d49`.
+- **Receipt compass → send-screen VINTAGE wheel** (visual only) — ✅ `20c9bfa`.
+- **Own-location strip + "Your Name" self-editor** (name-only; location code preserved) — ✅ `d57fb02`.
+- **Tagline rework** — 9 single-line instrument taglines, 16pt / 2-line wrap, compass dual-line w/ seeded-bearing
+  fallback — ✅ `66417dd`.
+- **Receipt `showBucket:true` restored for the 5 dedicated receipts** (bucket = landing target) — ✅ `d23e9f2`.
+- **Feedback category chips** — Bug Report / Animation Idea / Feature Idea / General Feedback / How Do I… / Other
+  (default "bug") — ✅ `d87ed85`.
+- **Compass re-arm overlay** — deliberate "Tap to send again ✦" card after a send (kills auto-re-arm-while-walking)
+  — ✅ `6ed123b`.
+- **Onboarding cleanup** — removed the "signed in ✦" success state + its 1.3 s delay (sign-in advances straight to
+  name) — ✅ `444c9a8`.
+- **Permission rework Part 1** — location deferred to first compass open, notifications deferred to first real
+  send (fixes installer/link-arriver asymmetry), redundant onboarding location request removed, soft denied-location
+  fallback on the compass — ✅ `dabe257`.
+- **Demo Dan re-arm card** — removed the `!isDemoSelected` gate; Demo Dan shows "Tap to send again ✦" like any real
+  person — ✅ `471b9a9`.
+- **Directional Catch Receipt** — Lab-only prototype (recipient turns to receive; reuses SkinFaceView /
+  DirectionIndicator / EmojiRevealView) — ✅ `15aca02`.
+- **Catch-bucket removed from live v1** (flag default false) + **preserved in the Animation Lab** "Interactive
+  Catch Receipts" — ✅ `b85dfc7`.
+
+### 🔒 DECISIONS LOCKED
+- **Allow Paste / clipboard bridge = REQUIRED — do NOT remove.** iOS loses the link context across the App-Store
+  install gap; Universal Links cannot recover it; the clipboard bridge is the only mechanism that survives a cold
+  install. (Architecture analysis — `RootView.recoverPendingLinkFromClipboardOnce`.)
+- **Universal Links = already fully configured** — AASA live, entitlements correct, cold + warm handlers present.
+  Zero work needed. (Audit: `reports/universal_links_appleid_audit.md`.)
+- **Sign in with Apple deferral = SAFE architecturally** (pairing retired; add-person is local SwiftData; compass
+  is local + anon; the §C guard already routes first-send sign-in) — **DEFERRED to Part 2: needs a thorough test
+  with a live web link + internal/external testers before building.**
+- **Demo Dan re-arm card = SHOW it** (same as real people); the `isDemoSelected` gate is removed.
+- **Demo Dan send fork = KEEP as-is.** Signed-out users need the local sandbox without being forced to onboard.
+  Do NOT remove the fork. (Supersedes the `reports/demo_dan_simplification.md` proposal to remove it — that work
+  is deferred; see OPEN.)
+- **B3 degree readout for Demo Dan = KEEP** (technically accurate).
+- **Onboarding "signed in ✦" success state = REMOVED** (a 1.3 s pause with no purpose after name-only).
+- **Compass flash on launch** = audit running, fix pending (it is the sign-in screen's background compass —
+  see `reports/` audit).
+
+### 🟡 OPEN / DEFERRED
+- **Compass flash on first launch** — audit running, fix pending before archive.
+- **Permission rework Part 2** — Sign in with Apple deferral + clipboard-bridge restructuring. Needs a live web
+  link + two-phone internal-tester environment. (`reports/universal_links_appleid_audit.md`.)
+- **Demo Dan simplification** (make sends real for signed-in users) — deferred, complex, not needed for v1.
+- **"Send yourself a test thought ✦" surface** (out of `#if DEBUG`) — deferred, not needed for v1.
+- **§C Part 1 device check** — needs a second device.
+- **Signed-out Feedback UI tap-through** — request shape proven 201; the literal signed-out UI path is unrun.
+- **Arrival sequence order** — observe during TestFlight; fix if confirmed backwards.
+- **Compass B1 copy + layout fresh-eyes pass.**
+- **Walking-send observation** — gather data during the TestFlight week.
 
 ## What Pointward Is
 
@@ -3316,6 +3377,7 @@ here for a single roadmap view._
 - Arrival sequence order — observe TestFlight, fix if confirmed backwards
 - Compass send-screen copy/layout fresh-eyes pass (B1 too long, B3 placement)
 - 9d short-code system keep/retire — post-launch with real link-failure data
+- Permission rework Part 2 — Sign in with Apple deferral + clipboard-bridge restructuring (needs live web link + two-phone testers; `reports/universal_links_appleid_audit.md`)
 
 ### Later (v3+)
 - New instruments (mechanics list exists)
@@ -3351,3 +3413,4 @@ _PRODUCT DIRECTION DUMP banked (future work, decided-vs-for-thought): APP CONCEP
 _STAGE B VERIFIED end-to-end (two-phone test, 2 real Apple IDs → link_connections row formed — the back-channel is PROVEN). Findings banked: arrival shows "Someone" not sender_display_name (BUG) + recipient-local-name enhancement; Plane v1-not-v2 wrong-animation regression (careful audit-first, future); connection-status indicator (driven by senderID, pairs with Stage C); don't-seed-Alex-into-People; remove "[John] added you" notification (pairing-era); widget surface + Phase-3 live-location payoff; address-on-add PARKED + contacts-permission RESOLVED (ask only on pick-from-contacts) + send-channel fork (open); MANUAL PAIRING RESOLVED — do NOT re-add (re-tappable link is the fallback)._
 _Session bank 2026-06-25 (build-session close): repo-verified completions banked — §B-B1 nine instruction strings `55750ff` (flick gets text per John override; compass reworded hands-free, NO "tap") → §B compass send screen now COMPLETE end-to-end; §J app-side short-code suffix removed `5e38782` (infra/`shortCode` kept); §C PART 1 landing collapse `1878fe0` (single "Send one back ✦" CTA + "maybe later"; extra doors retired-commented; gift-before-ask untouched); Permissions screen `39d2d11` (deep-link only, no native prompts/batch, CompassManager untouched); §O-1 wind receipt unified "{name} sent you something ✦" `4400942` (Option A, SUPERSEDES "thinking of you"); Feedback form `7f5e1fb` (apikey REST insert, 201 anon+auth). DECISIONS: 9d "got a code?" KEEP-for-v1; Demo Dan no-code (re-affirm); contact cluster resolved (address optional, typed-name precedence, send-channel on `Person.sendChannel`). OPEN (gates v1): §C PART 2 send-guard at `CompassView.swift:2441`, predicate `localUserID != nil`. PARKED for device walk-through: §K catch-bucket conflict (cross-ref, not duplicated), B1 long-string wrapping, flick-text keep/resuppress, signed-out Feedback glance._
 _Device walk-through 2026-06-25 (clean install): VERIFIED — Demo-Dan re-seed + wife-connection survives reinstall (server data intact, local wiped), B1 text / hands-free compass / B3-under-instruction / B5 vintage wheel / single-line wind caption all good; 9d "got a code?" KEEP + tucked-away-is-fine. OPEN (fresh-head): ⭐ catch-bucket reframed — present on receiver wand animation (reconciles "intentional"; old "no bucket" = churn-fogged) BUT does NOT catch when aligned → §K now "catch behaviour broken," keep-fix/move/drop-for-v1 TBD; arrival sequence ORDER (envelope→"you were sent"→animation) maybe backwards, review. REVERSAL: arrival/receipt compass → MATCH the SEND compass look (B5 vintage), supersedes prior "unify send toward receipt." REVIEW-LATER cluster ("compass send-screen fresh-eyes day"): B1 too-long/inconsistent, compass line missing "align to [N]°", B3 placement shipped-vs-spec, flick text. PENDING (2nd device): §C part-1 landing-collapse check, signed-out Feedback UI tap-through._
+_Session bank 2026-06-26 (session close): repo-verified completions — permissions reorder `cbb9d49`, receipt vintage wheel `20c9bfa`, location-strip + Your Name `d57fb02`, tagline rework `66417dd`, receipt showBucket restore `d23e9f2`, feedback chips `d87ed85`, re-arm overlay `6ed123b`, onboarding "signed in ✦" removal `444c9a8`, permission rework Part 1 `dabe257`, demo re-arm gate removed `471b9a9`, directional-catch Lab `15aca02`, catch-bucket removal+Lab `b85dfc7`. DECISIONS: clipboard bridge REQUIRED (UL can't recover the install-gap link); UL already fully configured; SiwA deferral safe but Part-2-deferred (live-link test first); Demo Dan send fork KEPT (signed-out sandbox), re-arm card SHOWN, B3 readout KEPT. STANDING DIRECTIVE added: SIMPLEST SOLUTION FIRST. OPEN: compass-flash fix, permission Part 2, demo-simplification, test-thought surface, §C device check, signed-out feedback UI, arrival order, B1 copy/layout, walking-send data._
