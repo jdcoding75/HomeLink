@@ -254,18 +254,19 @@ struct FlickDeskCompassFace: View {
 
     private var labels: some View {
         VStack {
-            Text("pointing toward \(personName)")
-                .font(.system(size: 16, design: .serif).italic())
-                .foregroundColor(Self.lavender.opacity(0.9))
-                .shadow(color: .black.opacity(0.5), radius: 5)
-                .padding(.top, 70)
+            // [§B6] Removed the standing in-face instruction — it duplicated the bottom-of-screen
+            // instruction line ("Flick your thought toward [Name]"); flick now uses that like the other 8.
+            // PRIOR (dropped): Text("pointing toward \(personName)") … .padding(.top, 70)
             Spacer()
-            Text(showWeakHint ? "flick a little harder ✦"
-                 : autoPlay ? "flick ✦" : "flick toward the point ✦")
-                .font(.system(size: 18, design: .serif).italic())
-                .foregroundColor(Self.lavender)
-                .shadow(color: .black.opacity(0.5), radius: 5)
-                .padding(.bottom, 80)
+            // [§B6] Keep ONLY the in-the-moment weak-flick correction (the bottom line can't say "harder");
+            // the idle "flick toward the point ✦" standing prompt is dropped. (autoPlay = Animation-Lab preview.)
+            if showWeakHint || autoPlay {
+                Text(showWeakHint ? "flick a little harder ✦" : "flick ✦")
+                    .font(.system(size: 18, design: .serif).italic())
+                    .foregroundColor(Self.lavender)
+                    .shadow(color: .black.opacity(0.5), radius: 5)
+                    .padding(.bottom, 80)
+            }
         }
         .allowsHitTesting(false)
     }
