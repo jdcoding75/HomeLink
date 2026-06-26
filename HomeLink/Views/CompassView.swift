@@ -244,13 +244,16 @@ struct CompassView: View {
     /// recipe is the face's own instruction (BirthdayCakeCompassFaceV2 /
     /// FireworkCompassFace), not a compass "point · hold".
     private var mechanismRecipe: String {
-        if instrumentStore.selected == .compass {
-            switch sendRemoteEmoji(for: effectiveToken) {
-            case "🎂": return "tap each candle to light it"
-            case "🎆": return "drag the match up to the fuse"
-            default:  break
-            }
-        }
+        // [tagline-rework-2026-06] 🎂/🎆 sub-mode lines REDUNDANT — the new single birthday/firework
+        // taglines carry both instruction + action cue (and mechanismRecipe is no longer rendered).
+        // Preserved:
+        //   if instrumentStore.selected == .compass {
+        //       switch sendRemoteEmoji(for: effectiveToken) {
+        //       case "🎂": return "tap each candle to light it"
+        //       case "🎆": return "drag the match up to the fuse"
+        //       default:  break
+        //       }
+        //   }
         return universalInstruction   // now the stripped gesture tail
     }
 
@@ -1504,15 +1507,23 @@ struct CompassView: View {
         //           .multilineTextAlignment(.center)
         //       if isAimInstrument, compass.rawBearingToTarget != nil { degreeReadout }
         //   }
-        VStack(spacing: 0) {
+        VStack(spacing: 4) {   // [tagline-rework-2026-06] was spacing: 0 — breathing room for the compass 2nd line
             if let tagline = instrumentTagline {
                 Text(tagline)
-                    .font(.system(size: 20, weight: .semibold))
+                    .font(.system(size: 16, weight: .semibold))   // [tagline-rework-2026-06] was size: 20
                     .foregroundColor(DesignTokens.Color.accentSoft)
+                    .multilineTextAlignment(.center)               // (no lineLimit → natural 2-line wrap)
+            }
+            // [tagline-rework-2026-06] compass B3 degree readout — BENEATH the action tagline, real-GPS only
+            // (nil-hidden when seeded, as the old compass tagline behaved). Relocated from instrumentTagline.
+            if instrumentStore.selected == .compass, let raw = compass.rawBearingToTarget {
+                Text("\(compass.state.personName) appears \(Int(raw.rounded()))° away")
+                    .font(.system(size: 13))
+                    .foregroundColor(DesignTokens.Color.accentSoft.opacity(0.7))
                     .multilineTextAlignment(.center)
             }
         }
-        .frame(maxWidth: .infinity, minHeight: 52)   // ≈ prior 2-line block height; centers the 1 line. TUNABLE (device-check).
+        .frame(maxWidth: .infinity, minHeight: 68)   // [tagline-rework-2026-06] was 52 — 2-line wrap room (TUNABLE device-check).
         // Recede during a receipt, exactly as the dots did.
         .opacity(pings.nowPlaying == nil ? 1 : 0)
     }
@@ -2283,17 +2294,26 @@ struct CompassView: View {
         let name = compass.state.personName
         switch instrumentStore.selected {
         case .compass:
-            guard let bearing = compass.rawBearingToTarget else { return nil }   // HIDE when seeded/no-GPS
-            return "\(name) appears \(Int(bearing.rounded()))° away"
-        case .bow:      return "Aiming toward \(name)…"
-        case .firefly:  return "Float this toward \(name)…"
-        case .flick:    return "Flicked toward \(name)…"
-        case .rocket:   return "Fueling up to launch toward \(name)…"
-        case .wand:     return "A little magic for \(name)…"
-        case .plane:    return "Ready for takeoff toward \(name)…"
-        case .birthday: return "Light the candles to send this to \(name)…"
-        case .firework: return "Light the fuse to fire toward \(name)…"
+            // [tagline-rework-2026-06] ALWAYS show a degree — real rawBearingToTarget when there's a
+            // GPS fix, else the SEEDED bearing (same FNV-1a the needle uses). Never 0°, never hidden.
+            let degree = compass.rawBearingToTarget ?? compass.seededBearingToTarget ?? 0
+            return "Aim to \(Int(degree.rounded()))° and hold to lock, then push your thought…"
+        case .bow:      return "Aim, draw, and release thought"
+        case .flick:    return "Flick toward \(name)"
+        case .firefly:  return "Blow thru mic toward \(name)"
+        case .rocket:   return "Aim · Tap to fuel · Launch thought"
+        case .wand:     return "Shake a magic thought to \(name)"
+        case .plane:    return "Spin prop to start takeoff"   // ⚑ copy only; plane anim regression = separate audit
+        case .birthday: return "Tap and light candles for \(name)"
+        case .firework: return "Drag match up to light fuse"
         }
+        // [tagline-rework-2026-06] PRIOR strings (preserved):
+        //   .compass:  guard let bearing = compass.rawBearingToTarget else { return nil }
+        //              return "\(name) appears \(Int(bearing.rounded()))° away"   ← now the B3 second line (instrumentHelperLines)
+        //   .bow:      "Aiming toward \(name)…"  · .firefly: "Float this toward \(name)…"  · .flick: "Flicked toward \(name)…"
+        //   .rocket:   "Fueling up to launch toward \(name)…"  · .wand: "A little magic for \(name)…"
+        //   .plane:    "Ready for takeoff toward \(name)…"  · .birthday: "Light the candles to send this to \(name)…"
+        //   .firework: "Light the fuse to fire toward \(name)…"
     }
 
     /// The instrument's own action verb, used once locked. (Kept for the

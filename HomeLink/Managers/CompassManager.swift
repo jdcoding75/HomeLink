@@ -282,6 +282,13 @@ final class CompassManager: NSObject, ObservableObject {
     /// reported bearing. nil until a location fix exists.
     @Published private(set) var rawBearingToTarget: Double?
 
+    /// [tagline-rework-2026-06] Seeded fallback bearing toward the CURRENT target — the SAME
+    /// FNV-1a value the needle uses when `rawBearingToTarget` is nil (no GPS / seeded). Lets the
+    /// compass tagline always show a stable degree. nil only when no target is tracked.
+    var seededBearingToTarget: Double? {
+        targetPerson.map { Self.seededAbsoluteBearing(for: $0) }
+    }
+
     /// [phase2 build7] A deterministic 0–360° bearing for a contact, derived from
     /// the immutable key. Used as the SEEDED fallback when there's no real
     /// location — same person always appears from the SAME direction (feels
