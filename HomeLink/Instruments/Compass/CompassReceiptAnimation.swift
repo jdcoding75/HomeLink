@@ -17,7 +17,8 @@
 //   → EmojiRevealView (the reveal)                                       ≈ 3.0s
 //
 // SHARED GRAPHIC (single source of truth): the SAME compass the app's face uses
-// — SkinFaceView(.minimal) (the plain/clean skin) + NeedleView. No bespoke dial.
+// — SkinFaceView(.vintage) (the §B5 brass wheel — matches the send screen) +
+// NeedleView. No bespoke dial. [receipt-compass-match-send] was .minimal.
 //
 // Screen-coordinate rules (InstrumentBoundaries): GeometryReader root, background
 // .ignoresSafeArea(), every position derived from geo.size.
@@ -130,15 +131,20 @@ struct CompassReceiptAnimation: View {
         .allowsHitTesting(false)
     }
 
-    // ── The shared compass face (plain/clean = minimal skin) ─────────────────
+    // ── The shared compass face (VINTAGE — matches the send-screen wheel) ─────
 
     private func compassFace(geo: GeometryProxy) -> some View {
         ZStack {
-            // The SAME face graphic the app's compass uses (single source of
-            // truth): the minimal skin dial + the shared needle.
-            SkinFaceView(skin: .minimal, bearing: needleBearing, locked: faceLocked,
+            // [receipt-compass-match-send] The SAME face graphic the send-screen
+            // compass uses (single source of truth): now the VINTAGE skin — the §B5
+            // brass wheel (15° notches · degree numbers every 30° · surveyor
+            // crosshair · brass rings), via the existing VintageFaceView in
+            // SkinFaceView. Reuses the send wheel's drawing exactly (just the skin
+            // argument changed); SkinFaceView itself is untouched. VISUAL ONLY.
+            // PRIOR (plain/clean): SkinFaceView(skin: .minimal …) + NeedleView(skin: .minimal …)
+            SkinFaceView(skin: .vintage, bearing: needleBearing, locked: faceLocked,
                          quietMode: false, pingRingActive: ringPulse)
-            NeedleView(bearing: needleBearing, skin: .minimal, locked: faceLocked,
+            NeedleView(bearing: needleBearing, skin: .vintage, locked: faceLocked,
                        quietMode: false)
         }
         .frame(width: 240, height: 240)
