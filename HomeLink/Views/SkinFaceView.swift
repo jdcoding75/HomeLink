@@ -599,17 +599,15 @@ struct VintageFaceView: View {
             Canvas { ctx, size in
                 let cx = size.width / 2, cy = size.height / 2
 
-                // Bezel ticks every 2°, heavier every 10°, heaviest at cardinals
+                // [§B5] Bezel NOTCHES every 15° (was every 2° + 10°/cardinal weights — the fine grid
+                // was too dense to read). Cardinals (every 90°) heaviest; NO minor ticks.
                 let tickOuter: CGFloat = 92
-                for deg in stride(from: 0, to: 360, by: 2) {
+                for deg in stride(from: 0, to: 360, by: 15) {
                     let rad  = Double(deg) * .pi / 180
                     let is90 = deg % 90 == 0
-                    let is10 = deg % 10 == 0
-                    let len: CGFloat = is90 ? 10 : is10 ? 8 : 4
-                    let sw:  CGFloat = is90 ? 1.2 : is10 ? 0.8 : 0.4
-                    let col = is90 ? Self.brassBright
-                                   : is10 ? Self.brass.opacity(0.9)
-                                          : Self.brassDim.opacity(0.7)
+                    let len: CGFloat = is90 ? 10 : 7
+                    let sw:  CGFloat = is90 ? 1.2 : 0.8
+                    let col = is90 ? Self.brassBright : Self.brass.opacity(0.9)
                     var path = Path()
                     path.move(to: CGPoint(x: cx + CGFloat(sin(rad)) * tickOuter,
                                           y: cy - CGFloat(cos(rad)) * tickOuter))
@@ -637,12 +635,13 @@ struct VintageFaceView: View {
             }
             .frame(width: 200, height: 200)
 
-            // Degree numbers every 10°, set radially like a real bezel
-            ForEach(0..<36, id: \.self) { i in
-                let deg = i * 10
+            // [§B5] Degree numbers every 30° (was every 10° — aligned to the new 15° notches + far more
+            // readable), set radially like a real bezel.
+            ForEach(0..<12, id: \.self) { i in
+                let deg = i * 30
                 let rad = Double(deg) * .pi / 180
                 Text("\(deg)")
-                    .font(.system(size: 7, weight: .medium, design: .monospaced))
+                    .font(.system(size: 8, weight: .medium, design: .monospaced))
                     .foregroundColor(deg % 90 == 0 ? Self.brassBright : Self.brass.opacity(0.85))
                     .rotationEffect(.degrees(Double(deg)))
                     .offset(x: CGFloat(sin(rad)) * 73, y: -CGFloat(cos(rad)) * 73)

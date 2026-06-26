@@ -2583,6 +2583,16 @@ struct CompassView: View {
             .rotationEffect(.degrees(compass.state.faceRotationDegrees))
             .animation(.easeOut(duration: 0.18), value: compass.state.faceRotationDegrees)
 
+            // [§B5] Fixed RED INDEX MARK (lubber line) at top-center — the reference you turn the
+            // person's bearing under to aim. FIXED on screen (OUTSIDE the rotating rose). Vintage only.
+            if compass.state.activeSkin == .vintage {
+                Image(systemName: "arrowtriangle.down.fill")
+                    .font(.system(size: 11))
+                    .foregroundColor(.red)
+                    .offset(y: -123)            // just above the bezel, top-center (device-tunable)
+                    .allowsHitTesting(false)
+            }
+
             // Emoji presence system — always at center, never rotates
             emojiPresence
 
