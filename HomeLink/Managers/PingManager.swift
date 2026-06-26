@@ -58,6 +58,12 @@ final class PingManager: ObservableObject {
         didSet { persistCaughtHistory() }
     }
 
+    /// [history-split 2026-06] Sent-thought history — newest last, capped 50, persisted
+    /// like caughtHistory. Built only by recordSent() at the send site.
+    @Published private(set) var sentHistory: [SentRecord] = [] {
+        didSet { persistSentHistory() }
+    }
+
     static let maxQueued = 50
 
     private let networkService: NetworkServiceProtocol
@@ -92,11 +98,25 @@ final class PingManager: ObservableObject {
         var isTest: Bool = false
     }
 
+    /// [history-split 2026-06] A thought the USER sent — the sent-side mirror of
+    /// ReceivedPing, for the "thoughts sent ✦" bucket section. Display-only (no
+    /// remoteID/read-receipt, no isTest: the demo path never records a sent thought).
+    struct SentRecord: Equatable, Identifiable {
+        let id = UUID()
+        let toName:      String
+        let emoji:       String
+        let timestamp:   Date
+        var senderStyle: String? = nil
+        var message:     String? = nil
+        var tagline:     String? = nil
+    }
+
     init(networkService: NetworkServiceProtocol, appState: AppStateManager? = nil) {
         self.networkService = networkService
         self.appState = appState
         restoreQueue()          // waiting thoughts survive an app relaunch
         restoreCaughtHistory()  // [2/5] caught-thought history survives too
+        restoreSentHistory()    // [history-split 2026-06] sent-thought history survives too
     }
 
     static let maxCaughtHistory = 50
@@ -114,6 +134,18 @@ final class PingManager: ObservableObject {
         }
         caughtHistory = updated
         log.info("history: recorded caught thought from \(ping.fromName, privacy: .public) (\(self.caughtHistory.count) kept)")
+    }
+
+    /// [history-split 2026-06] Append a sent thought (newest last; cap maxCaughtHistory).
+    /// No id/remoteID dedup — every send is a distinct event.
+    func recordSent(_ record: SentRecord) {
+        var updated = sentHistory
+        updated.append(record)
+        if updated.count > Self.maxCaughtHistory {
+            updated.removeFirst(updated.count - Self.maxCaughtHistory)
+        }
+        sentHistory = updated
+        log.info("history: recorded sent thought to \(record.toName, privacy: .public) (\(self.sentHistory.count) kept)")
     }
 
     /// [bucket delete · ⭐ Phase-3 backbone] Remove ONE thought from local history by its
@@ -151,6 +183,36 @@ final class PingManager: ObservableObject {
                          timestamp: $0.timestamp, remoteID: $0.remoteID,
                          senderStyle: $0.senderStyle, message: $0.message,
                          tagline: $0.tagline, isTest: $0.isTest)
+        }
+    }
+
+    // ── [history-split 2026-06] Sent-thought persistence (new "sentHistory" key) ──
+    private struct PersistedSent: Codable {
+        let toName: String
+        let emoji: String
+        let timestamp: Date
+        var senderStyle: String? = nil
+        var message: String? = nil
+        var tagline: String? = nil
+    }
+
+    private func persistSentHistory() {
+        let stored = sentHistory.map {
+            PersistedSent(toName: $0.toName, emoji: $0.emoji, timestamp: $0.timestamp,
+                          senderStyle: $0.senderStyle, message: $0.message, tagline: $0.tagline)
+        }
+        if let data = try? JSONEncoder().encode(stored) {
+            UserDefaults.standard.set(data, forKey: "sentHistory")
+        }
+    }
+
+    private func restoreSentHistory() {
+        guard let data = UserDefaults.standard.data(forKey: "sentHistory"),
+              let stored = try? JSONDecoder().decode([PersistedSent].self, from: data),
+              !stored.isEmpty else { return }
+        sentHistory = stored.map {
+            SentRecord(toName: $0.toName, emoji: $0.emoji, timestamp: $0.timestamp,
+                       senderStyle: $0.senderStyle, message: $0.message, tagline: $0.tagline)
         }
     }
 

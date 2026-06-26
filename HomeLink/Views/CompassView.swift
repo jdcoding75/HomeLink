@@ -2748,6 +2748,17 @@ struct CompassView: View {
                     if let cid { people.recordSentLink(messageID: id, personID: cid) }
                 })
         }
+
+        // [history-split 2026-06] Record this send into the "thoughts sent ✦" bucket — ONE
+        // call covers BOTH PATH 1 (direct) and PATH 2 (link); the demo branch returned above,
+        // so demo previews never record a sent thought.
+        pings.recordSent(PingManager.SentRecord(
+            toName:      people.selectedPerson?.name ?? "someone",
+            emoji:       sendRemoteEmoji(for: token),
+            timestamp:   .now,
+            senderStyle: style.rawValue,
+            message:     outgoingMessage.isEmpty ? nil : outgoingMessage,
+            tagline:     people.selectedPerson?.tagline))
         // Cleanup moved to SenderAnimationView.onComplete (duration varies by style)
         // DispatchQueue.main.asyncAfter(deadline: .now() + 1.6) {
         //     flightToken = nil
@@ -3047,17 +3058,21 @@ struct CompassView: View {
         }
     }
 
+    // [history-split 2026-06] Sent-thought history, newest first, for the "thoughts sent ✦" section.
+    private var sortedSent: [PingManager.SentRecord] {
+        pings.sentHistory.sorted { $0.timestamp > $1.timestamp }   // newest first
+    }
+
     private var thoughtsDrawer: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            Text("your bucket ✦")
+        VStack(alignment: .leading, spacing: 16) {
+            // ── TOP: received ───────────────────────────────────────────────
+            Text("thoughts received ✦")
                 .font(.system(size: 15, design: .serif).italic())
-                .foregroundColor(Color(hex: "#c4a8d4"))
-                .padding(.leading, 4)
+                .foregroundColor(Color(hex: "#c4a8d4")).padding(.leading, 4)
             if compassThoughts.isEmpty {
                 Text(thoughtsLoaded ? "all caught up ✦" : "loading…")
                     .font(.system(size: 12, design: .serif).italic())
-                    .foregroundColor(DesignTokens.Color.textMuted)
-                    .padding(.vertical, 12)
+                    .foregroundColor(DesignTokens.Color.textMuted).padding(.vertical, 8)
             } else {
                 // Max 6 fit; more scroll horizontally. Unread first, then read.
                 ScrollView(.horizontal, showsIndicators: false) {
@@ -3066,8 +3081,28 @@ struct CompassView: View {
                             thoughtBubble(rec)
                         }
                     }
-                    .padding(.horizontal, 4)
-                    .padding(.vertical, 6)
+                    .padding(.horizontal, 4).padding(.vertical, 6)
+                }
+            }
+
+            Divider().background(DesignTokens.Color.borderMid).padding(.vertical, 2)
+
+            // ── BOTTOM: sent ────────────────────────────────────────────────
+            Text("thoughts sent ✦")
+                .font(.system(size: 15, design: .serif).italic())
+                .foregroundColor(Color(hex: "#c4a8d4")).padding(.leading, 4)
+            if sortedSent.isEmpty {
+                Text("nothing sent yet ✦")
+                    .font(.system(size: 12, design: .serif).italic())
+                    .foregroundColor(DesignTokens.Color.textMuted).padding(.vertical, 8)
+            } else {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 18) {
+                        ForEach(Array(sortedSent.prefix(12)), id: \.id) { rec in
+                            sentBubble(rec)
+                        }
+                    }
+                    .padding(.horizontal, 4).padding(.vertical, 6)
                 }
             }
         }
@@ -3120,6 +3155,32 @@ struct CompassView: View {
         }
         .buttonStyle(.plain)
         .transition(.scale(scale: 0.8).combined(with: .opacity))
+    }
+
+    /// [history-split 2026-06] A sent-thought bubble — display-only (no tap/replay, no
+    /// "new ✦"/unread). Shows the RECIPIENT initial (toName), emoji, style emoji, timestamp.
+    private func sentBubble(_ rec: PingManager.SentRecord) -> some View {
+        let hue = EmojiHue.color(for: rec.emoji)
+        return VStack(spacing: 6) {
+            Text(rec.emoji)
+                .font(.system(size: 32))
+                .shadow(color: hue.opacity(0.7), radius: 8)
+                .padding(.top, 4)
+            // Recipient initial (who you sent to)
+            Text(String(rec.toName.prefix(1)))
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundColor(DesignTokens.Color.textMuted)
+                .frame(width: 18, height: 18)
+                .background(Circle().fill(hue.opacity(0.25)))
+            // Instrument-style indicator
+            Text(SenderStyle.from(rec.senderStyle).emoji)
+                .font(.system(size: 9)).opacity(0.7)
+            // Timestamp (relative)
+            Text(Self.timeAgo(rec.timestamp))
+                .font(.system(size: 7))
+                .foregroundColor(DesignTokens.Color.textDim)
+        }
+        .frame(width: 56)
     }
 
     /// "from [name] · [time ago]" — fades in after a replay finishes.
