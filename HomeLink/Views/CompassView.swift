@@ -1480,25 +1480,28 @@ struct CompassView: View {
     /// recipe sits with the instrument it describes (it also fills the slot the
     /// retired stage-completion dots used to occupy).
     private var instrumentHelperLines: some View {
-        VStack(spacing: 6) {
-            // Mechanism recipe — the gesture tail. [copy] SUPPRESSED for flick:
-            // the flick face already carries its own edge text ("pointing toward
-            // [name]" / "flick toward the point ✦"), so the bare "flick" recipe
-            // line was redundant. Shown for every other instrument.
-            // [§B1] Instruction block — shown for ALL instruments incl. flick now (§B6 removed flick's
-            // in-face text; B1 gives it the standard line "Flick your thought toward [Name]."). [§B] 20pt.
-            Text(mechanismRecipe)
-                .font(.system(size: 20, weight: .semibold))
-                .foregroundColor(DesignTokens.Color.accentSoft)
-                .multilineTextAlignment(.center)
-
-            // [§B2/B3] Aim readout — compass ONLY. REPLACES the old "[Name] is to your {direction}"
-            // (alignmentInstruction) line with the absolute-bearing degree readout "{name} is at {N}°".
-            // Hidden when seeded (rawBearingToTarget == nil), like the distance. PRIOR: Text(alignmentInstruction)
-            if isAimInstrument, compass.rawBearingToTarget != nil {
-                degreeReadout
+        // [tagline rework 2026-06-26] ONE single line now (was the 2-line `mechanismRecipe`
+        // recipe + compass `degreeReadout`). Reserve the prior 2-line height and CENTER the one
+        // line in it → it "drops to center", reads intentional, and the slot height stays
+        // constant so nothing below reflows (incl. the compass nil-hide). `instrumentTagline`
+        // is nil for the compass when there's no fix → the line hides, the slot holds.
+        // Preserved original (restore by swapping back):
+        //   VStack(spacing: 6) {
+        //       Text(mechanismRecipe)
+        //           .font(.system(size: 20, weight: .semibold))
+        //           .foregroundColor(DesignTokens.Color.accentSoft)
+        //           .multilineTextAlignment(.center)
+        //       if isAimInstrument, compass.rawBearingToTarget != nil { degreeReadout }
+        //   }
+        VStack(spacing: 0) {
+            if let tagline = instrumentTagline {
+                Text(tagline)
+                    .font(.system(size: 20, weight: .semibold))
+                    .foregroundColor(DesignTokens.Color.accentSoft)
+                    .multilineTextAlignment(.center)
             }
         }
+        .frame(maxWidth: .infinity, minHeight: 52)   // ≈ prior 2-line block height; centers the 1 line. TUNABLE (device-check).
         // Recede during a receipt, exactly as the dots did.
         .opacity(pings.nowPlaying == nil ? 1 : 0)
     }
@@ -2226,6 +2229,30 @@ struct CompassView: View {
         case .plane:    return "Set the plane on the runway toward \(name)\nWind it up, then let it fly with your thought."
         case .birthday: return "Light the candles for \(name)."
         case .firework: return "Light the fuse to send it toward \(name)."
+        }
+    }
+
+    /// [tagline rework 2026-06-26] The SINGLE-LINE instrument tagline shown under the
+    /// instrument — supersedes the 2-line `universalInstruction` block for the helper line.
+    /// [name] = recipient (`compass.state.personName`). COMPASS is DYNAMIC — the ABSOLUTE
+    /// bearing (`compass.rawBearingToTarget`, the same source as the B3 degree readout) — and
+    /// returns nil to HIDE when there's no fix (seeded / Demo Dan / no GPS), matching the B3 /
+    /// distance nil-hide rule. NB: the compass instrument shows the bearing line for ANY emoji,
+    /// incl. the 🎂/🎆 sub-modes (it's still the compass — bearing is always relevant).
+    private var instrumentTagline: String? {
+        let name = compass.state.personName
+        switch instrumentStore.selected {
+        case .compass:
+            guard let bearing = compass.rawBearingToTarget else { return nil }   // HIDE when seeded/no-GPS
+            return "\(name) appears \(Int(bearing.rounded()))° away"
+        case .bow:      return "Aiming toward \(name)…"
+        case .firefly:  return "Float this toward \(name)…"
+        case .flick:    return "Flicked toward \(name)…"
+        case .rocket:   return "Fueling up to launch toward \(name)…"
+        case .wand:     return "A little magic for \(name)…"
+        case .plane:    return "Ready for takeoff toward \(name)…"
+        case .birthday: return "Light the candles to send this to \(name)…"
+        case .firework: return "Light the fuse to fire toward \(name)…"
         }
     }
 
