@@ -66,15 +66,27 @@ struct RootView: View {
     var body: some View {
         ZStack {
             Group {
-                if hasCompletedOnboarding || enteredViaLink {
+                // [flash-fix 2026-06-26] Order matters. A never-onboarded user goes
+                // straight to onboarding (the opaque SplashView covers the first ~1.5s).
+                // An onboarded / link user holds a BLANK under the splash until it clears,
+                // so MainTabView (the compass tab) never enters the hierarchy during the
+                // launch window — killing the brief compass flash. The routing was already
+                // a full replacement (not a sheet); this just gates the MainTabView render
+                // behind the splash. PRIOR: `if hasCompletedOnboarding || enteredViaLink {
+                // MainTabView } else { OnboardingView }`.
+                if !hasCompletedOnboarding && !enteredViaLink {
+                    OnboardingView(geocodingService: appEnv.geocodingService)
+                } else if showSplash {
+                    // Onboarded / link, but the splash is still up → blank under the opaque
+                    // splash (zIndex 10). Keeps the compass out of view until showSplash clears.
+                    Color.clear
+                } else {
                     // Even with no people (e.g. all deleted), stay in the main app —
                     // CompassView shows a warm empty state instead of re-running onboarding.
                     // [build10 shot2] `enteredViaLink` lets a link-arriver in without the
                     // onboarding tour (verified safe: the main app tolerates a not-onboarded,
                     // unauthenticated user — empty state / sender-pointing, no crash).
                     MainTabView(geocodingService: appEnv.geocodingService)
-                } else {
-                    OnboardingView(geocodingService: appEnv.geocodingService)
                 }
             }
 
