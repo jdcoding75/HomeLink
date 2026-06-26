@@ -14,6 +14,7 @@
 // Overlay-only: hit-testing disabled, sized to the instrument's 370 pt frame.
 
 import SwiftUI
+import UIKit   // [item15] UIImage(data:) for the contact photo
 
 struct DirectionIndicator: View {
 
@@ -26,6 +27,9 @@ struct DirectionIndicator: View {
     var showHint: Bool = true
     /// [3/5] Optional distance shown beneath the marker ("88 mi").
     var distanceText: String? = nil
+    /// [item15] Optional contact photo; non-nil → render in the disc, else the initial. Default nil
+    /// so the existing callers (instrument faces + the Lab) are unchanged.
+    var photoData: Data? = nil
     /// Instruments that aim by something other than the phone bearing (the
     /// bow's finger-spin) pass their own approach error so the marker and arc
     /// brighten as *that* aim closes in, while the marker stays at the
@@ -100,7 +104,7 @@ struct DirectionIndicator: View {
             PersonInitialMarker(initial: initial, opacity: markerOpacity,
                                 near: angleError < 30,
                                 close: angleError < 15, perfect: angleError < 5,
-                                pulse: pulse, distanceText: distanceText)
+                                pulse: pulse, distanceText: distanceText, photoData: photoData)
                 .offset(x: CGFloat(sin(rad)) * (ringRadius + 26),
                         y: -CGFloat(cos(rad)) * (ringRadius + 26))
                 .animation(.easeOut(duration: 0.2), value: bearingDegrees)
@@ -141,6 +145,7 @@ struct PersonInitialMarker: View {
     var perfect: Bool = false    // within 5°
     var pulse: Bool = false      // the slow 2 s attention pulse
     var distanceText: String? = nil
+    var photoData: Data? = nil   // [item15]
 
     private static let lavender = Color(hex: "#c4a8d4")
 
@@ -162,19 +167,31 @@ struct PersonInitialMarker: View {
                     .rotationEffect(.degrees(Double(i) * 90))
             }
 
-            // The disc — 36 pt
-            Circle()
-                .fill(DesignTokens.Color.background.opacity(0.85))
-                .frame(width: 36, height: 36)
-                .overlay(
-                    Circle().stroke(Self.lavender.opacity(opacity),
-                                    lineWidth: perfect ? 2.4 : 1.6)
-                )
+            // [item15] The disc — 42 pt. Contact PHOTO when present (circular, matching the
+            // People-list avatar: resizable · scaledToFill · clipShape(Circle)); else the
+            // soft-lavender disc + bold initial. Same disc for both; only 36→42 / 17→20 changed.
+            if let photoData, let ui = UIImage(data: photoData) {
+                Image(uiImage: ui)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: 42, height: 42)
+                    .clipShape(Circle())
+                    .overlay(Circle().stroke(Self.lavender.opacity(opacity),
+                                             lineWidth: perfect ? 2.4 : 1.6))
+            } else {
+                Circle()
+                    .fill(DesignTokens.Color.background.opacity(0.85))
+                    .frame(width: 42, height: 42)
+                    .overlay(
+                        Circle().stroke(Self.lavender.opacity(opacity),
+                                        lineWidth: perfect ? 2.4 : 1.6)
+                    )
 
-            // The initial — bold
-            Text(initial)
-                .font(.system(size: 17, weight: .bold, design: .rounded))
-                .foregroundColor(Self.lavender.opacity(min(1, opacity + 0.1)))
+                // The initial — bold
+                Text(initial)
+                    .font(.system(size: 20, weight: .bold, design: .rounded))
+                    .foregroundColor(Self.lavender.opacity(min(1, opacity + 0.1)))
+            }
 
             // Distance beneath the marker
             if let distanceText {

@@ -135,6 +135,7 @@ final class CompassManager: NSObject, ObservableObject {
             personID:         person.id,
             personName:       person.name,
             personEmoji:      person.emoji,
+            personPhotoData:  person.photoData,   // [item15]
             tagline:          person.tagline,
             pendingPingEmoji: state.pendingPingEmoji,
             isLocked:         false,
@@ -273,6 +274,7 @@ final class CompassManager: NSObject, ObservableObject {
             personID:         state.personID,
             personName:       state.personName,
             personEmoji:      state.personEmoji,
+            personPhotoData:  state.personPhotoData,   // [item15] preserve across a pending-ping rebuild
             tagline:          state.tagline,
             pendingPingEmoji: emoji,
             isLocked:         state.isLocked,
@@ -363,6 +365,7 @@ final class CompassManager: NSObject, ObservableObject {
             personID:         target.id,
             personName:       target.name,
             personEmoji:      target.emoji,
+            personPhotoData:  target.photoData,   // [item15] carry on every heading update (else photo flickers off)
             tagline:          target.tagline,
             pendingPingEmoji: state.pendingPingEmoji,
             isLocked:         isNowLocked,

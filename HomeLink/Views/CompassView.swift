@@ -389,7 +389,8 @@ struct CompassView: View {
                                             personName: compass.state.personName,
                                             personEmoji: compass.state.personEmoji,
                                             ringRadius: 180,
-                                            distanceText: compass.state.formattedDistance   // [3/5]
+                                            distanceText: compass.state.formattedDistance,  // [3/5]
+                                            photoData: compass.state.personPhotoData         // [item15]
                                         )
                                     )
                                     // Full-compass send styles dim the skin

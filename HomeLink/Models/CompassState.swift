@@ -15,6 +15,9 @@ struct CompassState: Equatable {
     var personID:        UUID?
     var personName:      String
     var personEmoji:     String
+    /// [item15] The target's contact photo (CNContact.thumbnailImageData), when present —
+    /// drives the direction-indicator disc; nil → the initial. Additive, default nil.
+    var personPhotoData: Data? = nil
     var tagline:         String?
     var pendingPingEmoji: String?
     var isLocked:        Bool
