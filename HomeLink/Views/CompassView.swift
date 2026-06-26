@@ -74,6 +74,9 @@ struct CompassView: View {
 
     // Layered distance system — random per launch, lockable in Settings
     @AppStorage("funnyUnitLocked")      private var funnyUnitLocked      = -1
+    // [item17] real on/off for the funny distance (separate from the UNIT). Default off = literal
+    // distance shown (non-choosers unchanged). funnyUnitLocked now means only the unit: -1 = random.
+    @AppStorage("funnyDistanceOn")      private var funnyDistanceOn      = false
     @AppStorage("thoughtTaglineLocked") private var thoughtTaglineLocked = -1
     @AppStorage("showLightSpeed")       private var showLightSpeed       = true
     @State private var funnyIndex   = Int.random(in: 0..<DistanceFun.funnyCount)
@@ -1296,6 +1299,11 @@ struct CompassView: View {
             runCompassSelfTestIfRequested()   // [restore-tap selftest] -compassSelfTest
             #endif
             syncPersonTagline()            // [4/4] show the selected person's tagline
+            // [item17] one-time migration: a prior locked unit means the feature was ON.
+            if funnyUnitLocked >= 0 && !funnyDistanceOn { funnyDistanceOn = true }
+            // [item17] funny distance ON → the compass shows it by default (tap still cycles to
+            // real distance / light-speed). OFF → literal, unchanged.
+            distanceMode = funnyDistanceOn ? 1 : 0
             // Locked favourites override the per-launch randomization
             if funnyUnitLocked >= 0 && funnyUnitLocked < DistanceFun.funnyCount {
                 funnyIndex = funnyUnitLocked
@@ -1728,7 +1736,8 @@ struct CompassView: View {
 
     private var distanceLineText: String {
         switch distanceMode {
-        case 1:  return DistanceFun.funnyText(km: compass.state.distanceKm, index: funnyIndex)
+        case 1:  return DistanceFun.funnyText(km: compass.state.distanceKm,
+                                              index: funnyUnitLocked >= 0 ? funnyUnitLocked : funnyIndex)  // [item17] chosen unit live (-1 = random)
         case 2:  return DistanceFun.lightSpeedText(km: compass.state.distanceKm)
         default: return compass.state.formattedDistance
         }
@@ -1752,8 +1761,8 @@ struct CompassView: View {
         .onTapGesture {
             HapticEngine.personSelected()
             withAnimation(.easeInOut(duration: 0.3)) {
-                let next = (distanceMode + 1) % 3
-                distanceMode = (next == 1 && !proOn) ? 2 : next
+                // [item17] funny is free in v1 — never skip it. PRIOR: (next == 1 && !proOn) ? 2 : next
+                distanceMode = (distanceMode + 1) % 3
             }
         }
         .animation(.easeInOut(duration: 0.3), value: distanceMode)

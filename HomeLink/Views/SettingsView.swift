@@ -27,8 +27,10 @@ struct SettingsView: View {
     @State private var isSigningIn   = false
     @State private var signInError: String? = nil
 
-    // Display preference — surprise unit each launch (-1) or a locked favourite.
+    // Display preference — the UNIT only now (-1 = random, 0..7 = a specific unit).
     @AppStorage("funnyUnitLocked")       private var funnyUnitLocked      = -1
+    // [item17] real on/off for the funny distance, separate from the unit. Default off = literal.
+    @AppStorage("funnyDistanceOn")       private var funnyDistanceOn      = false
     // [thoughts-toggle removed] `@AppStorage("notifyPointing")` REMOVED — the toggle it
     // backed was dead + mislabeled: it wrote the RETIRED pointing-push pref
     // (SupabaseService.setNotifyPointing → users.notify_pointing), but no pointing pushes
@@ -135,29 +137,28 @@ struct SettingsView: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("funny distance")
                         .settingsLabel()
-                    Text(funnyUnitLocked < 0 ? "a surprise unit each launch"
-                                             : "locked to your favourite")
+                    // [item17] real on/off — when on, the compass shows the funny distance.
+                    Text(funnyDistanceOn ? "shown on the compass"
+                                         : "off — shows the real distance")
                         .font(.system(size: 11))
                         .foregroundColor(DesignTokens.Color.textDim)
                 }
                 Spacer()
-                Toggle("", isOn: Binding(
-                    get: { funnyUnitLocked >= 0 },
-                    set: { locked in funnyUnitLocked = locked ? 0 : -1 }
-                ))
+                Toggle("", isOn: $funnyDistanceOn)   // [item17] on/off
                 .tint(Self.toggleOn)
                 .labelsHidden()
             }
 
-            if funnyUnitLocked >= 0 {
+            if funnyDistanceOn {
                 Divider().background(DesignTokens.Color.border).padding(.leading, 44)
                 settingsRow {
                     Image(systemName: "sportscourt")
                         .settingsIcon()
-                    Text("favourite unit")
+                    Text("unit")
                         .settingsLabel()
                     Spacer()
                     Picker("", selection: $funnyUnitLocked) {
+                        Text("random").tag(-1)   // [item17] random at the TOP of the list
                         ForEach(0..<DistanceFun.funnyCount, id: \.self) { i in
                             Text(DistanceFun.funnyLabels[i]).tag(i)
                         }
