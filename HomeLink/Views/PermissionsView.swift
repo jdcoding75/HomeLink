@@ -75,12 +75,13 @@ struct PermissionsView: View {
                             .foregroundColor(DesignTokens.Color.textMuted)
                             .padding(.bottom, 2)
 
-                        row(icon: "mic.fill", name: "microphone",
-                            detail: "breath sending (wind · birthday)",
-                            granted: micGranted, critical: false)
+                        // [perm-reorder 2026-06] LOCATION first — it's the critical permission; mic + notifications follow.
                         row(icon: "location.fill", name: "location",
                             detail: "points the compass to your people",
                             granted: locationGranted, critical: true)
+                        row(icon: "mic.fill", name: "microphone",
+                            detail: "breath sending (wind · birthday)",
+                            granted: micGranted, critical: false)
                         row(icon: "bell.fill", name: "notifications",
                             detail: "a gentle word when a thought arrives",
                             granted: notifGranted ?? false, loading: notifGranted == nil, critical: false)
