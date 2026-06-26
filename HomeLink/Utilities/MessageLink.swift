@@ -32,12 +32,14 @@ enum MessageLink {
     }
 
     /// Warm, Pointward-voiced share copy: the DESIGNED canonical invite line (with
-    /// the sender's NAME) + the link + the short-code fallback so a no-app recipient
-    /// can open Pointward and type the code. e.g.
+    /// the sender's NAME) + the link. e.g.
     ///   "Sarah sent you a custom animated message ✦ tap to preview
-    ///    https://pointward.app/m/…  · no app? open Pointward and enter ABC234"
-    /// The code is omitted if we don't have one (degrades to link-only). The sender
-    /// name is the recipient-facing display name, resolved at the call site
+    ///    https://pointward.app/m/…"
+    /// [§J 2026-06-25] The recipient-facing short-code suffix was REMOVED (web side
+    /// removed in 65708a5). The short_code INFRA stays (mint / lookup / People-tab
+    /// entry); the `shortCode:` parameter is retained for plumbing (caller unchanged,
+    /// suffix restorable) but is no longer appended to the text. The sender name is
+    /// the recipient-facing display name, resolved at the call site
     /// (people.profile?.displayName ?? UserProfile.snapshot?.displayName ?? "").
     static func shareText(senderName: String, link: String, shortCode: String) -> String {
         let trimmed = senderName.trimmingCharacters(in: .whitespaces)
@@ -48,13 +50,20 @@ enum MessageLink {
         // [pre-fix] generic-by-default, no "animated/preview" hook:
         // let name = trimmed.isEmpty ? "Someone" : senderName
         // var text = "\(name) sent you a thought 💭  \(link)"
-        var text = trimmed.isEmpty
+        // [§J 2026-06-25] `let` (was `var`): nothing mutates `text` now that the
+        // recipient-facing short-code suffix is removed.
+        let text = trimmed.isEmpty
             ? "Someone sent you a thought ✦ tap to preview  \(link)"
             : "\(trimmed) sent you a custom animated message ✦ tap to preview  \(link)"
-        let code = shortCode.trimmingCharacters(in: .whitespaces)
-        if !code.isEmpty {
-            text += "  · no app? open Pointward and enter \(code)"
-        }
+        // [§J 2026-06-25] Recipient-facing short-code suffix REMOVED (web side removed
+        // in 65708a5). The short_code infra stays (mint / lookup / People-tab entry);
+        // only this TEXT comes out. The `shortCode` parameter is retained so the caller
+        // (PingManager) is unchanged and the suffix can be restored if needed.
+        // Preserved original:
+        //   let code = shortCode.trimmingCharacters(in: .whitespaces)
+        //   if !code.isEmpty {
+        //       text += "  · no app? open Pointward and enter \(code)"
+        //   }
         return text
     }
 }
