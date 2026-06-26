@@ -54,6 +54,16 @@
 - **BATCH verification when safe.** Prefer ONE test run / ONE device pass across several INDEPENDENT changes
   over a cycle per change (the "5-fix batch → one clean test" pattern). Only batch independent/safe changes
   — isolate risky/interacting ones so a failure isn't ambiguous. **Goal: fewest test cycles.**
+- **SELF-TEST FIRST, RISK-GATE THE DEVICE PASS.** Claude Code captures its own logs and runs its own test
+  passes (harness / sim / DB-scenario) BEFORE relaying — **default to self-verifying to save John a testing
+  round.** **Sim logs = autonomous** (`simctl log stream`). **Physical-device logs are NOT self-capturable
+  today** — `libimobiledevice`/`idevicesyslog` can't reach an iOS-17+/26 device (only Apple CoreDevice/Xcode
+  can, no clean CLI stream), so **John copies device logs from the Xcode console** (revisit if a working
+  device-log path is set up; pull John in for device unlock / trust / approval regardless). A human
+  device/two-phone pass is requested ONLY when a change is genuinely likely to hit something self-tests can't
+  catch — an irreducible OS / real-world step (real magnetometer/motion, APNs to a closed phone, true cold
+  install, live socket, actual UI render). Low-risk changes (copy, layout, logic the harness covers, DB facts
+  checkable via MCP) ship WITHOUT asking John to test. Findings always → `reports/<name>.md`.
 - **TESTING PHILOSOPHY (standing).** PREFER automated, step-checked tests over manual conversational testing
   (manual two-phone is slow + churn-prone + loses fidelity). **SIMULATE-AT-BOUNDARY, AUTOMATE-DOWNSTREAM:**
   for any flow with one irreducible OS/real-world step (clipboard handoff, APNs, true cold install), verify
