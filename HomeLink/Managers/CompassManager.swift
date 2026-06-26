@@ -58,6 +58,10 @@ final class CompassManager: NSObject, ObservableObject {
     @Published private(set) var locationDenied = false
     // Published so list views can show live distances per person
     @Published private(set) var userLocation: CLLocation?
+    // [location-restore-2026-06] one-time guard so the first GPS fix writes to the server
+    // profile once per session. (Plain `private var`, NOT @State — CompassManager is an
+    // ObservableObject class, not a SwiftUI View.)
+    private var hasWrittenLocationThisSession = false
     private var currentHeading: Double = 0
     /// [1/6] Low-pass-filtered heading — heavy smoothing (0.2 new · 0.8 old)
     /// removes magnetometer jitter so the marker is dead still when the phone
@@ -377,6 +381,20 @@ final class CompassManager: NSObject, ObservableObject {
 extension CompassManager: CLLocationManagerDelegate {
     func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
         userLocation = locations.last
+        // [location-restore-2026-06] Write first real GPS fix to server profile — behavior
+        // moved here from OnboardingView.commitProfile (removed in d57fb02 location strip).
+        // Only fires once per session (guard against repeat writes).
+        if !hasWrittenLocationThisSession, let loc = locations.last {
+            hasWrittenLocationThisSession = true
+            Task {
+                await SupabaseService.shared.updateUserProfile(
+                    name: UserProfile.snapshot?.displayName ?? "",
+                    emoji: UserProfile.snapshot?.emoji ?? "❤️",
+                    latitude: loc.coordinate.latitude,
+                    longitude: loc.coordinate.longitude
+                )
+            }
+        }
         updateCompassState()
     }
     func locationManager(_ manager: CLLocationManager, didUpdateHeading newHeading: CLHeading) {
