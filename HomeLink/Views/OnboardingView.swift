@@ -47,14 +47,18 @@ struct OnboardingView: View {
     @State private var geocodeTask:      Task<Void, Never>? = nil
     #endif
 
-    private let locationManager = CLLocationManager()   // [location-stripped-2026-06] KEEP — compass device-location permission
+    // [permission-rework-2026-06] now UNUSED — the onboarding location prompt was removed (location
+    // deferred to first compass open). Preserved, not hard-deleted:
+    // private let locationManager = CLLocationManager()
     // [build10] "Use current location" — one-shot grab → reverse-geocode → the SAME
     // geocoded path a typed address uses. @State holds one stable instance.
     #if false
     @State private var oneShotLocation = OneShotLocationProvider()   // [location-stripped-2026-06]
     @State private var locating = false                              // [location-stripped-2026-06]
     #endif
-    @State private var notificationsRequested = false
+    // [permission-rework-2026-06] now UNUSED — the onboarding notification prompt was removed
+    // (notifications deferred to first successful send, CompassView.finishSend). Preserved:
+    // @State private var notificationsRequested = false
     @State private var showContactPicker = false
 
     private static let lavender = Color(hex: "#c4a8d4")
@@ -744,15 +748,18 @@ struct OnboardingView: View {
         guard !name.trimmingCharacters(in: .whitespaces).isEmpty else { return }
         commitProfile()   // [#6 fix C] writes display_name unconditionally
 
-        // Permissions, at the natural moment.
-        locationManager.requestWhenInUseAuthorization()
-        if !notificationsRequested {
-            Task {
-                _ = try? await UNUserNotificationCenter.current()
-                    .requestAuthorization(options: [.alert, .sound, .badge])
-            }
-            notificationsRequested = true
-        }
+        // [permission-rework-2026-06] Permissions NO LONGER asked here.
+        //   · LOCATION → deferred to first compass open (CompassView starts the compass when the
+        //     compass screen is presented — the contextually-obvious ask).
+        //   · NOTIFICATIONS → deferred to first SUCCESSFUL send (CompassView.finishSend), so direct
+        //     installers AND link-arrivers (who never reach this screen) get asked at the same moment.
+        // PRIOR (removed):
+        //   locationManager.requestWhenInUseAuthorization()
+        //   if !notificationsRequested {
+        //       Task { _ = try? await UNUserNotificationCenter.current()
+        //                 .requestAuthorization(options: [.alert, .sound, .badge]) }
+        //       notificationsRequested = true
+        //   }
 
         HapticEngine.connectionFelt()
         // [build10 fixbatch] instruments (marketing) cut → aboutYou is the LAST step.

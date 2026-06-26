@@ -377,6 +377,13 @@ struct RootView: View {
     /// Launching with a saved person should immediately show that person on the
     /// compass — don't rely on child-view onAppear ordering.
     private func startCompassIfNeeded() {
+        // [permission-rework-2026-06] Defer the location prompt to first COMPASS open — do not
+        // fire it on cold launch / during onboarding / during the link-arriver gift. Until
+        // onboarding is done this no-ops; CompassView.onAppear starts the compass when the
+        // compass screen is actually presented (the contextually-obvious location moment).
+        // The onChange(hasCompletedOnboarding) caller fires this the instant onboarding finishes
+        // (compass is tab 1 → shown immediately), which is acceptable.
+        guard hasCompletedOnboarding else { return }
         if let person = people.selectedPerson {
             compass.start(tracking: person)
         }

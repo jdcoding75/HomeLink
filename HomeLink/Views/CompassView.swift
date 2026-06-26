@@ -18,6 +18,8 @@ import SwiftUI
 import CoreLocation
 import Combine
 import os
+import UIKit                  // [permission-rework-2026-06] Settings deep-link (openSettingsURLString)
+import UserNotifications      // [permission-rework-2026-06] first-send notification ask
 
 struct CompassView: View {
 
@@ -164,6 +166,11 @@ struct CompassView: View {
     @State private var sentMessage: String? = nil   // [2/3] for the sent confirmation
     @State private var sentTagline: String? = nil
     @State private var sentNotice = false
+    // [permission-rework-2026-06] notifications deferred to the FIRST successful real send.
+    // `notificationsAsked` fires the OS prompt once (persisted); `notifFramingToast` makes the
+    // sent toast carry the framing copy on that one send.
+    @AppStorage("notificationsAsked") private var notificationsAsked = false
+    @State private var notifFramingToast = false
     // [sent-confirmation] The recipient's name captured at send time, so the post-send
     // toast can read "sent to [Name] ✦" (falls back to "sent ✦" when there's no name).
     @State private var sentToName = ""
@@ -651,6 +658,10 @@ struct CompassView: View {
                     // retired dots' slot. (Previously lived in bottomBandRedesign.)
                     instrumentHelperLines
                         .padding(.top, 26)
+
+                    // [permission-rework-2026-06] soft fallback when location is denied — sits below
+                    // the face where the distance line is. Informational; never blocks or re-asks inline.
+                    locationDeniedFallback
 
                     Spacer(minLength: 12)
 
@@ -1504,6 +1515,35 @@ struct CompassView: View {
         .frame(maxWidth: .infinity, minHeight: 52)   // ≈ prior 2-line block height; centers the 1 line. TUNABLE (device-check).
         // Recede during a receipt, exactly as the dots did.
         .opacity(pings.nowPlaying == nil ? 1 : 0)
+    }
+
+    /// [permission-rework-2026-06] Soft fallback when location auth is denied — a warm,
+    /// unobtrusive card below the face with a Settings deep-link (same pattern as
+    /// PermissionsView). Never blocks the user and never re-asks inline (iOS won't re-prompt
+    /// once denied → deep-link is the only recovery). Hidden unless `compass.locationDenied`.
+    @ViewBuilder
+    private var locationDeniedFallback: some View {
+        if compass.locationDenied {
+            VStack(spacing: 8) {
+                Text("Location needed to point toward people ✦")
+                    .font(.system(size: 14, design: .serif).italic())
+                    .foregroundColor(DesignTokens.Color.textPrimary)
+                    .multilineTextAlignment(.center)
+                Button("Open Settings") {
+                    if let url = URL(string: UIApplication.openSettingsURLString) {
+                        UIApplication.shared.open(url)
+                    }
+                }
+                .font(DesignTokens.Font.label)
+                .foregroundColor(DesignTokens.Color.accentSoft)
+            }
+            .padding(14)
+            .background(DesignTokens.Color.backgroundCard)
+            .cornerRadius(DesignTokens.Radius.card)
+            .padding(.horizontal, 40)
+            .padding(.top, 8)
+            .transition(.opacity)
+        }
     }
 
     /// The redesigned bottom band, beneath the (unchanged) compass face:
@@ -2386,9 +2426,15 @@ struct CompassView: View {
                 Image(systemName: "checkmark.circle.fill")
                     .font(.system(size: 16))
                     .foregroundColor(Color(hex: "#5dcaa5"))
-                Text(sentToName.isEmpty ? "sent ✦" : "sent to \(sentToName) ✦")
+                // [permission-rework-2026-06] On the first real send the toast carries the
+                // notification framing copy (the OS prompt fires a beat later); after that it's
+                // the normal "sent to [Name] ✦".
+                Text(notifFramingToast
+                     ? "Your thought is on its way ✦ — want to know when they send one back?"
+                     : (sentToName.isEmpty ? "sent ✦" : "sent to \(sentToName) ✦"))
                     .font(.system(size: 16, weight: .medium, design: .serif).italic())
                     .foregroundColor(Color(hex: "#c4a8d4"))
+                    .multilineTextAlignment(.center)
             }
             .padding(.horizontal, 20)
             .padding(.vertical, 11)
@@ -2414,6 +2460,21 @@ struct CompassView: View {
         // "sent to [Name] ✦" (the recipient is the selected person at send time).
         sentToName = people.selectedPerson?.name ?? ""
         showSentNotice()
+        // [permission-rework-2026-06] FIRST successful REAL send → ask for notifications. This is
+        // the symmetric moment: BOTH direct installers AND link-arrivers reach finishSend (the single
+        // funnel for all 6 send-out onComplete closures). Once only (persisted); skip Demo Dan (no
+        // real delivery). The sent toast shows the framing copy now; the OS prompt fires a beat later
+        // so the copy reads first.
+        if !notificationsAsked && !isDemoSelected {
+            notificationsAsked = true
+            notifFramingToast = true
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.4) {
+                Task {
+                    _ = try? await UNUserNotificationCenter.current()
+                        .requestAuthorization(options: [.alert, .sound, .badge])
+                }
+            }
+        }
         appState.transition(to: .idle)
         // [firework/birthday freeze fix] FireworkCompassFace + BirthdayCakeCompassFaceV2
         // hold one-way @State (`sent = true` after firing) and never self-reset. As
@@ -2477,6 +2538,7 @@ struct CompassView: View {
         // reads comfortably before it fades.
         DispatchQueue.main.asyncAfter(deadline: .now() + 2.2) {
             withAnimation(.easeIn(duration: 0.4)) { sentNotice = false }
+            notifFramingToast = false   // [permission-rework-2026-06] one-time framing copy resets after the toast
         }
     }
 

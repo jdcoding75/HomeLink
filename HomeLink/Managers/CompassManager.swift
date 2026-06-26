@@ -52,6 +52,10 @@ final class CompassManager: NSObject, ObservableObject {
     /// where CoreMotion is absent.
     @Published private(set) var isDeviceFlat = false
     private let flatZBand: Double = 0.85   // |gravity.z| >= this = flat (the preserved old uprightZBand)
+    /// [permission-rework-2026-06] TRUE when location auth is denied/restricted — drives the
+    /// compass screen's soft fallback (warm message + Settings deep-link). Set from the
+    /// authorization-change delegate. Default FALSE (no nag before a decision).
+    @Published private(set) var locationDenied = false
     // Published so list views can show live distances per person
     @Published private(set) var userLocation: CLLocation?
     private var currentHeading: Double = 0
@@ -411,11 +415,14 @@ extension CompassManager: CLLocationManagerDelegate {
         case .notDetermined:
             manager.requestWhenInUseAuthorization()
         case .authorizedWhenInUse, .authorizedAlways:
+            locationDenied = false   // [permission-rework-2026-06]
             // Permission may arrive after start(tracking:) — kick updates off now
             if targetPerson != nil {
                 manager.startUpdatingLocation()
                 manager.startUpdatingHeading()
             }
+        case .denied, .restricted:
+            locationDenied = true    // [permission-rework-2026-06] drives the compass soft-fallback overlay
         default:
             break
         }
