@@ -183,7 +183,9 @@ struct OnboardingView: View {
     // MARK: - Screen 1 · Sign in with Apple (now first; carries the compass bg)
 
     @State private var signInBusy   = false
-    @State private var signedIn     = SupabaseService.localUserID != nil
+    // [onboarding-cleanup-2026-06] signedIn REMOVED — the "signed in ✦" success state it gated is gone;
+    // sign-in now advances straight to the name screen. Preserved:
+    //   @State private var signedIn     = SupabaseService.localUserID != nil
     @State private var signInError: String?
     @State private var currentNonce = ""
 
@@ -200,19 +202,22 @@ struct OnboardingView: View {
             VStack(spacing: 0) {
                 Spacer()
 
-            if signedIn {
-                // Success moment — soft green check, then onward
-                VStack(spacing: 14) {
-                    Image(systemName: "checkmark.circle.fill")
-                        .font(.system(size: 54))
-                        .foregroundColor(Color(hex: "#5dcaa5").opacity(0.9))
-                        .shadow(color: Color(hex: "#5dcaa5").opacity(0.5), radius: 16)
-                    Text("signed in ✦")
-                        .font(.system(size: 22, weight: .semibold, design: .serif))
-                        .foregroundColor(DesignTokens.Color.textPrimary)
-                }
-                .transition(.scale(scale: 0.8).combined(with: .opacity))
-            } else {
+            // [onboarding-cleanup-2026-06] "signed in ✦" success state REMOVED (signedIn never set now);
+            // the sign-in content below renders UNCONDITIONALLY and sign-in advances straight to the name
+            // screen. Preserved (was: if signedIn { …green check… } else { …sign-in content… }):
+            //   if signedIn {
+            //       // Success moment — soft green check, then onward
+            //       VStack(spacing: 14) {
+            //           Image(systemName: "checkmark.circle.fill")
+            //               .font(.system(size: 54))
+            //               .foregroundColor(Color(hex: "#5dcaa5").opacity(0.9))
+            //               .shadow(color: Color(hex: "#5dcaa5").opacity(0.5), radius: 16)
+            //           Text("signed in ✦")
+            //               .font(.system(size: 22, weight: .semibold, design: .serif))
+            //               .foregroundColor(DesignTokens.Color.textPrimary)
+            //       }
+            //       .transition(.scale(scale: 0.8).combined(with: .opacity))
+            //   } else {
                 Text("sign in to connect")
                     .font(.system(size: 30, weight: .semibold, design: .serif))
                     .foregroundColor(DesignTokens.Color.textPrimary)
@@ -266,15 +271,17 @@ struct OnboardingView: View {
                     .font(.system(size: 11, design: .serif).italic())
                     .foregroundColor(DesignTokens.Color.textDim)
                     .padding(.top, 6)
-            }
+            // [onboarding-cleanup-2026-06] (was the `else` close `}` — unwrapped; sign-in content is now unconditional)
 
             Spacer()
 
-            if signedIn {
-                nextButton
-            }
+            // [onboarding-cleanup-2026-06] nextButton was the signedIn success-state CTA — removed with that
+            // state (nextButton itself survives — aboutYouScreen still uses it). Preserved:
+            //   if signedIn {
+            //       nextButton
+            //   }
             }   // [build10] close VStack
-            .animation(.easeOut(duration: 0.4), value: signedIn)
+            // [onboarding-cleanup-2026-06] .animation(.easeOut(duration: 0.4), value: signedIn)  — signedIn removed
         }   // [build10] close ZStack (merged compass bg)
     }
 
@@ -315,13 +322,16 @@ struct OnboardingView: View {
                     // was discarded; the code is unredeemable + never surfaced). Stops
                     // writing new `connections` rows. The func def stays (removed later, in
                     // order). The LINK path (senderID/link_connections) is unaffected.
-                    withAnimation(.easeOut(duration: 0.4)) { signedIn = true }
+                    // [onboarding-cleanup-2026-06] No "signed in ✦" hold — sign-in advances STRAIGHT to the
+                    // name screen (standard 0.4s TabView slide). Preserved:
+                    //   withAnimation(.easeOut(duration: 0.4)) { signedIn = true }
+                    //   // Brief success moment, then onward
+                    //   DispatchQueue.main.asyncAfter(deadline: .now() + 1.3) {
+                    //       if page == 0 { withAnimation(.easeInOut(duration: 0.4)) { page = 1 } }
+                    //   }
                     HapticEngine.connectionFelt()
-                    // Brief success moment, then onward
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.3) {
-                        if page == 0 {   // [build10] sign-in is now tag 0
-                            withAnimation(.easeInOut(duration: 0.4)) { page = 1 }   // → aboutYou
-                        }
+                    if page == 0 {   // [build10] sign-in is now tag 0
+                        withAnimation(.easeInOut(duration: 0.4)) { page = 1 }   // → aboutYou
                     }
                 } catch {
                     signInError = error.localizedDescription
