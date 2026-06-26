@@ -17,20 +17,22 @@ struct FeedbackView: View {
 
     private enum Phase { case idle, sending, sent }
     @State private var phase: Phase = .idle
-    @State private var category = "idea"          // default-selected → the NOT-NULL column is always set
+    @State private var category = "broken"        // default-selected (first option) → the NOT-NULL column is always set
     @State private var bodyText = ""
     @State private var errorText: String? = nil
 
     private static let bodyLimit = 4000
 
-    /// 6 warm chips → internal category keys (the row stores the key).
+    /// 6 options → internal category keys (the row stores the KEY, a readable slug).
+    /// [feedback copy fix 2026-06-25] labels + set + keys replaced to spec; the chip
+    /// SELECTION mechanic (FlowChips) is unchanged.
     private let chips: [(key: String, label: String)] = [
-        ("idea",      "💡 idea"),
-        ("bug",       "🐞 something broke"),
-        ("love",      "💜 love it"),
-        ("confusing", "😕 confusing"),
-        ("feature",   "✨ wish it did…"),
-        ("other",     "· other")
+        ("broken",          "Something didn't work right"),
+        ("more_animations", "I want more animations"),
+        ("personalization", "I want more ways to personalize thoughts"),
+        ("sending_options", "I want better sending options"),
+        ("confused",        "I'm confused about something"),
+        ("idea",            "I have an idea ✦")
     ]
 
     private var trimmedBody: String { bodyText.trimmingCharacters(in: .whitespacesAndNewlines) }
@@ -43,7 +45,7 @@ struct FeedbackView: View {
                 header
                 ScrollView {
                     VStack(alignment: .leading, spacing: 16) {
-                        Text("Tell me what's working or what's not — it shapes what I build next ✦")
+                        Text("Pointward is my first app — I'm learning as I go. Your thoughts help me decide what to improve next ✦")
                             .font(.system(size: 14, design: .serif).italic())
                             .foregroundColor(DesignTokens.Color.textMuted)
 
@@ -74,7 +76,7 @@ struct FeedbackView: View {
                 .font(DesignTokens.Font.label)
                 .foregroundColor(DesignTokens.Color.textMuted)
             Spacer()
-            Text("send feedback")
+            Text("Help Make This Better")
                 .font(DesignTokens.Font.label)
                 .foregroundColor(DesignTokens.Color.textPrimary)
             Spacer()
@@ -100,6 +102,9 @@ struct FeedbackView: View {
 
     private var bodyEditor: some View {
         VStack(alignment: .leading, spacing: 6) {
+            Text("Tell me more (optional)")
+                .font(DesignTokens.Font.overline)
+                .foregroundColor(DesignTokens.Color.textMuted)
             ZStack(alignment: .topLeading) {
                 if bodyText.isEmpty {
                     Text("type your note…")
@@ -138,7 +143,7 @@ struct FeedbackView: View {
                 if phase == .sending {
                     ProgressView().tint(DesignTokens.Color.textPrimary)
                 }
-                Text(phase == .sent ? "sent ✓" : "send ✦")
+                Text(phase == .sent ? "sent ✓" : "Send feedback")
                     .font(DesignTokens.Font.label)
                     .foregroundColor(DesignTokens.Color.textPrimary)
             }
