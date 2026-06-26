@@ -517,6 +517,76 @@ repo-verified (`git log` subject match, HEAD `471b9a9`). ADD-ONLY. Report: `repo
 - **Compass B1 copy + layout fresh-eyes pass.**
 - **Walking-send observation** — gather data during the TestFlight week.
 
+## ⭐⭐ TESTFLIGHT TWO-PHONE — ROUND 1 FIXES + OPEN ITEMS (2026-06-26)
+
+_Fixes + open items from the first two-phone TestFlight round. ADD-ONLY; repo-verified hashes (HEAD `ea46bb2`).
+Full observation log: `reports/testflight_twoPhone_observations.md`; audit: `reports/testflight_twoPhone_audit.md`._
+
+### ✅ COMPLETIONS (verified, with hash)
+- **Feedback "Loved It" chip** (replaced "General Feedback") — ✅ `ca05a50`.
+- **Wind double-send fix** — exempt wind/`.firefly` from the post-send `instrumentResetID` rebuild (preserves the
+  breath cooldown so residual breath can't re-fire) — ✅ `a1ba2ad`.
+- **EditPersonView save fix** — save gates on NAME only; saves gracefully with the prior coords when a geocode
+  fails (no more stuck-disabled save on an address edit) — ✅ `180fc93`.
+- **CompassView — 3 changes** — re-arm card moved into the helper-lines slot below the face; rotation hint
+  "turn phone to aim ✦" for rocket + bow; wind tagline "Blow or breathe toward [name]…" — ✅ `f0597c1`.
+- **Location restore** — write the FIRST real GPS fix to the server profile in
+  `CompassManager.didUpdateLocations` — ✅ `dc08817`.
+- **PendingLink FIFO queue + drain-on-dismiss** — two quick `/m/` links no longer clobber; the second auto-plays
+  after the first dismisses — ✅ `3d263a0`.
+- **Un-gate Animation Lab + "Send test thought" for release** — new `ThoughtPreview.swift` helper, an "explore"
+  Settings section; `DevTools` stays DEBUG-only — ✅ `131ccb7`.
+- **History drawer split** — "thoughts received ✦" / "thoughts sent ✦"; new `SentRecord` store in PingManager,
+  `recordSent` at `sendThought`, display-only sent bubbles — ✅ `ea46bb2`.
+
+### 🛰 SERVER / CONFIG (not a commit — live edge-function secret)
+- **`APNS_SANDBOX` true → false** in the Supabase edge-function secrets (`send-ping-notification`). TestFlight
+  uses Production APNs; the function now tries Production first. Fixes Item 10b (notifications not received).
+  **Pending live confirmation next test round.**
+
+### 🔒 DECISIONS LOCKED
+- **⚑ LOCATION — CORRECTION (supersedes the "stripped entirely" framing).** The strip removed only the ONBOARDING
+  field + forced collection — **NOT** location functionality. **Location IS written to the server profile on the
+  first GPS fix (`dc08817`).** This **corrects/supersedes** the "USER'S OWN LOCATION STRIPPED" bank above and the
+  audit's "Item 18 = by design / no write" note. **Sender-location-travels-with-sends now works** via the profile
+  write. (Opt-in per-person SEND-TIME location sharing remains a separate parked feature.)
+- **Demo Dan re-arm card** — shows for Demo Dan like everyone else (the `isDemoSelected` gate was removed).
+- **Demo Dan send fork — KEPT** (signed-out sandbox). NOT made into real sends — too complex/risky for v1.
+- **"Send test thought" + Animation Lab — un-gated to ALL users** (`131ccb7`).
+- **Notifications model:** PATH-1 pings fire pushes via the `on_ping_insert` trigger → `send-ping-notification`
+  edge function. **PATH-2 link messages have NO push trigger** (the first link message never pushes — known).
+
+### 🟡 OPEN ITEMS (carry to next conversation)
+**PENDING / NOT RUN:**
+- **Item 1 — WEB LANDING PAGE** (the **`pointward-website` repo, NOT HomeLink**). The compass landing page is
+  weak; wanted: dark theme, vintage-wheel compass-face background, needle turning then pulsing, repeat. The prompt
+  was written but NEVER RUN — goes to the WEBSITE Claude. **HIGH PRIORITY** (first thing recipients see).
+- **Item 5 — guidance text** "make message selections" hint for the first 3 sends (rotation guidance already done
+  in `f0597c1`). NOT RUN.
+- **Item 15 — contact photo on the compass circle indicator** (audit not run; make the indicator slightly bigger
+  if there's room). NOT RUN.
+
+**NEEDS DEVICE RETEST NEXT ROUND:**
+- **Item 10 — Demo Dan "disappeared" for Jess** (audit: deselected, not deleted; John believes really gone). Jess
+  installed via TestFlight differently than John — retest on device.
+- **Item 10b — notification banner** — confirm Jess receives after the `APNS_SANDBOX` fix.
+- **Item 16 — second message auto-plays** after the first dismisses (`3d263a0` device check).
+- **Item 17 — funny-distance name display** (changed on tap but didn't show the chosen name; confirm the random
+  option is at the top). Observe after the location fix lands.
+
+**BIGGER / DEDICATED FOCUS:**
+- **Item 7 — receipt/arrival animation STRENGTH across ALL surfaces** (sender, receiver, history bucket, on send,
+  on receipt, in test thought). Compass animation flies off-screen with little seen; rocket is fine; some need
+  strengthening in specific spots. Needs a dedicated session.
+
+**ALREADY CLOSED this session:** Items 3, 4 (caused by 16), 6, 8, 12, 13, 14, 18, 19. Item 2 (permission flash)
+= minor, banked. _(Reconciliation: the prior bank's "compass flash on launch — fix pending" appears CLOSED by
+`09a751c` — confirm.)_
+
+### REFERENCE
+- Verbatim observation log: `reports/testflight_twoPhone_observations.md` · history-split proposal:
+  `reports/history_split.md` · audit: `reports/testflight_twoPhone_audit.md`.
+
 ## What Pointward Is
 
 Pointward is a SwiftUI + SwiftData iOS app for sending small, emotional
@@ -3414,3 +3484,4 @@ _STAGE B VERIFIED end-to-end (two-phone test, 2 real Apple IDs → link_connecti
 _Session bank 2026-06-25 (build-session close): repo-verified completions banked — §B-B1 nine instruction strings `55750ff` (flick gets text per John override; compass reworded hands-free, NO "tap") → §B compass send screen now COMPLETE end-to-end; §J app-side short-code suffix removed `5e38782` (infra/`shortCode` kept); §C PART 1 landing collapse `1878fe0` (single "Send one back ✦" CTA + "maybe later"; extra doors retired-commented; gift-before-ask untouched); Permissions screen `39d2d11` (deep-link only, no native prompts/batch, CompassManager untouched); §O-1 wind receipt unified "{name} sent you something ✦" `4400942` (Option A, SUPERSEDES "thinking of you"); Feedback form `7f5e1fb` (apikey REST insert, 201 anon+auth). DECISIONS: 9d "got a code?" KEEP-for-v1; Demo Dan no-code (re-affirm); contact cluster resolved (address optional, typed-name precedence, send-channel on `Person.sendChannel`). OPEN (gates v1): §C PART 2 send-guard at `CompassView.swift:2441`, predicate `localUserID != nil`. PARKED for device walk-through: §K catch-bucket conflict (cross-ref, not duplicated), B1 long-string wrapping, flick-text keep/resuppress, signed-out Feedback glance._
 _Device walk-through 2026-06-25 (clean install): VERIFIED — Demo-Dan re-seed + wife-connection survives reinstall (server data intact, local wiped), B1 text / hands-free compass / B3-under-instruction / B5 vintage wheel / single-line wind caption all good; 9d "got a code?" KEEP + tucked-away-is-fine. OPEN (fresh-head): ⭐ catch-bucket reframed — present on receiver wand animation (reconciles "intentional"; old "no bucket" = churn-fogged) BUT does NOT catch when aligned → §K now "catch behaviour broken," keep-fix/move/drop-for-v1 TBD; arrival sequence ORDER (envelope→"you were sent"→animation) maybe backwards, review. REVERSAL: arrival/receipt compass → MATCH the SEND compass look (B5 vintage), supersedes prior "unify send toward receipt." REVIEW-LATER cluster ("compass send-screen fresh-eyes day"): B1 too-long/inconsistent, compass line missing "align to [N]°", B3 placement shipped-vs-spec, flick text. PENDING (2nd device): §C part-1 landing-collapse check, signed-out Feedback UI tap-through._
 _Session bank 2026-06-26 (session close): repo-verified completions — permissions reorder `cbb9d49`, receipt vintage wheel `20c9bfa`, location-strip + Your Name `d57fb02`, tagline rework `66417dd`, receipt showBucket restore `d23e9f2`, feedback chips `d87ed85`, re-arm overlay `6ed123b`, onboarding "signed in ✦" removal `444c9a8`, permission rework Part 1 `dabe257`, demo re-arm gate removed `471b9a9`, directional-catch Lab `15aca02`, catch-bucket removal+Lab `b85dfc7`. DECISIONS: clipboard bridge REQUIRED (UL can't recover the install-gap link); UL already fully configured; SiwA deferral safe but Part-2-deferred (live-link test first); Demo Dan send fork KEPT (signed-out sandbox), re-arm card SHOWN, B3 readout KEPT. STANDING DIRECTIVE added: SIMPLEST SOLUTION FIRST. OPEN: compass-flash fix, permission Part 2, demo-simplification, test-thought surface, §C device check, signed-out feedback UI, arrival order, B1 copy/layout, walking-send data._
+_TestFlight two-phone round 1 (2026-06-26): FIXES — feedback "Loved It" `ca05a50`, wind double-send `a1ba2ad`, EditPerson save `180fc93`, compass re-arm-slot/rotation-hint/wind-tagline `f0597c1`, location restore (first GPS fix → profile) `dc08817`, PendingLink FIFO `3d263a0`, un-gate Lab + test-thought `131ccb7`, history split received/sent `ea46bb2`; SERVER: APNS_SANDBOX true→false (Production APNs, fixes 10b, confirm next round). DECISIONS: ⚑ LOCATION CORRECTION — strip removed only the onboarding field, location IS written on first GPS fix (dc08817) → sender-location-travels works (supersedes "stripped entirely"); Demo Dan re-arm shown, send-fork KEPT; Lab+test-thought un-gated; PATH-2 link msgs have no push (known). OPEN: web landing page (website repo, HIGH), Item 5 guidance, Item 15 contact photo, device-retest 10/10b/16/17, Item 7 animation-strength (dedicated). Closed: 3,4,6,8,12,13,14,18,19; compass-flash fix `09a751c` (confirm)._
