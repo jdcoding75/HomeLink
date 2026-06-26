@@ -41,6 +41,13 @@ struct ComposeBackView: View {
     @State private var signInError: String? = nil
     @State private var lastCommittedName = ""
 
+    // [§C PART 2 / unification] The minimal sign-in+name IS onboarding (Model A:
+    // showcase is optional/deferred). Setting this flag in commitAndEnter makes
+    // ComposeBack and OnboardingView converge — localUserID != nil ⟺ onboarded — so
+    // the §C send-guard and the flag-gates (RootView, the 9b landing) agree and the
+    // landing stops recurring for a reply-sign-in user.
+    @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
+
     private static let lavender = Color(hex: "#c4a8d4")
 
     var body: some View {
@@ -194,6 +201,7 @@ struct ComposeBackView: View {
             people.saveProfile(name: trimmed, emoji: emoji)                       // LOCAL
             Task { await SupabaseService.shared.updateUserProfile(name: trimmed, emoji: emoji) }  // SERVER (display_name always)
         }
+        hasCompletedOnboarding = true   // [§C PART 2 / unification] signed-in + named ⇒ onboarded (see flag decl)
         onEntered()
     }
 

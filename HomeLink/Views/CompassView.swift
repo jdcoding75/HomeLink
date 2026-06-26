@@ -127,6 +127,7 @@ struct CompassView: View {
     @State private var showSkinOverlay = false
     @State private var showSkinPaywall = false
     @State private var showConnectSheet = false
+    @State private var showOnboardForSend = false   // [§C PART 2] not-signed-in real send → route to onboarding
     // @State private var showScopeReticle = false   // [4/6] scope retired
 
     /// The three alignment layers wake whenever aiming or catching.
@@ -1440,6 +1441,15 @@ struct CompassView: View {
                 .presentationDetents([.height(min(420, CGFloat(people.people.count) * 64 + 90))])
                 .presentationDragIndicator(.visible)
         }
+        // [§C PART 2] not-signed-in real send → minimal onboarding (ComposeBackView reuse).
+        // onEntered: dismiss back to compose; the now-signed-in user re-taps send → guard passes.
+        .fullScreenCover(isPresented: $showOnboardForSend) {
+            ComposeBackView(
+                senderName: people.selectedPerson?.name ?? "them",
+                onEntered: { showOnboardForSend = false }
+            )
+            .environmentObject(people)
+        }
     }
 
     /// [5/6] True when the compass is showing the auto-created demo person (Alex).
@@ -1450,6 +1460,14 @@ struct CompassView: View {
         // method 'isDemo' in a synchronous nonisolated context").
         guard let person = people.selectedPerson else { return false }
         return DemoPerson.isDemo(person)
+    }
+
+    /// [§C PART 2] A not-signed-in user tried a REAL send → route to the minimal
+    /// onboarding (reuse ComposeBackView, no new screen). onEntered just dismisses;
+    /// the now-signed-in user re-taps send and the guard passes. Demo Dan never reaches
+    /// here (exempted in the guard). Reply-shaped copy is acceptable for now (refine later).
+    private func routeToOnboardingForSend() {
+        showOnboardForSend = true
     }
 
     // ════════════════════════════════════════════════════════════════════
@@ -2439,6 +2457,17 @@ struct CompassView: View {
     /// SenderAnimationView owns the haptics and the style voice; the
     /// thought's own sound still plays here.
     private func sendThought(_ token: String) {
+        // [§C PART 2] REAL sends require a signed-in identity (insertMessage throws
+        // .notSignedIn without localUserID). Not signed-in → route to onboarding (reuse
+        // ComposeBackView, no new screen) — never a silent no-op. EXEMPT Demo Dan: the
+        // un-onboarded try-it sandbox is LOCAL-ONLY (the demo branch below writes no DB)
+        // and MUST stay open. Returns BEFORE appState.transition/animation, so a blocked
+        // send can't half-fire; a signed-in user falls straight through unchanged.
+        if SupabaseService.localUserID == nil && !isDemoSelected {
+            CompassView.log.info("send: blocked — not signed in → onboarding (§C view-only)")
+            routeToOnboardingForSend()
+            return
+        }
         // One state at a time — a catch in progress owns the screen
         guard appState.transition(to: .sending) else {
             // The gesture succeeded but the screen is owned (catch mode) —
