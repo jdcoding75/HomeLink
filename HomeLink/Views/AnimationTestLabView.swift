@@ -37,6 +37,7 @@ struct AnimationTestLabView: View {
     // (the bucket is gated OFF in the live app via showBucket/interactiveCatch defaults).
     struct CatchDemo: Identifiable { let style: SenderStyle; var id: String { style.rawValue } }
     @State private var catchDemo: CatchDemo?
+    @State private var showDirectionalCatch = false   // [directional-catch concept] Lab-only prototype
 
     private static let lavender = Color(hex: "#c4a8d4")
     private static let gold     = Color(hex: "#e0a85a")
@@ -73,6 +74,9 @@ struct AnimationTestLabView: View {
         .preferredColorScheme(.dark)
         .fullScreenCover(item: $run) { playerOverlay($0) }
         .fullScreenCover(item: $catchDemo) { catchPlayer($0.style) }   // [catch-bucket-removed-2026-06]
+        .fullScreenCover(isPresented: $showDirectionalCatch) {        // [directional-catch concept] Lab-only prototype
+            DirectionalCatchReceiptLab(onFinished: { showDirectionalCatch = false })
+        }
     }
 
     // ── Interactive Catch Receipts — the retired bucket animations, preserved ──
@@ -108,6 +112,25 @@ struct AnimationTestLabView: View {
                     .buttonStyle(.plain)
                 }
             }
+
+            // [directional-catch concept] NEW prototype — the directional INVERSE of the send
+            // mechanic (recipient turns to receive). Self-contained Lab file; touches nothing live.
+            Button { showDirectionalCatch = true } label: {
+                HStack(spacing: 6) {
+                    Text("🧭").font(.system(size: 16))
+                    Text("Directional Catch (concept)")
+                        .font(.system(size: 13, weight: .medium, design: .serif))
+                        .foregroundColor(DesignTokens.Color.textPrimary)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 12)
+                .background(DesignTokens.Color.backgroundCard)
+                .cornerRadius(DesignTokens.Radius.card)
+                .overlay(RoundedRectangle(cornerRadius: DesignTokens.Radius.card)
+                    .stroke(Self.lavender.opacity(0.6), lineWidth: 1))
+            }
+            .buttonStyle(.plain)
+            .padding(.top, 2)
         }
     }
 
