@@ -189,7 +189,8 @@ struct ReceiptView: View {
             tagline: ping.tagline,
             fromName: ping.fromName,
             onRevealed: { revealHandoff() },
-            onFinished: onFinished
+            onFinished: onFinished,
+            showBucket: true   // [catch-bucket-restore 2026-06-26] bucket = landing target (not spin-catch)
         )
     }
 
@@ -203,7 +204,8 @@ struct ReceiptView: View {
             tagline: ping.tagline,
             fromName: ping.fromName,
             onRevealed: { revealHandoff() },
-            onFinished: onFinished
+            onFinished: onFinished,
+            showBucket: true   // [catch-bucket-restore 2026-06-26] bucket = landing target (not spin-catch)
         )
     }
 
@@ -217,7 +219,8 @@ struct ReceiptView: View {
             tagline: ping.tagline,
             fromName: ping.fromName,
             onRevealed: { revealHandoff() },
-            onFinished: onFinished
+            onFinished: onFinished,
+            showBucket: true   // [catch-bucket-restore 2026-06-26] bucket = landing target (not spin-catch)
         )
     }
 
@@ -287,7 +290,8 @@ struct ReceiptView: View {
             tagline: ping.tagline,
             fromName: ping.fromName,
             onRevealed: { revealHandoff() },
-            onFinished: onFinished
+            onFinished: onFinished,
+            showBucket: true   // [catch-bucket-restore 2026-06-26] bucket = landing target (not spin-catch)
         )
     }
 
@@ -304,7 +308,8 @@ struct ReceiptView: View {
             tagline: ping.tagline,
             fromName: ping.fromName,
             onRevealed: { revealHandoff() },
-            onFinished: onFinished
+            onFinished: onFinished,
+            showBucket: true   // [catch-bucket-restore 2026-06-26] bucket = landing target (not spin-catch)
         )
     }
 
