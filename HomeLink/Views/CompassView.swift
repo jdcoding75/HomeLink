@@ -313,6 +313,8 @@ struct CompassView: View {
                     if compass.rawBearingToTarget != nil {
                         distanceLine
                             .padding(.top, 6)
+                        degreeReadout              // [§B3] absolute-bearing readout (same nil-gate as distance)
+                            .padding(.top, 3)
                     }
 
                     Spacer(minLength: 12)
@@ -1590,6 +1592,16 @@ struct CompassView: View {
     // ── BOTTOM ZONE ───────────────────────────────────────────────────────
 
     /// The mode line 1 cycles through: standard → funny (Pro) → light speed.
+    /// [§B3] TOP ZONE — "{name} is at {N}°": the ABSOLUTE bearing to the person
+    /// (`compass.rawBearingToTarget`), raw 0–360 integer, no cardinal word. Only rendered inside the
+    /// `rawBearingToTarget != nil` gate (hidden for seeded / Demo-Dan / no-GPS, like the distance).
+    private var degreeReadout: some View {
+        Text("\(compass.state.personName) is at \(Int((compass.rawBearingToTarget ?? 0).rounded()))°")
+            .font(.system(size: 14, design: .serif).italic())
+            .foregroundColor(DesignTokens.Color.textMuted)
+            .monospacedDigit()
+    }
+
     private var distanceLineText: String {
         switch distanceMode {
         case 1:  return DistanceFun.funnyText(km: compass.state.distanceKm, index: funnyIndex)
