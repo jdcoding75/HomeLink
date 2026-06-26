@@ -49,6 +49,7 @@ struct CompassView: View {
     // a fire requires a deliberate turn-away-past-30°-then-re-aim. Normal first use re-arms instantly (you start
     // pointed away from the person and turn ONTO them).
     @State private var compassArmed = false
+    @State private var showReArmPrompt = false   // [re-arm-overlay 2026-06] compass post-send tap-to-re-arm card
     // [compass-grace] Set when the compass becomes active (app open / screen appear / person change). The
     // holdTick suppresses ALL firing for `compassGrace` seconds after it, so the startup heading settle
     // (currentHeading 0 → actual sweeps past 30° then aligns) can't auto-send on open. Device-tunable.
@@ -1252,7 +1253,10 @@ struct CompassView: View {
             // makes it fire ONCE per aim (no rapid-fire) AND enables repeat sends.
             if !compassArmed {
                 if holdProgress > 0 { holdProgress = 0 }
-                if sendAlignDiff >= compassReArmThreshold { compassArmed = true }
+                // [re-arm-overlay 2026-06] After a SEND the compass waits for a deliberate TAP on the
+                // re-arm card (showReArmPrompt) — NOT a turn-away — so walking can't auto-re-arm/repeat-fire.
+                // Before the first send (no card) the original turn-away arm still applies (no auto-fire on open).
+                if !showReArmPrompt && sendAlignDiff >= compassReArmThreshold { compassArmed = true }
                 return
             }
             // SOFT LOCK — the hold STARTS within 15°, then tolerates drift up to 30° (aim hysteresis) so a
@@ -2177,6 +2181,7 @@ struct CompassView: View {
         // Cut any in-flight hold/load progress so nothing fires after a cancel.
         holdProgress = 0
         compassArmed = false                     // [hands-free] cancel → disarmed (no surprise re-fire on a sitting-aligned phone; re-arm via turn-away)
+        showReArmPrompt = false                  // [re-arm-overlay 2026-06] clear any stale re-arm card
         loadFlightToken = nil
         loadFlightProgress = 0
         messageFocused = false                   // [5/7] close the message editor
@@ -2496,6 +2501,12 @@ struct CompassView: View {
             }
         }
         appState.transition(to: .idle)
+        // [re-arm-overlay 2026-06] Compass post-send: stay DISARMED + raise the deliberate-tap re-arm card
+        // (kills auto-re-arm-while-walking). Compass instrument ONLY; skip Demo Dan (test sends need no re-arm).
+        // Subtle 0.3s fade-in after the flight; the tap re-arms + snaps it away (see compassFace).
+        if instrumentStore.selected == .compass && !isDemoSelected {
+            withAnimation(.easeIn(duration: 0.3)) { showReArmPrompt = true }
+        }
         // [firework/birthday freeze fix] FireworkCompassFace + BirthdayCakeCompassFaceV2
         // hold one-way @State (`sent = true` after firing) and never self-reset. As
         // SELECTED instruments their face instance PERSISTS across sends → frozen after
@@ -2773,6 +2784,29 @@ struct CompassView: View {
                 .frame(width: 10, height: 10)
                 .shadow(color: pivotGlow, radius: 4)
                 .zIndex(4)
+
+            // [re-arm-overlay 2026-06] Post-send re-arm card — calm, centered over the face. The compass
+            // stays DISARMED (no angle auto-re-arm) until this deliberate tap. Tap = re-arm + snap away
+            // (no dismiss animation). Fades in (0.3s) via the withAnimation in finishSend. Compass-only,
+            // non-demo (only finishSend raises it for the compass).
+            if showReArmPrompt {
+                Text("Tap to send again ✦")
+                    .font(.system(size: 18, design: .serif).italic())
+                    .foregroundColor(DesignTokens.Color.accentSoft)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 22).padding(.vertical, 16)
+                    .background(DesignTokens.Color.backgroundCard)
+                    .cornerRadius(DesignTokens.Radius.card)
+                    .overlay(RoundedRectangle(cornerRadius: DesignTokens.Radius.card)
+                        .stroke(DesignTokens.Color.border, lineWidth: 1))
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        compassArmed = true          // re-arm ON the deliberate tap (the only re-arm path now)
+                        showReArmPrompt = false      // snap away — compass is live again (no dismiss anim)
+                    }
+                    .transition(.opacity)
+                    .zIndex(5)
+            }
         }
     }
 
@@ -3154,6 +3188,7 @@ struct CompassView: View {
     private func handlePersonChange() {
         compassReadyAt = .now   // [compass-grace] new aim context → restart the no-auto-fire window
         compassArmed = false    // and disarm, so switching to a person you're already pointed at can't fire
+        showReArmPrompt = false // [re-arm-overlay 2026-06] clear any stale re-arm card on person switch
         // Re-trigger tagline fade-out → fade-in
         withAnimation {
             taglineKey = UUID()
