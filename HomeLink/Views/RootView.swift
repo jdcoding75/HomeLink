@@ -123,6 +123,10 @@ struct RootView: View {
         // }
         .onAppear {
             people.configure(with: modelContext)
+            // [demo-seed-once · migration (b)] BEFORE this session's onboarding completes — an existing
+            // install (onboarded or has contacts AT LAUNCH) is marked already-seeded so a prior deleter
+            // isn't re-served Demo Dan. A fresh installer is not yet onboarded here → seeds normally.
+            people.migrateDemoSeedFlagIfNeeded(onboarded: hasCompletedOnboarding)
             #if DEBUG
             applySkipOnboardingIfNeeded()
             maybeDebugOpenMessage()   // -openMessageID <uuid> → drive the real /m flow
@@ -167,6 +171,11 @@ struct RootView: View {
             //         connectPromptShown = true
             //     }
             // }
+        }
+        // [demo-seed-once] The link-arrival path flips `enteredViaLink` (NOT hasCompletedOnboarding) →
+        // run the SAME seed so Demo Dan appears for link-arrivers too (no link-arrival special case).
+        .onChange(of: enteredViaLink) { _, via in
+            if via { ensureDemoPersonIfAppropriate() }
         }
         // [build8] post-onboarding connect-prompt sheet stripped (pairing-era).
         // .sheet(isPresented: $showConnectPrompt) {
@@ -387,7 +396,9 @@ struct RootView: View {
         #if DEBUG
         if DevTools.wantsSkipOnboarding { return }
         #endif
-        guard hasCompletedOnboarding else { return }
+        // [demo-seed-once] Fire once the user is IN the app on EITHER path — direct (onboarded) OR
+        // link-arrival (enteredViaLink). Same predicate RootView routes MainTabView on (:69). No fork.
+        guard hasCompletedOnboarding || enteredViaLink else { return }
         people.ensureDemoPersonIfNeeded()
     }
 

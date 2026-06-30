@@ -153,16 +153,43 @@ final class PeopleManager: ObservableObject {
         people.count == 1 && DemoPerson.isDemo(people[0])
     }
 
-    /// Create the friendly demo person (Alex) when there's no one to point
-    /// toward yet, so the compass feels alive from first launch. Idempotent —
-    /// no-op when any person already exists. [5/6]
+    // [demo-seed-once] Persisted "Demo Dan was seeded once on this install" flag — replaces the old
+    // `people.isEmpty` guard so the seed (a) fires on BOTH paths even when pairing/link-arrival already
+    // made a real contact, and (b) NEVER re-seeds after the user deletes him.
+    private static let demoSeededKey = "hasSeededDemoDan"
+
+    /// [demo-seed-once · migration (b)] One-time at the first launch of this version: an EXISTING install
+    /// (already onboarded, or already has contacts) gets `hasSeededDemoDan` pre-set so a prior DELETER is
+    /// not re-served Demo Dan on upgrade. A FRESH install (not onboarded AND no people, checked BEFORE this
+    /// session's onboarding completes) leaves the flag false → `ensureDemoPersonIfNeeded` seeds normally.
+    /// Runs exactly once (own `didMigrateDemoSeedFlag` marker).
+    func migrateDemoSeedFlagIfNeeded(onboarded: Bool) {
+        let migratedKey = "didMigrateDemoSeedFlag"
+        guard !UserDefaults.standard.bool(forKey: migratedKey) else { return }
+        UserDefaults.standard.set(true, forKey: migratedKey)
+        if onboarded || !people.isEmpty {
+            UserDefaults.standard.set(true, forKey: Self.demoSeededKey)
+        }
+    }
+
+    /// Create the friendly demo person (Alex) ONCE per fresh install — on BOTH paths (direct + link-
+    /// arrival), gated on a persisted flag, never re-seeding after the user deletes him. [demo-seed-once]
     func ensureDemoPersonIfNeeded() {
-        guard modelContext != nil, people.isEmpty else { return }
+        guard modelContext != nil else { return }
+        // [demo-seed-once] Seed EXACTLY ONCE per install (persisted) — regardless of whether a real
+        // contact already exists; never re-seeds after a delete. (Was `guard people.isEmpty`.)
+        guard !UserDefaults.standard.bool(forKey: Self.demoSeededKey) else { return }
+        // Duplicate guard: a prior version may already have him (Person.id is NOT @unique → a 2nd insert
+        // would DUPLICATE Demo Dan). If he's already present, just record the flag and stop.
+        if demoPerson != nil { UserDefaults.standard.set(true, forKey: Self.demoSeededKey); return }
         let alex = DemoPerson.make()
         modelContext?.insert(alex)
         try? modelContext?.save()
+        UserDefaults.standard.set(true, forKey: Self.demoSeededKey)   // durable — survives a later delete
         fetchAll()
-        selectedPerson = alex
+        // [demo-seed-once] Don't steal an existing selection (e.g. the link-arrival inviter) — only
+        // default-select Demo Dan when nothing else is selected (direct install, the sole contact).
+        if selectedPerson == nil { selectedPerson = alex }
     }
 
     /// Remove the demo person once a real card exists. [keep-demo] RETIRED as an
