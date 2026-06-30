@@ -190,16 +190,16 @@ struct RootView: View {
                 startRealtimePings()
                 syncConnections()   // [phase2 stage B] drain (S2) + stamp on foreground
                 compass.resumeFromForeground()   // battery: sensors back on [5/8]
-                // The badge counts unread thoughts server-side; opening the
-                // app is the moment to clear it.
-                // [unread-badge fix · Option A] Drive the SERVER count to 0 too —
-                // otherwise the next push re-inflates the badge to the (ever-growing)
-                // unopened-pings count. Mark all my unopened pings opened on
-                // foreground ("seen/acknowledged on open"), then clear the local
-                // badge. Only when signed in. Fire-and-forget.
-                if SupabaseService.localUserID != nil {
-                    Task { await SupabaseService.shared.markAllMyPingsOpened() }
-                }
+                // [live-arrival-fix] Clear the LOCAL app-icon badge only — do NOT mark individual
+                // unplayed thoughts opened. opened_at is set solely by the play/reveal path (markOpened),
+                // so a queued-but-unplayed thought is no longer stamped opened and STAYS in
+                // syncMissedThoughts' offline replay (fixes the vanish). The badge reflects the true
+                // unopened count and decrements as the user plays each. PRIOR (preserved — the over-stamp
+                // band-aid that existed only because thoughts never played):
+                //   // [unread-badge fix · Option A] Drive the SERVER count to 0 too …
+                //   if SupabaseService.localUserID != nil {
+                //       Task { await SupabaseService.shared.markAllMyPingsOpened() }
+                //   }
                 UNUserNotificationCenter.current().setBadgeCount(0)
                 // Replay a device token that arrived signed-out or failed
                 // to upload — keeps push delivery alive across sign-ins.
@@ -664,27 +664,10 @@ struct MainTabView: View {
             // dismiss+queue-advance = finishedPlaying + appState.idle (onFinished); catch-mode
             // + aim-at-sender (.onAppear, fires at cover-appear exactly as today). beatFloor 1.6
             // (no fetch). ORIGINAL bare ReceiptView cover preserved in #if false below.
-            ArrivalSequenceView(
-                arrival:    Arrival(ping: playing,
-                                    senderBearing: compass.rawBearingToTarget ?? 120),
-                beatFloor:  1.6,
-                earlyName:  playing.fromName,
-                onOpened:   { pings.markOpened(playing) },
-                onFinished: {
-                    pings.finishedPlaying(playing)
-                    appState.transition(to: .idle)
-                }
-            )
-            .onAppear {
-                appState.transition(to: .catchMode)
-                // Swing the needle to the sender so the alignment is real (the RECEIPT reads
-                // compass.rawBearingToTarget after this; unchanged).
-                if let sender = people.people.first(where: { $0.name == playing.fromName }),
-                   people.selectedPerson?.id != sender.id {
-                    people.select(sender)
-                    compass.start(tracking: sender)
-                }
-            }
+            // [live-arrival-fix] Forward-only: the full arrival plays, then RESTS with
+            // (Next if more queued, else Done) + Delete. markOpened/finishedPlaying/playNext +
+            // the catch-mode/aim-at-sender policy all live in LiveArrivalView now.
+            LiveArrivalView(playing: playing)
             #if false  // [arrival-parity stage3] ORIGINAL bare PATH-1 cover — preserved:
             ReceiptView(
                 ping: playing,

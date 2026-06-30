@@ -567,7 +567,10 @@ final class PingManager: ObservableObject {
             } else if isTest, let idx = queue.firstIndex(where: { $0.id == ping.id }) {
                 // DEV test thought jumps straight to the front of an idle screen.
                 nowPlaying = queue.remove(at: idx)
-            } else if queue.count == 1 {
+            } else {
+                // [live-arrival-fix] Start the FIRST thought whenever the screen is idle (nowPlaying == nil),
+                // not only when it's the LONE queued item. A burst queues behind it; the user advances with
+                // Next. While a thought rests, nowPlaying stays non-nil → new arrivals just queue.
                 playNext()
             }
         }
